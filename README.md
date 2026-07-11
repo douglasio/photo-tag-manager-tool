@@ -7,6 +7,19 @@ thumbnails, and displays everything in a fast, virtualized gallery.
 
 Built with Electron, React, and TypeScript.
 
+## Download
+
+[![Latest release](https://img.shields.io/github/v/release/douglasio/photo-tag-manager-tool?label=latest%20release)](https://github.com/douglasio/photo-tag-manager-tool/releases/latest)
+
+Prebuilt installers for macOS, Windows, and Linux are attached to each
+[release](https://github.com/douglasio/photo-tag-manager-tool/releases/latest) —
+no need to build from source. Grab the one for your platform:
+
+- **macOS** — `.dmg` (unsigned; right-click → Open the first time to bypass
+  Gatekeeper, since there's no Apple Developer certificate yet)
+- **Windows** — `.exe` installer
+- **Linux** — `.AppImage`, `.deb`, or Snap
+
 ## Features
 
 - Recursive folder scan for `.jpg` / `.jpeg` / `.png` / `.tif` / `.tiff`
