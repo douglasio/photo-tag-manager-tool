@@ -40,3 +40,4 @@ publish:
   provider: github
   owner: douglasio
   repo: photo-tag-manager-tool
+  draft: false
