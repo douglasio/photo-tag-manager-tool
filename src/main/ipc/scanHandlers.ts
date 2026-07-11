@@ -6,6 +6,7 @@ import { scanDirectory } from '../services/directoryScanner'
 import { readPhotoRecord } from '../services/metadataService'
 import { generateThumbnail, thumbnailKeyFor, deleteThumbnail } from '../services/thumbnailService'
 import { findByPath, upsertPhoto, updateThumbnail, pruneMissing } from '../db/photoRepository'
+import { setSetting } from '../db/settingsRepository'
 import type {
   MetadataBatchEvent,
   PhotoRecord,
@@ -35,6 +36,7 @@ export function registerScanHandlers(): void {
     const scanId = randomUUID()
     const state: ScanState = { cancelled: false }
     activeScans.set(scanId, state)
+    setSetting('lastFolder', rootPath)
 
     runScan(scanId, rootPath, event.sender, state)
       .catch((err) => console.error(`scan ${scanId} failed`, err))
@@ -90,7 +92,19 @@ async function runScan(
   sender: WebContents,
   state: ScanState
 ): Promise<void> {
-  const filePaths = await scanDirectory(rootPath)
+  let filePaths: string[]
+  try {
+    filePaths = await scanDirectory(rootPath)
+  } catch (err) {
+    const completeEvent: ScanCompleteEvent = {
+      scanId,
+      totalScanned: 0,
+      cacheHits: 0,
+      errors: [{ filePath: rootPath, message: err instanceof Error ? err.message : String(err) }]
+    }
+    sender.send('scan:complete', completeEvent)
+    return
+  }
   if (state.cancelled) return
 
   const progressEvent: ScanProgressEvent = { scanId, filesFound: filePaths.length }

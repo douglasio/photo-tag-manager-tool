@@ -48,14 +48,23 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [])
 
-  const pickFolderAndScan = useCallback(async () => {
-    const rootPath = await window.api.selectFolder()
-    if (!rootPath) return
-
+  const startScanFor = useCallback(async (rootPath: string) => {
     const { scanId } = await window.api.startScan(rootPath)
     scanIdRef.current = scanId
     dispatch({ type: 'SCAN_STARTED', rootPath, scanId })
   }, [])
+
+  useEffect(() => {
+    window.api.getLastFolder().then((rootPath) => {
+      if (rootPath) void startScanFor(rootPath)
+    })
+  }, [startScanFor])
+
+  const pickFolderAndScan = useCallback(async () => {
+    const rootPath = await window.api.selectFolder()
+    if (!rootPath) return
+    await startScanFor(rootPath)
+  }, [startScanFor])
 
   const cancelScan = useCallback(async () => {
     if (!scanIdRef.current) return

@@ -15,6 +15,7 @@ function subscribe<T>(channel: string, callback: (payload: T) => void): () => vo
 
 const api = {
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectFolder'),
+  getLastFolder: (): Promise<string | null> => ipcRenderer.invoke('settings:getLastFolder'),
   startScan: (rootPath: string): Promise<ScanStartResult> =>
     ipcRenderer.invoke('scan:start', rootPath),
   cancelScan: (scanId: string): Promise<void> => ipcRenderer.invoke('scan:cancel', scanId),

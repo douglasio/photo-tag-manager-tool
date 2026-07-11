@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
+import { registerSettingsHandlers } from './ipc/settingsHandlers'
 import {
   registerThumbProtocolHandler,
   registerThumbProtocolScheme
@@ -67,6 +68,7 @@ if (!app.requestSingleInstanceLock()) {
     registerFileProtocolHandler()
     registerDialogHandlers()
     registerScanHandlers()
+    registerSettingsHandlers()
 
     createWindow()
 
