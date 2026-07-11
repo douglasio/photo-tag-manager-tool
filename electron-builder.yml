@@ -36,3 +36,7 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
+publish:
+  provider: github
+  owner: douglasio
+  repo: photo-tag-manager-tool
