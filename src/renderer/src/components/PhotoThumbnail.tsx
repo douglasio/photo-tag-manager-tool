@@ -27,12 +27,12 @@ export function PhotoThumbnail({ photo, selected, onSelect }: PhotoThumbnailProp
         />
       ) : (
         <Center className="photo-thumbnail__placeholder">
-          <Text c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'} size="lg">
+          <Text c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}>
             {photo.thumbnailStatus === 'error' ? '⚠︎' : '…'}
           </Text>
         </Center>
       )}
-      <Text size="xs" c="dimmed" truncate="end" ta="center" w="100%">
+      <Text c="dimmed" truncate="end" ta="center" w="100%">
         {photo.fileName}
       </Text>
     </UnstyledButton>

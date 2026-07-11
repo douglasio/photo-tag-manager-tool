@@ -18,10 +18,10 @@ function formatBytes(bytes: number): string {
 function DetailRow({ label, value }: { label: string; value: string }): ReactElement {
   return (
     <Group justify="space-between" wrap="nowrap" gap="md" align="flex-start">
-      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+      <Text c="dimmed" style={{ flexShrink: 0 }}>
         {label}
       </Text>
-      <Text size="xs" ta="right" style={{ wordBreak: 'break-word' }}>
+      <Text ta="right" style={{ wordBreak: 'break-word' }}>
         {value}
       </Text>
     </Group>
@@ -50,14 +50,14 @@ export function DetailPanel(): ReactElement {
       </Title>
 
       <Stack gap="xs">
-        <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+        <Text fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
           Tags
         </Text>
         <TagList tags={selectedPhoto.tags} />
       </Stack>
 
       <Stack gap="xs">
-        <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+        <Text fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
           Metadata
         </Text>
         <Stack gap={6}>
@@ -77,7 +77,7 @@ export function DetailPanel(): ReactElement {
           <DetailRow label="File size" value={formatBytes(metadata.fileSizeBytes)} />
           <DetailRow label="Format" value={metadata.format} />
         </Stack>
-        <Text size="xs" c="dimmed" style={{ wordBreak: 'break-word' }}>
+        <Text c="dimmed" style={{ wordBreak: 'break-word' }}>
           {selectedPhoto.filePath}
         </Text>
       </Stack>

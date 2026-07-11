@@ -39,7 +39,7 @@ function PhotoCell({
 }
 
 export function GalleryGrid(): ReactElement {
-  const { photos, state, selectPhoto } = usePhotoLibrary()
+  const { visiblePhotos: photos, state, selectPhoto } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
 
@@ -63,7 +63,7 @@ export function GalleryGrid(): ReactElement {
         <Center h="100%">
           {state.status === 'scanning' ? (
             <Group gap="xs">
-              <Loader size="sm" />
+              <Loader />
               <Text c="dimmed">Scanning for photos…</Text>
             </Group>
           ) : (

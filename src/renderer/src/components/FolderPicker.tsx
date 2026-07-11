@@ -8,7 +8,6 @@ export function FolderPicker(): ReactElement {
   return (
     <Group gap="sm" wrap="nowrap">
       <Button
-        size="xs"
         onClick={() => void pickFolderAndScan()}
         disabled={state.status === 'scanning'}
         loading={state.status === 'scanning'}
@@ -16,7 +15,7 @@ export function FolderPicker(): ReactElement {
         Select Folder…
       </Button>
       {state.rootPath && (
-        <Text size="xs" c="dimmed" truncate="end" maw={320}>
+        <Text c="dimmed" truncate="end" maw={320}>
           {state.rootPath}
         </Text>
       )}

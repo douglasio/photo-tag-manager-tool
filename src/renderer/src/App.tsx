@@ -4,6 +4,7 @@ import { FolderPicker } from './components/FolderPicker'
 import { ScanProgressBar } from './components/ScanProgressBar'
 import { GalleryGrid } from './components/GalleryGrid'
 import { DetailPanel } from './components/DetailPanel'
+import { FolderTree } from './components/FolderTree'
 
 const HEADER_HEIGHT = 52
 
@@ -12,6 +13,7 @@ function App(): React.JSX.Element {
     <PhotoLibraryProvider>
       <AppShell
         header={{ height: HEADER_HEIGHT }}
+        navbar={{ width: 260, breakpoint: 0 }}
         aside={{ width: 320, breakpoint: 0 }}
         padding={0}
       >
@@ -26,6 +28,9 @@ function App(): React.JSX.Element {
             <ScanProgressBar />
           </Group>
         </AppShell.Header>
+        <AppShell.Navbar p="md" style={{ overflowY: 'auto' }}>
+          <FolderTree />
+        </AppShell.Navbar>
         <AppShell.Main>
           <Box style={{ height: `calc(100dvh - ${HEADER_HEIGHT}px)`, display: 'flex' }}>
             <GalleryGrid />

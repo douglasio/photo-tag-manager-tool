@@ -41,21 +41,19 @@ export function ScanProgressBar(): ReactElement | null {
                       </Text>
                     }
                   />
-                  <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                  <Text c="dimmed" style={{ whiteSpace: 'nowrap' }}>
                     {processed} / {total || '…'} found
                   </Text>
                 </>
               )}
               {state.status === 'complete' && (
-                <Text size="xs" c="dimmed">
+                <Text c="dimmed">
                   Done — {total} photos ({state.cacheHits} from cache)
                   {state.errors.length > 0 && `, ${state.errors.length} error(s)`}
                 </Text>
               )}
               {state.status === 'canceled' && (
-                <Text size="xs" c="dimmed">
-                  Scan canceled ({processed} loaded)
-                </Text>
+                <Text c="dimmed">Scan canceled ({processed} loaded)</Text>
               )}
             </Group>
           </UnstyledButton>
@@ -65,7 +63,7 @@ export function ScanProgressBar(): ReactElement | null {
         </Popover.Dropdown>
       </Popover>
       {state.status === 'scanning' && (
-        <Button size="xs" variant="subtle" color="red" onClick={() => void cancelScan()}>
+        <Button variant="subtle" color="red" onClick={() => void cancelScan()}>
           Cancel
         </Button>
       )}

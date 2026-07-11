@@ -10,15 +10,18 @@ import {
   type ReactNode
 } from 'react'
 import { initialState, photoLibraryReducer, type PhotoLibraryState } from './photoLibraryReducer'
+import { isPhotoInFolder } from '../utils/folderTree'
 import type { PhotoRecord } from '../../../shared/types'
 
 interface PhotoLibraryContextValue {
   state: PhotoLibraryState
   photos: PhotoRecord[]
+  visiblePhotos: PhotoRecord[]
   selectedPhoto: PhotoRecord | null
   pickFolderAndScan: () => Promise<void>
   cancelScan: () => Promise<void>
   selectPhoto: (path: string | null) => void
+  setFolderFilter: (folder: string | null) => void
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -76,11 +79,20 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SELECT_PHOTO', path })
   }, [])
 
+  const setFolderFilter = useCallback((folder: string | null) => {
+    dispatch({ type: 'SET_FOLDER_FILTER', folder })
+  }, [])
+
   const photos = useMemo(
     () =>
       Array.from(state.photosByPath.values()).sort((a, b) => a.fileName.localeCompare(b.fileName)),
     [state.photosByPath]
   )
+
+  const visiblePhotos = useMemo(() => {
+    if (!state.selectedFolder) return photos
+    return photos.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
+  }, [photos, state.selectedFolder])
 
   const selectedPhoto = useMemo(
     () => (state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null),
@@ -90,10 +102,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const value: PhotoLibraryContextValue = {
     state,
     photos,
+    visiblePhotos,
     selectedPhoto,
     pickFolderAndScan,
     cancelScan,
-    selectPhoto
+    selectPhoto,
+    setFolderFilter
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

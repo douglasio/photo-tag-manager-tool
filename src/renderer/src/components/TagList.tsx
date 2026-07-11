@@ -7,11 +7,7 @@ interface TagListProps {
 
 export function TagList({ tags }: TagListProps): ReactElement {
   if (tags.length === 0) {
-    return (
-      <Text size="xs" c="dimmed">
-        No tags
-      </Text>
-    )
+    return <Text c="dimmed">No tags</Text>
   }
 
   return (

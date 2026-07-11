@@ -41,29 +41,25 @@ export function ScanLogContent(): ReactElement {
         {state.errors.map(({ filePath, message }) => (
           <Stack key={filePath} gap={0} miw={0}>
             <Group justify="space-between" wrap="nowrap" gap="md">
-              <Text size="sm" truncate="end" title={filePath} miw={0}>
+              <Text truncate="end" title={filePath} miw={0}>
                 {filePath}
               </Text>
               <StatusBadge status="error" />
             </Group>
-            <Text size="xs" c="red" truncate="end">
+            <Text c="red" truncate="end">
               {message}
             </Text>
           </Stack>
         ))}
         {photos.map((photo) => (
           <Group key={photo.filePath} justify="space-between" wrap="nowrap" gap="md">
-            <Text size="sm" truncate="end" title={photo.filePath} miw={0}>
+            <Text truncate="end" title={photo.filePath} miw={0}>
               {photo.fileName}
             </Text>
             <StatusBadge status={photo.thumbnailStatus} />
           </Group>
         ))}
-        {!hasEntries && (
-          <Text c="dimmed" size="sm">
-            No scan activity yet.
-          </Text>
-        )}
+        {!hasEntries && <Text c="dimmed">No scan activity yet.</Text>}
       </Stack>
     </ScrollArea.Autosize>
   )
