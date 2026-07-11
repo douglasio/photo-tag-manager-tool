@@ -6,6 +6,9 @@
   "author": "douglasio",
   "license": "MIT",
   "homepage": "https://github.com/douglasio/photo-tag-manager-tool",
+  "engines": {
+    "node": ">=20 <26"
+  },
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
