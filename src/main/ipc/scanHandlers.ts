@@ -62,7 +62,7 @@ async function processFile(
   let fromCache = false
 
   if (cached && cached.mtimeMs === fileStat.mtimeMs && cached.sizeBytes === fileStat.size) {
-    photo = cached.record
+    photo = { ...cached.record, fromCache: true }
     fromCache = true
   } else {
     photo = await readPhotoRecord(filePath)

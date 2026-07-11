@@ -1,4 +1,5 @@
-import { Center, Image, Text, UnstyledButton } from '@mantine/core'
+import { Center, Image, UnstyledButton, Text, useMantineTheme } from '@mantine/core'
+import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 import type { PhotoRecord } from '../../../shared/types'
 import { toThumbProtocolUrl } from '../../../shared/protocolUrls'
@@ -10,6 +11,8 @@ interface PhotoThumbnailProps {
 }
 
 export function PhotoThumbnail({ photo, selected, onSelect }: PhotoThumbnailProps): ReactElement {
+  const theme = useMantineTheme()
+
   return (
     <UnstyledButton
       onClick={() => onSelect(photo.filePath)}
@@ -26,10 +29,15 @@ export function PhotoThumbnail({ photo, selected, onSelect }: PhotoThumbnailProp
           style={{ aspectRatio: 1, width: '100%' }}
         />
       ) : (
-        <Center className="photo-thumbnail__placeholder">
-          <Text c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}>
-            {photo.thumbnailStatus === 'error' ? '⚠︎' : '…'}
-          </Text>
+        <Center
+          className="photo-thumbnail__placeholder"
+          c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}
+        >
+          {photo.thumbnailStatus === 'error' ? (
+            <IconAlertTriangle size={theme.spacing.xl} />
+          ) : (
+            <IconPhoto size={theme.spacing.xl} />
+          )}
         </Center>
       )}
       <Text c="dimmed" truncate="end" ta="center" w="100%">

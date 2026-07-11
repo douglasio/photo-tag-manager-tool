@@ -1,4 +1,14 @@
-import { Badge, Group, Text, Tree, useTree, type TreeNodeData } from '@mantine/core'
+import {
+  Badge,
+  Box,
+  Group,
+  Text,
+  Tree,
+  useMantineTheme,
+  useTree,
+  type TreeNodeData
+} from '@mantine/core'
+import { IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { useMemo, type ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { foldersToTreeData } from '../utils/folderTree'
@@ -16,6 +26,7 @@ function FolderTreeInner({
   folderChildren,
   setFolderFilter
 }: FolderTreeInnerProps): ReactElement {
+  const theme = useMantineTheme()
   const treeData = useMemo<TreeNodeData[]>(
     () => [foldersToTreeData(rootPath, folderCounts, folderChildren)],
     [rootPath, folderCounts, folderChildren]
@@ -46,9 +57,18 @@ function FolderTreeInner({
             wrap="nowrap"
             p={4}
           >
-            <Text size="lg" c="dimmed" w={12} ta="center" style={{ flexShrink: 0 }}>
-              {hasChildren ? (expanded ? '▾' : '▸') : ''}
-            </Text>
+            <Box
+              w="var(--mantine-spacing-sm)"
+              c="dimmed"
+              style={{ flexShrink: 0, display: 'flex' }}
+            >
+              {hasChildren &&
+                (expanded ? (
+                  <IconChevronDown size={theme.spacing.sm} />
+                ) : (
+                  <IconChevronRight size={theme.spacing.sm} />
+                ))}
+            </Box>
             <Text truncate="end" miw={0} style={{ flex: 1 }}>
               {node.label}
             </Text>
