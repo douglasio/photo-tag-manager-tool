@@ -1,3 +1,4 @@
+import { Box, Center, Group, Loader, Text } from '@mantine/core'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
@@ -27,13 +28,13 @@ function PhotoCell({
   const photo = photos[index]
   if (!photo) return <div style={style} />
   return (
-    <div style={style} className="gallery-cell">
+    <Box style={{ ...style, padding: 6 }}>
       <PhotoThumbnail
         photo={photo}
         selected={photo.filePath === selectedPath}
         onSelect={onSelect}
       />
-    </div>
+    </Box>
   )
 }
 
@@ -58,16 +59,21 @@ export function GalleryGrid(): ReactElement {
 
   if (photos.length === 0) {
     return (
-      <div ref={containerRef} className="gallery-grid-container gallery-grid-container--empty">
-        {state.status === 'scanning'
-          ? 'Scanning for photos…'
-          : 'No photos yet. Select a folder to begin.'}
-      </div>
+      <Center ref={containerRef} style={{ flex: 1, minWidth: 0 }}>
+        {state.status === 'scanning' ? (
+          <Group gap="xs">
+            <Loader size="sm" />
+            <Text c="dimmed">Scanning for photos…</Text>
+          </Group>
+        ) : (
+          <Text c="dimmed">No photos yet. Select a folder to begin.</Text>
+        )}
+      </Center>
     )
   }
 
   return (
-    <div ref={containerRef} className="gallery-grid-container">
+    <Box ref={containerRef} style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
       <Grid<CellProps>
         cellComponent={PhotoCell}
         cellProps={{ photos, columnCount, selectedPath: state.selectedPath, onSelect: selectPhoto }}
@@ -78,6 +84,6 @@ export function GalleryGrid(): ReactElement {
         defaultWidth={size.width}
         defaultHeight={size.height}
       />
-    </div>
+    </Box>
   )
 }

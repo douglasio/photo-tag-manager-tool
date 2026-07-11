@@ -38,6 +38,8 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@mantine/core": "^9.4.1",
+    "@mantine/hooks": "^9.4.1",
     "better-sqlite3": "^12.11.1",
     "exiftool-vendored": "^36.0.0",
     "fdir": "^6.5.0",

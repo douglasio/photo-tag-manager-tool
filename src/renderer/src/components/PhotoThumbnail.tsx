@@ -1,3 +1,4 @@
+import { Center, Image, Text, UnstyledButton } from '@mantine/core'
 import type { ReactElement } from 'react'
 import type { PhotoRecord } from '../../../shared/types'
 import { toThumbProtocolUrl } from '../../../shared/protocolUrls'
@@ -10,20 +11,30 @@ interface PhotoThumbnailProps {
 
 export function PhotoThumbnail({ photo, selected, onSelect }: PhotoThumbnailProps): ReactElement {
   return (
-    <button
-      type="button"
-      className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}`}
+    <UnstyledButton
       onClick={() => onSelect(photo.filePath)}
       title={photo.fileName}
+      className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}`}
     >
       {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
-        <img src={toThumbProtocolUrl(photo.thumbnailKey)} alt={photo.fileName} loading="lazy" />
+        <Image
+          src={toThumbProtocolUrl(photo.thumbnailKey)}
+          alt={photo.fileName}
+          radius="sm"
+          fit="cover"
+          loading="lazy"
+          style={{ aspectRatio: 1, width: '100%' }}
+        />
       ) : (
-        <div className="photo-thumbnail__placeholder">
-          {photo.thumbnailStatus === 'error' ? '⚠︎' : '…'}
-        </div>
+        <Center className="photo-thumbnail__placeholder">
+          <Text c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'} size="lg">
+            {photo.thumbnailStatus === 'error' ? '⚠︎' : '…'}
+          </Text>
+        </Center>
       )}
-      <span className="photo-thumbnail__name">{photo.fileName}</span>
-    </button>
+      <Text size="xs" c="dimmed" truncate="end" ta="center" w="100%">
+        {photo.fileName}
+      </Text>
+    </UnstyledButton>
   )
 }

@@ -1,3 +1,4 @@
+import { Button, Group, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 
@@ -5,15 +6,20 @@ export function FolderPicker(): ReactElement {
   const { pickFolderAndScan, state } = usePhotoLibrary()
 
   return (
-    <div className="folder-picker">
-      <button
-        type="button"
+    <Group gap="sm" wrap="nowrap">
+      <Button
+        size="xs"
         onClick={() => void pickFolderAndScan()}
         disabled={state.status === 'scanning'}
+        loading={state.status === 'scanning'}
       >
         Select Folder…
-      </button>
-      {state.rootPath && <span className="folder-picker__path">{state.rootPath}</span>}
-    </div>
+      </Button>
+      {state.rootPath && (
+        <Text size="xs" c="dimmed" truncate="end" maw={320}>
+          {state.rootPath}
+        </Text>
+      )}
+    </Group>
   )
 }

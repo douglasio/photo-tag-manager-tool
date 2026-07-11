@@ -1,3 +1,4 @@
+import { Center, Group, Stack, Text, Title } from '@mantine/core'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { TagList } from './TagList'
@@ -14,45 +15,72 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${units[unitIndex]}`
 }
 
+function DetailRow({ label, value }: { label: string; value: string }): ReactElement {
+  return (
+    <Group justify="space-between" wrap="nowrap" gap="md" align="flex-start">
+      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+        {label}
+      </Text>
+      <Text size="xs" ta="right" style={{ wordBreak: 'break-word' }}>
+        {value}
+      </Text>
+    </Group>
+  )
+}
+
 export function DetailPanel(): ReactElement {
   const { selectedPhoto } = usePhotoLibrary()
 
   if (!selectedPhoto) {
-    return <div className="detail-panel detail-panel--empty">Select a photo to see its details</div>
+    return (
+      <Center h="100%">
+        <Text c="dimmed" ta="center">
+          Select a photo to see its details
+        </Text>
+      </Center>
+    )
   }
 
   const { metadata } = selectedPhoto
 
   return (
-    <div className="detail-panel">
-      <h2 className="detail-panel__title">{selectedPhoto.fileName}</h2>
+    <Stack gap="lg">
+      <Title order={2} size="h4" style={{ wordBreak: 'break-word' }}>
+        {selectedPhoto.fileName}
+      </Title>
 
-      <section>
-        <h3>Tags</h3>
+      <Stack gap="xs">
+        <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+          Tags
+        </Text>
         <TagList tags={selectedPhoto.tags} />
-      </section>
+      </Stack>
 
-      <section>
-        <h3>Metadata</h3>
-        <dl className="detail-panel__metadata">
-          <dt>Date taken</dt>
-          <dd>{metadata.dateTaken ?? '—'}</dd>
-          <dt>Camera</dt>
-          <dd>{[metadata.cameraMake, metadata.cameraModel].filter(Boolean).join(' ') || '—'}</dd>
-          <dt>Dimensions</dt>
-          <dd>
-            {metadata.widthPx && metadata.heightPx
-              ? `${metadata.widthPx} × ${metadata.heightPx}`
-              : '—'}
-          </dd>
-          <dt>File size</dt>
-          <dd>{formatBytes(metadata.fileSizeBytes)}</dd>
-          <dt>Format</dt>
-          <dd>{metadata.format}</dd>
-          <dt>Path</dt>
-          <dd className="detail-panel__path">{selectedPhoto.filePath}</dd>
-        </dl>
-      </section>
-    </div>
+      <Stack gap="xs">
+        <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+          Metadata
+        </Text>
+        <Stack gap={6}>
+          <DetailRow label="Date taken" value={metadata.dateTaken ?? '—'} />
+          <DetailRow
+            label="Camera"
+            value={[metadata.cameraMake, metadata.cameraModel].filter(Boolean).join(' ') || '—'}
+          />
+          <DetailRow
+            label="Dimensions"
+            value={
+              metadata.widthPx && metadata.heightPx
+                ? `${metadata.widthPx} × ${metadata.heightPx}`
+                : '—'
+            }
+          />
+          <DetailRow label="File size" value={formatBytes(metadata.fileSizeBytes)} />
+          <DetailRow label="Format" value={metadata.format} />
+        </Stack>
+        <Text size="xs" c="dimmed" style={{ wordBreak: 'break-word' }}>
+          {selectedPhoto.filePath}
+        </Text>
+      </Stack>
+    </Stack>
   )
 }
