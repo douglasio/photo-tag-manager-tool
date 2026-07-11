@@ -16,11 +16,13 @@ function App(): React.JSX.Element {
         padding={0}
       >
         <AppShell.Header>
-          <Group h="100%" px="md" gap="md" wrap="nowrap">
-            <Title order={1} size="h5" style={{ flexShrink: 0 }}>
-              Tag Me
-            </Title>
-            <FolderPicker />
+          <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+            <Group gap="md" wrap="nowrap">
+              <Title order={1} size="h5" style={{ flexShrink: 0 }}>
+                Tag Me
+              </Title>
+              <FolderPicker />
+            </Group>
             <ScanProgressBar />
           </Group>
         </AppShell.Header>

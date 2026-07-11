@@ -57,33 +57,36 @@ export function GalleryGrid(): ReactElement {
   const columnCount = Math.max(1, Math.floor(size.width / CELL_WIDTH))
   const rowCount = Math.ceil(photos.length / columnCount)
 
-  if (photos.length === 0) {
-    return (
-      <Center ref={containerRef} style={{ flex: 1, minWidth: 0 }}>
-        {state.status === 'scanning' ? (
-          <Group gap="xs">
-            <Loader size="sm" />
-            <Text c="dimmed">Scanning for photos…</Text>
-          </Group>
-        ) : (
-          <Text c="dimmed">No photos yet. Select a folder to begin.</Text>
-        )}
-      </Center>
-    )
-  }
-
   return (
     <Box ref={containerRef} style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-      <Grid<CellProps>
-        cellComponent={PhotoCell}
-        cellProps={{ photos, columnCount, selectedPath: state.selectedPath, onSelect: selectPhoto }}
-        columnCount={columnCount}
-        columnWidth={CELL_WIDTH}
-        rowCount={rowCount}
-        rowHeight={CELL_HEIGHT}
-        defaultWidth={size.width}
-        defaultHeight={size.height}
-      />
+      {photos.length === 0 ? (
+        <Center h="100%">
+          {state.status === 'scanning' ? (
+            <Group gap="xs">
+              <Loader size="sm" />
+              <Text c="dimmed">Scanning for photos…</Text>
+            </Group>
+          ) : (
+            <Text c="dimmed">No photos yet. Select a folder to begin.</Text>
+          )}
+        </Center>
+      ) : (
+        <Grid<CellProps>
+          cellComponent={PhotoCell}
+          cellProps={{
+            photos,
+            columnCount,
+            selectedPath: state.selectedPath,
+            onSelect: selectPhoto
+          }}
+          columnCount={columnCount}
+          columnWidth={CELL_WIDTH}
+          rowCount={rowCount}
+          rowHeight={CELL_HEIGHT}
+          defaultWidth={size.width}
+          defaultHeight={size.height}
+        />
+      )}
     </Box>
   )
 }
