@@ -1,6 +1,9 @@
 # Tag Me
 
-A folder-based photo organizer for reading and browsing photo metadata tags.
+A photo organizer for reading and browsing photo metadata tags. Details about your photos stay where they belong - on the photo files themselves, not locked into a particular application or ecosystem.
+
+No cloud features, no telemetry, just your photos on your computer: organized, tagged, sorted, and more.
+
 Point it at a folder, and it recursively scans for JPEG/PNG/TIFF images,
 reads their EXIF/IPTC keyword tags and camera metadata, generates
 thumbnails, and displays everything in a fast, virtualized gallery.
