@@ -19,6 +19,7 @@ export interface PhotoLibraryState {
   errors: ScanCompleteEvent['errors']
   selectedPath: string | null
   selectedFolder: string | null
+  selectedTag: string | null
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
 }
@@ -34,6 +35,7 @@ export const initialState: PhotoLibraryState = {
   errors: [],
   selectedPath: null,
   selectedFolder: null,
+  selectedTag: null,
   folderCounts: new Map(),
   folderChildren: new Map()
 }
@@ -49,6 +51,7 @@ export type PhotoLibraryAction =
   | { type: 'SCAN_CANCELED' }
   | { type: 'SELECT_PHOTO'; path: string | null }
   | { type: 'SET_FOLDER_FILTER'; folder: string | null }
+  | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
   | { type: 'PHOTO_REMOVED'; filePath: string }
 
@@ -133,7 +136,9 @@ export function photoLibraryReducer(
     case 'SELECT_PHOTO':
       return { ...state, selectedPath: action.path }
     case 'SET_FOLDER_FILTER':
-      return { ...state, selectedFolder: action.folder }
+      return { ...state, selectedFolder: action.folder, selectedTag: null }
+    case 'SET_TAG_FILTER':
+      return { ...state, selectedTag: action.tag, selectedFolder: null }
     case 'PHOTO_UPSERTED': {
       const rootFolder = findRootFolder(action.photo.filePath, state.folders)
       const photosByPath = new Map(state.photosByPath)

@@ -28,11 +28,13 @@ interface PhotoLibraryContextValue {
   visiblePhotos: PhotoRecord[]
   selectedPhoto: PhotoRecord | null
   allTags: string[]
+  tagCounts: Map<string, number>
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   cancelScan: () => Promise<void>
   selectPhoto: (path: string | null) => void
   setFolderFilter: (folder: string | null) => void
+  setTagFilter: (tag: string | null) => void
   updateTags: (filePath: string, tags: string[]) => Promise<void>
 }
 
@@ -181,6 +183,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_FOLDER_FILTER', folder })
   }, [])
 
+  const setTagFilter = useCallback((tag: string | null) => {
+    dispatch({ type: 'SET_TAG_FILTER', tag })
+  }, [])
+
   const photos = useMemo(
     () =>
       Array.from(state.photosByPath.values()).sort((a, b) => a.fileName.localeCompare(b.fileName)),
@@ -188,19 +194,29 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   )
 
   const visiblePhotos = useMemo(() => {
+    if (state.selectedTag) {
+      return photos.filter((photo) => photo.tags.includes(state.selectedTag!))
+    }
     if (!state.selectedFolder) return photos
     return photos.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
-  }, [photos, state.selectedFolder])
+  }, [photos, state.selectedFolder, state.selectedTag])
 
   const selectedPhoto = useMemo(
     () => (state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null),
     [state.selectedPath, state.photosByPath]
   )
 
-  const allTags = useMemo(
-    () => Array.from(new Set(photos.flatMap((photo) => photo.tags))).sort(),
-    [photos]
-  )
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const photo of photos) {
+      for (const tag of photo.tags) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [photos])
+
+  const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
 
   const value: PhotoLibraryContextValue = {
     state,
@@ -208,11 +224,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     visiblePhotos,
     selectedPhoto,
     allTags,
+    tagCounts,
     addFolder,
     removeFolder,
     cancelScan,
     selectPhoto,
     setFolderFilter,
+    setTagFilter,
     updateTags
   }
 

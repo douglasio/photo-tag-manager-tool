@@ -58,15 +58,17 @@ export function GalleryGrid(): ReactElement {
   const columnCount = Math.max(1, Math.floor(size.width / CELL_WIDTH))
   const rowCount = Math.ceil(photos.length / columnCount)
 
-  const folderTitle = state.selectedFolder
-    ? basename(state.selectedFolder)
-    : state.folders.length > 0
-      ? 'All Photos'
-      : null
+  const galleryTitle = state.selectedTag
+    ? `#${state.selectedTag}`
+    : state.selectedFolder
+      ? basename(state.selectedFolder)
+      : state.folders.length > 0
+        ? 'All Photos'
+        : null
 
   return (
     <Box style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-      {folderTitle && (
+      {galleryTitle && (
         <Box px="md" py="sm" style={{ flexShrink: 0, minWidth: 0 }}>
           <Title
             order={2}
@@ -76,7 +78,7 @@ export function GalleryGrid(): ReactElement {
               textOverflow: 'ellipsis'
             }}
           >
-            {folderTitle}
+            {galleryTitle}
           </Title>
         </Box>
       )}
