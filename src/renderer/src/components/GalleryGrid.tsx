@@ -1,4 +1,15 @@
-import { ActionIcon, Box, Center, Flex, Group, Loader, Slider, Text, Title } from '@mantine/core'
+import {
+  ActionIcon,
+  Box,
+  Center,
+  Flex,
+  Group,
+  Loader,
+  Pill,
+  Slider,
+  Text,
+  Title
+} from '@mantine/core'
 import { IconPhoto } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
@@ -67,7 +78,9 @@ export function GalleryGrid(): ReactElement {
     setTagDescription,
     renameTag,
     deleteTag,
-    tagCounts
+    tagCounts,
+    folderTags,
+    setFolderTagFilter
   } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
@@ -127,7 +140,13 @@ export function GalleryGrid(): ReactElement {
     [photos, columnCount, state.selectedPath, selectPhoto]
   )
 
-  const galleryTitle = state.selectedTag
+  // A "pure" tag view (navigated via the Tags panel, no folder context) shows
+  // the tag's own name/description editing UI. A folder view — with or
+  // without an additional tag pill narrowing it — shows the folder as the
+  // primary title instead, since the tag there is just a filter layered on top.
+  const isPureTagView = state.selectedTag !== null && state.selectedFolder === null
+
+  const galleryTitle = isPureTagView
     ? `#${state.selectedTag}`
     : state.selectedFolder
       ? basename(state.selectedFolder)
@@ -135,26 +154,24 @@ export function GalleryGrid(): ReactElement {
         ? 'All Photos'
         : null
 
-  const tagDescription = state.selectedTag
-    ? (state.tagDescriptions.get(state.selectedTag) ?? '')
-    : ''
+  const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
   return (
     <Flex direction="column" flex={1} miw={0}>
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
-          {state.selectedTag ? (
+          {isPureTagView ? (
             <Group gap={4} wrap="nowrap" align="center">
               <Box flex={1} miw={0}>
                 <TagNameEditor
-                  tag={state.selectedTag}
-                  count={tagCounts.get(state.selectedTag) ?? 0}
+                  tag={state.selectedTag!}
+                  count={tagCounts.get(state.selectedTag!) ?? 0}
                   onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
                 />
               </Box>
               <TagDeleteButton
-                tag={state.selectedTag}
-                count={tagCounts.get(state.selectedTag) ?? 0}
+                tag={state.selectedTag!}
+                count={tagCounts.get(state.selectedTag!) ?? 0}
                 onDelete={() => deleteTag(state.selectedTag!)}
               />
             </Group>
@@ -170,11 +187,33 @@ export function GalleryGrid(): ReactElement {
               {galleryTitle}
             </Title>
           )}
-          {state.selectedTag && (
+          {isPureTagView && (
             <TagDescriptionEditor
               description={tagDescription}
               onSave={(description) => void setTagDescription(state.selectedTag!, description)}
             />
+          )}
+          {state.selectedFolder && folderTags.length > 0 && (
+            <Pill.Group mt="xs">
+              {folderTags.map((tag) => {
+                const isActive = state.selectedTag === tag
+                return (
+                  <Pill
+                    key={tag}
+                    onClick={() => setFolderTagFilter(isActive ? null : tag)}
+                    style={{
+                      cursor: 'pointer',
+                      backgroundColor: isActive
+                        ? 'var(--mantine-primary-color-filled)'
+                        : 'var(--mantine-primary-color-light)',
+                      color: isActive ? 'var(--mantine-color-white)' : undefined
+                    }}
+                  >
+                    {tag}
+                  </Pill>
+                )
+              })}
+            </Pill.Group>
           )}
         </Box>
       )}

@@ -30,6 +30,7 @@ interface PhotoLibraryContextValue {
   allTags: string[]
   tagCounts: Map<string, number>
   tagCoverPhotos: Map<string, PhotoRecord>
+  folderTags: string[]
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   cancelScan: () => Promise<void>
@@ -37,6 +38,7 @@ interface PhotoLibraryContextValue {
   selectPhoto: (path: string | null) => void
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
+  setFolderTagFilter: (tag: string | null) => void
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
@@ -225,6 +227,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_TAG_FILTER', tag })
   }, [])
 
+  const setFolderTagFilter = useCallback((tag: string | null) => {
+    dispatch({ type: 'SET_FOLDER_TAG_FILTER', tag })
+  }, [])
+
   const setTagDescription = useCallback(
     async (tag: string, description: string) => {
       const previous = state.tagDescriptions.get(tag) ?? ''
@@ -282,12 +288,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.photosByPath]
   )
 
+  // Folder and tag filters stack rather than being mutually exclusive, so a
+  // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
+  // current folder instead of replacing it with a folder-agnostic tag view.
   const visiblePhotos = useMemo(() => {
-    if (state.selectedTag) {
-      return photos.filter((photo) => photo.tags.includes(state.selectedTag!))
+    let result = photos
+    if (state.selectedFolder) {
+      result = result.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
     }
-    if (!state.selectedFolder) return photos
-    return photos.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
+    if (state.selectedTag) {
+      result = result.filter((photo) => photo.tags.includes(state.selectedTag!))
+    }
+    return result
   }, [photos, state.selectedFolder, state.selectedTag])
 
   const selectedPhoto = useMemo(
@@ -311,6 +323,19 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
 
+  // Tags found among photos in the currently selected folder (independent of
+  // any active tag filter), used to render the folder's tag pills.
+  const folderTags = useMemo(() => {
+    if (!state.selectedFolder) return []
+    const tags = new Set<string>()
+    for (const photo of photos) {
+      if (isPhotoInFolder(photo.filePath, state.selectedFolder!)) {
+        for (const tag of photo.tags) tags.add(tag)
+      }
+    }
+    return Array.from(tags).sort()
+  }, [photos, state.selectedFolder])
+
   const value: PhotoLibraryContextValue = {
     state,
     photos,
@@ -319,6 +344,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     allTags,
     tagCounts,
     tagCoverPhotos,
+    folderTags,
     addFolder,
     removeFolder,
     cancelScan,
@@ -326,6 +352,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     selectPhoto,
     setFolderFilter,
     setTagFilter,
+    setFolderTagFilter,
     updateTags,
     setTagDescription,
     renameTag,

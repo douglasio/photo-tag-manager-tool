@@ -54,6 +54,7 @@ export type PhotoLibraryAction =
   | { type: 'SELECT_PHOTO'; path: string | null }
   | { type: 'SET_FOLDER_FILTER'; folder: string | null }
   | { type: 'SET_TAG_FILTER'; tag: string | null }
+  | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
   | { type: 'PHOTO_REMOVED'; filePath: string }
   | { type: 'TAG_DESCRIPTIONS_LOADED'; descriptions: Record<string, string> }
@@ -145,6 +146,11 @@ export function photoLibraryReducer(
       return { ...state, selectedFolder: action.folder, selectedTag: null }
     case 'SET_TAG_FILTER':
       return { ...state, selectedTag: action.tag, selectedFolder: null }
+    // Unlike SET_TAG_FILTER, this keeps selectedFolder intact — used by the
+    // per-folder tag pills in the gallery header, which narrow within the
+    // current folder rather than replacing it with a folder-agnostic tag view.
+    case 'SET_FOLDER_TAG_FILTER':
+      return { ...state, selectedTag: action.tag }
     case 'PHOTO_UPSERTED': {
       const rootFolder = findRootFolder(action.photo.filePath, state.folders)
       const photosByPath = new Map(state.photosByPath)
