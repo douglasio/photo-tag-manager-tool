@@ -18,7 +18,8 @@ interface PhotoLibraryContextValue {
   photos: PhotoRecord[]
   visiblePhotos: PhotoRecord[]
   selectedPhoto: PhotoRecord | null
-  pickFolderAndScan: () => Promise<void>
+  addFolder: () => Promise<void>
+  removeFolder: (folder: string) => Promise<void>
   cancelScan: () => Promise<void>
   selectPhoto: (path: string | null) => void
   setFolderFilter: (folder: string | null) => void
@@ -51,23 +52,45 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [])
 
-  const startScanFor = useCallback(async (rootPath: string) => {
-    const { scanId } = await window.api.startScan(rootPath)
-    scanIdRef.current = scanId
-    dispatch({ type: 'SCAN_STARTED', rootPath, scanId })
+  // Starts a scan for one folder and resolves once that scan's scan:complete
+  // event arrives, so callers can await folders sequentially rather than
+  // firing them all at once.
+  const startScanFor = useCallback((rootPath: string): Promise<void> => {
+    return new Promise((resolve) => {
+      void window.api.startScan(rootPath).then(({ scanId }) => {
+        scanIdRef.current = scanId
+        dispatch({ type: 'SCAN_STARTED', rootPath, scanId })
+
+        const unsubscribe = window.api.onScanComplete((payload) => {
+          if (payload.scanId !== scanId) return
+          unsubscribe()
+          resolve()
+        })
+      })
+    })
   }, [])
 
   useEffect(() => {
-    window.api.getLastFolder().then((rootPath) => {
-      if (rootPath) void startScanFor(rootPath)
+    window.api.getFolders().then(async (folders) => {
+      dispatch({ type: 'FOLDERS_LOADED', folders })
+      for (const folder of folders) {
+        await startScanFor(folder)
+      }
     })
   }, [startScanFor])
 
-  const pickFolderAndScan = useCallback(async () => {
+  const addFolder = useCallback(async () => {
     const rootPath = await window.api.selectFolder()
     if (!rootPath) return
-    await startScanFor(rootPath)
+    await window.api.addFolder(rootPath)
+    dispatch({ type: 'FOLDER_ADDED', folder: rootPath })
+    void startScanFor(rootPath)
   }, [startScanFor])
+
+  const removeFolder = useCallback(async (folder: string) => {
+    await window.api.removeFolder(folder)
+    dispatch({ type: 'FOLDER_REMOVED', folder })
+  }, [])
 
   const cancelScan = useCallback(async () => {
     if (!scanIdRef.current) return
@@ -104,7 +127,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     photos,
     visiblePhotos,
     selectedPhoto,
-    pickFolderAndScan,
+    addFolder,
+    removeFolder,
     cancelScan,
     selectPhoto,
     setFolderFilter

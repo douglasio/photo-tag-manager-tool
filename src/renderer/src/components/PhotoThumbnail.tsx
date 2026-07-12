@@ -23,7 +23,6 @@ export function PhotoThumbnail({ photo, selected, onSelect }: PhotoThumbnailProp
         <Image
           src={toThumbProtocolUrl(photo.thumbnailKey)}
           alt={photo.fileName}
-          radius="sm"
           fit="cover"
           loading="lazy"
           style={{ aspectRatio: 1, width: '100%' }}

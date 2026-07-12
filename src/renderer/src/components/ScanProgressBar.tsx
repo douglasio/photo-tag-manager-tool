@@ -1,5 +1,5 @@
-import { Button, Group, Popover, RingProgress, Text, UnstyledButton } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
+import { Button, Group, Popover, RingProgress, Text } from '@mantine/core'
+import { useDisclosure, useHover } from '@mantine/hooks'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { ScanLogContent } from './ScanLogContent'
@@ -7,6 +7,7 @@ import { ScanLogContent } from './ScanLogContent'
 export function ScanProgressBar(): ReactElement | null {
   const { state, cancelScan } = usePhotoLibrary()
   const [logOpened, { toggle: toggleLog, close: closeLog }] = useDisclosure(false)
+  const { hovered, ref } = useHover<HTMLButtonElement>()
 
   if (state.status === 'idle') return null
 
@@ -26,7 +27,14 @@ export function ScanProgressBar(): ReactElement | null {
         shadow="md"
       >
         <Popover.Target>
-          <UnstyledButton onClick={toggleLog} style={{ cursor: 'pointer' }}>
+          <Button
+            ref={ref}
+            onClick={toggleLog}
+            px="xs"
+            py={4}
+            bg={hovered ? 'var(--mantine-color-default-hover)' : undefined}
+            variant="transparent"
+          >
             <Group gap="sm" wrap="nowrap">
               {state.status === 'scanning' && (
                 <>
@@ -48,7 +56,7 @@ export function ScanProgressBar(): ReactElement | null {
               )}
               {state.status === 'complete' && (
                 <Text c="dimmed">
-                  Done — {total} photos ({state.cacheHits} from cache)
+                  Done — {total} photos
                   {state.errors.length > 0 && `, ${state.errors.length} error(s)`}
                 </Text>
               )}
@@ -56,7 +64,7 @@ export function ScanProgressBar(): ReactElement | null {
                 <Text c="dimmed">Scan canceled ({processed} loaded)</Text>
               )}
             </Group>
-          </UnstyledButton>
+          </Button>
         </Popover.Target>
         <Popover.Dropdown>
           <ScanLogContent />

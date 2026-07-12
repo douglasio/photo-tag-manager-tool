@@ -1,9 +1,10 @@
-import { addPhotoToFolderTree } from '../utils/folderTree'
+import { addPhotoToFolderTree, isPathUnderOrEqual } from '../utils/folderTree'
 import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
 
 export type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 
 export interface PhotoLibraryState {
+  folders: string[]
   rootPath: string | null
   scanId: string | null
   status: ScanStatus
@@ -18,6 +19,7 @@ export interface PhotoLibraryState {
 }
 
 export const initialState: PhotoLibraryState = {
+  folders: [],
   rootPath: null,
   scanId: null,
   status: 'idle',
@@ -32,6 +34,9 @@ export const initialState: PhotoLibraryState = {
 }
 
 export type PhotoLibraryAction =
+  | { type: 'FOLDERS_LOADED'; folders: string[] }
+  | { type: 'FOLDER_ADDED'; folder: string }
+  | { type: 'FOLDER_REMOVED'; folder: string }
   | { type: 'SCAN_STARTED'; rootPath: string; scanId: string }
   | { type: 'SCAN_PROGRESS'; filesFound: number }
   | { type: 'METADATA_BATCH'; photos: PhotoRecord[] }
@@ -45,12 +50,54 @@ export function photoLibraryReducer(
   action: PhotoLibraryAction
 ): PhotoLibraryState {
   switch (action.type) {
+    case 'FOLDERS_LOADED':
+      return { ...state, folders: action.folders }
+    case 'FOLDER_ADDED':
+      if (state.folders.includes(action.folder)) return state
+      return { ...state, folders: [...state.folders, action.folder] }
+    case 'FOLDER_REMOVED': {
+      const folders = state.folders.filter((f) => f !== action.folder)
+
+      const photosByPath = new Map(state.photosByPath)
+      for (const filePath of photosByPath.keys()) {
+        if (isPathUnderOrEqual(filePath, action.folder)) photosByPath.delete(filePath)
+      }
+
+      const folderCounts = new Map(state.folderCounts)
+      for (const folder of folderCounts.keys()) {
+        if (isPathUnderOrEqual(folder, action.folder)) folderCounts.delete(folder)
+      }
+      const folderChildren = new Map(state.folderChildren)
+      for (const folder of folderChildren.keys()) {
+        if (isPathUnderOrEqual(folder, action.folder)) folderChildren.delete(folder)
+      }
+
+      const selectedFolder =
+        state.selectedFolder && isPathUnderOrEqual(state.selectedFolder, action.folder)
+          ? null
+          : state.selectedFolder
+      const selectedPath =
+        state.selectedPath && isPathUnderOrEqual(state.selectedPath, action.folder)
+          ? null
+          : state.selectedPath
+
+      return {
+        ...state,
+        folders,
+        photosByPath,
+        folderCounts,
+        folderChildren,
+        selectedFolder,
+        selectedPath
+      }
+    }
     case 'SCAN_STARTED':
       return {
-        ...initialState,
+        ...state,
         rootPath: action.rootPath,
         scanId: action.scanId,
-        status: 'scanning'
+        status: 'scanning',
+        filesFound: 0
       }
     case 'SCAN_PROGRESS':
       if (action.filesFound === state.filesFound) return state
@@ -71,8 +118,8 @@ export function photoLibraryReducer(
       return {
         ...state,
         status: 'complete',
-        cacheHits: action.result.cacheHits,
-        errors: action.result.errors
+        cacheHits: state.cacheHits + action.result.cacheHits,
+        errors: [...state.errors, ...action.result.errors]
       }
     case 'SCAN_CANCELED':
       return { ...state, status: 'canceled' }

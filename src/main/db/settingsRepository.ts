@@ -14,3 +14,18 @@ export function setSetting(key: string, value: string): void {
     )
     .run({ key, value })
 }
+
+export function getFolders(): string[] {
+  const raw = getSetting('watchedFolders')
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function setFolders(folders: string[]): void {
+  setSetting('watchedFolders', JSON.stringify(folders))
+}

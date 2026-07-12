@@ -16,6 +16,11 @@ export function isPhotoInFolder(filePath: string, folder: string): boolean {
   return nextChar === '/' || nextChar === '\\'
 }
 
+/** Like isPhotoInFolder, but also true when path is the ancestor folder itself. */
+export function isPathUnderOrEqual(path: string, ancestor: string): boolean {
+  return path === ancestor || isPhotoInFolder(path, ancestor)
+}
+
 /**
  * Incrementally folds one photo into the accumulated folder counts/hierarchy,
  * bumping the recursive file count for every ancestor folder from rootPath

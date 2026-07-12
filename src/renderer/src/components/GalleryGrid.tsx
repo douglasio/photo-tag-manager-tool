@@ -58,8 +58,11 @@ export function GalleryGrid(): ReactElement {
   const columnCount = Math.max(1, Math.floor(size.width / CELL_WIDTH))
   const rowCount = Math.ceil(photos.length / columnCount)
 
-  const folderPath = state.selectedFolder ?? state.rootPath
-  const folderTitle = folderPath ? basename(folderPath) : null
+  const folderTitle = state.selectedFolder
+    ? basename(state.selectedFolder)
+    : state.folders.length > 0
+      ? 'All Photos'
+      : null
 
   return (
     <Box style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -86,7 +89,7 @@ export function GalleryGrid(): ReactElement {
                 <Text c="dimmed">Scanning for photos…</Text>
               </Group>
             ) : (
-              <Text c="dimmed">No photos yet. Select a folder to begin.</Text>
+              <Text c="dimmed">No photos yet. Add a folder to begin.</Text>
             )}
           </Center>
         ) : (

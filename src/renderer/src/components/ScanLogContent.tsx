@@ -45,38 +45,41 @@ export function ScanLogContent(): ReactElement {
   const hasEntries = photos.length > 0 || state.errors.length > 0
 
   return (
-    <ScrollArea.Autosize mah={ROW_HEIGHT * VISIBLE_ROWS} w={320} scrollbars="y">
-      <Stack gap="md" w={320} miw={0}>
-        {state.errors.map(({ filePath, message }) => (
-          <Stack key={filePath} gap={0} w="100%" miw={0}>
-            <Group justify="space-between" wrap="nowrap" gap="md" w="100%" miw={0}>
-              <Text truncate="end" title={filePath} miw={0}>
-                {filePath}
+    <Stack gap="xs">
+      <ScrollArea.Autosize mah={ROW_HEIGHT * VISIBLE_ROWS} w={320} scrollbars="y">
+        <Stack gap="md" w={320} miw={0}>
+          {state.errors.map(({ filePath, message }) => (
+            <Stack key={filePath} gap={0} w="100%" miw={0}>
+              <Group justify="space-between" wrap="nowrap" gap="md" w="100%" miw={0}>
+                <Text truncate="end" title={filePath} miw={0}>
+                  {filePath}
+                </Text>
+                <StatusBadge status="error" fromCache={false} />
+              </Group>
+              <Text c="red" truncate="end">
+                {message}
               </Text>
-              <StatusBadge status="error" fromCache={false} />
+            </Stack>
+          ))}
+          {photos.map((photo) => (
+            <Group
+              key={photo.filePath}
+              justify="space-between"
+              wrap="nowrap"
+              gap="md"
+              w="100%"
+              miw={0}
+            >
+              <Text truncate="end" title={photo.filePath} miw={0}>
+                {photo.fileName}
+              </Text>
+              <StatusBadge status={photo.thumbnailStatus} fromCache={photo.fromCache} />
             </Group>
-            <Text c="red" truncate="end">
-              {message}
-            </Text>
-          </Stack>
-        ))}
-        {photos.map((photo) => (
-          <Group
-            key={photo.filePath}
-            justify="space-between"
-            wrap="nowrap"
-            gap="md"
-            w="100%"
-            miw={0}
-          >
-            <Text truncate="end" title={photo.filePath} miw={0}>
-              {photo.fileName}
-            </Text>
-            <StatusBadge status={photo.thumbnailStatus} fromCache={photo.fromCache} />
-          </Group>
-        ))}
-        {!hasEntries && <Text c="dimmed">No scan activity yet.</Text>}
-      </Stack>
-    </ScrollArea.Autosize>
+          ))}
+          {!hasEntries && <Text c="dimmed">No scan activity yet.</Text>}
+        </Stack>
+      </ScrollArea.Autosize>
+      <Text c="dimmed">({state.cacheHits} from cache)</Text>
+    </Stack>
   )
 }

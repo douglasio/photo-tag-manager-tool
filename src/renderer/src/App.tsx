@@ -1,6 +1,6 @@
 import { AppShell, Box, Group, Title } from '@mantine/core'
 import { PhotoLibraryProvider } from './state/PhotoLibraryContext'
-import { FolderPicker } from './components/FolderPicker'
+import { FolderSettingsModal } from './components/FolderSettingsModal'
 import { ScanProgressBar } from './components/ScanProgressBar'
 import { GalleryGrid } from './components/GalleryGrid'
 import { DetailPanel } from './components/DetailPanel'
@@ -19,13 +19,13 @@ function App(): React.JSX.Element {
       >
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+            <Title order={1} size="h5" style={{ flexShrink: 0 }}>
+              Tag Me
+            </Title>
             <Group gap="md" wrap="nowrap">
-              <Title order={1} size="h5" style={{ flexShrink: 0 }}>
-                Tag Me
-              </Title>
-              <FolderPicker />
+              <ScanProgressBar />
+              <FolderSettingsModal />
             </Group>
-            <ScanProgressBar />
           </Group>
         </AppShell.Header>
         <AppShell.Navbar p="md" style={{ overflowY: 'auto' }}>

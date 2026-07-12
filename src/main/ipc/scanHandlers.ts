@@ -6,7 +6,6 @@ import { scanDirectory } from '../services/directoryScanner'
 import { readPhotoRecord } from '../services/metadataService'
 import { generateThumbnail, thumbnailKeyFor, deleteThumbnail } from '../services/thumbnailService'
 import { findByPath, upsertPhoto, updateThumbnail, pruneMissing } from '../db/photoRepository'
-import { setSetting } from '../db/settingsRepository'
 import type {
   MetadataBatchEvent,
   PhotoRecord,
@@ -36,7 +35,6 @@ export function registerScanHandlers(): void {
     const scanId = randomUUID()
     const state: ScanState = { cancelled: false }
     activeScans.set(scanId, state)
-    setSetting('lastFolder', rootPath)
 
     runScan(scanId, rootPath, event.sender, state)
       .catch((err) => console.error(`scan ${scanId} failed`, err))
