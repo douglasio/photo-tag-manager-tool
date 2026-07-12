@@ -16,15 +16,7 @@ import { IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { useMemo, type ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { foldersToTreeData } from '../utils/folderTree'
-
-function activeHoverBackground(isActive: boolean, hovered: boolean): string | undefined {
-  if (isActive) {
-    return hovered
-      ? 'var(--mantine-primary-color-light-hover)'
-      : 'var(--mantine-primary-color-light)'
-  }
-  return hovered ? 'var(--mantine-color-default-hover)' : undefined
-}
+import { activeHoverBackground } from '../utils/listItemStyles'
 
 interface ExpandToggleProps {
   hasChildren: boolean
@@ -197,7 +189,7 @@ export function FolderTree(): ReactElement {
   return (
     <Stack gap="md">
       <AllPhotosRow
-        isActive={state.selectedFolder === null}
+        isActive={state.selectedFolder === null && state.selectedTag === null}
         onClick={() => setFolderFilter(null)}
       />
       {state.folders.map((folder) => (

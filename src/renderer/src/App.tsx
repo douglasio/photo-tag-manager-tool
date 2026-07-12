@@ -1,10 +1,12 @@
-import { AppShell, Box, Group, Title } from '@mantine/core'
+import { AppShell, Box, Divider, Group, Title } from '@mantine/core'
 import { PhotoLibraryProvider } from './state/PhotoLibraryContext'
 import { FolderSettingsModal } from './components/FolderSettingsModal'
 import { ScanProgressBar } from './components/ScanProgressBar'
 import { GalleryGrid } from './components/GalleryGrid'
 import { DetailPanel } from './components/DetailPanel'
 import { FolderTree } from './components/FolderTree'
+import { PanelSection } from './components/PanelSection'
+import { TagPanel } from './components/TagPanel'
 
 const HEADER_HEIGHT = 52
 
@@ -28,8 +30,14 @@ function App(): React.JSX.Element {
             </Group>
           </Group>
         </AppShell.Header>
-        <AppShell.Navbar p="md" style={{ overflowY: 'auto' }}>
-          <FolderTree />
+        <AppShell.Navbar style={{ display: 'flex', flexDirection: 'column' }}>
+          <PanelSection title="Tags">
+            <TagPanel />
+          </PanelSection>
+          <Divider />
+          <PanelSection title="Folders">
+            <FolderTree />
+          </PanelSection>
         </AppShell.Navbar>
         <AppShell.Main>
           <Box style={{ height: `calc(100dvh - ${HEADER_HEIGHT}px)`, display: 'flex' }}>
