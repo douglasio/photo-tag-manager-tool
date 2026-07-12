@@ -5,6 +5,7 @@ import { ScanProgressBar } from './components/ScanProgressBar'
 import { GalleryGrid } from './components/GalleryGrid'
 import { DetailPanel } from './components/DetailPanel'
 import { FolderTree } from './components/FolderTree'
+import { PanelSection } from './components/PanelSection'
 import { TagPanel } from './components/TagPanel'
 
 const HEADER_HEIGHT = 52
@@ -30,13 +31,13 @@ function App(): React.JSX.Element {
           </Group>
         </AppShell.Header>
         <AppShell.Navbar style={{ display: 'flex', flexDirection: 'column' }}>
-          <Box p="md" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <PanelSection title="Tags">
             <TagPanel />
-          </Box>
+          </PanelSection>
           <Divider />
-          <Box p="md" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <PanelSection title="Folders">
             <FolderTree />
-          </Box>
+          </PanelSection>
         </AppShell.Navbar>
         <AppShell.Main>
           <Box style={{ height: `calc(100dvh - ${HEADER_HEIGHT}px)`, display: 'flex' }}>

@@ -1,4 +1,4 @@
-import { ActionIcon, Button, createTheme, Image, Popover } from '@mantine/core'
+import { ActionIcon, Button, createTheme, Image, Popover, Tooltip } from '@mantine/core'
 
 const radiusSize = 'md'
 
@@ -30,6 +30,11 @@ export const theme = createTheme({
     Popover: Popover.extend({
       defaultProps: {
         radius: radiusSize
+      }
+    }),
+    Tooltip: Tooltip.extend({
+      defaultProps: {
+        color: 'gray'
       }
     })
   }

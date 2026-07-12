@@ -50,9 +50,9 @@ export function DetailPanel(): ReactElement {
       </Title>
 
       <Stack gap="xs">
-        <Text fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+        <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
           Tags
-        </Text>
+        </Title>
         <TagList
           tags={selectedPhoto.tags}
           allTags={allTags}
@@ -61,9 +61,9 @@ export function DetailPanel(): ReactElement {
       </Stack>
 
       <Stack gap="xs">
-        <Text fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+        <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
           Metadata
-        </Text>
+        </Title>
         <Stack gap={6}>
           <DetailRow label="Date taken" value={metadata.dateTaken ?? '—'} />
           <DetailRow
@@ -88,9 +88,9 @@ export function DetailPanel(): ReactElement {
 
       {metadata.comment && (
         <Stack gap="xs">
-          <Text fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+          <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
             Comment
-          </Text>
+          </Title>
           <Text style={{ wordBreak: 'break-word' }}>{metadata.comment}</Text>
         </Stack>
       )}

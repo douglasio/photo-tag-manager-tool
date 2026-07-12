@@ -29,6 +29,7 @@ interface PhotoLibraryContextValue {
   selectedPhoto: PhotoRecord | null
   allTags: string[]
   tagCounts: Map<string, number>
+  tagCoverPhotos: Map<string, PhotoRecord>
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   cancelScan: () => Promise<void>
@@ -36,6 +37,9 @@ interface PhotoLibraryContextValue {
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   updateTags: (filePath: string, tags: string[]) => Promise<void>
+  setTagDescription: (tag: string, description: string) => Promise<void>
+  renameTag: (oldTag: string, newTag: string) => Promise<void>
+  deleteTag: (tag: string) => Promise<void>
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -139,6 +143,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     })
   }, [startScanFor])
 
+  useEffect(() => {
+    window.api.getTagDescriptions().then((descriptions) => {
+      dispatch({ type: 'TAG_DESCRIPTIONS_LOADED', descriptions })
+    })
+  }, [])
+
   const addFolder = useCallback(async () => {
     const rootPath = await window.api.selectFolder()
     if (!rootPath) return
@@ -187,6 +197,57 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_TAG_FILTER', tag })
   }, [])
 
+  const setTagDescription = useCallback(
+    async (tag: string, description: string) => {
+      const previous = state.tagDescriptions.get(tag) ?? ''
+      dispatch({ type: 'TAG_DESCRIPTION_UPDATED', tag, description })
+      try {
+        await window.api.setTagDescription(tag, description)
+      } catch (err) {
+        console.error(`failed to save description for tag ${tag}`, err)
+        notifications.show({ color: 'red', message: 'Failed to save tag description' })
+        dispatch({ type: 'TAG_DESCRIPTION_UPDATED', tag, description: previous })
+      }
+    },
+    [state.tagDescriptions]
+  )
+
+  const renameTag = useCallback(
+    async (oldTag: string, newTag: string) => {
+      const filePaths = Array.from(state.photosByPath.values())
+        .filter((photo) => photo.tags.includes(oldTag))
+        .map((photo) => photo.filePath)
+
+      try {
+        const photos = await window.api.renameTag(oldTag, newTag, filePaths)
+        dispatch({ type: 'TAG_RENAMED', oldTag, newTag, photos })
+      } catch (err) {
+        console.error(`failed to rename tag ${oldTag} to ${newTag}`, err)
+        notifications.show({ color: 'red', message: 'Failed to rename tag' })
+        throw err
+      }
+    },
+    [state.photosByPath]
+  )
+
+  const deleteTag = useCallback(
+    async (tag: string) => {
+      const filePaths = Array.from(state.photosByPath.values())
+        .filter((photo) => photo.tags.includes(tag))
+        .map((photo) => photo.filePath)
+
+      try {
+        const photos = await window.api.deleteTag(tag, filePaths)
+        dispatch({ type: 'TAG_DELETED', tag, photos })
+      } catch (err) {
+        console.error(`failed to delete tag ${tag}`, err)
+        notifications.show({ color: 'red', message: 'Failed to delete tag' })
+        throw err
+      }
+    },
+    [state.photosByPath]
+  )
+
   const photos = useMemo(
     () =>
       Array.from(state.photosByPath.values()).sort((a, b) => a.fileName.localeCompare(b.fileName)),
@@ -206,14 +267,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.selectedPath, state.photosByPath]
   )
 
-  const tagCounts = useMemo(() => {
+  // photos is already sorted, so the first photo seen for a tag is a stable,
+  // deterministic "cover" pick — no extra pass or bookkeeping required.
+  const { tagCounts, tagCoverPhotos } = useMemo(() => {
     const counts = new Map<string, number>()
+    const covers = new Map<string, PhotoRecord>()
     for (const photo of photos) {
       for (const tag of photo.tags) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
+        if (!covers.has(tag)) covers.set(tag, photo)
       }
     }
-    return counts
+    return { tagCounts: counts, tagCoverPhotos: covers }
   }, [photos])
 
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
@@ -225,13 +290,17 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     selectedPhoto,
     allTags,
     tagCounts,
+    tagCoverPhotos,
     addFolder,
     removeFolder,
     cancelScan,
     selectPhoto,
     setFolderFilter,
     setTagFilter,
-    updateTags
+    updateTags,
+    setTagDescription,
+    renameTag,
+    deleteTag
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

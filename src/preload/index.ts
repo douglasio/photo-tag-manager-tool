@@ -27,6 +27,14 @@ const api = {
   cancelScan: (scanId: string): Promise<void> => ipcRenderer.invoke('scan:cancel', scanId),
   updateTags: (filePath: string, tags: string[]): Promise<PhotoRecord> =>
     ipcRenderer.invoke('tags:update', filePath, tags),
+  getTagDescriptions: (): Promise<Record<string, string>> =>
+    ipcRenderer.invoke('tags:getDescriptions'),
+  setTagDescription: (tag: string, description: string): Promise<void> =>
+    ipcRenderer.invoke('tags:setDescription', tag, description),
+  renameTag: (oldTag: string, newTag: string, filePaths: string[]): Promise<PhotoRecord[]> =>
+    ipcRenderer.invoke('tags:rename', oldTag, newTag, filePaths),
+  deleteTag: (tag: string, filePaths: string[]): Promise<PhotoRecord[]> =>
+    ipcRenderer.invoke('tags:delete', tag, filePaths),
   onScanProgress: (callback: (payload: ScanProgressEvent) => void): (() => void) =>
     subscribe('scan:progress', callback),
   onMetadataBatch: (callback: (payload: MetadataBatchEvent) => void): (() => void) =>

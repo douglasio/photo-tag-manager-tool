@@ -3,6 +3,9 @@ import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { PhotoThumbnail } from './PhotoThumbnail'
+import { TagDeleteButton } from './TagDeleteButton'
+import { TagDescriptionEditor } from './TagDescriptionEditor'
+import { TagNameEditor } from './TagNameEditor'
 import { basename } from '../utils/folderTree'
 import type { PhotoRecord } from '../../../shared/types'
 
@@ -40,7 +43,15 @@ function PhotoCell({
 }
 
 export function GalleryGrid(): ReactElement {
-  const { visiblePhotos: photos, state, selectPhoto } = usePhotoLibrary()
+  const {
+    visiblePhotos: photos,
+    state,
+    selectPhoto,
+    setTagDescription,
+    renameTag,
+    deleteTag,
+    tagCounts
+  } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
 
@@ -66,20 +77,47 @@ export function GalleryGrid(): ReactElement {
         ? 'All Photos'
         : null
 
+  const tagDescription = state.selectedTag
+    ? (state.tagDescriptions.get(state.selectedTag) ?? '')
+    : ''
+
   return (
     <Box style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
       {galleryTitle && (
         <Box px="md" py="sm" style={{ flexShrink: 0, minWidth: 0 }}>
-          <Title
-            order={2}
-            style={{
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}
-          >
-            {galleryTitle}
-          </Title>
+          {state.selectedTag ? (
+            <Group gap={4} wrap="nowrap" align="center">
+              <Box style={{ flex: 1, minWidth: 0 }}>
+                <TagNameEditor
+                  tag={state.selectedTag}
+                  count={tagCounts.get(state.selectedTag) ?? 0}
+                  onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
+                />
+              </Box>
+              <TagDeleteButton
+                tag={state.selectedTag}
+                count={tagCounts.get(state.selectedTag) ?? 0}
+                onDelete={() => deleteTag(state.selectedTag!)}
+              />
+            </Group>
+          ) : (
+            <Title
+              order={2}
+              style={{
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {galleryTitle}
+            </Title>
+          )}
+          {state.selectedTag && (
+            <TagDescriptionEditor
+              description={tagDescription}
+              onSave={(description) => void setTagDescription(state.selectedTag!, description)}
+            />
+          )}
         </Box>
       )}
       <Box ref={containerRef} style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>

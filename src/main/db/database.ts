@@ -37,6 +37,16 @@ export function getDb(): Database.Database {
     )
   `)
 
+  // App-local tag metadata (description, etc). Deliberately never written back to
+  // the photo files themselves — it's a local annotation layer on top of the tags
+  // that live in EXIF/IPTC.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tag_metadata (
+      tag TEXT PRIMARY KEY,
+      description TEXT
+    )
+  `)
+
   const photoColumns = db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]
   if (!photoColumns.some((column) => column.name === 'comment')) {
     db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')

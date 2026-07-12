@@ -22,6 +22,7 @@ export interface PhotoLibraryState {
   selectedTag: string | null
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
+  tagDescriptions: Map<string, string>
 }
 
 export const initialState: PhotoLibraryState = {
@@ -37,7 +38,8 @@ export const initialState: PhotoLibraryState = {
   selectedFolder: null,
   selectedTag: null,
   folderCounts: new Map(),
-  folderChildren: new Map()
+  folderChildren: new Map(),
+  tagDescriptions: new Map()
 }
 
 export type PhotoLibraryAction =
@@ -54,6 +56,10 @@ export type PhotoLibraryAction =
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
   | { type: 'PHOTO_REMOVED'; filePath: string }
+  | { type: 'TAG_DESCRIPTIONS_LOADED'; descriptions: Record<string, string> }
+  | { type: 'TAG_DESCRIPTION_UPDATED'; tag: string; description: string }
+  | { type: 'TAG_RENAMED'; oldTag: string; newTag: string; photos: PhotoRecord[] }
+  | { type: 'TAG_DELETED'; tag: string; photos: PhotoRecord[] }
 
 export function photoLibraryReducer(
   state: PhotoLibraryState,
@@ -164,6 +170,45 @@ export function photoLibraryReducer(
       const selectedPath = state.selectedPath === action.filePath ? null : state.selectedPath
 
       return { ...state, photosByPath, folderCounts, folderChildren, selectedPath }
+    }
+    case 'TAG_DESCRIPTIONS_LOADED':
+      return { ...state, tagDescriptions: new Map(Object.entries(action.descriptions)) }
+    case 'TAG_DESCRIPTION_UPDATED': {
+      const tagDescriptions = new Map(state.tagDescriptions)
+      if (action.description.trim() === '') {
+        tagDescriptions.delete(action.tag)
+      } else {
+        tagDescriptions.set(action.tag, action.description)
+      }
+      return { ...state, tagDescriptions }
+    }
+    case 'TAG_RENAMED': {
+      const photosByPath = new Map(state.photosByPath)
+      for (const photo of action.photos) {
+        photosByPath.set(photo.filePath, photo)
+      }
+
+      const tagDescriptions = new Map(state.tagDescriptions)
+      const movedDescription = tagDescriptions.get(action.oldTag)
+      tagDescriptions.delete(action.oldTag)
+      if (movedDescription) tagDescriptions.set(action.newTag, movedDescription)
+
+      const selectedTag = state.selectedTag === action.oldTag ? action.newTag : state.selectedTag
+
+      return { ...state, photosByPath, tagDescriptions, selectedTag }
+    }
+    case 'TAG_DELETED': {
+      const photosByPath = new Map(state.photosByPath)
+      for (const photo of action.photos) {
+        photosByPath.set(photo.filePath, photo)
+      }
+
+      const tagDescriptions = new Map(state.tagDescriptions)
+      tagDescriptions.delete(action.tag)
+
+      const selectedTag = state.selectedTag === action.tag ? null : state.selectedTag
+
+      return { ...state, photosByPath, tagDescriptions, selectedTag }
     }
     default:
       return state
