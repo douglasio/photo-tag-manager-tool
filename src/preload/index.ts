@@ -4,7 +4,9 @@ import type {
   MetadataBatchEvent,
   ScanCompleteEvent,
   ScanProgressEvent,
-  ScanStartResult
+  ScanStartResult,
+  WatchPhotoRemovedEvent,
+  WatchPhotoUpsertedEvent
 } from '../shared/types'
 
 function subscribe<T>(channel: string, callback: (payload: T) => void): () => void {
@@ -27,7 +29,11 @@ const api = {
   onMetadataBatch: (callback: (payload: MetadataBatchEvent) => void): (() => void) =>
     subscribe('scan:metadata-batch', callback),
   onScanComplete: (callback: (payload: ScanCompleteEvent) => void): (() => void) =>
-    subscribe('scan:complete', callback)
+    subscribe('scan:complete', callback),
+  onPhotoUpserted: (callback: (payload: WatchPhotoUpsertedEvent) => void): (() => void) =>
+    subscribe('watch:photo-upserted', callback),
+  onPhotoRemoved: (callback: (payload: WatchPhotoRemovedEvent) => void): (() => void) =>
+    subscribe('watch:photo-removed', callback)
 }
 
 export type PhotagApi = typeof api

@@ -8,6 +8,7 @@ export interface PhotoMetadata {
   heightPx: number | null
   fileSizeBytes: number
   format: SupportedFormat
+  comment: string | null
 }
 
 export type ThumbnailStatus = 'pending' | 'ready' | 'error'
@@ -43,4 +44,13 @@ export interface ScanCompleteEvent {
   totalScanned: number
   cacheHits: number
   errors: { filePath: string; message: string }[]
+}
+
+export interface WatchPhotoUpsertedEvent {
+  photo: PhotoRecord
+  changeType: 'add' | 'change'
+}
+
+export interface WatchPhotoRemovedEvent {
+  filePath: string
 }

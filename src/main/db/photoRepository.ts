@@ -13,6 +13,7 @@ interface PhotoRow {
   widthPx: number | null
   heightPx: number | null
   format: string
+  comment: string | null
   thumbnailKey: string | null
   thumbnailStatus: string
 }
@@ -30,7 +31,8 @@ function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
       widthPx: row.widthPx,
       heightPx: row.heightPx,
       fileSizeBytes: row.sizeBytes,
-      format: row.format as PhotoRecord['metadata']['format']
+      format: row.format as PhotoRecord['metadata']['format'],
+      comment: row.comment
     },
     thumbnailStatus: row.thumbnailStatus as PhotoRecord['thumbnailStatus'],
     thumbnailKey: row.thumbnailKey,
@@ -55,10 +57,10 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
     .prepare(
       `INSERT INTO photos (
         path, fileName, mtimeMs, sizeBytes, tags, dateTaken, cameraMake, cameraModel,
-        widthPx, heightPx, format, thumbnailKey, thumbnailStatus, lastScannedAt
+        widthPx, heightPx, format, comment, thumbnailKey, thumbnailStatus, lastScannedAt
       ) VALUES (
         @path, @fileName, @mtimeMs, @sizeBytes, @tags, @dateTaken, @cameraMake, @cameraModel,
-        @widthPx, @heightPx, @format, @thumbnailKey, @thumbnailStatus, @lastScannedAt
+        @widthPx, @heightPx, @format, @comment, @thumbnailKey, @thumbnailStatus, @lastScannedAt
       )
       ON CONFLICT(path) DO UPDATE SET
         fileName = excluded.fileName,
@@ -71,6 +73,7 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
         widthPx = excluded.widthPx,
         heightPx = excluded.heightPx,
         format = excluded.format,
+        comment = excluded.comment,
         thumbnailKey = excluded.thumbnailKey,
         thumbnailStatus = excluded.thumbnailStatus,
         lastScannedAt = excluded.lastScannedAt`
@@ -87,6 +90,7 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
       widthPx: record.metadata.widthPx,
       heightPx: record.metadata.heightPx,
       format: record.metadata.format,
+      comment: record.metadata.comment,
       thumbnailKey: record.thumbnailKey,
       thumbnailStatus: record.thumbnailStatus,
       lastScannedAt: Date.now()
@@ -101,6 +105,17 @@ export function updateThumbnail(
   getDb()
     .prepare('UPDATE photos SET thumbnailKey = ?, thumbnailStatus = ? WHERE path = ?')
     .run(thumbnailKey, status, filePath)
+}
+
+/** Deletes a single photo row (used by the folder watcher on file removal). Returns its thumbnailKey, if any, so the caller can clean up the thumbnail file. */
+export function removePhoto(filePath: string): string | null {
+  const db = getDb()
+  const row = db.prepare('SELECT thumbnailKey FROM photos WHERE path = ?').get(filePath) as
+    { thumbnailKey: string | null } | undefined
+  if (!row) return null
+
+  db.prepare('DELETE FROM photos WHERE path = ?').run(filePath)
+  return row.thumbnailKey
 }
 
 export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[] {

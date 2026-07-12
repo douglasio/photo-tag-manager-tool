@@ -81,6 +81,15 @@ export function DetailPanel(): ReactElement {
           {selectedPhoto.filePath}
         </Text>
       </Stack>
+
+      {metadata.comment && (
+        <Stack gap="xs">
+          <Text fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+            Comment
+          </Text>
+          <Text style={{ wordBreak: 'break-word' }}>{metadata.comment}</Text>
+        </Stack>
+      )}
     </Stack>
   )
 }

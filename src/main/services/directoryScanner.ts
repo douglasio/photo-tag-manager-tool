@@ -1,6 +1,5 @@
 import { fdir } from 'fdir'
-
-const SUPPORTED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.tif', '.tiff'])
+import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
 
 export async function scanDirectory(rootPath: string): Promise<string[]> {
   return new fdir()

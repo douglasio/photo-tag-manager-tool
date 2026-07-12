@@ -11,6 +11,8 @@ import {
 } from './protocols/thumbProtocol'
 import { registerFileProtocolHandler, registerFileProtocolScheme } from './protocols/fileProtocol'
 import { shutdownExifTool } from './services/metadataService'
+import { getFolders } from './db/settingsRepository'
+import { setWatchTarget, watchFolder, unwatchAllFolders } from './services/watchManager'
 
 app.setName('Tag Me')
 
@@ -72,6 +74,11 @@ if (!app.requestSingleInstanceLock()) {
 
     createWindow()
 
+    if (mainWindow) {
+      setWatchTarget(mainWindow.webContents)
+      getFolders().forEach(watchFolder)
+    }
+
     app.on('activate', function () {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
@@ -85,5 +92,6 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     void shutdownExifTool()
+    void unwatchAllFolders()
   })
 }

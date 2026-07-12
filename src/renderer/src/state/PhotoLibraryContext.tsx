@@ -9,9 +9,18 @@ import {
   type ReactElement,
   type ReactNode
 } from 'react'
+import { notifications } from '@mantine/notifications'
 import { initialState, photoLibraryReducer, type PhotoLibraryState } from './photoLibraryReducer'
 import { isPhotoInFolder } from '../utils/folderTree'
 import type { PhotoRecord } from '../../../shared/types'
+
+// How long to wait after the last file-watcher event before summarizing the
+// batch into a single toast, so a bulk copy/delete doesn't spam a toast per file.
+const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
+
+function pluralize(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
 
 interface PhotoLibraryContextValue {
   state: PhotoLibraryState
@@ -30,6 +39,43 @@ const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
 export function PhotoLibraryProvider({ children }: { children: ReactNode }): ReactElement {
   const [state, dispatch] = useReducer(photoLibraryReducer, initialState)
   const scanIdRef = useRef<string | null>(null)
+  const pendingWatchCountsRef = useRef({ added: 0, removed: 0 })
+  const watchFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const flushWatchNotification = useCallback(() => {
+    watchFlushTimerRef.current = null
+    const { added, removed } = pendingWatchCountsRef.current
+    pendingWatchCountsRef.current = { added: 0, removed: 0 }
+    if (added === 0 && removed === 0) return
+
+    const parts: string[] = []
+    if (added > 0) parts.push(`${pluralize(added, 'photo')} added`)
+    if (removed > 0) parts.push(`${pluralize(removed, 'photo')} removed`)
+
+    notifications.show({
+      message: parts.join(', '),
+      color: removed > 0 && added === 0 ? 'red' : 'teal',
+      autoClose: 4000
+    })
+  }, [])
+
+  const scheduleWatchNotification = useCallback(
+    (kind: 'added' | 'removed') => {
+      pendingWatchCountsRef.current[kind]++
+      if (watchFlushTimerRef.current) clearTimeout(watchFlushTimerRef.current)
+      watchFlushTimerRef.current = setTimeout(
+        flushWatchNotification,
+        WATCH_NOTIFICATION_DEBOUNCE_MS
+      )
+    },
+    [flushWatchNotification]
+  )
+
+  useEffect(() => {
+    return () => {
+      if (watchFlushTimerRef.current) clearTimeout(watchFlushTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const unsubscribeProgress = window.api.onScanProgress((payload) => {
@@ -44,13 +90,23 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       if (payload.scanId !== scanIdRef.current) return
       dispatch({ type: 'SCAN_COMPLETE', result: payload })
     })
+    const unsubscribeUpserted = window.api.onPhotoUpserted((payload) => {
+      dispatch({ type: 'PHOTO_UPSERTED', photo: payload.photo })
+      if (payload.changeType === 'add') scheduleWatchNotification('added')
+    })
+    const unsubscribeRemoved = window.api.onPhotoRemoved((payload) => {
+      dispatch({ type: 'PHOTO_REMOVED', filePath: payload.filePath })
+      scheduleWatchNotification('removed')
+    })
 
     return () => {
       unsubscribeProgress()
       unsubscribeBatch()
       unsubscribeComplete()
+      unsubscribeUpserted()
+      unsubscribeRemoved()
     }
-  }, [])
+  }, [scheduleWatchNotification])
 
   // Starts a scan for one folder and resolves once that scan's scan:complete
   // event arrives, so callers can await folders sequentially rather than
