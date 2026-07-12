@@ -34,7 +34,10 @@ function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
     },
     thumbnailStatus: row.thumbnailStatus as PhotoRecord['thumbnailStatus'],
     thumbnailKey: row.thumbnailKey,
-    scanError: null
+    scanError: null,
+    // Callers that actually hit the cache (see scanHandlers.ts's processFile)
+    // override this to true; a DB row read on its own isn't "from cache."
+    fromCache: false
   }
 }
 

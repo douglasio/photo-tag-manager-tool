@@ -60,7 +60,7 @@ async function processFile(
   let fromCache = false
 
   if (cached && cached.mtimeMs === fileStat.mtimeMs && cached.sizeBytes === fileStat.size) {
-    photo = cached.record
+    photo = { ...cached.record, fromCache: true }
     fromCache = true
   } else {
     photo = await readPhotoRecord(filePath)
@@ -90,7 +90,19 @@ async function runScan(
   sender: WebContents,
   state: ScanState
 ): Promise<void> {
-  const filePaths = await scanDirectory(rootPath)
+  let filePaths: string[]
+  try {
+    filePaths = await scanDirectory(rootPath)
+  } catch (err) {
+    const completeEvent: ScanCompleteEvent = {
+      scanId,
+      totalScanned: 0,
+      cacheHits: 0,
+      errors: [{ filePath: rootPath, message: err instanceof Error ? err.message : String(err) }]
+    }
+    sender.send('scan:complete', completeEvent)
+    return
+  }
   if (state.cancelled) return
 
   const progressEvent: ScanProgressEvent = { scanId, filesFound: filePaths.length }

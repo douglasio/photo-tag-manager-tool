@@ -21,6 +21,7 @@ export interface PhotoRecord {
   thumbnailStatus: ThumbnailStatus
   thumbnailKey: string | null
   scanError: string | null
+  fromCache: boolean
 }
 
 export interface ScanStartResult {

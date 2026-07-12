@@ -1,7 +1,9 @@
+import { Box, Center, Group, Loader, Text, Title } from '@mantine/core'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { PhotoThumbnail } from './PhotoThumbnail'
+import { basename } from '../utils/folderTree'
 import type { PhotoRecord } from '../../../shared/types'
 
 const CELL_WIDTH = 168
@@ -27,18 +29,18 @@ function PhotoCell({
   const photo = photos[index]
   if (!photo) return <div style={style} />
   return (
-    <div style={style} className="gallery-cell">
+    <Box style={{ ...style, padding: 6 }}>
       <PhotoThumbnail
         photo={photo}
         selected={photo.filePath === selectedPath}
         onSelect={onSelect}
       />
-    </div>
+    </Box>
   )
 }
 
 export function GalleryGrid(): ReactElement {
-  const { photos, state, selectPhoto } = usePhotoLibrary()
+  const { visiblePhotos: photos, state, selectPhoto } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
 
@@ -56,28 +58,58 @@ export function GalleryGrid(): ReactElement {
   const columnCount = Math.max(1, Math.floor(size.width / CELL_WIDTH))
   const rowCount = Math.ceil(photos.length / columnCount)
 
-  if (photos.length === 0) {
-    return (
-      <div ref={containerRef} className="gallery-grid-container gallery-grid-container--empty">
-        {state.status === 'scanning'
-          ? 'Scanning for photos…'
-          : 'No photos yet. Select a folder to begin.'}
-      </div>
-    )
-  }
+  const folderTitle = state.selectedFolder
+    ? basename(state.selectedFolder)
+    : state.folders.length > 0
+      ? 'All Photos'
+      : null
 
   return (
-    <div ref={containerRef} className="gallery-grid-container">
-      <Grid<CellProps>
-        cellComponent={PhotoCell}
-        cellProps={{ photos, columnCount, selectedPath: state.selectedPath, onSelect: selectPhoto }}
-        columnCount={columnCount}
-        columnWidth={CELL_WIDTH}
-        rowCount={rowCount}
-        rowHeight={CELL_HEIGHT}
-        defaultWidth={size.width}
-        defaultHeight={size.height}
-      />
-    </div>
+    <Box style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      {folderTitle && (
+        <Box px="md" py="sm" style={{ flexShrink: 0, minWidth: 0 }}>
+          <Title
+            order={2}
+            style={{
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            {folderTitle}
+          </Title>
+        </Box>
+      )}
+      <Box ref={containerRef} style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        {photos.length === 0 ? (
+          <Center h="100%">
+            {state.status === 'scanning' ? (
+              <Group gap="xs">
+                <Loader />
+                <Text c="dimmed">Scanning for photos…</Text>
+              </Group>
+            ) : (
+              <Text c="dimmed">No photos yet. Add a folder to begin.</Text>
+            )}
+          </Center>
+        ) : (
+          <Grid<CellProps>
+            cellComponent={PhotoCell}
+            cellProps={{
+              photos,
+              columnCount,
+              selectedPath: state.selectedPath,
+              onSelect: selectPhoto
+            }}
+            columnCount={columnCount}
+            columnWidth={CELL_WIDTH}
+            rowCount={rowCount}
+            rowHeight={CELL_HEIGHT}
+            defaultWidth={size.width}
+            defaultHeight={size.height}
+          />
+        )}
+      </Box>
+    </Box>
   )
 }
