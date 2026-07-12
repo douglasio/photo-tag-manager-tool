@@ -11,7 +11,7 @@ import {
 } from 'react'
 import { notifications } from '@mantine/notifications'
 import { initialState, photoLibraryReducer, type PhotoLibraryState } from './photoLibraryReducer'
-import { isPhotoInFolder } from '../utils/folderTree'
+import { basename, isPhotoInFolder } from '../utils/folderTree'
 import type { PhotoRecord } from '../../../shared/types'
 
 // How long to wait after the last file-watcher event before summarizing the
@@ -153,15 +153,36 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const addFolder = useCallback(async () => {
     const rootPath = await window.api.selectFolder()
     if (!rootPath) return
-    await window.api.addFolder(rootPath)
-    dispatch({ type: 'FOLDER_ADDED', folder: rootPath })
-    void startScanFor(rootPath)
+    try {
+      await window.api.addFolder(rootPath)
+      dispatch({ type: 'FOLDER_ADDED', folder: rootPath })
+      void startScanFor(rootPath)
+      notifications.show({ color: 'teal', message: `Added folder "${basename(rootPath)}"` })
+    } catch (err) {
+      console.error(`failed to add folder ${rootPath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to add folder' })
+      throw err
+    }
   }, [startScanFor])
 
-  const removeFolder = useCallback(async (folder: string) => {
-    await window.api.removeFolder(folder)
-    dispatch({ type: 'FOLDER_REMOVED', folder })
-  }, [])
+  const removeFolder = useCallback(
+    async (folder: string) => {
+      const count = state.folderCounts.get(folder) ?? 0
+      try {
+        await window.api.removeFolder(folder)
+        dispatch({ type: 'FOLDER_REMOVED', folder })
+        notifications.show({
+          color: 'red',
+          message: `Removed "${basename(folder)}" — ${count} photo${count === 1 ? '' : 's'} removed`
+        })
+      } catch (err) {
+        console.error(`failed to remove folder ${folder}`, err)
+        notifications.show({ color: 'red', message: 'Failed to remove folder' })
+        throw err
+      }
+    },
+    [state.folderCounts]
+  )
 
   const cancelScan = useCallback(async () => {
     if (!scanIdRef.current) return

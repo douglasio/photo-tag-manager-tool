@@ -1,16 +1,6 @@
-import {
-  Box,
-  Center,
-  Flex,
-  Group,
-  Loader,
-  Slider,
-  Text,
-  Title,
-  UnstyledButton
-} from '@mantine/core'
+import { ActionIcon, Box, Center, Flex, Group, Loader, Slider, Text, Title } from '@mantine/core'
 import { IconPhoto } from '@tabler/icons-react'
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { PhotoThumbnail } from './PhotoThumbnail'
@@ -29,7 +19,11 @@ const MIN_CELL_WIDTH = 100
 // Stays under thumbnailService's THUMBNAIL_LONG_EDGE (640px) so the largest
 // setting still displays a natively-generated thumbnail rather than upscaling it.
 const MAX_CELL_WIDTH = 600
-const CELL_WIDTH_STEP = 40
+// react-window's Grid renders its own vertical scrollbar inside the width we
+// give it, so column math needs to leave room for it — otherwise the last
+// column overflows the scrollbar's width and the grid gains an unwanted
+// horizontal scrollbar.
+const SCROLLBAR_RESERVE_PX = 16
 
 function clampCellWidth(value: number): number {
   return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, value))
@@ -78,7 +72,6 @@ export function GalleryGrid(): ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
   const [cellWidth, setCellWidth] = useState(DEFAULT_CELL_WIDTH)
-  const cellHeight = cellWidth + CELL_LABEL_HEIGHT
 
   useEffect(() => {
     const el = containerRef.current
@@ -103,8 +96,36 @@ export function GalleryGrid(): ReactElement {
     void window.api.setGalleryCellWidth(clamped)
   }
 
-  const columnCount = Math.max(1, Math.floor(size.width / cellWidth))
+  // Pick the column count closest to the target cell width, then stretch each
+  // column to exactly fill the available width — avoids a leftover sliver of
+  // empty space on the right that a plain floor-division would leave behind.
+  const availableWidth = Math.max(size.width - SCROLLBAR_RESERVE_PX, 0)
+  const columnCount = Math.max(1, Math.round(availableWidth / cellWidth))
+  const actualCellWidth = availableWidth > 0 ? availableWidth / columnCount : cellWidth
+  const cellHeight = actualCellWidth + CELL_LABEL_HEIGHT
   const rowCount = Math.ceil(photos.length / columnCount)
+
+  // The +/- buttons step by whole columns rather than by CELL_WIDTH_STEP
+  // pixels — near either end of the range a 40px nudge can round back to the
+  // same columnCount and visibly do nothing, whereas a column-count step is
+  // guaranteed to change something (until truly at the min/max clamp).
+  const stepByColumns = (delta: number): void => {
+    const nextColumnCount = Math.max(1, columnCount + delta)
+    const nextWidth = availableWidth > 0 ? availableWidth / nextColumnCount : cellWidth
+    setCellWidthPersisted(nextWidth)
+  }
+
+  // Keep a stable reference so react-window doesn't re-diff every visible
+  // cell whenever GalleryGrid re-renders for an unrelated reason.
+  const cellProps = useMemo(
+    () => ({
+      photos,
+      columnCount,
+      selectedPath: state.selectedPath,
+      onSelect: selectPhoto
+    }),
+    [photos, columnCount, state.selectedPath, selectPhoto]
+  )
 
   const galleryTitle = state.selectedTag
     ? `#${state.selectedTag}`
@@ -172,31 +193,28 @@ export function GalleryGrid(): ReactElement {
         ) : (
           <Grid<CellProps>
             cellComponent={PhotoCell}
-            cellProps={{
-              photos,
-              columnCount,
-              selectedPath: state.selectedPath,
-              onSelect: selectPhoto
-            }}
+            cellProps={cellProps}
             columnCount={columnCount}
-            columnWidth={cellWidth}
+            columnWidth={actualCellWidth}
             rowCount={rowCount}
             rowHeight={cellHeight}
             defaultWidth={size.width}
             defaultHeight={size.height}
+            style={{ overflowX: 'hidden' }}
           />
         )}
       </Box>
       {photos.length > 0 && (
         <Group gap="xs" wrap="nowrap" justify="flex-end" px="md" py="xs" style={{ flexShrink: 0 }}>
-          <UnstyledButton
-            p={4}
-            style={{ flexShrink: 0, display: 'flex' }}
-            onClick={() => setCellWidthPersisted(cellWidth - CELL_WIDTH_STEP)}
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            onClick={() => stepByColumns(1)}
             aria-label="Decrease thumbnail size"
           >
             <IconPhoto size={12} />
-          </UnstyledButton>
+          </ActionIcon>
           <Slider
             value={cellWidth}
             onChange={setCellWidth}
@@ -207,14 +225,14 @@ export function GalleryGrid(): ReactElement {
             label={null}
             w={120}
           />
-          <UnstyledButton
-            p={4}
-            style={{ flexShrink: 0, display: 'flex' }}
-            onClick={() => setCellWidthPersisted(cellWidth + CELL_WIDTH_STEP)}
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            onClick={() => stepByColumns(-1)}
             aria-label="Increase thumbnail size"
           >
             <IconPhoto size={22} />
-          </UnstyledButton>
+          </ActionIcon>
         </Group>
       )}
     </Flex>

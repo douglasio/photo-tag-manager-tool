@@ -1,7 +1,7 @@
-import { Button, Group, Modal } from '@mantine/core'
+import { Button, Group, Modal, Title } from '@mantine/core'
 import type { ReactElement, ReactNode } from 'react'
 
-interface TagConfirmDialogProps {
+interface ConfirmDialogProps {
   title: string
   opened: boolean
   saving: boolean
@@ -12,8 +12,8 @@ interface TagConfirmDialogProps {
   children: ReactNode
 }
 
-/** Shared shell for tag actions that need an explicit "this touches N files" confirmation. */
-export function TagConfirmDialog({
+/** Shared shell for any action that needs an explicit "this touches N things" confirmation. */
+export function ConfirmDialog({
   title,
   opened,
   saving,
@@ -22,9 +22,9 @@ export function TagConfirmDialog({
   onConfirm,
   onCancel,
   children
-}: TagConfirmDialogProps): ReactElement {
+}: ConfirmDialogProps): ReactElement {
   return (
-    <Modal opened={opened} onClose={onCancel} title={title} centered>
+    <Modal opened={opened} onClose={onCancel} title={<Title order={3}>{title}</Title>} centered>
       {children}
       <Group justify="flex-end" mt="lg">
         <Button variant="default" onClick={onCancel} disabled={saving}>

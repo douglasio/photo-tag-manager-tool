@@ -1,6 +1,6 @@
 import { Text } from '@mantine/core'
 import type { ReactElement } from 'react'
-import { TagConfirmDialog } from './TagConfirmDialog'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface TagRenameDialogProps {
   oldTag: string
@@ -22,7 +22,7 @@ export function TagRenameDialog({
   onCancel
 }: TagRenameDialogProps): ReactElement {
   return (
-    <TagConfirmDialog
+    <ConfirmDialog
       title="Rename tag"
       opened={opened}
       saving={saving}
@@ -45,6 +45,6 @@ export function TagRenameDialog({
         This will update the tag on {count} photo{count === 1 ? '' : 's'} — the change is written
         directly into each photo file&apos;s metadata and can&apos;t be automatically undone.
       </Text>
-    </TagConfirmDialog>
+    </ConfirmDialog>
   )
 }

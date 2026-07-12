@@ -1,6 +1,6 @@
 import { AppShell, Box, Divider, Group, Title } from '@mantine/core'
 import { PhotoLibraryProvider } from './state/PhotoLibraryContext'
-import { FolderSettingsModal } from './components/FolderSettingsModal'
+import { SettingsModal } from './components/SettingsModal'
 import { ScanProgressBar } from './components/ScanProgressBar'
 import { GalleryGrid } from './components/GalleryGrid'
 import { DetailPanel } from './components/DetailPanel'
@@ -26,7 +26,7 @@ function App(): React.JSX.Element {
             </Title>
             <Group gap="md" wrap="nowrap">
               <ScanProgressBar />
-              <FolderSettingsModal />
+              <SettingsModal />
             </Group>
           </Group>
         </AppShell.Header>
