@@ -5,7 +5,7 @@ function dirname(path: string): string {
   return idx === -1 ? path : path.slice(0, idx)
 }
 
-function basename(path: string): string {
+export function basename(path: string): string {
   const idx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
   return idx === -1 ? path : path.slice(idx + 1)
 }

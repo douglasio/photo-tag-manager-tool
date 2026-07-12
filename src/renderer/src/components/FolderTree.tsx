@@ -42,6 +42,7 @@ function FolderTreeInner({
       data={treeData}
       tree={tree}
       selectOnClick
+      expandOnClick={false}
       renderNode={({ node, expanded, hasChildren, selected, elementProps }) => {
         const { onClick, style, ...restProps } = elementProps
         const fileCount = (node.nodeProps as { fileCount?: number } | undefined)?.fileCount ?? 0
@@ -60,7 +61,16 @@ function FolderTreeInner({
             <Box
               w="var(--mantine-spacing-sm)"
               c="dimmed"
-              style={{ flexShrink: 0, display: 'flex' }}
+              style={{
+                flexShrink: 0,
+                display: 'flex',
+                cursor: hasChildren ? 'pointer' : undefined
+              }}
+              onClick={(event) => {
+                if (!hasChildren) return
+                event.stopPropagation()
+                tree.toggleExpanded(node.value)
+              }}
             >
               {hasChildren &&
                 (expanded ? (
@@ -72,7 +82,7 @@ function FolderTreeInner({
             <Text truncate="end" miw={0} style={{ flex: 1 }}>
               {node.label}
             </Text>
-            <Badge variant={selected ? 'filled' : 'light'} color="indigo">
+            <Badge variant={selected ? 'filled' : 'light'} color="var(--mantine-color-gray-7">
               {fileCount}
             </Badge>
           </Group>
