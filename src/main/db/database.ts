@@ -52,5 +52,20 @@ export function getDb(): Database.Database {
     db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')
   }
 
+  // Bumping THUMBNAIL_GENERATION (e.g. after changing thumbnailService's target
+  // size) marks every cached thumbnail stale so the next scan regenerates them
+  // at the new size, without needing a full library rescan or cache wipe.
+  const THUMBNAIL_GENERATION = '2'
+  const storedGeneration = db
+    .prepare("SELECT value FROM settings WHERE key = 'thumbnailGeneration'")
+    .get() as { value: string } | undefined
+  if (storedGeneration?.value !== THUMBNAIL_GENERATION) {
+    db.exec("UPDATE photos SET thumbnailStatus = 'pending', thumbnailKey = NULL")
+    db.prepare(
+      `INSERT INTO settings (key, value) VALUES ('thumbnailGeneration', @value)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    ).run({ value: THUMBNAIL_GENERATION })
+  }
+
   return db
 }

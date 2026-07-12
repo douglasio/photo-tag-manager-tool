@@ -13,7 +13,7 @@ import {
 } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react'
-import { useMemo, type ReactElement } from 'react'
+import { useMemo, type ReactElement, type ReactNode } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { foldersToTreeData } from '../utils/folderTree'
 import { activeHoverBackground } from '../utils/listItemStyles'
@@ -107,9 +107,7 @@ function TreeRow({ payload, isActive, onSelect, onToggleExpand }: TreeRowProps):
         <Text truncate="end" miw={0} flex="1">
           {node.label}
         </Text>
-        <Badge circle variant={isActive ? 'filled' : 'light'}>
-          {fileCount}
-        </Badge>
+        <FolderBadge isActive={isActive}>{fileCount}</FolderBadge>
       </Group>
     </Button>
   )
@@ -156,11 +154,31 @@ function FolderTreeInner({
   )
 }
 
+function FolderBadge({
+  isActive,
+  children
+}: {
+  isActive: boolean
+  children: ReactNode
+}): ReactElement {
+  return (
+    <Badge
+      circle
+      variant={isActive ? 'filled' : 'transparent'}
+      color={isActive ? undefined : 'gray'}
+    >
+      {children}
+    </Badge>
+  )
+}
+
 function AllPhotosRow({
   isActive,
+  count,
   onClick
 }: {
   isActive: boolean
+  count: number
   onClick: () => void
 }): ReactElement {
   const { hovered, ref } = useHover<HTMLButtonElement>()
@@ -170,11 +188,17 @@ function AllPhotosRow({
       ref={ref}
       onClick={onClick}
       bg={activeHoverBackground(isActive, hovered)}
-      justify="left"
+      w="100%"
       variant="transparent"
-      leftSection={' '}
+      justify="left"
+      leftSection={<Box w="md" style={{ flexShrink: 0 }} />}
     >
-      <Text>All Photos</Text>
+      <Group gap={6} wrap="nowrap" p={4}>
+        <Text truncate="end" miw={0} flex="1">
+          All Photos
+        </Text>
+        <FolderBadge isActive={isActive}>{count}</FolderBadge>
+      </Group>
     </Button>
   )
 }
@@ -190,6 +214,7 @@ export function FolderTree(): ReactElement {
     <Stack gap="md">
       <AllPhotosRow
         isActive={state.selectedFolder === null && state.selectedTag === null}
+        count={state.photosByPath.size}
         onClick={() => setFolderFilter(null)}
       />
       {state.folders.map((folder) => (

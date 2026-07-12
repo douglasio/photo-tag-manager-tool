@@ -11,7 +11,7 @@ import {
 } from 'react'
 import { notifications } from '@mantine/notifications'
 import { initialState, photoLibraryReducer, type PhotoLibraryState } from './photoLibraryReducer'
-import { isPhotoInFolder } from '../utils/folderTree'
+import { basename, isPhotoInFolder } from '../utils/folderTree'
 import type { PhotoRecord } from '../../../shared/types'
 
 // How long to wait after the last file-watcher event before summarizing the
@@ -30,12 +30,15 @@ interface PhotoLibraryContextValue {
   allTags: string[]
   tagCounts: Map<string, number>
   tagCoverPhotos: Map<string, PhotoRecord>
+  folderTags: string[]
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   cancelScan: () => Promise<void>
+  rescanAll: () => Promise<void>
   selectPhoto: (path: string | null) => void
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
+  setFolderTagFilter: (tag: string | null) => void
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
@@ -152,21 +155,48 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const addFolder = useCallback(async () => {
     const rootPath = await window.api.selectFolder()
     if (!rootPath) return
-    await window.api.addFolder(rootPath)
-    dispatch({ type: 'FOLDER_ADDED', folder: rootPath })
-    void startScanFor(rootPath)
+    try {
+      await window.api.addFolder(rootPath)
+      dispatch({ type: 'FOLDER_ADDED', folder: rootPath })
+      void startScanFor(rootPath)
+      notifications.show({ color: 'teal', message: `Added folder "${basename(rootPath)}"` })
+    } catch (err) {
+      console.error(`failed to add folder ${rootPath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to add folder' })
+      throw err
+    }
   }, [startScanFor])
 
-  const removeFolder = useCallback(async (folder: string) => {
-    await window.api.removeFolder(folder)
-    dispatch({ type: 'FOLDER_REMOVED', folder })
-  }, [])
+  const removeFolder = useCallback(
+    async (folder: string) => {
+      const count = state.folderCounts.get(folder) ?? 0
+      try {
+        await window.api.removeFolder(folder)
+        dispatch({ type: 'FOLDER_REMOVED', folder })
+        notifications.show({
+          color: 'red',
+          message: `Removed "${basename(folder)}" — ${count} photo${count === 1 ? '' : 's'} removed`
+        })
+      } catch (err) {
+        console.error(`failed to remove folder ${folder}`, err)
+        notifications.show({ color: 'red', message: 'Failed to remove folder' })
+        throw err
+      }
+    },
+    [state.folderCounts]
+  )
 
   const cancelScan = useCallback(async () => {
     if (!scanIdRef.current) return
     await window.api.cancelScan(scanIdRef.current)
     dispatch({ type: 'SCAN_CANCELED' })
   }, [])
+
+  const rescanAll = useCallback(async () => {
+    for (const folder of state.folders) {
+      await startScanFor(folder)
+    }
+  }, [state.folders, startScanFor])
 
   const selectPhoto = useCallback((path: string | null) => {
     dispatch({ type: 'SELECT_PHOTO', path })
@@ -195,6 +225,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const setTagFilter = useCallback((tag: string | null) => {
     dispatch({ type: 'SET_TAG_FILTER', tag })
+  }, [])
+
+  const setFolderTagFilter = useCallback((tag: string | null) => {
+    dispatch({ type: 'SET_FOLDER_TAG_FILTER', tag })
   }, [])
 
   const setTagDescription = useCallback(
@@ -254,12 +288,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.photosByPath]
   )
 
+  // Folder and tag filters stack rather than being mutually exclusive, so a
+  // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
+  // current folder instead of replacing it with a folder-agnostic tag view.
   const visiblePhotos = useMemo(() => {
-    if (state.selectedTag) {
-      return photos.filter((photo) => photo.tags.includes(state.selectedTag!))
+    let result = photos
+    if (state.selectedFolder) {
+      result = result.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
     }
-    if (!state.selectedFolder) return photos
-    return photos.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
+    if (state.selectedTag) {
+      result = result.filter((photo) => photo.tags.includes(state.selectedTag!))
+    }
+    return result
   }, [photos, state.selectedFolder, state.selectedTag])
 
   const selectedPhoto = useMemo(
@@ -283,6 +323,19 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
 
+  // Tags found among photos in the currently selected folder (independent of
+  // any active tag filter), used to render the folder's tag pills.
+  const folderTags = useMemo(() => {
+    if (!state.selectedFolder) return []
+    const tags = new Set<string>()
+    for (const photo of photos) {
+      if (isPhotoInFolder(photo.filePath, state.selectedFolder!)) {
+        for (const tag of photo.tags) tags.add(tag)
+      }
+    }
+    return Array.from(tags).sort()
+  }, [photos, state.selectedFolder])
+
   const value: PhotoLibraryContextValue = {
     state,
     photos,
@@ -291,12 +344,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     allTags,
     tagCounts,
     tagCoverPhotos,
+    folderTags,
     addFolder,
     removeFolder,
     cancelScan,
+    rescanAll,
     selectPhoto,
     setFolderFilter,
     setTagFilter,
+    setFolderTagFilter,
     updateTags,
     setTagDescription,
     renameTag,

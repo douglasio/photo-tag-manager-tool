@@ -1,6 +1,6 @@
 import { Text } from '@mantine/core'
 import type { ReactElement } from 'react'
-import { TagConfirmDialog } from './TagConfirmDialog'
+import { ConfirmDialog } from './ConfirmDialog'
 
 interface TagDeleteDialogProps {
   tag: string
@@ -20,7 +20,7 @@ export function TagDeleteDialog({
   onCancel
 }: TagDeleteDialogProps): ReactElement {
   return (
-    <TagConfirmDialog
+    <ConfirmDialog
       title="Delete tag"
       opened={opened}
       saving={saving}
@@ -40,6 +40,6 @@ export function TagDeleteDialog({
         This will remove the tag from {count} photo{count === 1 ? '' : 's'} — the change is written
         directly into each photo file&apos;s metadata and can&apos;t be automatically undone.
       </Text>
-    </TagConfirmDialog>
+    </ConfirmDialog>
   )
 }
