@@ -29,3 +29,13 @@ export function getFolders(): string[] {
 export function setFolders(folders: string[]): void {
   setSetting('watchedFolders', JSON.stringify(folders))
 }
+
+export function getGalleryCellWidth(): number | null {
+  const raw = getSetting('galleryCellWidth')
+  const parsed = raw ? Number(raw) : NaN
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export function setGalleryCellWidth(width: number): void {
+  setSetting('galleryCellWidth', String(width))
+}

@@ -33,6 +33,7 @@ interface PhotoLibraryContextValue {
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   cancelScan: () => Promise<void>
+  rescanAll: () => Promise<void>
   selectPhoto: (path: string | null) => void
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
@@ -168,6 +169,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SCAN_CANCELED' })
   }, [])
 
+  const rescanAll = useCallback(async () => {
+    for (const folder of state.folders) {
+      await startScanFor(folder)
+    }
+  }, [state.folders, startScanFor])
+
   const selectPhoto = useCallback((path: string | null) => {
     dispatch({ type: 'SELECT_PHOTO', path })
   }, [])
@@ -294,6 +301,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     addFolder,
     removeFolder,
     cancelScan,
+    rescanAll,
     selectPhoto,
     setFolderFilter,
     setTagFilter,

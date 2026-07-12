@@ -67,7 +67,7 @@ export function ScanProgressBar(): ReactElement | null {
           </Button>
         </Popover.Target>
         <Popover.Dropdown>
-          <ScanLogContent />
+          <ScanLogContent onRescan={closeLog} />
         </Popover.Dropdown>
       </Popover>
       {state.status === 'scanning' && (

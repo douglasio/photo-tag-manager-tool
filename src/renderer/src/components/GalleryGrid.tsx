@@ -1,4 +1,15 @@
-import { Box, Center, Group, Loader, Text, Title } from '@mantine/core'
+import {
+  Box,
+  Center,
+  Flex,
+  Group,
+  Loader,
+  Slider,
+  Text,
+  Title,
+  UnstyledButton
+} from '@mantine/core'
+import { IconPhoto } from '@tabler/icons-react'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
@@ -9,8 +20,20 @@ import { TagNameEditor } from './TagNameEditor'
 import { basename } from '../utils/folderTree'
 import type { PhotoRecord } from '../../../shared/types'
 
-const CELL_WIDTH = 168
-const CELL_HEIGHT = 196
+const DEFAULT_CELL_WIDTH = 168
+// The filename label below each thumbnail takes roughly this much extra
+// vertical space regardless of thumbnail size, so cell height tracks width
+// with a constant offset rather than a fixed aspect ratio.
+const CELL_LABEL_HEIGHT = 28
+const MIN_CELL_WIDTH = 100
+// Stays under thumbnailService's THUMBNAIL_LONG_EDGE (640px) so the largest
+// setting still displays a natively-generated thumbnail rather than upscaling it.
+const MAX_CELL_WIDTH = 600
+const CELL_WIDTH_STEP = 40
+
+function clampCellWidth(value: number): number {
+  return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, value))
+}
 
 interface CellProps {
   photos: PhotoRecord[]
@@ -32,7 +55,7 @@ function PhotoCell({
   const photo = photos[index]
   if (!photo) return <div style={style} />
   return (
-    <Box style={{ ...style, padding: 6 }}>
+    <Box style={style} p={6}>
       <PhotoThumbnail
         photo={photo}
         selected={photo.filePath === selectedPath}
@@ -54,6 +77,8 @@ export function GalleryGrid(): ReactElement {
   } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
+  const [cellWidth, setCellWidth] = useState(DEFAULT_CELL_WIDTH)
+  const cellHeight = cellWidth + CELL_LABEL_HEIGHT
 
   useEffect(() => {
     const el = containerRef.current
@@ -66,7 +91,19 @@ export function GalleryGrid(): ReactElement {
     return () => observer.disconnect()
   }, [])
 
-  const columnCount = Math.max(1, Math.floor(size.width / CELL_WIDTH))
+  useEffect(() => {
+    window.api.getGalleryCellWidth().then((width) => {
+      if (width !== null) setCellWidth(clampCellWidth(width))
+    })
+  }, [])
+
+  const setCellWidthPersisted = (width: number): void => {
+    const clamped = clampCellWidth(width)
+    setCellWidth(clamped)
+    void window.api.setGalleryCellWidth(clamped)
+  }
+
+  const columnCount = Math.max(1, Math.floor(size.width / cellWidth))
   const rowCount = Math.ceil(photos.length / columnCount)
 
   const galleryTitle = state.selectedTag
@@ -82,12 +119,12 @@ export function GalleryGrid(): ReactElement {
     : ''
 
   return (
-    <Box style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+    <Flex direction="column" flex={1} miw={0}>
       {galleryTitle && (
-        <Box px="md" py="sm" style={{ flexShrink: 0, minWidth: 0 }}>
+        <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
           {state.selectedTag ? (
             <Group gap={4} wrap="nowrap" align="center">
-              <Box style={{ flex: 1, minWidth: 0 }}>
+              <Box flex={1} miw={0}>
                 <TagNameEditor
                   tag={state.selectedTag}
                   count={tagCounts.get(state.selectedTag) ?? 0}
@@ -120,7 +157,7 @@ export function GalleryGrid(): ReactElement {
           )}
         </Box>
       )}
-      <Box ref={containerRef} style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+      <Box ref={containerRef} flex={1} miw={0} style={{ overflow: 'hidden' }}>
         {photos.length === 0 ? (
           <Center h="100%">
             {state.status === 'scanning' ? (
@@ -142,14 +179,44 @@ export function GalleryGrid(): ReactElement {
               onSelect: selectPhoto
             }}
             columnCount={columnCount}
-            columnWidth={CELL_WIDTH}
+            columnWidth={cellWidth}
             rowCount={rowCount}
-            rowHeight={CELL_HEIGHT}
+            rowHeight={cellHeight}
             defaultWidth={size.width}
             defaultHeight={size.height}
           />
         )}
       </Box>
-    </Box>
+      {photos.length > 0 && (
+        <Group gap="xs" wrap="nowrap" justify="flex-end" px="md" py="xs" style={{ flexShrink: 0 }}>
+          <UnstyledButton
+            p={4}
+            style={{ flexShrink: 0, display: 'flex' }}
+            onClick={() => setCellWidthPersisted(cellWidth - CELL_WIDTH_STEP)}
+            aria-label="Decrease thumbnail size"
+          >
+            <IconPhoto size={12} />
+          </UnstyledButton>
+          <Slider
+            value={cellWidth}
+            onChange={setCellWidth}
+            onChangeEnd={setCellWidthPersisted}
+            min={MIN_CELL_WIDTH}
+            max={MAX_CELL_WIDTH}
+            step={4}
+            label={null}
+            w={120}
+          />
+          <UnstyledButton
+            p={4}
+            style={{ flexShrink: 0, display: 'flex' }}
+            onClick={() => setCellWidthPersisted(cellWidth + CELL_WIDTH_STEP)}
+            aria-label="Increase thumbnail size"
+          >
+            <IconPhoto size={22} />
+          </UnstyledButton>
+        </Group>
+      )}
+    </Flex>
   )
 }

@@ -1,5 +1,14 @@
-import { Badge, Group, Loader, ScrollArea, Stack, Text, useMantineTheme } from '@mantine/core'
-import { IconCheck, IconX } from '@tabler/icons-react'
+import {
+  Badge,
+  Button,
+  Group,
+  Loader,
+  ScrollArea,
+  Stack,
+  Text,
+  useMantineTheme
+} from '@mantine/core'
+import { IconCheck, IconRefresh, IconX } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import type { ThumbnailStatus } from '../../../shared/types'
@@ -39,10 +48,15 @@ function StatusBadge({
   )
 }
 
-export function ScanLogContent(): ReactElement {
-  const { photos, state } = usePhotoLibrary()
+interface ScanLogContentProps {
+  onRescan: () => void
+}
+
+export function ScanLogContent({ onRescan }: ScanLogContentProps): ReactElement {
+  const { photos, state, rescanAll } = usePhotoLibrary()
 
   const hasEntries = photos.length > 0 || state.errors.length > 0
+  const scanning = state.status === 'scanning'
 
   return (
     <Stack gap="xs">
@@ -79,7 +93,21 @@ export function ScanLogContent(): ReactElement {
           {!hasEntries && <Text c="dimmed">No scan activity yet.</Text>}
         </Stack>
       </ScrollArea.Autosize>
-      <Text c="dimmed">({state.cacheHits} from cache)</Text>
+      <Group justify="space-between">
+        <Text c="dimmed">({state.cacheHits} from cache)</Text>
+        <Button
+          variant="light"
+          leftSection={<IconRefresh size={14} />}
+          loading={scanning}
+          disabled={state.folders.length === 0}
+          onClick={() => {
+            void rescanAll()
+            onRescan()
+          }}
+        >
+          Rescan
+        </Button>
+      </Group>
     </Stack>
   )
 }

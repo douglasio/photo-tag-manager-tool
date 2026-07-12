@@ -4,7 +4,7 @@ import { mkdir, unlink } from 'fs/promises'
 import { join } from 'path'
 import sharp from 'sharp'
 
-const THUMBNAIL_LONG_EDGE = 300
+const THUMBNAIL_LONG_EDGE = 640
 const THUMBNAIL_QUALITY = 80
 
 let thumbnailDir: string | null = null
@@ -17,8 +17,13 @@ async function getThumbnailDir(): Promise<string> {
   return thumbnailDir
 }
 
+// Folding THUMBNAIL_LONG_EDGE into the key means bumping it invalidates every
+// existing thumbnail key automatically — paired with the generation check in
+// database.ts, that's what forces a one-time regeneration at the new size.
 export function thumbnailKeyFor(filePath: string, mtimeMs: number, sizeBytes: number): string {
-  return createHash('sha1').update(`${filePath}:${mtimeMs}:${sizeBytes}`).digest('hex')
+  return createHash('sha1')
+    .update(`${filePath}:${mtimeMs}:${sizeBytes}:${THUMBNAIL_LONG_EDGE}`)
+    .digest('hex')
 }
 
 export async function thumbnailFilePath(thumbnailKey: string): Promise<string> {
