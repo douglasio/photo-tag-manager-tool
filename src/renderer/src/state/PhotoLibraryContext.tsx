@@ -27,11 +27,13 @@ interface PhotoLibraryContextValue {
   photos: PhotoRecord[]
   visiblePhotos: PhotoRecord[]
   selectedPhoto: PhotoRecord | null
+  allTags: string[]
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   cancelScan: () => Promise<void>
   selectPhoto: (path: string | null) => void
   setFolderFilter: (folder: string | null) => void
+  updateTags: (filePath: string, tags: string[]) => Promise<void>
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -158,6 +160,23 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SELECT_PHOTO', path })
   }, [])
 
+  const updateTags = useCallback(
+    async (filePath: string, tags: string[]) => {
+      const current = state.photosByPath.get(filePath)
+      if (current) dispatch({ type: 'PHOTO_UPSERTED', photo: { ...current, tags } })
+
+      try {
+        const photo = await window.api.updateTags(filePath, tags)
+        dispatch({ type: 'PHOTO_UPSERTED', photo })
+      } catch (err) {
+        console.error(`failed to update tags for ${filePath}`, err)
+        notifications.show({ color: 'red', message: 'Failed to save tags' })
+        if (current) dispatch({ type: 'PHOTO_UPSERTED', photo: current })
+      }
+    },
+    [state.photosByPath]
+  )
+
   const setFolderFilter = useCallback((folder: string | null) => {
     dispatch({ type: 'SET_FOLDER_FILTER', folder })
   }, [])
@@ -178,16 +197,23 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.selectedPath, state.photosByPath]
   )
 
+  const allTags = useMemo(
+    () => Array.from(new Set(photos.flatMap((photo) => photo.tags))).sort(),
+    [photos]
+  )
+
   const value: PhotoLibraryContextValue = {
     state,
     photos,
     visiblePhotos,
     selectedPhoto,
+    allTags,
     addFolder,
     removeFolder,
     cancelScan,
     selectPhoto,
-    setFolderFilter
+    setFolderFilter,
+    updateTags
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

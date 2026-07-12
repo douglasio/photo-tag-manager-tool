@@ -42,6 +42,18 @@ function dateToIso(value: Tags['DateTimeOriginal'] | Tags['CreateDate']): string
   return value.toISOString?.() ?? String(value)
 }
 
+export async function writeTags(filePath: string, tags: string[]): Promise<void> {
+  // Keywords (IPTC) and Subject (XMP) are the two fields mergeTags() reads back;
+  // writing both keeps other tools (Lightroom, Photos, etc.) in sync too. A `null`
+  // value clears the tag entirely, which a plain empty array won't do.
+  const value = tags.length > 0 ? tags : null
+  await getExifTool().write(
+    filePath,
+    { Keywords: value, Subject: value },
+    { writeArgs: ['-overwrite_original'] }
+  )
+}
+
 export async function readPhotoRecord(filePath: string): Promise<PhotoRecord> {
   const fileStat = await stat(filePath)
   const tags = await getExifTool().read(filePath)

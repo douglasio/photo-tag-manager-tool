@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
+import { registerTagHandlers } from './ipc/tagHandlers'
 import {
   registerThumbProtocolHandler,
   registerThumbProtocolScheme
@@ -71,6 +72,7 @@ if (!app.requestSingleInstanceLock()) {
     registerDialogHandlers()
     registerScanHandlers()
     registerSettingsHandlers()
+    registerTagHandlers()
 
     createWindow()
 

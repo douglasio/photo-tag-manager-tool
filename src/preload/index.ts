@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
   MetadataBatchEvent,
+  PhotoRecord,
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
@@ -24,6 +25,8 @@ const api = {
   startScan: (rootPath: string): Promise<ScanStartResult> =>
     ipcRenderer.invoke('scan:start', rootPath),
   cancelScan: (scanId: string): Promise<void> => ipcRenderer.invoke('scan:cancel', scanId),
+  updateTags: (filePath: string, tags: string[]): Promise<PhotoRecord> =>
+    ipcRenderer.invoke('tags:update', filePath, tags),
   onScanProgress: (callback: (payload: ScanProgressEvent) => void): (() => void) =>
     subscribe('scan:progress', callback),
   onMetadataBatch: (callback: (payload: MetadataBatchEvent) => void): (() => void) =>

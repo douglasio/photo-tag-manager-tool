@@ -1,20 +1,25 @@
-import { Pill, Text } from '@mantine/core'
+import { TagsInput } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 interface TagListProps {
   tags: string[]
+  allTags: string[]
+  onChange: (tags: string[]) => void
 }
 
-export function TagList({ tags }: TagListProps): ReactElement {
-  if (tags.length === 0) {
-    return <Text c="dimmed">No tags</Text>
-  }
-
+export function TagList({ tags, allTags, onChange }: TagListProps): ReactElement {
   return (
-    <Pill.Group>
-      {tags.map((tag) => (
-        <Pill key={tag}>{tag}</Pill>
-      ))}
-    </Pill.Group>
+    <TagsInput
+      value={tags}
+      onChange={onChange}
+      data={allTags}
+      placeholder="Add a tag…"
+      size="md"
+      styles={{
+        pill: {
+          backgroundColor: 'var(--mantine-primary-color-light)'
+        }
+      }}
+    />
   )
 }

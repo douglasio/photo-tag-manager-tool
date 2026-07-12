@@ -29,7 +29,7 @@ function DetailRow({ label, value }: { label: string; value: string }): ReactEle
 }
 
 export function DetailPanel(): ReactElement {
-  const { selectedPhoto } = usePhotoLibrary()
+  const { selectedPhoto, allTags, updateTags } = usePhotoLibrary()
 
   if (!selectedPhoto) {
     return (
@@ -53,7 +53,11 @@ export function DetailPanel(): ReactElement {
         <Text fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
           Tags
         </Text>
-        <TagList tags={selectedPhoto.tags} />
+        <TagList
+          tags={selectedPhoto.tags}
+          allTags={allTags}
+          onChange={(tags) => void updateTags(selectedPhoto.filePath, tags)}
+        />
       </Stack>
 
       <Stack gap="xs">
