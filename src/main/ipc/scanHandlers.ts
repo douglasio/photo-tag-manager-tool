@@ -1,11 +1,10 @@
 import { ipcMain, type WebContents } from 'electron'
 import { randomUUID } from 'crypto'
-import { stat } from 'fs/promises'
 import pLimitImport from 'p-limit'
 import { scanDirectory } from '../services/directoryScanner'
-import { readPhotoRecord } from '../services/metadataService'
-import { generateThumbnail, thumbnailKeyFor, deleteThumbnail } from '../services/thumbnailService'
-import { findByPath, upsertPhoto, updateThumbnail, pruneMissing } from '../db/photoRepository'
+import { ingestFile } from '../services/photoIngest'
+import { deleteThumbnail } from '../services/thumbnailService'
+import { pruneMissing } from '../db/photoRepository'
 import type {
   MetadataBatchEvent,
   PhotoRecord,
@@ -47,41 +46,6 @@ export function registerScanHandlers(): void {
     const state = activeScans.get(scanId)
     if (state) state.cancelled = true
   })
-}
-
-async function processFile(
-  filePath: string,
-  thumbnailLimit: <T>(fn: () => Promise<T>) => Promise<T>
-): Promise<{ photo: PhotoRecord; fromCache: boolean }> {
-  const fileStat = await stat(filePath)
-  const cached = findByPath(filePath)
-
-  let photo: PhotoRecord
-  let fromCache = false
-
-  if (cached && cached.mtimeMs === fileStat.mtimeMs && cached.sizeBytes === fileStat.size) {
-    photo = { ...cached.record, fromCache: true }
-    fromCache = true
-  } else {
-    photo = await readPhotoRecord(filePath)
-    upsertPhoto(photo, fileStat.mtimeMs, fileStat.size)
-  }
-
-  if (photo.thumbnailStatus !== 'ready') {
-    const key = thumbnailKeyFor(filePath, fileStat.mtimeMs, fileStat.size)
-    await thumbnailLimit(async () => {
-      try {
-        await generateThumbnail(filePath, key)
-        updateThumbnail(filePath, key, 'ready')
-        photo = { ...photo, thumbnailStatus: 'ready', thumbnailKey: key }
-      } catch {
-        updateThumbnail(filePath, key, 'error')
-        photo = { ...photo, thumbnailStatus: 'error', thumbnailKey: null }
-      }
-    })
-  }
-
-  return { photo, fromCache }
 }
 
 async function runScan(
@@ -134,7 +98,7 @@ async function runScan(
       metadataLimit(async () => {
         if (state.cancelled) return
         try {
-          const result = await processFile(filePath, thumbnailLimit)
+          const result = await ingestFile(filePath, thumbnailLimit)
           if (result.fromCache) cacheHits++
           pendingBatch.push(result.photo)
           flush()

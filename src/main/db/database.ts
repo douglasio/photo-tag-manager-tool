@@ -37,5 +37,10 @@ export function getDb(): Database.Database {
     )
   `)
 
+  const photoColumns = db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]
+  if (!photoColumns.some((column) => column.name === 'comment')) {
+    db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')
+  }
+
   return db
 }

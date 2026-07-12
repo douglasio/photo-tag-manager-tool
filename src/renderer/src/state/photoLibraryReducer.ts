@@ -1,4 +1,9 @@
-import { addPhotoToFolderTree, isPathUnderOrEqual } from '../utils/folderTree'
+import {
+  addPhotoToFolderTree,
+  findRootFolder,
+  isPathUnderOrEqual,
+  removePhotoFromFolderTree
+} from '../utils/folderTree'
 import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
 
 export type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
@@ -44,6 +49,8 @@ export type PhotoLibraryAction =
   | { type: 'SCAN_CANCELED' }
   | { type: 'SELECT_PHOTO'; path: string | null }
   | { type: 'SET_FOLDER_FILTER'; folder: string | null }
+  | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
+  | { type: 'PHOTO_REMOVED'; filePath: string }
 
 export function photoLibraryReducer(
   state: PhotoLibraryState,
@@ -127,6 +134,32 @@ export function photoLibraryReducer(
       return { ...state, selectedPath: action.path }
     case 'SET_FOLDER_FILTER':
       return { ...state, selectedFolder: action.folder }
+    case 'PHOTO_UPSERTED': {
+      const rootFolder = findRootFolder(action.photo.filePath, state.folders)
+      const photosByPath = new Map(state.photosByPath)
+      const folderCounts = new Map(state.folderCounts)
+      const folderChildren = new Map(state.folderChildren)
+      if (rootFolder && !photosByPath.has(action.photo.filePath)) {
+        addPhotoToFolderTree(action.photo.filePath, rootFolder, folderCounts, folderChildren)
+      }
+      photosByPath.set(action.photo.filePath, action.photo)
+      return { ...state, photosByPath, folderCounts, folderChildren }
+    }
+    case 'PHOTO_REMOVED': {
+      if (!state.photosByPath.has(action.filePath)) return state
+
+      const rootFolder = findRootFolder(action.filePath, state.folders)
+      const photosByPath = new Map(state.photosByPath)
+      photosByPath.delete(action.filePath)
+      const folderCounts = new Map(state.folderCounts)
+      const folderChildren = new Map(state.folderChildren)
+      if (rootFolder) {
+        removePhotoFromFolderTree(action.filePath, rootFolder, folderCounts, folderChildren)
+      }
+      const selectedPath = state.selectedPath === action.filePath ? null : state.selectedPath
+
+      return { ...state, photosByPath, folderCounts, folderChildren, selectedPath }
+    }
     default:
       return state
   }

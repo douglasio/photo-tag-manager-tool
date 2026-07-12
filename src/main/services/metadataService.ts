@@ -53,7 +53,8 @@ export async function readPhotoRecord(filePath: string): Promise<PhotoRecord> {
     widthPx: tags.ImageWidth ?? null,
     heightPx: tags.ImageHeight ?? null,
     fileSizeBytes: fileStat.size,
-    format: formatFromExtension(filePath)
+    format: formatFromExtension(filePath),
+    comment: tags.UserComment ?? tags.Description ?? null
   }
 
   return {

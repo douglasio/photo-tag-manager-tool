@@ -52,6 +52,49 @@ export function addPhotoToFolderTree(
   }
 }
 
+/** Mirror image of addPhotoToFolderTree, for when a watched file is deleted or moves out of scope. */
+export function removePhotoFromFolderTree(
+  filePath: string,
+  rootPath: string,
+  counts: Map<string, number>,
+  childrenOf: Map<string, Set<string>>
+): void {
+  const chain: string[] = []
+  let dir = dirname(filePath)
+  while (dir.length >= rootPath.length && dir.startsWith(rootPath)) {
+    chain.push(dir)
+    if (dir === rootPath) break
+    dir = dirname(dir)
+  }
+  chain.reverse()
+
+  for (const folder of chain) {
+    const next = (counts.get(folder) ?? 0) - 1
+    if (next > 0) {
+      counts.set(folder, next)
+    } else {
+      counts.delete(folder)
+      childrenOf.delete(folder)
+    }
+  }
+  for (let i = 0; i < chain.length - 1; i++) {
+    if (!counts.has(chain[i + 1])) {
+      childrenOf.get(chain[i])?.delete(chain[i + 1])
+    }
+  }
+}
+
+/** Finds which watched root folder (if any) a file path falls under. */
+export function findRootFolder(filePath: string, folders: string[]): string | null {
+  let best: string | null = null
+  for (const folder of folders) {
+    if (isPathUnderOrEqual(filePath, folder) && (best === null || folder.length > best.length)) {
+      best = folder
+    }
+  }
+  return best
+}
+
 /**
  * Flattens the accumulated counts/hierarchy maps into a Mantine Tree data
  * structure. Cost is O(folders log folders), not O(photos) — folders are
