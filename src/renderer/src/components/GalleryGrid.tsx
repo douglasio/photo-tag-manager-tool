@@ -245,13 +245,7 @@ export function GalleryGrid(): ReactElement {
       </Box>
       {photos.length > 0 && (
         <Group gap="xs" wrap="nowrap" justify="flex-end" px="md" py="xs" style={{ flexShrink: 0 }}>
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            size="sm"
-            onClick={() => stepByColumns(1)}
-            aria-label="Decrease thumbnail size"
-          >
+          <ActionIcon onClick={() => stepByColumns(1)} aria-label="Decrease thumbnail size">
             <IconPhoto size={12} />
           </ActionIcon>
           <Slider
@@ -264,12 +258,7 @@ export function GalleryGrid(): ReactElement {
             label={null}
             w={120}
           />
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            onClick={() => stepByColumns(-1)}
-            aria-label="Increase thumbnail size"
-          >
+          <ActionIcon onClick={() => stepByColumns(-1)} aria-label="Increase thumbnail size">
             <IconPhoto size={22} />
           </ActionIcon>
         </Group>

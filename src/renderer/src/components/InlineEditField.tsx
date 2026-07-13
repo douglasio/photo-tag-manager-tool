@@ -34,13 +34,8 @@ export function InlineEditField({
       </Box>
       {!editing && (
         <ActionIcon
-          variant="subtle"
-          size="sm"
           style={{
-            flexShrink: 0,
-            opacity: hovered ? 0.7 : 0,
-            pointerEvents: hovered ? 'auto' : 'none',
-            transition: 'opacity 120ms ease'
+            opacity: hovered ? 0.7 : 0
           }}
           onClick={onStartEdit}
         >

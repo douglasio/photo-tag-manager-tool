@@ -12,7 +12,15 @@ import {
 import { notifications } from '@mantine/notifications'
 import { initialState, photoLibraryReducer, type PhotoLibraryState } from './photoLibraryReducer'
 import { basename, isPhotoInFolder } from '../utils/folderTree'
+import { toDisplayMetadata, type DisplayMetadata } from '../utils/metadataDisplay'
 import type { PhotoRecord } from '../../../shared/types'
+
+// selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
+// only it gets the labeled/display-formatted shape — transforming the whole
+// photos array on every render would be wasted work for fields nothing reads.
+export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
+  metadata: DisplayMetadata
+}
 
 // How long to wait after the last file-watcher event before summarizing the
 // batch into a single toast, so a bulk copy/delete doesn't spam a toast per file.
@@ -26,7 +34,7 @@ interface PhotoLibraryContextValue {
   state: PhotoLibraryState
   photos: PhotoRecord[]
   visiblePhotos: PhotoRecord[]
-  selectedPhoto: PhotoRecord | null
+  selectedPhoto: DisplayPhotoRecord | null
   allTags: string[]
   tagCounts: Map<string, number>
   tagCoverPhotos: Map<string, PhotoRecord>
@@ -302,10 +310,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return result
   }, [photos, state.selectedFolder, state.selectedTag])
 
-  const selectedPhoto = useMemo(
-    () => (state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null),
-    [state.selectedPath, state.photosByPath]
-  )
+  const selectedPhoto = useMemo(() => {
+    const raw = state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null
+    return raw ? { ...raw, metadata: toDisplayMetadata(raw.metadata) } : null
+  }, [state.selectedPath, state.photosByPath])
 
   // photos is already sorted, so the first photo seen for a tag is a stable,
   // deterministic "cover" pick — no extra pass or bookkeeping required.

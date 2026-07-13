@@ -38,13 +38,10 @@ export function TagDeleteButton({ tag, count, onDelete }: TagDeleteButtonProps):
       <Tooltip label="Delete tag">
         <ActionIcon
           ref={ref}
-          variant="subtle"
           color="red"
           size="md"
           style={{
-            flexShrink: 0,
-            opacity: hovered ? 0.7 : 0.25,
-            transition: 'opacity 120ms ease'
+            opacity: hovered ? 0.7 : 0.25
           }}
           onClick={() => setConfirming(true)}
           aria-label="Delete tag"

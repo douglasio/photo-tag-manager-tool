@@ -31,7 +31,7 @@ export function FolderRemoveButton({ folder, count }: FolderRemoveButtonProps): 
     <>
       <Tooltip label="Remove folder">
         <ActionIcon
-          variant="subtle"
+          size="md"
           color="red"
           onClick={() => setConfirming(true)}
           aria-label={`Remove ${folder}`}

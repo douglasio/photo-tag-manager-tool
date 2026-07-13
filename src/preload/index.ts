@@ -19,6 +19,7 @@ function subscribe<T>(channel: string, callback: (payload: T) => void): () => vo
 const api = {
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectFolder'),
   getFolders: (): Promise<string[]> => ipcRenderer.invoke('settings:getFolders'),
+  showItemInFolder: (path: string) => ipcRenderer.invoke('show-item-in-folder', path),
   getGalleryCellWidth: (): Promise<number | null> =>
     ipcRenderer.invoke('settings:getGalleryCellWidth'),
   setGalleryCellWidth: (width: number): Promise<void> =>

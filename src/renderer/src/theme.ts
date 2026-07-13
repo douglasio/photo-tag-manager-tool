@@ -14,7 +14,12 @@ export const theme = createTheme({
     // an explicit radius="md" prop to stay consistent with the rest of the UI.
     ActionIcon: ActionIcon.extend({
       defaultProps: {
-        radius: radiusSize
+        radius: radiusSize,
+        size: 'sm',
+        variant: 'subtle',
+        styles: {
+          root: { transition: 'opacity 120ms ease' }
+        }
       }
     }),
     Button: Button.extend({
