@@ -14,6 +14,7 @@ import { IconPhoto } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { useCtrlKeyHeld } from '../hooks/useCtrlKeyHeld'
 import { PhotoContextMenu } from './PhotoContextMenu'
 import { PhotoThumbnail } from './PhotoThumbnail'
 import { TagDeleteButton } from './TagDeleteButton'
@@ -36,9 +37,18 @@ const MAX_CELL_WIDTH = 600
 // column overflows the scrollbar's width and the grid gains an unwanted
 // horizontal scrollbar.
 const SCROLLBAR_RESERVE_PX = 16
+const MIN_PREVIEW_SCALE = 0.5
+const MAX_PREVIEW_SCALE = 3
+// A typical wheel "notch" reports a deltaY of roughly 100, so this yields
+// about a 0.15x change per notch — noticeable without feeling twitchy.
+const PREVIEW_ZOOM_SENSITIVITY = 0.0015
 
 function clampCellWidth(value: number): number {
   return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, value))
+}
+
+function clampPreviewScale(value: number): number {
+  return Math.min(MAX_PREVIEW_SCALE, Math.max(MIN_PREVIEW_SCALE, value))
 }
 
 interface CellProps {
@@ -50,6 +60,8 @@ interface CellProps {
   onStartRename: (path: string) => void
   onStopRename: () => void
   onRename: (filePath: string, newBaseName: string) => Promise<void>
+  ctrlHeld: boolean
+  previewScale: number
 }
 
 function PhotoCell({
@@ -63,7 +75,9 @@ function PhotoCell({
   renamingPath,
   onStartRename,
   onStopRename,
-  onRename
+  onRename,
+  ctrlHeld,
+  previewScale
 }: CellComponentProps<CellProps>): ReactElement {
   const index = rowIndex * columnCount + columnIndex
   const photo = photos[index]
@@ -79,6 +93,8 @@ function PhotoCell({
           onStartRename={() => onStartRename(photo.filePath)}
           onStopRename={onStopRename}
           onRename={(newBaseName) => onRename(photo.filePath, newBaseName)}
+          ctrlHeld={ctrlHeld}
+          previewScale={previewScale}
         />
       </PhotoContextMenu>
     </Box>
@@ -105,6 +121,39 @@ export function GalleryGrid(): ReactElement {
   // instances across different photos as the user scrolls — per-cell local
   // state would risk leaking "is renaming" onto the wrong photo.
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const ctrlHeld = useCtrlKeyHeld()
+  // A ref mirror of ctrlHeld so the native wheel listener below (attached
+  // once) always reads the latest value without needing to re-subscribe.
+  const ctrlHeldRef = useRef(ctrlHeld)
+  useEffect(() => {
+    ctrlHeldRef.current = ctrlHeld
+  }, [ctrlHeld])
+  const [previewScale, setPreviewScale] = useState(1)
+  // Reset the zoom once Ctrl is released, so the next Ctrl+hover session
+  // starts fresh — adjusted during render (not a useEffect) per this
+  // codebase's pattern for resetting state when an external value changes.
+  const [wasCtrlHeld, setWasCtrlHeld] = useState(ctrlHeld)
+  if (ctrlHeld !== wasCtrlHeld) {
+    setWasCtrlHeld(ctrlHeld)
+    if (!ctrlHeld) setPreviewScale(1)
+  }
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    // React's synthetic onWheel attaches its DOM listener as passive, so
+    // event.preventDefault() inside it is silently ignored by the browser
+    // (Chrome just logs a "preventDefault inside passive listener" warning)
+    // and the grid keeps scrolling underneath the zoom. A manually attached
+    // { passive: false } listener is the only way to actually cancel it.
+    const handleWheel = (event: WheelEvent): void => {
+      if (!ctrlHeldRef.current) return
+      event.preventDefault()
+      setPreviewScale((scale) => clampPreviewScale(scale - event.deltaY * PREVIEW_ZOOM_SENSITIVITY))
+    }
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
@@ -159,9 +208,20 @@ export function GalleryGrid(): ReactElement {
       renamingPath,
       onStartRename: setRenamingPath,
       onStopRename: () => setRenamingPath(null),
-      onRename: renameFile
+      onRename: renameFile,
+      ctrlHeld,
+      previewScale
     }),
-    [photos, columnCount, state.selectedPath, selectPhoto, renamingPath, renameFile]
+    [
+      photos,
+      columnCount,
+      state.selectedPath,
+      selectPhoto,
+      renamingPath,
+      renameFile,
+      ctrlHeld,
+      previewScale
+    ]
   )
 
   // A "pure" tag view (navigated via the Tags panel, no folder context) shows

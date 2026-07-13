@@ -2,6 +2,7 @@ import { Box, Menu, MultiSelect } from '@mantine/core'
 import { IconEdit, IconExternalLink, IconFolderOpen, IconTag } from '@tabler/icons-react'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { isMac } from '../utils/platform'
 import type { PhotoRecord } from '../../../shared/types'
 
 interface PhotoContextMenuProps {
@@ -18,8 +19,6 @@ export function PhotoContextMenu({
   const { openPhoto, allTags, updateTags } = usePhotoLibrary()
   const [opened, setOpened] = useState(false)
   const [addingTag, setAddingTag] = useState(false)
-
-  const isMac = window.electron.process.platform === 'darwin'
 
   const handleChange = (value: boolean): void => {
     setOpened(value)
