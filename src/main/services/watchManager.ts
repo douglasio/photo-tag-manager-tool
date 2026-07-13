@@ -21,6 +21,19 @@ export function setWatchTarget(target: WebContents): void {
   watchTarget = target
 }
 
+// Lets a programmatic file operation (e.g. a rename) tell the watcher to
+// ignore the filesystem event(s) it's about to cause, so the operation's own
+// IPC response stays the single source of truth instead of racing a
+// redundant unlink/add pair (which would also regenerate the thumbnail for
+// nothing and could fire a spurious "photo added" toast).
+const suppressedPaths = new Set<string>()
+const SUPPRESSION_TIMEOUT_MS = 5000
+
+export function suppressNextEvent(filePath: string): void {
+  suppressedPaths.add(filePath)
+  setTimeout(() => suppressedPaths.delete(filePath), SUPPRESSION_TIMEOUT_MS)
+}
+
 async function handleUpsert(filePath: string, changeType: 'add' | 'change'): Promise<void> {
   try {
     const { photo } = await ingestFile(filePath, thumbnailLimit)
@@ -41,6 +54,7 @@ async function handleRemove(filePath: string): Promise<void> {
 export function watchFolder(rootPath: string): void {
   startWatching(rootPath, {
     onFileEvent: (type, filePath) => {
+      if (suppressedPaths.delete(filePath)) return
       if (type === 'unlink') void handleRemove(filePath)
       else void handleUpsert(filePath, type)
     }

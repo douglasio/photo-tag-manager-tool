@@ -51,6 +51,8 @@ interface PhotoLibraryContextValue {
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
   deleteTag: (tag: string) => Promise<void>
+  renameFile: (filePath: string, newBaseName: string) => Promise<void>
+  openPhoto: (filePath: string) => Promise<void>
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -290,6 +292,35 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.photosByPath]
   )
 
+  const renameFile = useCallback(
+    async (filePath: string, newBaseName: string) => {
+      try {
+        const photo = await window.api.renamePhoto(filePath, newBaseName)
+        const wasSelected = state.selectedPath === filePath
+        dispatch({ type: 'PHOTO_REMOVED', filePath })
+        dispatch({ type: 'PHOTO_UPSERTED', photo })
+        if (wasSelected) dispatch({ type: 'SELECT_PHOTO', path: photo.filePath })
+      } catch (err) {
+        console.error(`failed to rename ${filePath}`, err)
+        notifications.show({
+          color: 'red',
+          message: err instanceof Error ? err.message : 'Failed to rename file'
+        })
+        throw err
+      }
+    },
+    [state.selectedPath]
+  )
+
+  const openPhoto = useCallback(async (filePath: string) => {
+    try {
+      await window.api.openPhoto(filePath)
+    } catch (err) {
+      console.error(`failed to open ${filePath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to open file' })
+    }
+  }, [])
+
   const photos = useMemo(
     () =>
       Array.from(state.photosByPath.values()).sort((a, b) => a.fileName.localeCompare(b.fileName)),
@@ -364,7 +395,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     updateTags,
     setTagDescription,
     renameTag,
-    deleteTag
+    deleteTag,
+    renameFile,
+    openPhoto
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

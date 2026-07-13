@@ -118,6 +118,15 @@ export function removePhoto(filePath: string): string | null {
   return row.thumbnailKey
 }
 
+/** Moves a photo's cached row to a new path/fileName in place, preserving its
+ * thumbnail, metadata, and tags — used for renames, where the file's content
+ * (and therefore mtime/size/thumbnail) doesn't actually change. */
+export function renamePhotoPath(oldPath: string, newPath: string, fileName: string): void {
+  getDb()
+    .prepare('UPDATE photos SET path = @newPath, fileName = @fileName WHERE path = @oldPath')
+    .run({ oldPath, newPath, fileName })
+}
+
 export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[] {
   const db = getDb()
   const rows = db

@@ -11,6 +11,7 @@ import {
 import { notifications } from '@mantine/notifications'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { FileNameEditor } from './FileNameEditor'
 import { TagList } from './TagList'
 import { isNullOrEmpty } from '@renderer/utils/functions'
 import { IconCopy, IconWindowMaximize } from '@tabler/icons-react'
@@ -44,7 +45,7 @@ import { useHover } from '@mantine/hooks'
 const metadataDisplayFilters = ['comment']
 
 export function DetailPanel(): ReactElement {
-  const { selectedPhoto, allTags, updateTags } = usePhotoLibrary()
+  const { selectedPhoto, allTags, updateTags, renameFile } = usePhotoLibrary()
   const { hovered, ref } = useHover<HTMLDivElement>()
 
   if (!selectedPhoto) {
@@ -62,9 +63,10 @@ export function DetailPanel(): ReactElement {
   return (
     <Stack>
       <Stack>
-        <Title order={2} size="h4" style={{ wordBreak: 'break-word' }}>
-          {selectedPhoto.fileName}
-        </Title>
+        <FileNameEditor
+          fileName={selectedPhoto.fileName}
+          onRename={(newBaseName) => renameFile(selectedPhoto.filePath, newBaseName)}
+        />
         {metadata.comment.value && (
           <DataList orientation="vertical">
             <DataList.Item>

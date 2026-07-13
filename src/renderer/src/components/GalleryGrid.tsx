@@ -14,6 +14,7 @@ import { IconPhoto } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { PhotoContextMenu } from './PhotoContextMenu'
 import { PhotoThumbnail } from './PhotoThumbnail'
 import { TagDeleteButton } from './TagDeleteButton'
 import { TagDescriptionEditor } from './TagDescriptionEditor'
@@ -45,6 +46,10 @@ interface CellProps {
   columnCount: number
   selectedPath: string | null
   onSelect: (path: string) => void
+  renamingPath: string | null
+  onStartRename: (path: string) => void
+  onStopRename: () => void
+  onRename: (filePath: string, newBaseName: string) => Promise<void>
 }
 
 function PhotoCell({
@@ -54,18 +59,28 @@ function PhotoCell({
   photos,
   columnCount,
   selectedPath,
-  onSelect
+  onSelect,
+  renamingPath,
+  onStartRename,
+  onStopRename,
+  onRename
 }: CellComponentProps<CellProps>): ReactElement {
   const index = rowIndex * columnCount + columnIndex
   const photo = photos[index]
   if (!photo) return <div style={style} />
   return (
     <Box style={style} p={6}>
-      <PhotoThumbnail
-        photo={photo}
-        selected={photo.filePath === selectedPath}
-        onSelect={onSelect}
-      />
+      <PhotoContextMenu photo={photo} onRename={() => onStartRename(photo.filePath)}>
+        <PhotoThumbnail
+          photo={photo}
+          selected={photo.filePath === selectedPath}
+          onSelect={onSelect}
+          renaming={renamingPath === photo.filePath}
+          onStartRename={() => onStartRename(photo.filePath)}
+          onStopRename={onStopRename}
+          onRename={(newBaseName) => onRename(photo.filePath, newBaseName)}
+        />
+      </PhotoContextMenu>
     </Box>
   )
 }
@@ -80,11 +95,16 @@ export function GalleryGrid(): ReactElement {
     deleteTag,
     tagCounts,
     folderTags,
-    setFolderTagFilter
+    setFolderTagFilter,
+    renameFile
   } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
   const [cellWidth, setCellWidth] = useState(DEFAULT_CELL_WIDTH)
+  // Lifted up here (not into PhotoCell) since react-window recycles cell
+  // instances across different photos as the user scrolls — per-cell local
+  // state would risk leaking "is renaming" onto the wrong photo.
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
 
   useEffect(() => {
     const el = containerRef.current
@@ -135,9 +155,13 @@ export function GalleryGrid(): ReactElement {
       photos,
       columnCount,
       selectedPath: state.selectedPath,
-      onSelect: selectPhoto
+      onSelect: selectPhoto,
+      renamingPath,
+      onStartRename: setRenamingPath,
+      onStopRename: () => setRenamingPath(null),
+      onRename: renameFile
     }),
-    [photos, columnCount, state.selectedPath, selectPhoto]
+    [photos, columnCount, state.selectedPath, selectPhoto, renamingPath, renameFile]
   )
 
   // A "pure" tag view (navigated via the Tags panel, no folder context) shows

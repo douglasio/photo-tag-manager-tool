@@ -7,6 +7,12 @@ interface InlineEditFieldProps {
   editing: boolean
   onStartEdit: () => void
   children: ReactNode
+  // 'start' (default) shrink-wraps the content when not editing, so the
+  // pencil icon hugs left-aligned text (FileNameEditor, TagNameEditor).
+  // 'center' keeps the content full-width at all times, so centered text
+  // (e.g. gallery captions) actually centers instead of collapsing to its
+  // own content width.
+  contentAlign?: 'start' | 'center'
 }
 
 /**
@@ -18,17 +24,24 @@ interface InlineEditFieldProps {
 export function InlineEditField({
   editing,
   onStartEdit,
-  children
+  children,
+  contentAlign = 'start'
 }: InlineEditFieldProps): ReactElement {
   const { hovered, ref } = useHover<HTMLDivElement>()
 
   return (
-    <Group ref={ref} gap={4} wrap="nowrap" align="center">
+    <Group
+      ref={ref}
+      gap={4}
+      wrap="nowrap"
+      align="center"
+      justify={contentAlign === 'center' ? 'center' : undefined}
+    >
       <Box
         onDoubleClick={() => {
           if (!editing) onStartEdit()
         }}
-        style={{ flex: editing ? 1 : 'initial', minWidth: 0 }}
+        style={{ flex: editing || contentAlign === 'center' ? 1 : 'initial', minWidth: 0 }}
       >
         {children}
       </Box>

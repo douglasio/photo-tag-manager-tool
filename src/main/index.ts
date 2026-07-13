@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
+import { registerPhotoHandlers } from './ipc/photoHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
 import { registerShellHandlers } from './ipc/shellHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
@@ -71,6 +72,7 @@ if (!app.requestSingleInstanceLock()) {
     registerThumbProtocolHandler()
     registerFileProtocolHandler()
     registerDialogHandlers()
+    registerPhotoHandlers()
     registerShellHandlers()
     registerScanHandlers()
     registerSettingsHandlers()
