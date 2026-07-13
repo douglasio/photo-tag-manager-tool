@@ -52,7 +52,10 @@ interface PhotoLibraryContextValue {
   renameTag: (oldTag: string, newTag: string) => Promise<void>
   deleteTag: (tag: string) => Promise<void>
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
-  openPhoto: (filePath: string) => Promise<void>
+  openTabPhotos: PhotoRecord[]
+  openPhotoTab: (filePath: string) => void
+  closePhotoTab: (filePath: string) => void
+  setActiveTab: (tab: string) => void
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -297,6 +300,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       try {
         const photo = await window.api.renamePhoto(filePath, newBaseName)
         const wasSelected = state.selectedPath === filePath
+        // Dispatched before PHOTO_REMOVED so a tab open on the old path is
+        // repointed to the new one, rather than PHOTO_REMOVED's own openTabs
+        // pruning treating the rename as if the file had just disappeared.
+        dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: filePath, newPath: photo.filePath })
         dispatch({ type: 'PHOTO_REMOVED', filePath })
         dispatch({ type: 'PHOTO_UPSERTED', photo })
         if (wasSelected) dispatch({ type: 'SELECT_PHOTO', path: photo.filePath })
@@ -312,13 +319,16 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.selectedPath]
   )
 
-  const openPhoto = useCallback(async (filePath: string) => {
-    try {
-      await window.api.openPhoto(filePath)
-    } catch (err) {
-      console.error(`failed to open ${filePath}`, err)
-      notifications.show({ color: 'red', message: 'Failed to open file' })
-    }
+  const openPhotoTab = useCallback((filePath: string) => {
+    dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
+  }, [])
+
+  const closePhotoTab = useCallback((filePath: string) => {
+    dispatch({ type: 'CLOSE_PHOTO_TAB', filePath })
+  }, [])
+
+  const setActiveTab = useCallback((tab: string) => {
+    dispatch({ type: 'SET_ACTIVE_TAB', tab })
   }, [])
 
   const photos = useMemo(
@@ -375,6 +385,16 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return Array.from(tags).sort()
   }, [photos, state.selectedFolder])
 
+  // Resolved in openTabs order (not sorted) so tabs stay in the order they
+  // were opened rather than jumping around as the user opens more.
+  const openTabPhotos = useMemo(
+    () =>
+      state.openTabs
+        .map((path) => state.photosByPath.get(path))
+        .filter((photo): photo is PhotoRecord => photo != null),
+    [state.openTabs, state.photosByPath]
+  )
+
   const value: PhotoLibraryContextValue = {
     state,
     photos,
@@ -397,7 +417,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     renameTag,
     deleteTag,
     renameFile,
-    openPhoto
+    openTabPhotos,
+    openPhotoTab,
+    closePhotoTab,
+    setActiveTab
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

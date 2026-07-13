@@ -1,4 +1,4 @@
-import { ActionIcon, Button, createTheme, Image, Popover, Tooltip } from '@mantine/core'
+import { ActionIcon, Button, createTheme, Image, Popover, Tabs, Tooltip } from '@mantine/core'
 
 const radiusSize = 'md'
 
@@ -40,6 +40,13 @@ export const theme = createTheme({
     Tooltip: Tooltip.extend({
       defaultProps: {
         color: 'gray'
+      }
+    }),
+    // Tabs default to the app's rounded defaultRadius on the tab buttons,
+    // which looks wrong for the Photo View tab bar — keep tabs square.
+    Tabs: Tabs.extend({
+      defaultProps: {
+        radius: 0
       }
     })
   }

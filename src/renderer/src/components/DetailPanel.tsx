@@ -1,12 +1,15 @@
 import {
   ActionIcon,
   ActionIconGroup,
+  Box,
   Center,
   DataList,
   Flex,
+  Group,
   Stack,
   Text,
-  Title
+  Title,
+  Tooltip
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import type { ReactElement } from 'react'
@@ -14,7 +17,7 @@ import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { FileNameEditor } from './FileNameEditor'
 import { TagList } from './TagList'
 import { isNullOrEmpty } from '@renderer/utils/functions'
-import { IconCopy, IconWindowMaximize } from '@tabler/icons-react'
+import { IconCopy, IconExternalLink, IconWindowMaximize } from '@tabler/icons-react'
 import { useHover } from '@mantine/hooks'
 
 // function formatBytes(bytes: number): string {
@@ -45,7 +48,7 @@ import { useHover } from '@mantine/hooks'
 const metadataDisplayFilters = ['comment']
 
 export function DetailPanel(): ReactElement {
-  const { selectedPhoto, allTags, updateTags, renameFile } = usePhotoLibrary()
+  const { selectedPhoto, allTags, updateTags, renameFile, openPhotoTab } = usePhotoLibrary()
   const { hovered, ref } = useHover<HTMLDivElement>()
 
   if (!selectedPhoto) {
@@ -63,10 +66,23 @@ export function DetailPanel(): ReactElement {
   return (
     <Stack>
       <Stack>
-        <FileNameEditor
-          fileName={selectedPhoto.fileName}
-          onRename={(newBaseName) => renameFile(selectedPhoto.filePath, newBaseName)}
-        />
+        <Group justify="space-between" wrap="nowrap" align="flex-start" gap={4}>
+          <Box flex={1} miw={0}>
+            <FileNameEditor
+              fileName={selectedPhoto.fileName}
+              onRename={(newBaseName) => renameFile(selectedPhoto.filePath, newBaseName)}
+            />
+          </Box>
+          <Tooltip label="Open">
+            <ActionIcon
+              variant="subtle"
+              onClick={() => openPhotoTab(selectedPhoto.filePath)}
+              style={{ flexShrink: 0 }}
+            >
+              <IconExternalLink size={18} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
         {metadata.comment.value && (
           <DataList orientation="vertical">
             <DataList.Item>

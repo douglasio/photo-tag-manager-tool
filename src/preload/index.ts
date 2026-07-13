@@ -20,7 +20,6 @@ const api = {
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectFolder'),
   getFolders: (): Promise<string[]> => ipcRenderer.invoke('settings:getFolders'),
   showItemInFolder: (path: string) => ipcRenderer.invoke('show-item-in-folder', path),
-  openPhoto: (path: string): Promise<void> => ipcRenderer.invoke('open-photo', path),
   renamePhoto: (filePath: string, newBaseName: string): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:rename', filePath, newBaseName),
   getGalleryCellWidth: (): Promise<number | null> =>

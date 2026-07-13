@@ -5,6 +5,7 @@ import type { PhotoRecord } from '../../../shared/types'
 import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../shared/protocolUrls'
 import { GalleryFileName } from './GalleryFileName'
 import { ctrlKeyLabel } from '../utils/platform'
+import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 
 // Preview size at previewScale === 1, in viewport-relative units so it
 // scales with the window rather than a fixed pixel size.
@@ -50,6 +51,7 @@ export function PhotoThumbnail({
   ...rest
 }: PhotoThumbnailProps): ReactElement {
   const theme = useMantineTheme()
+  const { openPhotoTab } = usePhotoLibrary()
   const canPreview = ctrlHeld && photo.thumbnailStatus === 'ready'
 
   return (
@@ -93,7 +95,11 @@ export function PhotoThumbnail({
             }
           }}
         >
-          <UnstyledButton onClick={() => onSelect(photo.filePath)} w="100%">
+          <UnstyledButton
+            onClick={() => onSelect(photo.filePath)}
+            onDoubleClick={() => openPhotoTab(photo.filePath)}
+            w="100%"
+          >
             {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
               <Image
                 src={toThumbProtocolUrl(photo.thumbnailKey)}

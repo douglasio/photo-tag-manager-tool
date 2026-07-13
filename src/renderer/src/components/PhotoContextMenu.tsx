@@ -16,7 +16,7 @@ export function PhotoContextMenu({
   onRename,
   children
 }: PhotoContextMenuProps): ReactElement {
-  const { openPhoto, allTags, updateTags } = usePhotoLibrary()
+  const { openPhotoTab, allTags, updateTags } = usePhotoLibrary()
   const [opened, setOpened] = useState(false)
   const [addingTag, setAddingTag] = useState(false)
 
@@ -49,7 +49,7 @@ export function PhotoContextMenu({
           <>
             <Menu.Item
               leftSection={<IconExternalLink size={14} />}
-              onClick={() => void openPhoto(photo.filePath)}
+              onClick={() => openPhotoTab(photo.filePath)}
             >
               Open
             </Menu.Item>

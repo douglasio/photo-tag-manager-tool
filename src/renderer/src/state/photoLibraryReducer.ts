@@ -23,6 +23,10 @@ export interface PhotoLibraryState {
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
   tagDescriptions: Map<string, string>
+  // Ordered list of photo paths open as Photo View tabs. activeTab is either
+  // 'gallery' or one of the paths in openTabs.
+  openTabs: string[]
+  activeTab: string
 }
 
 export const initialState: PhotoLibraryState = {
@@ -39,7 +43,9 @@ export const initialState: PhotoLibraryState = {
   selectedTag: null,
   folderCounts: new Map(),
   folderChildren: new Map(),
-  tagDescriptions: new Map()
+  tagDescriptions: new Map(),
+  openTabs: [],
+  activeTab: 'gallery'
 }
 
 export type PhotoLibraryAction =
@@ -61,6 +67,10 @@ export type PhotoLibraryAction =
   | { type: 'TAG_DESCRIPTION_UPDATED'; tag: string; description: string }
   | { type: 'TAG_RENAMED'; oldTag: string; newTag: string; photos: PhotoRecord[] }
   | { type: 'TAG_DELETED'; tag: string; photos: PhotoRecord[] }
+  | { type: 'OPEN_PHOTO_TAB'; filePath: string }
+  | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
+  | { type: 'SET_ACTIVE_TAB'; tab: string }
+  | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
 
 export function photoLibraryReducer(
   state: PhotoLibraryState,
@@ -98,6 +108,12 @@ export function photoLibraryReducer(
           ? null
           : state.selectedPath
 
+      const openTabs = state.openTabs.filter((path) => !isPathUnderOrEqual(path, action.folder))
+      const activeTab =
+        state.activeTab !== 'gallery' && isPathUnderOrEqual(state.activeTab, action.folder)
+          ? 'gallery'
+          : state.activeTab
+
       return {
         ...state,
         folders,
@@ -105,7 +121,9 @@ export function photoLibraryReducer(
         folderCounts,
         folderChildren,
         selectedFolder,
-        selectedPath
+        selectedPath,
+        openTabs,
+        activeTab
       }
     }
     case 'SCAN_STARTED':
@@ -174,8 +192,18 @@ export function photoLibraryReducer(
         removePhotoFromFolderTree(action.filePath, rootFolder, folderCounts, folderChildren)
       }
       const selectedPath = state.selectedPath === action.filePath ? null : state.selectedPath
+      const openTabs = state.openTabs.filter((path) => path !== action.filePath)
+      const activeTab = state.activeTab === action.filePath ? 'gallery' : state.activeTab
 
-      return { ...state, photosByPath, folderCounts, folderChildren, selectedPath }
+      return {
+        ...state,
+        photosByPath,
+        folderCounts,
+        folderChildren,
+        selectedPath,
+        openTabs,
+        activeTab
+      }
     }
     case 'TAG_DESCRIPTIONS_LOADED':
       return { ...state, tagDescriptions: new Map(Object.entries(action.descriptions)) }
@@ -215,6 +243,31 @@ export function photoLibraryReducer(
       const selectedTag = state.selectedTag === action.tag ? null : state.selectedTag
 
       return { ...state, photosByPath, tagDescriptions, selectedTag }
+    }
+    case 'OPEN_PHOTO_TAB': {
+      const openTabs = state.openTabs.includes(action.filePath)
+        ? state.openTabs
+        : [...state.openTabs, action.filePath]
+      return { ...state, openTabs, activeTab: action.filePath }
+    }
+    case 'CLOSE_PHOTO_TAB': {
+      if (!state.openTabs.includes(action.filePath)) return state
+      const openTabs = state.openTabs.filter((path) => path !== action.filePath)
+      const activeTab = state.activeTab === action.filePath ? 'gallery' : state.activeTab
+      return { ...state, openTabs, activeTab }
+    }
+    case 'SET_ACTIVE_TAB':
+      return { ...state, activeTab: action.tab }
+    // Keeps a photo's tab (and active-tab pointer, if it was the active one)
+    // pointed at its new path across a rename, instead of PHOTO_REMOVED
+    // pruning it away as if the file had actually disappeared.
+    case 'RENAME_PHOTO_TAB': {
+      if (!state.openTabs.includes(action.oldPath)) return state
+      const openTabs = state.openTabs.map((path) =>
+        path === action.oldPath ? action.newPath : path
+      )
+      const activeTab = state.activeTab === action.oldPath ? action.newPath : state.activeTab
+      return { ...state, openTabs, activeTab }
     }
     default:
       return state
