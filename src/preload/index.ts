@@ -29,6 +29,8 @@ const api = {
   addFolder: (folder: string): Promise<void> => ipcRenderer.invoke('settings:addFolder', folder),
   removeFolder: (folder: string): Promise<void> =>
     ipcRenderer.invoke('settings:removeFolder', folder),
+  renameFolder: (folder: string, newBaseName: string): Promise<string> =>
+    ipcRenderer.invoke('settings:renameFolder', folder, newBaseName),
   startScan: (rootPath: string): Promise<ScanStartResult> =>
     ipcRenderer.invoke('scan:start', rootPath),
   cancelScan: (scanId: string): Promise<void> => ipcRenderer.invoke('scan:cancel', scanId),

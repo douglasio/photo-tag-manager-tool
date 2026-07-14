@@ -71,7 +71,13 @@ export function GalleryFileName({
               padding: 0,
               minHeight: 'auto',
               height: 'auto',
-              fontSize: 'var(--mantine-font-size-md)'
+              fontSize: 'var(--mantine-font-size-md)',
+              // variant="unstyled" zeroes out padding but not
+              // --input-line-height, which still defaults to the 'sm' input
+              // size's ~36px line-height — far taller than Text's natural
+              // line-height, so the row grows and visibly shifts down
+              // relative to view mode unless this is matched explicitly.
+              lineHeight: 'var(--mantine-line-height-md)'
             }
           }}
         />

@@ -2,7 +2,8 @@ import {
   addPhotoToFolderTree,
   findRootFolder,
   isPathUnderOrEqual,
-  removePhotoFromFolderTree
+  removePhotoFromFolderTree,
+  rewritePathPrefix
 } from '../utils/folderTree'
 import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
 
@@ -52,6 +53,7 @@ export type PhotoLibraryAction =
   | { type: 'FOLDERS_LOADED'; folders: string[] }
   | { type: 'FOLDER_ADDED'; folder: string }
   | { type: 'FOLDER_REMOVED'; folder: string }
+  | { type: 'FOLDER_RENAMED'; oldFolder: string; newFolder: string }
   | { type: 'SCAN_STARTED'; rootPath: string; scanId: string }
   | { type: 'SCAN_PROGRESS'; filesFound: number }
   | { type: 'METADATA_BATCH'; photos: PhotoRecord[] }
@@ -113,6 +115,53 @@ export function photoLibraryReducer(
         state.activeTab !== 'gallery' && isPathUnderOrEqual(state.activeTab, action.folder)
           ? 'gallery'
           : state.activeTab
+
+      return {
+        ...state,
+        folders,
+        photosByPath,
+        folderCounts,
+        folderChildren,
+        selectedFolder,
+        selectedPath,
+        openTabs,
+        activeTab
+      }
+    }
+    // The folder itself was renamed on disk — every photo nested under it
+    // keeps its own fileName, but its filePath/id (and every other
+    // path-shaped bit of state) needs the oldFolder prefix swapped for
+    // newFolder. rewritePathPrefix is a no-op for anything unrelated, so it's
+    // safe to apply unconditionally across every map/array/string below.
+    case 'FOLDER_RENAMED': {
+      const { oldFolder, newFolder } = action
+      const rewrite = (path: string): string => rewritePathPrefix(path, oldFolder, newFolder)
+
+      const folders = state.folders.map(rewrite)
+
+      const photosByPath = new Map<string, PhotoRecord>()
+      for (const [path, photo] of state.photosByPath) {
+        const newPath = rewrite(path)
+        photosByPath.set(
+          newPath,
+          newPath === path ? photo : { ...photo, id: newPath, filePath: newPath }
+        )
+      }
+
+      const folderCounts = new Map<string, number>()
+      for (const [folder, count] of state.folderCounts) {
+        folderCounts.set(rewrite(folder), count)
+      }
+
+      const folderChildren = new Map<string, Set<string>>()
+      for (const [folder, children] of state.folderChildren) {
+        folderChildren.set(rewrite(folder), new Set(Array.from(children, rewrite)))
+      }
+
+      const selectedFolder = state.selectedFolder !== null ? rewrite(state.selectedFolder) : null
+      const selectedPath = state.selectedPath !== null ? rewrite(state.selectedPath) : null
+      const openTabs = state.openTabs.map(rewrite)
+      const activeTab = rewrite(state.activeTab)
 
       return {
         ...state,

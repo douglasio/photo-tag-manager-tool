@@ -41,6 +41,7 @@ interface PhotoLibraryContextValue {
   folderTags: string[]
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
+  renameFolder: (folder: string, newBaseName: string) => Promise<void>
   cancelScan: () => Promise<void>
   rescanAll: () => Promise<void>
   selectPhoto: (path: string | null) => void
@@ -78,8 +79,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
     notifications.show({
       message: parts.join(', '),
-      color: removed > 0 && added === 0 ? 'red' : 'teal',
-      autoClose: 4000
+      color: removed > 0 && added === 0 ? 'red' : 'teal'
     })
   }, [])
 
@@ -198,6 +198,26 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     },
     [state.folderCounts]
   )
+
+  const renameFolder = useCallback(async (folder: string, newBaseName: string) => {
+    try {
+      const newFolder = await window.api.renameFolder(folder, newBaseName)
+      dispatch({ type: 'FOLDER_RENAMED', oldFolder: folder, newFolder })
+      if (newFolder !== folder) {
+        notifications.show({
+          color: 'teal',
+          message: `Renamed folder "${basename(folder)}" to "${basename(newFolder)}"`
+        })
+      }
+    } catch (err) {
+      console.error(`failed to rename folder ${folder}`, err)
+      notifications.show({
+        color: 'red',
+        message: err instanceof Error ? err.message : 'Failed to rename folder'
+      })
+      throw err
+    }
+  }, [])
 
   const cancelScan = useCallback(async () => {
     if (!scanIdRef.current) return
@@ -406,6 +426,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     folderTags,
     addFolder,
     removeFolder,
+    renameFolder,
     cancelScan,
     rescanAll,
     selectPhoto,

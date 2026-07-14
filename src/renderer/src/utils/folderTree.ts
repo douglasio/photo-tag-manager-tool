@@ -84,6 +84,16 @@ export function removePhotoFromFolderTree(
   }
 }
 
+/** Rewrites path if it's oldFolder itself or nested under it, substituting
+ * oldFolder for newFolder; otherwise returns path unchanged. Used to sweep
+ * every path-shaped piece of state (folders, Map keys, selection, tabs...)
+ * after a folder rename. */
+export function rewritePathPrefix(path: string, oldFolder: string, newFolder: string): string {
+  if (path === oldFolder) return newFolder
+  if (isPhotoInFolder(path, oldFolder)) return newFolder + path.slice(oldFolder.length)
+  return path
+}
+
 /** Finds which watched root folder (if any) a file path falls under. */
 export function findRootFolder(filePath: string, folders: string[]): string | null {
   let best: string | null = null

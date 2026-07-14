@@ -29,19 +29,47 @@ export function InlineEditField({
 }: InlineEditFieldProps): ReactElement {
   const { hovered, ref } = useHover<HTMLDivElement>()
 
+  // In 'center' mode the pencil overlays on top instead of sitting in the
+  // flex flow — otherwise, even at opacity 0, it still occupies width on one
+  // side only, which both throws off centering and (since it disappears
+  // entirely while editing) shifts the text's available width — and so its
+  // position — the moment edit mode toggles.
+  if (contentAlign === 'center') {
+    return (
+      <Box ref={ref} pos="relative">
+        <Box
+          onDoubleClick={() => {
+            if (!editing) onStartEdit()
+          }}
+          style={{ width: '100%', minWidth: 0 }}
+        >
+          {children}
+        </Box>
+        {!editing && (
+          <ActionIcon
+            style={{
+              position: 'absolute',
+              top: '50%',
+              right: 0,
+              transform: 'translateY(-50%)',
+              opacity: hovered ? 0.7 : 0
+            }}
+            onClick={onStartEdit}
+          >
+            <IconPencil />
+          </ActionIcon>
+        )}
+      </Box>
+    )
+  }
+
   return (
-    <Group
-      ref={ref}
-      gap={4}
-      wrap="nowrap"
-      align="center"
-      justify={contentAlign === 'center' ? 'center' : undefined}
-    >
+    <Group ref={ref} gap={4} wrap="nowrap" align="center">
       <Box
         onDoubleClick={() => {
           if (!editing) onStartEdit()
         }}
-        style={{ flex: editing || contentAlign === 'center' ? 1 : 'initial', minWidth: 0 }}
+        style={{ flex: editing ? 1 : 'initial', minWidth: 0 }}
       >
         {children}
       </Box>

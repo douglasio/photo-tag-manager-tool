@@ -127,6 +127,37 @@ export function renamePhotoPath(oldPath: string, newPath: string, fileName: stri
     .run({ oldPath, newPath, fileName })
 }
 
+function isPathUnderFolder(path: string, folder: string): boolean {
+  if (!path.startsWith(folder)) return false
+  const nextChar = path[folder.length]
+  return nextChar === '/' || nextChar === '\\'
+}
+
+/** Bulk-rewrites the path prefix of every photo row nested under (or equal
+ * to) oldFolder — used for folder renames, where every nested photo's
+ * content and fileName are untouched but the folder segment of its stored
+ * path changes. Filters the broad `LIKE` match down to true descendants (not
+ * just any path sharing the same string prefix, e.g. a sibling "FooBar" when
+ * renaming "Foo") before writing anything. */
+export function renamePhotoPathPrefix(oldFolder: string, newFolder: string): void {
+  const db = getDb()
+  const rows = db.prepare('SELECT path FROM photos WHERE path LIKE ?').all(`${oldFolder}%`) as {
+    path: string
+  }[]
+
+  const affected = rows
+    .filter((row) => row.path === oldFolder || isPathUnderFolder(row.path, oldFolder))
+    .map((row) => ({ oldPath: row.path, newPath: newFolder + row.path.slice(oldFolder.length) }))
+
+  if (affected.length === 0) return
+
+  const update = db.prepare('UPDATE photos SET path = @newPath WHERE path = @oldPath')
+  const updateMany = db.transaction((pairs: { oldPath: string; newPath: string }[]) => {
+    for (const pair of pairs) update.run(pair)
+  })
+  updateMany(affected)
+}
+
 export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[] {
   const db = getDb()
   const rows = db
