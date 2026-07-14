@@ -1,11 +1,19 @@
 import { Box, Center, Image, Tooltip, UnstyledButton, useMantineTheme } from '@mantine/core'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
-import type { ComponentPropsWithoutRef, MouseEvent, ReactElement } from 'react'
+import {
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+  type DragEvent,
+  type MouseEvent,
+  type ReactElement
+} from 'react'
 import type { PhotoRecord } from '../../../shared/types'
 import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../shared/protocolUrls'
 import { GalleryFileName } from './GalleryFileName'
 import { ctrlKeyLabel } from '../utils/platform'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { setDraggedPhotoPaths } from '../utils/photoDrag'
 
 // Preview size at previewScale === 1, in viewport-relative units so it
 // scales with the window rather than a fixed pixel size.
@@ -55,8 +63,61 @@ export function PhotoThumbnail({
   ...rest
 }: PhotoThumbnailProps): ReactElement {
   const theme = useMantineTheme()
-  const { openPhotoTab } = usePhotoLibrary()
+  const { openPhotoTab, state } = usePhotoLibrary()
   const canPreview = ctrlHeld && photo.thumbnailStatus === 'ready'
+  const [isDragging, setIsDragging] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  // Dragging a photo that's part of the active multi-selection (2+ photos)
+  // carries the whole batch; dragging anything else carries just that one —
+  // same "what's actually selected" convention as the right-click menu.
+  const handleDragStart = (event: DragEvent<HTMLDivElement>): void => {
+    const paths =
+      state.selectedPaths.has(photo.filePath) && state.selectedPaths.size > 1
+        ? Array.from(state.selectedPaths)
+        : [photo.filePath]
+    setDraggedPhotoPaths(event.dataTransfer, paths)
+
+    // The browser's default drag ghost is a near-opaque, full-size snapshot
+    // that we have no CSS control over — changing this element's own opacity
+    // only affects the source left behind in the grid, not the ghost that
+    // follows the cursor. Building a scaled-down, translucent copy on an
+    // offscreen canvas and handing it to setDragImage is the only way to
+    // actually change what the ghost itself looks like.
+    const img = imgRef.current
+    if (img?.complete && img.naturalWidth > 0) {
+      const scale = 0.5
+      const width = Math.max(1, Math.round(img.clientWidth * scale))
+      const height = Math.max(1, Math.round(img.clientHeight * scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.globalAlpha = 0.6
+        ctx.drawImage(img, 0, 0, width, height)
+        // setDragImage needs the element to have actually been painted — an
+        // off-DOM canvas isn't reliably rasterized by Electron/Chromium in
+        // time, so the OS falls back to its own generic "web content" drag
+        // glyph (the little globe) instead of this snapshot. Briefly
+        // attaching it off-screen (not display:none, which also skips
+        // painting) fixes that; it's removed again right after.
+        canvas.style.position = 'fixed'
+        canvas.style.top = '-9999px'
+        canvas.style.left = '-9999px'
+        document.body.appendChild(canvas)
+        event.dataTransfer.setDragImage(canvas, width / 2, height / 2)
+        setTimeout(() => canvas.remove(), 0)
+      }
+    }
+
+    // Deferred so this render (which fades the thumbnail) happens after the
+    // browser has already read this element for setDragImage above —
+    // mutating opacity synchronously here could affect the canvas snapshot.
+    setTimeout(() => setIsDragging(true), 0)
+  }
+
+  const handleDragEnd = (): void => setIsDragging(false)
 
   return (
     <Tooltip
@@ -68,7 +129,11 @@ export function PhotoThumbnail({
     >
       <Box
         {...rest}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         title={photo.fileName}
+        style={{ ...rest.style, opacity: isDragging ? 0.4 : undefined }}
         className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${!selected && multiSelected ? ' photo-thumbnail--multi-selected' : ''}${className ? ` ${className}` : ''}`}
       >
         <Tooltip.Floating
@@ -107,6 +172,7 @@ export function PhotoThumbnail({
           >
             {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
               <Image
+                ref={imgRef}
                 src={toThumbProtocolUrl(photo.thumbnailKey)}
                 alt={photo.fileName}
                 fit="cover"

@@ -49,6 +49,7 @@ interface PhotoLibraryContextValue {
   selectPhotoRange: (targetPath: string) => void
   clearSelection: () => void
   addTagsToSelection: (tags: string[]) => Promise<void>
+  addTagsToPhotos: (tags: string[], filePaths: string[]) => Promise<void>
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
@@ -257,20 +258,25 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_SELECTED_PATHS', paths: [] })
   }, [])
 
+  // General-purpose batch tag-add, shared by the multi-select context menu
+  // (tags applied to state.selectedPaths) and drag-and-drop onto a tag row
+  // (tags applied to whatever was actually dragged, which isn't necessarily
+  // the current selection — e.g. dragging a single unselected photo).
+  const addTagsToPhotos = useCallback(async (tags: string[], filePaths: string[]) => {
+    if (filePaths.length === 0 || tags.length === 0) return
+    try {
+      const photos = await window.api.addTagsToPhotos(tags, filePaths)
+      dispatch({ type: 'PHOTOS_UPSERTED', photos })
+    } catch (err) {
+      console.error('failed to add tags to photos', err)
+      notifications.show({ color: 'red', message: 'Failed to save tags' })
+      throw err
+    }
+  }, [])
+
   const addTagsToSelection = useCallback(
-    async (tags: string[]) => {
-      const filePaths = Array.from(state.selectedPaths)
-      if (filePaths.length === 0 || tags.length === 0) return
-      try {
-        const photos = await window.api.addTagsToPhotos(tags, filePaths)
-        dispatch({ type: 'PHOTOS_UPSERTED', photos })
-      } catch (err) {
-        console.error('failed to add tags to selection', err)
-        notifications.show({ color: 'red', message: 'Failed to save tags' })
-        throw err
-      }
-    },
-    [state.selectedPaths]
+    (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
+    [addTagsToPhotos, state.selectedPaths]
   )
 
   const updateTags = useCallback(
@@ -498,6 +504,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     selectPhotoRange,
     clearSelection,
     addTagsToSelection,
+    addTagsToPhotos,
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,
