@@ -2,6 +2,7 @@ import {
   ActionIcon,
   ActionIconGroup,
   Box,
+  Button,
   Center,
   DataList,
   Flex,
@@ -17,7 +18,7 @@ import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { FileNameEditor } from './FileNameEditor'
 import { TagList } from './TagList'
 import { isNullOrEmpty } from '@renderer/utils/functions'
-import { IconCopy, IconExternalLink, IconWindowMaximize } from '@tabler/icons-react'
+import { IconCopy, IconExternalLink, IconPhoto } from '@tabler/icons-react'
 import { useHover } from '@mantine/hooks'
 
 // function formatBytes(bytes: number): string {
@@ -66,7 +67,7 @@ export function DetailPanel(): ReactElement {
   return (
     <Stack>
       <Stack>
-        <Group justify="space-between" wrap="nowrap" align="flex-start" gap={4}>
+        <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
           <Box flex={1} miw={0}>
             <FileNameEditor
               fileName={selectedPhoto.fileName}
@@ -74,13 +75,12 @@ export function DetailPanel(): ReactElement {
             />
           </Box>
           <Tooltip label="Open">
-            <ActionIcon
-              variant="subtle"
+            <Button
+              leftSection={<IconPhoto size={18} />}
               onClick={() => openPhotoTab(selectedPhoto.filePath)}
-              style={{ flexShrink: 0 }}
             >
-              <IconExternalLink size={18} />
-            </ActionIcon>
+              Open
+            </Button>
           </Tooltip>
         </Group>
         {metadata.comment.value && (
@@ -141,7 +141,7 @@ export function DetailPanel(): ReactElement {
 
                       onClick={() => window.api.showItemInFolder(selectedPhoto.filePath)}
                     >
-                      <IconWindowMaximize />
+                      <IconExternalLink />
                     </ActionIcon>
                   </ActionIconGroup>
                 </Flex>

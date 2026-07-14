@@ -47,6 +47,15 @@ function clampCellWidth(value: number): number {
   return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, value))
 }
 
+// Evenly spaced tick marks spanning the slider's actual min/max range, so
+// they land at real, reachable cell-width values rather than arbitrary points.
+const SIZE_MARK_COUNT = 5
+const SIZE_MARK_VALUES = Array.from(
+  { length: SIZE_MARK_COUNT },
+  (_, index) => MIN_CELL_WIDTH + ((MAX_CELL_WIDTH - MIN_CELL_WIDTH) * index) / (SIZE_MARK_COUNT - 1)
+)
+const SIZE_MARKS = SIZE_MARK_VALUES.map((value) => ({ value }))
+
 function clampPreviewScale(value: number): number {
   return Math.min(MAX_PREVIEW_SCALE, Math.max(MIN_PREVIEW_SCALE, value))
 }
@@ -187,14 +196,19 @@ export function GalleryGrid(): ReactElement {
   const cellHeight = actualCellWidth + CELL_LABEL_HEIGHT
   const rowCount = Math.ceil(photos.length / columnCount)
 
-  // The +/- buttons step by whole columns rather than by CELL_WIDTH_STEP
-  // pixels — near either end of the range a 40px nudge can round back to the
-  // same columnCount and visibly do nothing, whereas a column-count step is
-  // guaranteed to change something (until truly at the min/max clamp).
-  const stepByColumns = (delta: number): void => {
-    const nextColumnCount = Math.max(1, columnCount + delta)
-    const nextWidth = availableWidth > 0 ? availableWidth / nextColumnCount : cellWidth
-    setCellWidthPersisted(nextWidth)
+  // The +/- buttons jump between the slider's own SIZE_MARK_VALUES rather
+  // than stepping by a fixed pixel amount, so they always land exactly on a
+  // mark instead of somewhere between two of them.
+  const stepToMark = (delta: number): void => {
+    const closestIndex = SIZE_MARK_VALUES.reduce(
+      (closest, value, index) =>
+        Math.abs(value - cellWidth) < Math.abs(SIZE_MARK_VALUES[closest] - cellWidth)
+          ? index
+          : closest,
+      0
+    )
+    const nextIndex = Math.min(SIZE_MARK_VALUES.length - 1, Math.max(0, closestIndex + delta))
+    setCellWidthPersisted(SIZE_MARK_VALUES[nextIndex])
   }
 
   // Keep a stable reference so react-window doesn't re-diff every visible
@@ -241,7 +255,14 @@ export function GalleryGrid(): ReactElement {
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
   return (
-    <Flex direction="column" flex={1} miw={0}>
+    // mih=0 (in addition to miw=0) is required because this component is
+    // mounted as a flex item in different parent orientations depending on
+    // context (a row-flex Box outside Tabs, a column-flex Tabs when photo
+    // tabs are open) — without it, its main axis defaults to its content's
+    // intrinsic size in a column parent, overflowing past the fixed-height
+    // ancestor instead of shrinking to fit, which hides the footer and
+    // breaks the internal grid's own scroll container.
+    <Flex direction="column" flex={1} miw={0} mih={0}>
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
           {isPureTagView ? (
@@ -329,7 +350,7 @@ export function GalleryGrid(): ReactElement {
       </Box>
       {photos.length > 0 && (
         <Group gap="xs" wrap="nowrap" justify="flex-end" px="md" py="xs" style={{ flexShrink: 0 }}>
-          <ActionIcon onClick={() => stepByColumns(1)} aria-label="Decrease thumbnail size">
+          <ActionIcon onClick={() => stepToMark(-1)} aria-label="Decrease thumbnail size">
             <IconPhoto size={12} />
           </ActionIcon>
           <Slider
@@ -339,10 +360,12 @@ export function GalleryGrid(): ReactElement {
             min={MIN_CELL_WIDTH}
             max={MAX_CELL_WIDTH}
             step={4}
+            marks={SIZE_MARKS}
             label={null}
             w={120}
+            restrictToMarks
           />
-          <ActionIcon onClick={() => stepByColumns(-1)} aria-label="Increase thumbnail size">
+          <ActionIcon onClick={() => stepToMark(1)} aria-label="Increase thumbnail size">
             <IconPhoto size={22} />
           </ActionIcon>
         </Group>

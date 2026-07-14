@@ -1,4 +1,13 @@
-import { ActionIcon, Button, createTheme, Image, Popover, Tabs, Tooltip } from '@mantine/core'
+import {
+  ActionIcon,
+  Button,
+  createTheme,
+  Group,
+  Image,
+  Popover,
+  Tabs,
+  Tooltip
+} from '@mantine/core'
 
 const radiusSize = 'md'
 
@@ -25,6 +34,11 @@ export const theme = createTheme({
     Button: Button.extend({
       defaultProps: {
         radius: radiusSize
+      }
+    }),
+    Group: Group.extend({
+      defaultProps: {
+        bdrs: radiusSize
       }
     }),
     Image: Image.extend({
