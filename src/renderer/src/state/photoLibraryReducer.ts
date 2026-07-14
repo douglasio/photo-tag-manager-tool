@@ -19,6 +19,11 @@ export interface PhotoLibraryState {
   cacheHits: number
   errors: ScanCompleteEvent['errors']
   selectedPath: string | null
+  // Batch/multi-select in the gallery (Ctrl/Cmd+click toggle, Shift+click
+  // range). Kept in sync with selectedPath (which stays the "last-engaged"
+  // photo for DetailPanel) rather than replacing it, so existing
+  // single-selection call sites are unaffected.
+  selectedPaths: Set<string>
   selectedFolder: string | null
   selectedTag: string | null
   folderCounts: Map<string, number>
@@ -40,6 +45,7 @@ export const initialState: PhotoLibraryState = {
   cacheHits: 0,
   errors: [],
   selectedPath: null,
+  selectedPaths: new Set(),
   selectedFolder: null,
   selectedTag: null,
   folderCounts: new Map(),
@@ -60,6 +66,8 @@ export type PhotoLibraryAction =
   | { type: 'SCAN_COMPLETE'; result: ScanCompleteEvent }
   | { type: 'SCAN_CANCELED' }
   | { type: 'SELECT_PHOTO'; path: string | null }
+  | { type: 'SET_SELECTED_PATHS'; paths: string[] }
+  | { type: 'PHOTOS_UPSERTED'; photos: PhotoRecord[] }
   | { type: 'SET_FOLDER_FILTER'; folder: string | null }
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
@@ -116,6 +124,10 @@ export function photoLibraryReducer(
           ? 'gallery'
           : state.activeTab
 
+      const selectedPaths = new Set(
+        Array.from(state.selectedPaths).filter((path) => !isPathUnderOrEqual(path, action.folder))
+      )
+
       return {
         ...state,
         folders,
@@ -124,6 +136,7 @@ export function photoLibraryReducer(
         folderChildren,
         selectedFolder,
         selectedPath,
+        selectedPaths,
         openTabs,
         activeTab
       }
@@ -160,6 +173,7 @@ export function photoLibraryReducer(
 
       const selectedFolder = state.selectedFolder !== null ? rewrite(state.selectedFolder) : null
       const selectedPath = state.selectedPath !== null ? rewrite(state.selectedPath) : null
+      const selectedPaths = new Set(Array.from(state.selectedPaths, rewrite))
       const openTabs = state.openTabs.map(rewrite)
       const activeTab = rewrite(state.activeTab)
 
@@ -171,6 +185,7 @@ export function photoLibraryReducer(
         folderChildren,
         selectedFolder,
         selectedPath,
+        selectedPaths,
         openTabs,
         activeTab
       }
@@ -209,6 +224,15 @@ export function photoLibraryReducer(
       return { ...state, status: 'canceled' }
     case 'SELECT_PHOTO':
       return { ...state, selectedPath: action.path }
+    case 'SET_SELECTED_PATHS':
+      return { ...state, selectedPaths: new Set(action.paths) }
+    case 'PHOTOS_UPSERTED': {
+      const photosByPath = new Map(state.photosByPath)
+      for (const photo of action.photos) {
+        photosByPath.set(photo.filePath, photo)
+      }
+      return { ...state, photosByPath }
+    }
     case 'SET_FOLDER_FILTER':
       return { ...state, selectedFolder: action.folder, selectedTag: null }
     case 'SET_TAG_FILTER':
@@ -241,6 +265,9 @@ export function photoLibraryReducer(
         removePhotoFromFolderTree(action.filePath, rootFolder, folderCounts, folderChildren)
       }
       const selectedPath = state.selectedPath === action.filePath ? null : state.selectedPath
+      const selectedPaths = state.selectedPaths.has(action.filePath)
+        ? new Set(Array.from(state.selectedPaths).filter((path) => path !== action.filePath))
+        : state.selectedPaths
       const openTabs = state.openTabs.filter((path) => path !== action.filePath)
       const activeTab = state.activeTab === action.filePath ? 'gallery' : state.activeTab
 
@@ -250,6 +277,7 @@ export function photoLibraryReducer(
         folderCounts,
         folderChildren,
         selectedPath,
+        selectedPaths,
         openTabs,
         activeTab
       }

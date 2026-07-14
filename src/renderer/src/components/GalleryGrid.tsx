@@ -11,7 +11,15 @@ import {
   Title
 } from '@mantine/core'
 import { IconPhoto } from '@tabler/icons-react'
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactElement
+} from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { useCtrlKeyHeld } from '../hooks/useCtrlKeyHeld'
@@ -64,7 +72,8 @@ interface CellProps {
   photos: PhotoRecord[]
   columnCount: number
   selectedPath: string | null
-  onSelect: (path: string) => void
+  selectedPaths: Set<string>
+  onSelect: (path: string, event: ReactMouseEvent) => void
   renamingPath: string | null
   onStartRename: (path: string) => void
   onStopRename: () => void
@@ -80,6 +89,7 @@ function PhotoCell({
   photos,
   columnCount,
   selectedPath,
+  selectedPaths,
   onSelect,
   renamingPath,
   onStartRename,
@@ -97,6 +107,7 @@ function PhotoCell({
         <PhotoThumbnail
           photo={photo}
           selected={photo.filePath === selectedPath}
+          multiSelected={selectedPaths.has(photo.filePath)}
           onSelect={onSelect}
           renaming={renamingPath === photo.filePath}
           onStartRename={() => onStartRename(photo.filePath)}
@@ -115,6 +126,9 @@ export function GalleryGrid(): ReactElement {
     visiblePhotos: photos,
     state,
     selectPhoto,
+    toggleSelectPhoto,
+    selectPhotoRange,
+    clearSelection,
     setTagDescription,
     renameTag,
     deleteTag,
@@ -211,6 +225,22 @@ export function GalleryGrid(): ReactElement {
     setCellWidthPersisted(SIZE_MARK_VALUES[nextIndex])
   }
 
+  // Ctrl/Cmd+click toggles the photo in/out of the batch selection;
+  // Shift+click extends a range from the current selectedPath; a plain click
+  // replaces the whole selection with just this photo.
+  const handleSelect = useCallback(
+    (path: string, event: ReactMouseEvent): void => {
+      if (event.shiftKey) {
+        selectPhotoRange(path)
+      } else if (event.ctrlKey || event.metaKey) {
+        toggleSelectPhoto(path)
+      } else {
+        selectPhoto(path)
+      }
+    },
+    [selectPhoto, toggleSelectPhoto, selectPhotoRange]
+  )
+
   // Keep a stable reference so react-window doesn't re-diff every visible
   // cell whenever GalleryGrid re-renders for an unrelated reason.
   const cellProps = useMemo(
@@ -218,7 +248,8 @@ export function GalleryGrid(): ReactElement {
       photos,
       columnCount,
       selectedPath: state.selectedPath,
-      onSelect: selectPhoto,
+      selectedPaths: state.selectedPaths,
+      onSelect: handleSelect,
       renamingPath,
       onStartRename: setRenamingPath,
       onStopRename: () => setRenamingPath(null),
@@ -230,7 +261,8 @@ export function GalleryGrid(): ReactElement {
       photos,
       columnCount,
       state.selectedPath,
-      selectPhoto,
+      state.selectedPaths,
+      handleSelect,
       renamingPath,
       renameFile,
       ctrlHeld,
@@ -322,7 +354,18 @@ export function GalleryGrid(): ReactElement {
           )}
         </Box>
       )}
-      <Box ref={containerRef} flex={1} miw={0} style={{ overflow: 'hidden' }}>
+      <Box
+        ref={containerRef}
+        flex={1}
+        miw={0}
+        style={{ overflow: 'hidden' }}
+        onClick={(event) => {
+          // Only clears when the click lands directly on this empty
+          // container (not bubbled up from a thumbnail), matching the usual
+          // "click empty space to deselect" convention.
+          if (event.target === event.currentTarget) clearSelection()
+        }}
+      >
         {photos.length === 0 ? (
           <Center h="100%">
             {state.status === 'scanning' ? (

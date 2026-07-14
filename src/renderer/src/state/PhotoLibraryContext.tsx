@@ -45,6 +45,10 @@ interface PhotoLibraryContextValue {
   cancelScan: () => Promise<void>
   rescanAll: () => Promise<void>
   selectPhoto: (path: string | null) => void
+  toggleSelectPhoto: (path: string) => void
+  selectPhotoRange: (targetPath: string) => void
+  clearSelection: () => void
+  addTagsToSelection: (tags: string[]) => Promise<void>
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
@@ -231,9 +235,43 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [state.folders, startScanFor])
 
+  // A plain click always replaces the whole selection with just this photo —
+  // both the DetailPanel-primary pointer and the multi-select batch.
   const selectPhoto = useCallback((path: string | null) => {
     dispatch({ type: 'SELECT_PHOTO', path })
+    dispatch({ type: 'SET_SELECTED_PATHS', paths: path ? [path] : [] })
   }, [])
+
+  const toggleSelectPhoto = useCallback(
+    (path: string) => {
+      const next = new Set(state.selectedPaths)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      dispatch({ type: 'SET_SELECTED_PATHS', paths: Array.from(next) })
+      dispatch({ type: 'SELECT_PHOTO', path })
+    },
+    [state.selectedPaths]
+  )
+
+  const clearSelection = useCallback(() => {
+    dispatch({ type: 'SET_SELECTED_PATHS', paths: [] })
+  }, [])
+
+  const addTagsToSelection = useCallback(
+    async (tags: string[]) => {
+      const filePaths = Array.from(state.selectedPaths)
+      if (filePaths.length === 0 || tags.length === 0) return
+      try {
+        const photos = await window.api.addTagsToPhotos(tags, filePaths)
+        dispatch({ type: 'PHOTOS_UPSERTED', photos })
+      } catch (err) {
+        console.error('failed to add tags to selection', err)
+        notifications.show({ color: 'red', message: 'Failed to save tags' })
+        throw err
+      }
+    },
+    [state.selectedPaths]
+  )
 
   const updateTags = useCallback(
     async (filePath: string, tags: string[]) => {
@@ -371,6 +409,32 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return result
   }, [photos, state.selectedFolder, state.selectedTag])
 
+  // Shift+click range-select, anchored at the current selectedPath (the
+  // last-engaged photo) through targetPath, within the currently visible
+  // (filtered) gallery order. Simplification vs. a strict Finder-style fixed
+  // anchor: selectedPath — and so the anchor for the *next* Shift+click —
+  // moves to targetPath each time, rather than staying pinned to the first
+  // click of the sequence.
+  const selectPhotoRange = useCallback(
+    (targetPath: string) => {
+      const anchorPath = state.selectedPath
+      if (!anchorPath) {
+        dispatch({ type: 'SET_SELECTED_PATHS', paths: [targetPath] })
+        dispatch({ type: 'SELECT_PHOTO', path: targetPath })
+        return
+      }
+      const ordered = visiblePhotos.map((photo) => photo.filePath)
+      const anchorIndex = ordered.indexOf(anchorPath)
+      const targetIndex = ordered.indexOf(targetPath)
+      if (anchorIndex === -1 || targetIndex === -1) return
+      const [start, end] =
+        anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex]
+      dispatch({ type: 'SET_SELECTED_PATHS', paths: ordered.slice(start, end + 1) })
+      dispatch({ type: 'SELECT_PHOTO', path: targetPath })
+    },
+    [state.selectedPath, visiblePhotos]
+  )
+
   const selectedPhoto = useMemo(() => {
     const raw = state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null
     return raw ? { ...raw, metadata: toDisplayMetadata(raw.metadata) } : null
@@ -430,6 +494,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     cancelScan,
     rescanAll,
     selectPhoto,
+    toggleSelectPhoto,
+    selectPhotoRange,
+    clearSelection,
+    addTagsToSelection,
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,

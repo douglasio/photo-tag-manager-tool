@@ -1,6 +1,6 @@
 import { Box, Center, Image, Tooltip, UnstyledButton, useMantineTheme } from '@mantine/core'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
-import type { ComponentPropsWithoutRef, ReactElement } from 'react'
+import type { ComponentPropsWithoutRef, MouseEvent, ReactElement } from 'react'
 import type { PhotoRecord } from '../../../shared/types'
 import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../shared/protocolUrls'
 import { GalleryFileName } from './GalleryFileName'
@@ -15,7 +15,10 @@ const BASE_PREVIEW_HEIGHT_VH = 70
 interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onSelect'> {
   photo: PhotoRecord
   selected: boolean
-  onSelect: (path: string) => void
+  // Part of the active multi-selection, but not the DetailPanel-primary
+  // photo — gets a distinct (lighter) highlight from `selected`.
+  multiSelected: boolean
+  onSelect: (path: string, event: MouseEvent) => void
   renaming: boolean
   onStartRename: () => void
   onStopRename: () => void
@@ -40,6 +43,7 @@ interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onS
 export function PhotoThumbnail({
   photo,
   selected,
+  multiSelected,
   onSelect,
   renaming,
   onStartRename,
@@ -65,7 +69,7 @@ export function PhotoThumbnail({
       <Box
         {...rest}
         title={photo.fileName}
-        className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${className ? ` ${className}` : ''}`}
+        className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${!selected && multiSelected ? ' photo-thumbnail--multi-selected' : ''}${className ? ` ${className}` : ''}`}
       >
         <Tooltip.Floating
           disabled={!canPreview}
@@ -96,7 +100,8 @@ export function PhotoThumbnail({
           }}
         >
           <UnstyledButton
-            onClick={() => onSelect(photo.filePath)}
+            className="photo-thumbnail__select-button"
+            onClick={(event) => onSelect(photo.filePath, event)}
             onDoubleClick={() => openPhotoTab(photo.filePath)}
             w="100%"
           >

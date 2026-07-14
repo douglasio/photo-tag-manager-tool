@@ -49,8 +49,22 @@ import { useHover } from '@mantine/hooks'
 const metadataDisplayFilters = ['comment']
 
 export function DetailPanel(): ReactElement {
-  const { selectedPhoto, allTags, updateTags, renameFile, openPhotoTab } = usePhotoLibrary()
+  const { selectedPhoto, allTags, updateTags, renameFile, openPhotoTab, state } = usePhotoLibrary()
   const { hovered, ref } = useHover<HTMLDivElement>()
+
+  // Showing one photo's metadata/tags while a multi-selection is active
+  // would misleadingly suggest edits apply to just that one photo (batch
+  // edits go through the gallery's right-click menu instead), so this stays
+  // blank whenever more than one photo is selected.
+  if (state.selectedPaths.size > 1) {
+    return (
+      <Center h="100%">
+        <Text c="dimmed" ta="center">
+          {state.selectedPaths.size} photos selected
+        </Text>
+      </Center>
+    )
+  }
 
   if (!selectedPhoto) {
     return (

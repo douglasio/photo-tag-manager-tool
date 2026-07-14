@@ -44,6 +44,8 @@ const api = {
     ipcRenderer.invoke('tags:rename', oldTag, newTag, filePaths),
   deleteTag: (tag: string, filePaths: string[]): Promise<PhotoRecord[]> =>
     ipcRenderer.invoke('tags:delete', tag, filePaths),
+  addTagsToPhotos: (tags: string[], filePaths: string[]): Promise<PhotoRecord[]> =>
+    ipcRenderer.invoke('tags:addBatch', tags, filePaths),
   onScanProgress: (callback: (payload: ScanProgressEvent) => void): (() => void) =>
     subscribe('scan:progress', callback),
   onMetadataBatch: (callback: (payload: MetadataBatchEvent) => void): (() => void) =>
