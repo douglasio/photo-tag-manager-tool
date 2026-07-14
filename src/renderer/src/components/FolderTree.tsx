@@ -1,9 +1,7 @@
 import {
   ActionIcon,
   Badge,
-  Box,
   Button,
-  Group,
   Stack,
   Text,
   TextInput,
@@ -30,22 +28,13 @@ interface ExpandToggleProps {
 
 function ExpandToggle({ hasChildren, expanded, onToggle }: ExpandToggleProps): ReactElement {
   const theme = useMantineTheme()
-  const { hovered, ref } = useHover<HTMLDivElement>()
+  const { ref } = useHover<HTMLButtonElement>()
 
   return (
-    <Box
+    <ActionIcon
       ref={ref}
-      w="md"
       c="dimmed"
-      style={{
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: hasChildren ? 'pointer' : undefined,
-        borderRadius: '50%',
-        backgroundColor: hasChildren && hovered ? 'var(--mantine-color-default-hover)' : undefined
-      }}
+      variant="transparent"
       onClick={(event) => {
         if (!hasChildren) return
         event.stopPropagation()
@@ -58,7 +47,7 @@ function ExpandToggle({ hasChildren, expanded, onToggle }: ExpandToggleProps): R
         ) : (
           <IconChevronRight size={theme.spacing.sm} />
         ))}
-    </Box>
+    </ActionIcon>
   )
 }
 
@@ -84,8 +73,8 @@ function TreeRow({
   onToggleExpand
 }: TreeRowProps): ReactElement {
   const { node, expanded, hasChildren, elementProps } = payload
-  const { hovered, ref } = useHover<HTMLDivElement>()
-  const { onClick, style, ...restProps } = elementProps
+  const { hovered, ref } = useHover<HTMLButtonElement>()
+  const { onClick, style } = elementProps
   const fileCount = (node.nodeProps as { fileCount?: number } | undefined)?.fileCount ?? 0
 
   const { base } = splitFolderPath(node.value)
@@ -117,83 +106,87 @@ function TreeRow({
   // otherwise the differing padding/gap between a Button and a plain Group
   // shifts the row's font size and horizontal position when toggling.
   return (
-    <Group gap={0} wrap="nowrap" ref={ref} bg={activeHoverBackground(isActive, hovered)}>
-      <Button
-        onClick={(event) => {
-          if (editing) return
-          onClick(event)
-          onSelect(node.value)
-        }}
-        onDoubleClick={() => {
-          if (editing || !hasChildren) return
-          onToggleExpand(node.value)
-        }}
-        style={style}
-        flex="1"
-        miw="0"
-        variant="transparent"
-        justify="left"
-        leftSection={
-          <ExpandToggle
-            hasChildren={hasChildren}
-            expanded={expanded}
-            onToggle={() => onToggleExpand(node.value)}
-          />
-        }
-      >
-        <Group {...restProps} gap={6} wrap="nowrap" p={4}>
-          {editing ? (
-            <TextInput
-              autoFocus
-              variant="unstyled"
-              value={draft}
-              error={error}
-              onChange={(event) => setDraft(event.currentTarget.value)}
-              onBlur={commit}
-              onClick={(event) => event.stopPropagation()}
-              onDoubleClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => {
-                // Mantine's Tree attaches its own keyboard-nav handler on the
-                // <li role="treeitem"> ancestor — Space (expand/collapse) and
-                // the arrow keys are intercepted there unconditionally, so
-                // without stopping propagation here they'd never reach the
-                // input (no spaces, no cursor movement) while renaming.
-                event.stopPropagation()
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  commit()
-                } else if (event.key === 'Escape') {
-                  cancel()
-                }
-              }}
-              style={{ flex: 1, minWidth: 0 }}
-              styles={{ input: { padding: 0, height: 'auto', minHeight: 'auto' } }}
-            />
-          ) : (
-            <>
-              <Text truncate="end" miw={0} flex="1">
-                {node.label}
-              </Text>
-              <FolderBadge isActive={isActive}>{fileCount}</FolderBadge>
-            </>
-          )}
-        </Group>
-      </Button>
-      {!editing && (
-        <Tooltip label="Rename folder">
-          <ActionIcon
-            style={{ opacity: hovered ? 0.7 : 0, flexShrink: 0 }}
-            onClick={(event) => {
-              event.stopPropagation()
-              onStartEdit()
-            }}
-            aria-label={`Rename ${node.value}`}
-          >
-            <IconPencil size={14} />
-          </ActionIcon>
-        </Tooltip>
+    <Button
+      ref={ref}
+      bg={activeHoverBackground(isActive, hovered)}
+      onClick={(event) => {
+        if (editing) return
+        onClick(event)
+        onSelect(node.value)
+      }}
+      onDoubleClick={() => {
+        if (editing || !hasChildren) return
+        onToggleExpand(node.value)
+      }}
+      style={style}
+      variant="transparent"
+      justify="space-between"
+      fullWidth
+      // Button's "label" slot (wrapping children) shrink-wraps to its
+      // content by default instead of growing to fill the space between
+      // leftSection/rightSection — with justify="space-between" that leaves
+      // the narrow label floating with roughly even gaps on both sides
+      // (reads as centered) instead of hugging the left edge.
+      styles={{ label: { flex: 1 } }}
+      leftSection={
+        <ExpandToggle
+          hasChildren={hasChildren}
+          expanded={expanded}
+          onToggle={() => onToggleExpand(node.value)}
+        />
+      }
+      rightSection={
+        !editing && (
+          <>
+            <Tooltip label="Rename folder">
+              <ActionIcon
+                style={{ opacity: hovered ? 0.7 : 0, flexShrink: 0 }}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onStartEdit()
+                }}
+                aria-label={`Rename ${node.value}`}
+              >
+                <IconPencil />
+              </ActionIcon>
+            </Tooltip>
+            <FolderBadge isActive={isActive}>{fileCount}</FolderBadge>
+          </>
+        )
+      }
+    >
+      {editing ? (
+        <TextInput
+          autoFocus
+          variant="unstyled"
+          value={draft}
+          error={error}
+          flex="1"
+          miw="0"
+          onChange={(event) => setDraft(event.currentTarget.value)}
+          onBlur={commit}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            // Mantine's Tree attaches its own keyboard-nav handler on the
+            // <li role="treeitem"> ancestor — Space (expand/collapse) and
+            // the arrow keys are intercepted there unconditionally, so
+            // without stopping propagation here they'd never reach the
+            // input (no spaces, no cursor movement) while renaming.
+            event.stopPropagation()
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              commit()
+            } else if (event.key === 'Escape') {
+              cancel()
+            }
+          }}
+          styles={{ input: { padding: 0, height: 'auto', minHeight: 'auto' } }}
+        />
+      ) : (
+        <Text truncate="end">{node.label}</Text>
       )}
-    </Group>
+    </Button>
   )
 }
 
@@ -284,17 +277,13 @@ function AllPhotosRow({
       ref={ref}
       onClick={onClick}
       bg={activeHoverBackground(isActive, hovered)}
-      w="100%"
       variant="transparent"
-      justify="left"
-      leftSection={<Box w="md" style={{ flexShrink: 0 }} />}
+      justify="space-between"
+      fullWidth
+      // leftSection={<Box w="md" style={{ flexShrink: 0 }} />}
+      rightSection={<FolderBadge isActive={isActive}>{count}</FolderBadge>}
     >
-      <Group gap={6} wrap="nowrap" p={4}>
-        <Text truncate="end" miw={0} flex="1">
-          All Photos
-        </Text>
-        <FolderBadge isActive={isActive}>{count}</FolderBadge>
-      </Group>
+      <Text>All Photos</Text>
     </Button>
   )
 }
