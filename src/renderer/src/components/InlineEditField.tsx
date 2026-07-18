@@ -7,6 +7,12 @@ interface InlineEditFieldProps {
   editing: boolean
   onStartEdit: () => void
   children: ReactNode
+  // 'start' (default) shrink-wraps the content when not editing, so the
+  // pencil icon hugs left-aligned text (FileNameEditor, TagNameEditor).
+  // 'center' keeps the content full-width at all times, so centered text
+  // (e.g. gallery captions) actually centers instead of collapsing to its
+  // own content width.
+  contentAlign?: 'start' | 'center'
 }
 
 /**
@@ -18,9 +24,44 @@ interface InlineEditFieldProps {
 export function InlineEditField({
   editing,
   onStartEdit,
-  children
+  children,
+  contentAlign = 'start'
 }: InlineEditFieldProps): ReactElement {
   const { hovered, ref } = useHover<HTMLDivElement>()
+
+  // In 'center' mode the pencil overlays on top instead of sitting in the
+  // flex flow — otherwise, even at opacity 0, it still occupies width on one
+  // side only, which both throws off centering and (since it disappears
+  // entirely while editing) shifts the text's available width — and so its
+  // position — the moment edit mode toggles.
+  if (contentAlign === 'center') {
+    return (
+      <Box ref={ref} pos="relative">
+        <Box
+          onDoubleClick={() => {
+            if (!editing) onStartEdit()
+          }}
+          style={{ width: '100%', minWidth: 0 }}
+        >
+          {children}
+        </Box>
+        {!editing && (
+          <ActionIcon
+            style={{
+              position: 'absolute',
+              top: '50%',
+              right: 0,
+              transform: 'translateY(-50%)',
+              opacity: hovered ? 0.7 : 0
+            }}
+            onClick={onStartEdit}
+          >
+            <IconPencil />
+          </ActionIcon>
+        )}
+      </Box>
+    )
+  }
 
   return (
     <Group ref={ref} gap={4} wrap="nowrap" align="center">
@@ -34,13 +75,8 @@ export function InlineEditField({
       </Box>
       {!editing && (
         <ActionIcon
-          variant="subtle"
-          size="sm"
           style={{
-            flexShrink: 0,
-            opacity: hovered ? 0.7 : 0,
-            pointerEvents: hovered ? 'auto' : 'none',
-            transition: 'opacity 120ms ease'
+            opacity: hovered ? 0.7 : 0
           }}
           onClick={onStartEdit}
         >

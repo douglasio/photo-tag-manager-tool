@@ -11,9 +11,19 @@ import {
   Title
 } from '@mantine/core'
 import { IconPhoto } from '@tabler/icons-react'
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactElement
+} from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { useCtrlKeyHeld } from '../hooks/useCtrlKeyHeld'
+import { PhotoContextMenu } from './PhotoContextMenu'
 import { PhotoThumbnail } from './PhotoThumbnail'
 import { TagDeleteButton } from './TagDeleteButton'
 import { TagDescriptionEditor } from './TagDescriptionEditor'
@@ -35,16 +45,41 @@ const MAX_CELL_WIDTH = 600
 // column overflows the scrollbar's width and the grid gains an unwanted
 // horizontal scrollbar.
 const SCROLLBAR_RESERVE_PX = 16
+const MIN_PREVIEW_SCALE = 0.5
+const MAX_PREVIEW_SCALE = 3
+// A typical wheel "notch" reports a deltaY of roughly 100, so this yields
+// about a 0.15x change per notch — noticeable without feeling twitchy.
+const PREVIEW_ZOOM_SENSITIVITY = 0.0015
 
 function clampCellWidth(value: number): number {
   return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, value))
+}
+
+// Evenly spaced tick marks spanning the slider's actual min/max range, so
+// they land at real, reachable cell-width values rather than arbitrary points.
+const SIZE_MARK_COUNT = 5
+const SIZE_MARK_VALUES = Array.from(
+  { length: SIZE_MARK_COUNT },
+  (_, index) => MIN_CELL_WIDTH + ((MAX_CELL_WIDTH - MIN_CELL_WIDTH) * index) / (SIZE_MARK_COUNT - 1)
+)
+const SIZE_MARKS = SIZE_MARK_VALUES.map((value) => ({ value }))
+
+function clampPreviewScale(value: number): number {
+  return Math.min(MAX_PREVIEW_SCALE, Math.max(MIN_PREVIEW_SCALE, value))
 }
 
 interface CellProps {
   photos: PhotoRecord[]
   columnCount: number
   selectedPath: string | null
-  onSelect: (path: string) => void
+  selectedPaths: Set<string>
+  onSelect: (path: string, event: ReactMouseEvent) => void
+  renamingPath: string | null
+  onStartRename: (path: string) => void
+  onStopRename: () => void
+  onRename: (filePath: string, newBaseName: string) => Promise<void>
+  ctrlHeld: boolean
+  previewScale: number
 }
 
 function PhotoCell({
@@ -54,18 +89,34 @@ function PhotoCell({
   photos,
   columnCount,
   selectedPath,
-  onSelect
+  selectedPaths,
+  onSelect,
+  renamingPath,
+  onStartRename,
+  onStopRename,
+  onRename,
+  ctrlHeld,
+  previewScale
 }: CellComponentProps<CellProps>): ReactElement {
   const index = rowIndex * columnCount + columnIndex
   const photo = photos[index]
   if (!photo) return <div style={style} />
   return (
     <Box style={style} p={6}>
-      <PhotoThumbnail
-        photo={photo}
-        selected={photo.filePath === selectedPath}
-        onSelect={onSelect}
-      />
+      <PhotoContextMenu photo={photo} onRename={() => onStartRename(photo.filePath)}>
+        <PhotoThumbnail
+          photo={photo}
+          selected={photo.filePath === selectedPath}
+          multiSelected={selectedPaths.has(photo.filePath)}
+          onSelect={onSelect}
+          renaming={renamingPath === photo.filePath}
+          onStartRename={() => onStartRename(photo.filePath)}
+          onStopRename={onStopRename}
+          onRename={(newBaseName) => onRename(photo.filePath, newBaseName)}
+          ctrlHeld={ctrlHeld}
+          previewScale={previewScale}
+        />
+      </PhotoContextMenu>
     </Box>
   )
 }
@@ -75,16 +126,57 @@ export function GalleryGrid(): ReactElement {
     visiblePhotos: photos,
     state,
     selectPhoto,
+    toggleSelectPhoto,
+    selectPhotoRange,
+    clearSelection,
     setTagDescription,
     renameTag,
     deleteTag,
     tagCounts,
     folderTags,
-    setFolderTagFilter
+    setFolderTagFilter,
+    renameFile
   } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
   const [cellWidth, setCellWidth] = useState(DEFAULT_CELL_WIDTH)
+  // Lifted up here (not into PhotoCell) since react-window recycles cell
+  // instances across different photos as the user scrolls — per-cell local
+  // state would risk leaking "is renaming" onto the wrong photo.
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const ctrlHeld = useCtrlKeyHeld()
+  // A ref mirror of ctrlHeld so the native wheel listener below (attached
+  // once) always reads the latest value without needing to re-subscribe.
+  const ctrlHeldRef = useRef(ctrlHeld)
+  useEffect(() => {
+    ctrlHeldRef.current = ctrlHeld
+  }, [ctrlHeld])
+  const [previewScale, setPreviewScale] = useState(1)
+  // Reset the zoom once Ctrl is released, so the next Ctrl+hover session
+  // starts fresh — adjusted during render (not a useEffect) per this
+  // codebase's pattern for resetting state when an external value changes.
+  const [wasCtrlHeld, setWasCtrlHeld] = useState(ctrlHeld)
+  if (ctrlHeld !== wasCtrlHeld) {
+    setWasCtrlHeld(ctrlHeld)
+    if (!ctrlHeld) setPreviewScale(1)
+  }
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    // React's synthetic onWheel attaches its DOM listener as passive, so
+    // event.preventDefault() inside it is silently ignored by the browser
+    // (Chrome just logs a "preventDefault inside passive listener" warning)
+    // and the grid keeps scrolling underneath the zoom. A manually attached
+    // { passive: false } listener is the only way to actually cancel it.
+    const handleWheel = (event: WheelEvent): void => {
+      if (!ctrlHeldRef.current) return
+      event.preventDefault()
+      setPreviewScale((scale) => clampPreviewScale(scale - event.deltaY * PREVIEW_ZOOM_SENSITIVITY))
+    }
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
@@ -118,15 +210,36 @@ export function GalleryGrid(): ReactElement {
   const cellHeight = actualCellWidth + CELL_LABEL_HEIGHT
   const rowCount = Math.ceil(photos.length / columnCount)
 
-  // The +/- buttons step by whole columns rather than by CELL_WIDTH_STEP
-  // pixels — near either end of the range a 40px nudge can round back to the
-  // same columnCount and visibly do nothing, whereas a column-count step is
-  // guaranteed to change something (until truly at the min/max clamp).
-  const stepByColumns = (delta: number): void => {
-    const nextColumnCount = Math.max(1, columnCount + delta)
-    const nextWidth = availableWidth > 0 ? availableWidth / nextColumnCount : cellWidth
-    setCellWidthPersisted(nextWidth)
+  // The +/- buttons jump between the slider's own SIZE_MARK_VALUES rather
+  // than stepping by a fixed pixel amount, so they always land exactly on a
+  // mark instead of somewhere between two of them.
+  const stepToMark = (delta: number): void => {
+    const closestIndex = SIZE_MARK_VALUES.reduce(
+      (closest, value, index) =>
+        Math.abs(value - cellWidth) < Math.abs(SIZE_MARK_VALUES[closest] - cellWidth)
+          ? index
+          : closest,
+      0
+    )
+    const nextIndex = Math.min(SIZE_MARK_VALUES.length - 1, Math.max(0, closestIndex + delta))
+    setCellWidthPersisted(SIZE_MARK_VALUES[nextIndex])
   }
+
+  // Ctrl/Cmd+click toggles the photo in/out of the batch selection;
+  // Shift+click extends a range from the current selectedPath; a plain click
+  // replaces the whole selection with just this photo.
+  const handleSelect = useCallback(
+    (path: string, event: ReactMouseEvent): void => {
+      if (event.shiftKey) {
+        selectPhotoRange(path)
+      } else if (event.ctrlKey || event.metaKey) {
+        toggleSelectPhoto(path)
+      } else {
+        selectPhoto(path)
+      }
+    },
+    [selectPhoto, toggleSelectPhoto, selectPhotoRange]
+  )
 
   // Keep a stable reference so react-window doesn't re-diff every visible
   // cell whenever GalleryGrid re-renders for an unrelated reason.
@@ -135,9 +248,26 @@ export function GalleryGrid(): ReactElement {
       photos,
       columnCount,
       selectedPath: state.selectedPath,
-      onSelect: selectPhoto
+      selectedPaths: state.selectedPaths,
+      onSelect: handleSelect,
+      renamingPath,
+      onStartRename: setRenamingPath,
+      onStopRename: () => setRenamingPath(null),
+      onRename: renameFile,
+      ctrlHeld,
+      previewScale
     }),
-    [photos, columnCount, state.selectedPath, selectPhoto]
+    [
+      photos,
+      columnCount,
+      state.selectedPath,
+      state.selectedPaths,
+      handleSelect,
+      renamingPath,
+      renameFile,
+      ctrlHeld,
+      previewScale
+    ]
   )
 
   // A "pure" tag view (navigated via the Tags panel, no folder context) shows
@@ -157,7 +287,14 @@ export function GalleryGrid(): ReactElement {
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
   return (
-    <Flex direction="column" flex={1} miw={0}>
+    // mih=0 (in addition to miw=0) is required because this component is
+    // mounted as a flex item in different parent orientations depending on
+    // context (a row-flex Box outside Tabs, a column-flex Tabs when photo
+    // tabs are open) — without it, its main axis defaults to its content's
+    // intrinsic size in a column parent, overflowing past the fixed-height
+    // ancestor instead of shrinking to fit, which hides the footer and
+    // breaks the internal grid's own scroll container.
+    <Flex direction="column" flex={1} miw={0} mih={0}>
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
           {isPureTagView ? (
@@ -217,7 +354,18 @@ export function GalleryGrid(): ReactElement {
           )}
         </Box>
       )}
-      <Box ref={containerRef} flex={1} miw={0} style={{ overflow: 'hidden' }}>
+      <Box
+        ref={containerRef}
+        flex={1}
+        miw={0}
+        style={{ overflow: 'hidden' }}
+        onClick={(event) => {
+          // Only clears when the click lands directly on this empty
+          // container (not bubbled up from a thumbnail), matching the usual
+          // "click empty space to deselect" convention.
+          if (event.target === event.currentTarget) clearSelection()
+        }}
+      >
         {photos.length === 0 ? (
           <Center h="100%">
             {state.status === 'scanning' ? (
@@ -245,13 +393,7 @@ export function GalleryGrid(): ReactElement {
       </Box>
       {photos.length > 0 && (
         <Group gap="xs" wrap="nowrap" justify="flex-end" px="md" py="xs" style={{ flexShrink: 0 }}>
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            size="sm"
-            onClick={() => stepByColumns(1)}
-            aria-label="Decrease thumbnail size"
-          >
+          <ActionIcon onClick={() => stepToMark(-1)} aria-label="Decrease thumbnail size">
             <IconPhoto size={12} />
           </ActionIcon>
           <Slider
@@ -261,15 +403,12 @@ export function GalleryGrid(): ReactElement {
             min={MIN_CELL_WIDTH}
             max={MAX_CELL_WIDTH}
             step={4}
+            marks={SIZE_MARKS}
             label={null}
             w={120}
+            restrictToMarks
           />
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            onClick={() => stepByColumns(-1)}
-            aria-label="Increase thumbnail size"
-          >
+          <ActionIcon onClick={() => stepToMark(1)} aria-label="Increase thumbnail size">
             <IconPhoto size={22} />
           </ActionIcon>
         </Group>

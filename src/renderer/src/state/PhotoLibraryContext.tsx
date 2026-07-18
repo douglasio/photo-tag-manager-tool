@@ -12,7 +12,15 @@ import {
 import { notifications } from '@mantine/notifications'
 import { initialState, photoLibraryReducer, type PhotoLibraryState } from './photoLibraryReducer'
 import { basename, isPhotoInFolder } from '../utils/folderTree'
+import { toDisplayMetadata, type DisplayMetadata } from '../utils/metadataDisplay'
 import type { PhotoRecord } from '../../../shared/types'
+
+// selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
+// only it gets the labeled/display-formatted shape — transforming the whole
+// photos array on every render would be wasted work for fields nothing reads.
+export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
+  metadata: DisplayMetadata
+}
 
 // How long to wait after the last file-watcher event before summarizing the
 // batch into a single toast, so a bulk copy/delete doesn't spam a toast per file.
@@ -26,16 +34,22 @@ interface PhotoLibraryContextValue {
   state: PhotoLibraryState
   photos: PhotoRecord[]
   visiblePhotos: PhotoRecord[]
-  selectedPhoto: PhotoRecord | null
+  selectedPhoto: DisplayPhotoRecord | null
   allTags: string[]
   tagCounts: Map<string, number>
   tagCoverPhotos: Map<string, PhotoRecord>
   folderTags: string[]
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
+  renameFolder: (folder: string, newBaseName: string) => Promise<void>
   cancelScan: () => Promise<void>
   rescanAll: () => Promise<void>
   selectPhoto: (path: string | null) => void
+  toggleSelectPhoto: (path: string) => void
+  selectPhotoRange: (targetPath: string) => void
+  clearSelection: () => void
+  addTagsToSelection: (tags: string[]) => Promise<void>
+  addTagsToPhotos: (tags: string[], filePaths: string[]) => Promise<void>
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
@@ -43,6 +57,11 @@ interface PhotoLibraryContextValue {
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
   deleteTag: (tag: string) => Promise<void>
+  renameFile: (filePath: string, newBaseName: string) => Promise<void>
+  openTabPhotos: PhotoRecord[]
+  openPhotoTab: (filePath: string) => void
+  closePhotoTab: (filePath: string) => void
+  setActiveTab: (tab: string) => void
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -65,8 +84,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
     notifications.show({
       message: parts.join(', '),
-      color: removed > 0 && added === 0 ? 'red' : 'teal',
-      autoClose: 4000
+      color: removed > 0 && added === 0 ? 'red' : 'teal'
     })
   }, [])
 
@@ -186,6 +204,26 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.folderCounts]
   )
 
+  const renameFolder = useCallback(async (folder: string, newBaseName: string) => {
+    try {
+      const newFolder = await window.api.renameFolder(folder, newBaseName)
+      dispatch({ type: 'FOLDER_RENAMED', oldFolder: folder, newFolder })
+      if (newFolder !== folder) {
+        notifications.show({
+          color: 'teal',
+          message: `Renamed folder "${basename(folder)}" to "${basename(newFolder)}"`
+        })
+      }
+    } catch (err) {
+      console.error(`failed to rename folder ${folder}`, err)
+      notifications.show({
+        color: 'red',
+        message: err instanceof Error ? err.message : 'Failed to rename folder'
+      })
+      throw err
+    }
+  }, [])
+
   const cancelScan = useCallback(async () => {
     if (!scanIdRef.current) return
     await window.api.cancelScan(scanIdRef.current)
@@ -198,9 +236,48 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [state.folders, startScanFor])
 
+  // A plain click always replaces the whole selection with just this photo —
+  // both the DetailPanel-primary pointer and the multi-select batch.
   const selectPhoto = useCallback((path: string | null) => {
     dispatch({ type: 'SELECT_PHOTO', path })
+    dispatch({ type: 'SET_SELECTED_PATHS', paths: path ? [path] : [] })
   }, [])
+
+  const toggleSelectPhoto = useCallback(
+    (path: string) => {
+      const next = new Set(state.selectedPaths)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      dispatch({ type: 'SET_SELECTED_PATHS', paths: Array.from(next) })
+      dispatch({ type: 'SELECT_PHOTO', path })
+    },
+    [state.selectedPaths]
+  )
+
+  const clearSelection = useCallback(() => {
+    dispatch({ type: 'SET_SELECTED_PATHS', paths: [] })
+  }, [])
+
+  // General-purpose batch tag-add, shared by the multi-select context menu
+  // (tags applied to state.selectedPaths) and drag-and-drop onto a tag row
+  // (tags applied to whatever was actually dragged, which isn't necessarily
+  // the current selection — e.g. dragging a single unselected photo).
+  const addTagsToPhotos = useCallback(async (tags: string[], filePaths: string[]) => {
+    if (filePaths.length === 0 || tags.length === 0) return
+    try {
+      const photos = await window.api.addTagsToPhotos(tags, filePaths)
+      dispatch({ type: 'PHOTOS_UPSERTED', photos })
+    } catch (err) {
+      console.error('failed to add tags to photos', err)
+      notifications.show({ color: 'red', message: 'Failed to save tags' })
+      throw err
+    }
+  }, [])
+
+  const addTagsToSelection = useCallback(
+    (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
+    [addTagsToPhotos, state.selectedPaths]
+  )
 
   const updateTags = useCallback(
     async (filePath: string, tags: string[]) => {
@@ -282,6 +359,42 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.photosByPath]
   )
 
+  const renameFile = useCallback(
+    async (filePath: string, newBaseName: string) => {
+      try {
+        const photo = await window.api.renamePhoto(filePath, newBaseName)
+        const wasSelected = state.selectedPath === filePath
+        // Dispatched before PHOTO_REMOVED so a tab open on the old path is
+        // repointed to the new one, rather than PHOTO_REMOVED's own openTabs
+        // pruning treating the rename as if the file had just disappeared.
+        dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: filePath, newPath: photo.filePath })
+        dispatch({ type: 'PHOTO_REMOVED', filePath })
+        dispatch({ type: 'PHOTO_UPSERTED', photo })
+        if (wasSelected) dispatch({ type: 'SELECT_PHOTO', path: photo.filePath })
+      } catch (err) {
+        console.error(`failed to rename ${filePath}`, err)
+        notifications.show({
+          color: 'red',
+          message: err instanceof Error ? err.message : 'Failed to rename file'
+        })
+        throw err
+      }
+    },
+    [state.selectedPath]
+  )
+
+  const openPhotoTab = useCallback((filePath: string) => {
+    dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
+  }, [])
+
+  const closePhotoTab = useCallback((filePath: string) => {
+    dispatch({ type: 'CLOSE_PHOTO_TAB', filePath })
+  }, [])
+
+  const setActiveTab = useCallback((tab: string) => {
+    dispatch({ type: 'SET_ACTIVE_TAB', tab })
+  }, [])
+
   const photos = useMemo(
     () =>
       Array.from(state.photosByPath.values()).sort((a, b) => a.fileName.localeCompare(b.fileName)),
@@ -302,10 +415,36 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return result
   }, [photos, state.selectedFolder, state.selectedTag])
 
-  const selectedPhoto = useMemo(
-    () => (state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null),
-    [state.selectedPath, state.photosByPath]
+  // Shift+click range-select, anchored at the current selectedPath (the
+  // last-engaged photo) through targetPath, within the currently visible
+  // (filtered) gallery order. Simplification vs. a strict Finder-style fixed
+  // anchor: selectedPath — and so the anchor for the *next* Shift+click —
+  // moves to targetPath each time, rather than staying pinned to the first
+  // click of the sequence.
+  const selectPhotoRange = useCallback(
+    (targetPath: string) => {
+      const anchorPath = state.selectedPath
+      if (!anchorPath) {
+        dispatch({ type: 'SET_SELECTED_PATHS', paths: [targetPath] })
+        dispatch({ type: 'SELECT_PHOTO', path: targetPath })
+        return
+      }
+      const ordered = visiblePhotos.map((photo) => photo.filePath)
+      const anchorIndex = ordered.indexOf(anchorPath)
+      const targetIndex = ordered.indexOf(targetPath)
+      if (anchorIndex === -1 || targetIndex === -1) return
+      const [start, end] =
+        anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex]
+      dispatch({ type: 'SET_SELECTED_PATHS', paths: ordered.slice(start, end + 1) })
+      dispatch({ type: 'SELECT_PHOTO', path: targetPath })
+    },
+    [state.selectedPath, visiblePhotos]
   )
+
+  const selectedPhoto = useMemo(() => {
+    const raw = state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null
+    return raw ? { ...raw, metadata: toDisplayMetadata(raw.metadata) } : null
+  }, [state.selectedPath, state.photosByPath])
 
   // photos is already sorted, so the first photo seen for a tag is a stable,
   // deterministic "cover" pick — no extra pass or bookkeeping required.
@@ -336,6 +475,16 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return Array.from(tags).sort()
   }, [photos, state.selectedFolder])
 
+  // Resolved in openTabs order (not sorted) so tabs stay in the order they
+  // were opened rather than jumping around as the user opens more.
+  const openTabPhotos = useMemo(
+    () =>
+      state.openTabs
+        .map((path) => state.photosByPath.get(path))
+        .filter((photo): photo is PhotoRecord => photo != null),
+    [state.openTabs, state.photosByPath]
+  )
+
   const value: PhotoLibraryContextValue = {
     state,
     photos,
@@ -347,16 +496,27 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     folderTags,
     addFolder,
     removeFolder,
+    renameFolder,
     cancelScan,
     rescanAll,
     selectPhoto,
+    toggleSelectPhoto,
+    selectPhotoRange,
+    clearSelection,
+    addTagsToSelection,
+    addTagsToPhotos,
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,
     updateTags,
     setTagDescription,
     renameTag,
-    deleteTag
+    deleteTag,
+    renameFile,
+    openTabPhotos,
+    openPhotoTab,
+    closePhotoTab,
+    setActiveTab
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

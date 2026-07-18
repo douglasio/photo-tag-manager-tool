@@ -2,7 +2,8 @@ import {
   addPhotoToFolderTree,
   findRootFolder,
   isPathUnderOrEqual,
-  removePhotoFromFolderTree
+  removePhotoFromFolderTree,
+  rewritePathPrefix
 } from '../utils/folderTree'
 import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
 
@@ -18,11 +19,20 @@ export interface PhotoLibraryState {
   cacheHits: number
   errors: ScanCompleteEvent['errors']
   selectedPath: string | null
+  // Batch/multi-select in the gallery (Ctrl/Cmd+click toggle, Shift+click
+  // range). Kept in sync with selectedPath (which stays the "last-engaged"
+  // photo for DetailPanel) rather than replacing it, so existing
+  // single-selection call sites are unaffected.
+  selectedPaths: Set<string>
   selectedFolder: string | null
   selectedTag: string | null
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
   tagDescriptions: Map<string, string>
+  // Ordered list of photo paths open as Photo View tabs. activeTab is either
+  // 'gallery' or one of the paths in openTabs.
+  openTabs: string[]
+  activeTab: string
 }
 
 export const initialState: PhotoLibraryState = {
@@ -35,23 +45,29 @@ export const initialState: PhotoLibraryState = {
   cacheHits: 0,
   errors: [],
   selectedPath: null,
+  selectedPaths: new Set(),
   selectedFolder: null,
   selectedTag: null,
   folderCounts: new Map(),
   folderChildren: new Map(),
-  tagDescriptions: new Map()
+  tagDescriptions: new Map(),
+  openTabs: [],
+  activeTab: 'gallery'
 }
 
 export type PhotoLibraryAction =
   | { type: 'FOLDERS_LOADED'; folders: string[] }
   | { type: 'FOLDER_ADDED'; folder: string }
   | { type: 'FOLDER_REMOVED'; folder: string }
+  | { type: 'FOLDER_RENAMED'; oldFolder: string; newFolder: string }
   | { type: 'SCAN_STARTED'; rootPath: string; scanId: string }
   | { type: 'SCAN_PROGRESS'; filesFound: number }
   | { type: 'METADATA_BATCH'; photos: PhotoRecord[] }
   | { type: 'SCAN_COMPLETE'; result: ScanCompleteEvent }
   | { type: 'SCAN_CANCELED' }
   | { type: 'SELECT_PHOTO'; path: string | null }
+  | { type: 'SET_SELECTED_PATHS'; paths: string[] }
+  | { type: 'PHOTOS_UPSERTED'; photos: PhotoRecord[] }
   | { type: 'SET_FOLDER_FILTER'; folder: string | null }
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
@@ -61,6 +77,10 @@ export type PhotoLibraryAction =
   | { type: 'TAG_DESCRIPTION_UPDATED'; tag: string; description: string }
   | { type: 'TAG_RENAMED'; oldTag: string; newTag: string; photos: PhotoRecord[] }
   | { type: 'TAG_DELETED'; tag: string; photos: PhotoRecord[] }
+  | { type: 'OPEN_PHOTO_TAB'; filePath: string }
+  | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
+  | { type: 'SET_ACTIVE_TAB'; tab: string }
+  | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
 
 export function photoLibraryReducer(
   state: PhotoLibraryState,
@@ -98,6 +118,16 @@ export function photoLibraryReducer(
           ? null
           : state.selectedPath
 
+      const openTabs = state.openTabs.filter((path) => !isPathUnderOrEqual(path, action.folder))
+      const activeTab =
+        state.activeTab !== 'gallery' && isPathUnderOrEqual(state.activeTab, action.folder)
+          ? 'gallery'
+          : state.activeTab
+
+      const selectedPaths = new Set(
+        Array.from(state.selectedPaths).filter((path) => !isPathUnderOrEqual(path, action.folder))
+      )
+
       return {
         ...state,
         folders,
@@ -105,7 +135,59 @@ export function photoLibraryReducer(
         folderCounts,
         folderChildren,
         selectedFolder,
-        selectedPath
+        selectedPath,
+        selectedPaths,
+        openTabs,
+        activeTab
+      }
+    }
+    // The folder itself was renamed on disk — every photo nested under it
+    // keeps its own fileName, but its filePath/id (and every other
+    // path-shaped bit of state) needs the oldFolder prefix swapped for
+    // newFolder. rewritePathPrefix is a no-op for anything unrelated, so it's
+    // safe to apply unconditionally across every map/array/string below.
+    case 'FOLDER_RENAMED': {
+      const { oldFolder, newFolder } = action
+      const rewrite = (path: string): string => rewritePathPrefix(path, oldFolder, newFolder)
+
+      const folders = state.folders.map(rewrite)
+
+      const photosByPath = new Map<string, PhotoRecord>()
+      for (const [path, photo] of state.photosByPath) {
+        const newPath = rewrite(path)
+        photosByPath.set(
+          newPath,
+          newPath === path ? photo : { ...photo, id: newPath, filePath: newPath }
+        )
+      }
+
+      const folderCounts = new Map<string, number>()
+      for (const [folder, count] of state.folderCounts) {
+        folderCounts.set(rewrite(folder), count)
+      }
+
+      const folderChildren = new Map<string, Set<string>>()
+      for (const [folder, children] of state.folderChildren) {
+        folderChildren.set(rewrite(folder), new Set(Array.from(children, rewrite)))
+      }
+
+      const selectedFolder = state.selectedFolder !== null ? rewrite(state.selectedFolder) : null
+      const selectedPath = state.selectedPath !== null ? rewrite(state.selectedPath) : null
+      const selectedPaths = new Set(Array.from(state.selectedPaths, rewrite))
+      const openTabs = state.openTabs.map(rewrite)
+      const activeTab = rewrite(state.activeTab)
+
+      return {
+        ...state,
+        folders,
+        photosByPath,
+        folderCounts,
+        folderChildren,
+        selectedFolder,
+        selectedPath,
+        selectedPaths,
+        openTabs,
+        activeTab
       }
     }
     case 'SCAN_STARTED':
@@ -142,6 +224,15 @@ export function photoLibraryReducer(
       return { ...state, status: 'canceled' }
     case 'SELECT_PHOTO':
       return { ...state, selectedPath: action.path }
+    case 'SET_SELECTED_PATHS':
+      return { ...state, selectedPaths: new Set(action.paths) }
+    case 'PHOTOS_UPSERTED': {
+      const photosByPath = new Map(state.photosByPath)
+      for (const photo of action.photos) {
+        photosByPath.set(photo.filePath, photo)
+      }
+      return { ...state, photosByPath }
+    }
     case 'SET_FOLDER_FILTER':
       return { ...state, selectedFolder: action.folder, selectedTag: null }
     case 'SET_TAG_FILTER':
@@ -174,8 +265,22 @@ export function photoLibraryReducer(
         removePhotoFromFolderTree(action.filePath, rootFolder, folderCounts, folderChildren)
       }
       const selectedPath = state.selectedPath === action.filePath ? null : state.selectedPath
+      const selectedPaths = state.selectedPaths.has(action.filePath)
+        ? new Set(Array.from(state.selectedPaths).filter((path) => path !== action.filePath))
+        : state.selectedPaths
+      const openTabs = state.openTabs.filter((path) => path !== action.filePath)
+      const activeTab = state.activeTab === action.filePath ? 'gallery' : state.activeTab
 
-      return { ...state, photosByPath, folderCounts, folderChildren, selectedPath }
+      return {
+        ...state,
+        photosByPath,
+        folderCounts,
+        folderChildren,
+        selectedPath,
+        selectedPaths,
+        openTabs,
+        activeTab
+      }
     }
     case 'TAG_DESCRIPTIONS_LOADED':
       return { ...state, tagDescriptions: new Map(Object.entries(action.descriptions)) }
@@ -215,6 +320,31 @@ export function photoLibraryReducer(
       const selectedTag = state.selectedTag === action.tag ? null : state.selectedTag
 
       return { ...state, photosByPath, tagDescriptions, selectedTag }
+    }
+    case 'OPEN_PHOTO_TAB': {
+      const openTabs = state.openTabs.includes(action.filePath)
+        ? state.openTabs
+        : [...state.openTabs, action.filePath]
+      return { ...state, openTabs, activeTab: action.filePath }
+    }
+    case 'CLOSE_PHOTO_TAB': {
+      if (!state.openTabs.includes(action.filePath)) return state
+      const openTabs = state.openTabs.filter((path) => path !== action.filePath)
+      const activeTab = state.activeTab === action.filePath ? 'gallery' : state.activeTab
+      return { ...state, openTabs, activeTab }
+    }
+    case 'SET_ACTIVE_TAB':
+      return { ...state, activeTab: action.tab }
+    // Keeps a photo's tab (and active-tab pointer, if it was the active one)
+    // pointed at its new path across a rename, instead of PHOTO_REMOVED
+    // pruning it away as if the file had actually disappeared.
+    case 'RENAME_PHOTO_TAB': {
+      if (!state.openTabs.includes(action.oldPath)) return state
+      const openTabs = state.openTabs.map((path) =>
+        path === action.oldPath ? action.newPath : path
+      )
+      const activeTab = state.activeTab === action.oldPath ? action.newPath : state.activeTab
+      return { ...state, openTabs, activeTab }
     }
     default:
       return state

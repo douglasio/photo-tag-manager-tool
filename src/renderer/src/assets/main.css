@@ -18,6 +18,13 @@ body {
   border: 2px solid transparent;
   border-radius: var(--mantine-radius-default);
   padding: 6px;
+  /* Without this, holding Shift (for range-select) and moving the mouse
+     primes Chromium's native text-selection ("rubber-band") behavior, which
+     visually outlines selectable elements like <img> caught in the region —
+     an unwanted outline unrelated to our own selection highlighting. Inputs
+     (e.g. the filename rename field) manage their own selection regardless
+     of an ancestor's user-select, so this doesn't block that. */
+  user-select: none;
 }
 
 .photo-thumbnail:hover {
@@ -29,8 +36,26 @@ body {
   background-color: var(--mantine-color-default-hover);
 }
 
+/* Part of an active multi-selection, but not the DetailPanel-primary photo —
+   a lighter tint so it's distinguishable from --selected. */
+.photo-thumbnail--multi-selected {
+  border-color: var(--mantine-primary-color-light-hover);
+  background-color: var(--mantine-primary-color-light);
+}
+
 .photo-thumbnail img {
   -webkit-user-drag: none;
+}
+
+/* UnstyledButton doesn't reset the browser's native :focus-visible outline.
+   Clicking a thumbnail focuses it via mouse, so Chromium's heuristic
+   normally keeps the ring hidden — but pressing a modifier key like Shift
+   while it's still focused flips that heuristic to "keyboard-like" and the
+   default outline suddenly appears, on top of our own selection styling.
+   Scoped to just this button (not the rename pencil) to keep the pencil's
+   own focus ring for keyboard accessibility. */
+.photo-thumbnail__select-button:focus-visible {
+  outline: none;
 }
 
 .photo-thumbnail__placeholder {

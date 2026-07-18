@@ -19,6 +19,9 @@ function subscribe<T>(channel: string, callback: (payload: T) => void): () => vo
 const api = {
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectFolder'),
   getFolders: (): Promise<string[]> => ipcRenderer.invoke('settings:getFolders'),
+  showItemInFolder: (path: string) => ipcRenderer.invoke('show-item-in-folder', path),
+  renamePhoto: (filePath: string, newBaseName: string): Promise<PhotoRecord> =>
+    ipcRenderer.invoke('photo:rename', filePath, newBaseName),
   getGalleryCellWidth: (): Promise<number | null> =>
     ipcRenderer.invoke('settings:getGalleryCellWidth'),
   setGalleryCellWidth: (width: number): Promise<void> =>
@@ -26,6 +29,8 @@ const api = {
   addFolder: (folder: string): Promise<void> => ipcRenderer.invoke('settings:addFolder', folder),
   removeFolder: (folder: string): Promise<void> =>
     ipcRenderer.invoke('settings:removeFolder', folder),
+  renameFolder: (folder: string, newBaseName: string): Promise<string> =>
+    ipcRenderer.invoke('settings:renameFolder', folder, newBaseName),
   startScan: (rootPath: string): Promise<ScanStartResult> =>
     ipcRenderer.invoke('scan:start', rootPath),
   cancelScan: (scanId: string): Promise<void> => ipcRenderer.invoke('scan:cancel', scanId),
@@ -39,6 +44,8 @@ const api = {
     ipcRenderer.invoke('tags:rename', oldTag, newTag, filePaths),
   deleteTag: (tag: string, filePaths: string[]): Promise<PhotoRecord[]> =>
     ipcRenderer.invoke('tags:delete', tag, filePaths),
+  addTagsToPhotos: (tags: string[], filePaths: string[]): Promise<PhotoRecord[]> =>
+    ipcRenderer.invoke('tags:addBatch', tags, filePaths),
   onScanProgress: (callback: (payload: ScanProgressEvent) => void): (() => void) =>
     subscribe('scan:progress', callback),
   onMetadataBatch: (callback: (payload: MetadataBatchEvent) => void): (() => void) =>

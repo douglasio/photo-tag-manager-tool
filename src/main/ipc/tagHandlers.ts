@@ -59,6 +59,24 @@ export function registerTagHandlers(): void {
   )
 
   ipcMain.handle(
+    'tags:addBatch',
+    async (_event, tagsToAdd: string[], filePaths: string[]): Promise<PhotoRecord[]> => {
+      const limit = pLimit(TAG_BATCH_CONCURRENCY)
+      return Promise.all(
+        filePaths.map((filePath) =>
+          limit(async () => {
+            const currentTags = findByPath(filePath)?.record.tags ?? []
+            const nextTags = Array.from(new Set([...currentTags, ...tagsToAdd]))
+            await writeTags(filePath, nextTags)
+            const { photo } = await ingestFile(filePath, (fn) => fn())
+            return photo
+          })
+        )
+      )
+    }
+  )
+
+  ipcMain.handle(
     'tags:delete',
     async (_event, tag: string, filePaths: string[]): Promise<PhotoRecord[]> => {
       const limit = pLimit(TAG_BATCH_CONCURRENCY)

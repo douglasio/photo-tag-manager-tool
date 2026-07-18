@@ -1,5 +1,6 @@
-import { Badge, Box, Group, Image, Stack, Text } from '@mantine/core'
-import { useHover } from '@mantine/hooks'
+import { AspectRatio, Badge, Button, Image, Stack, Text } from '@mantine/core'
+import { useHover, useMergedRef } from '@mantine/hooks'
+import { useDroppable } from '@dnd-kit/core'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { activeHoverBackground } from '../utils/listItemStyles'
@@ -8,13 +9,7 @@ import type { PhotoRecord } from '../../../shared/types'
 
 const COVER_SIZE = 28
 
-// Descriptions can contain line breaks (edited via a multi-line textarea in the
-// gallery header); collapse them to a single line for this compact list row.
-function toOneLine(text: string): string {
-  return text.replace(/\s+/g, ' ').trim()
-}
-
-interface TagRowProps {
+interface TagListItemProps {
   tag: string
   count: number
   description: string
@@ -23,62 +18,66 @@ interface TagRowProps {
   onSelect: () => void
 }
 
-function TagRow({
+function TagListItem({
   tag,
   count,
   description,
   coverPhoto,
   isActive,
   onSelect
-}: TagRowProps): ReactElement {
-  const { hovered, ref } = useHover<HTMLDivElement>()
+}: TagListItemProps): ReactElement {
+  const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
+  const { isOver, setNodeRef } = useDroppable({ id: `tag:${tag}`, data: { tag } })
+  const ref = useMergedRef(hoverRef, setNodeRef)
 
   return (
-    <Group
+    <Button
       ref={ref}
       onClick={onSelect}
-      wrap="nowrap"
-      gap="xs"
-      p={4}
+      fullWidth
+      justify="space-between"
+      variant="transparent"
+      bg={isOver ? 'var(--mantine-primary-color-light)' : activeHoverBackground(isActive, hovered)}
       style={{
-        cursor: 'pointer',
-        borderRadius: 'var(--mantine-radius-default)',
-        backgroundColor: activeHoverBackground(isActive, hovered)
+        outline: isOver ? '2px dashed var(--mantine-primary-color-filled)' : undefined,
+        outlineOffset: -2
       }}
+      styles={{
+        label: {
+          flex: 1,
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          justifyContent: 'center'
+        }
+      }}
+      leftSection={
+        coverPhoto?.thumbnailStatus === 'ready' &&
+        coverPhoto.thumbnailKey && (
+          <AspectRatio ratio={1 / 1}>
+            <Image
+              src={toThumbProtocolUrl(coverPhoto.thumbnailKey)}
+              w={COVER_SIZE}
+              h={COVER_SIZE}
+              fit="cover"
+            />
+          </AspectRatio>
+        )
+      }
+      rightSection={
+        <Badge circle variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
+          {count}
+        </Badge>
+      }
     >
-      <Box
-        w={COVER_SIZE}
-        h={COVER_SIZE}
-        style={{
-          flexShrink: 0,
-          borderRadius: 'var(--mantine-radius-sm)',
-          overflow: 'hidden',
-          backgroundColor: 'var(--mantine-color-default)'
-        }}
-      >
-        {coverPhoto?.thumbnailStatus === 'ready' && coverPhoto.thumbnailKey && (
-          <Image
-            src={toThumbProtocolUrl(coverPhoto.thumbnailKey)}
-            w={COVER_SIZE}
-            h={COVER_SIZE}
-            fit="cover"
-          />
-        )}
-      </Box>
-      <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
-        <Text truncate="end" fw={isActive ? 700 : 400}>
-          {tag}
+      <Text display="block" lh="1" ta="left" truncate="end">
+        {tag}
+      </Text>
+      {description && (
+        <Text display="block" truncate="end" size="xs" c="dimmed" lineClamp={1}>
+          {description}
         </Text>
-        {description && (
-          <Text truncate="end" size="xs" c="dimmed">
-            {toOneLine(description)}
-          </Text>
-        )}
-      </Stack>
-      <Badge circle variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
-        {count}
-      </Badge>
-    </Group>
+      )}
+    </Button>
   )
 }
 
@@ -90,11 +89,11 @@ export function TagPanel(): ReactElement {
   }
 
   return (
-    <Stack gap={4}>
+    <Stack gap="xs">
       {allTags.map((tag) => {
         const isActive = state.selectedTag === tag
         return (
-          <TagRow
+          <TagListItem
             key={tag}
             tag={tag}
             count={tagCounts.get(tag) ?? 0}
