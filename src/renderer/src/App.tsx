@@ -39,13 +39,17 @@ import type { PhotoRecord } from '../../shared/types'
 
 const HEADER_HEIGHT = 52
 const DRAG_PREVIEW_SIZE = 64
+// Fine-tune knobs if the preview still looks off-center after the size fix —
+// this can happen because the OS cursor's visual hotspot (the actual tip of
+// the arrow glyph) isn't exactly at the clientX/clientY dnd-kit reads, and
+// that gap varies by platform/cursor theme. Positive X moves the preview
+// right, positive Y moves it down; nudge in a few pixels at a time.
+const DRAG_PREVIEW_OFFSET_X = 0
+const DRAG_PREVIEW_OFFSET_Y = -100
 
-// DragOverlay positions itself using the ORIGINAL dragged element's
-// bounding box by default, offset by pointer movement — since our preview
-// is a fixed, much smaller size than the full gallery thumbnail being
-// dragged, that leaves it visually far from the cursor. This is dnd-kit's
-// own documented recipe for snapping the overlay so it's centered directly
-// under the pointer instead, regardless of the source element's size.
+// dnd-kit's official recipe for snapping the overlay to be centered
+// directly under the pointer, using draggingNodeRect (the overlay's own
+// measured rect) rather than the original dragged element's rect.
 const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
   if (draggingNodeRect && activatorEvent) {
     const activatorCoordinates = getEventCoordinates(activatorEvent)
@@ -54,8 +58,8 @@ const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transf
     const offsetY = activatorCoordinates.y - draggingNodeRect.top
     return {
       ...transform,
-      x: transform.x + offsetX - draggingNodeRect.width / 2,
-      y: transform.y + offsetY - draggingNodeRect.height / 2
+      x: transform.x + offsetX - draggingNodeRect.width / 2 + DRAG_PREVIEW_OFFSET_X,
+      y: transform.y + offsetY - draggingNodeRect.height / 2 + DRAG_PREVIEW_OFFSET_Y
     }
   }
   return transform
@@ -252,7 +256,18 @@ function AppLayout(): React.JSX.Element {
           <DetailPanel />
         </AppShell.Aside>
       </AppShell>
-      <DragOverlay modifiers={[snapCenterToCursor]}>
+      {/* DragOverlay's wrapper element is sized to the ORIGINAL dragged
+          node's bounding box by default (the full gallery thumbnail card),
+          not to whatever content is rendered inside it — so our much
+          smaller DragPreview was rendering pinned to the corner of that
+          oversized, invisible box, and the centering modifier above was
+          also computing its offset from that same wrong-sized rect. This
+          style override forces the wrapper itself to match the preview's
+          actual size, fixing both. */}
+      <DragOverlay
+        modifiers={[snapCenterToCursor]}
+        style={{ width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }}
+      >
         {activeDragPhoto && (
           <DragPreview photo={activeDragPhoto} count={activeDragPaths?.length ?? 1} />
         )}
