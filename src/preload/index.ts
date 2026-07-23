@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
+  GallerySort,
   MetadataBatchEvent,
   PhotoRecord,
   ScanCompleteEvent,
@@ -26,6 +27,9 @@ const api = {
     ipcRenderer.invoke('settings:getGalleryCellWidth'),
   setGalleryCellWidth: (width: number): Promise<void> =>
     ipcRenderer.invoke('settings:setGalleryCellWidth', width),
+  getGallerySort: (): Promise<GallerySort | null> => ipcRenderer.invoke('settings:getGallerySort'),
+  setGallerySort: (sort: GallerySort): Promise<void> =>
+    ipcRenderer.invoke('settings:setGallerySort', sort),
   addFolder: (folder: string): Promise<void> => ipcRenderer.invoke('settings:addFolder', folder),
   removeFolder: (folder: string): Promise<void> =>
     ipcRenderer.invoke('settings:removeFolder', folder),

@@ -54,3 +54,8 @@ export interface WatchPhotoUpsertedEvent {
 export interface WatchPhotoRemovedEvent {
   filePath: string
 }
+
+export interface GallerySort {
+  sortBy: 'name' | 'dateTaken'
+  sortOrder: 'asc' | 'desc'
+}

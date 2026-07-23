@@ -10,7 +10,13 @@ import {
   type ReactNode
 } from 'react'
 import { notifications } from '@mantine/notifications'
-import { initialState, photoLibraryReducer, type PhotoLibraryState } from './photoLibraryReducer'
+import {
+  initialState,
+  photoLibraryReducer,
+  type GallerySortBy,
+  type GallerySortOrder,
+  type PhotoLibraryState
+} from './photoLibraryReducer'
 import { basename, isPhotoInFolder } from '../utils/folderTree'
 import { toDisplayMetadata, type DisplayMetadata } from '../utils/metadataDisplay'
 import type { PhotoRecord } from '../../../shared/types'
@@ -53,6 +59,7 @@ interface PhotoLibraryContextValue {
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
+  setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
@@ -173,6 +180,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getTagDescriptions().then((descriptions) => {
       dispatch({ type: 'TAG_DESCRIPTIONS_LOADED', descriptions })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getGallerySort().then((sort) => {
+      if (sort) dispatch({ type: 'SET_SORT', sortBy: sort.sortBy, sortOrder: sort.sortOrder })
     })
   }, [])
 
@@ -414,11 +427,31 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_ACTIVE_TAB', tab })
   }, [])
 
-  const photos = useMemo(
-    () =>
-      Array.from(state.photosByPath.values()).sort((a, b) => a.fileName.localeCompare(b.fileName)),
-    [state.photosByPath]
-  )
+  const photos = useMemo(() => {
+    const direction = state.sortOrder === 'desc' ? -1 : 1
+    const result = Array.from(state.photosByPath.values())
+    if (state.sortBy === 'dateTaken') {
+      // Photos without EXIF date data (screenshots, stripped exports, ...)
+      // always sort to the end regardless of direction, rather than
+      // clustering at whichever end null happens to compare to.
+      result.sort((a, b) => {
+        const aTime = a.metadata.dateTaken ? Date.parse(a.metadata.dateTaken) : null
+        const bTime = b.metadata.dateTaken ? Date.parse(b.metadata.dateTaken) : null
+        if (aTime === null && bTime === null) return a.fileName.localeCompare(b.fileName)
+        if (aTime === null) return 1
+        if (bTime === null) return -1
+        return direction * (aTime - bTime)
+      })
+    } else {
+      result.sort((a, b) => direction * a.fileName.localeCompare(b.fileName))
+    }
+    return result
+  }, [state.photosByPath, state.sortBy, state.sortOrder])
+
+  const setSort = useCallback((sortBy: GallerySortBy, sortOrder: GallerySortOrder) => {
+    dispatch({ type: 'SET_SORT', sortBy, sortOrder })
+    void window.api.setGallerySort({ sortBy, sortOrder })
+  }, [])
 
   // Folder and tag filters stack rather than being mutually exclusive, so a
   // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
@@ -465,19 +498,39 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return raw ? { ...raw, metadata: toDisplayMetadata(raw.metadata) } : null
   }, [state.selectedPath, state.photosByPath])
 
-  // photos is already sorted, so the first photo seen for a tag is a stable,
-  // deterministic "cover" pick — no extra pass or bookkeeping required.
+  // Tag covers always pick the most-recently-taken photo, independent of the
+  // gallery's own sort order/direction — otherwise switching gallery sort
+  // would make tag thumbnails jump around. Iterates state.photosByPath
+  // directly (not the sorted `photos`) since order doesn't matter here.
   const { tagCounts, tagCoverPhotos } = useMemo(() => {
     const counts = new Map<string, number>()
     const covers = new Map<string, PhotoRecord>()
-    for (const photo of photos) {
+    for (const photo of state.photosByPath.values()) {
+      const photoTime = photo.metadata.dateTaken ? Date.parse(photo.metadata.dateTaken) : null
       for (const tag of photo.tags) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
-        if (!covers.has(tag)) covers.set(tag, photo)
+        const current = covers.get(tag)
+        if (!current) {
+          covers.set(tag, photo)
+          continue
+        }
+        const currentTime = current.metadata.dateTaken
+          ? Date.parse(current.metadata.dateTaken)
+          : null
+        // Prefer the later dateTaken; if neither photo has EXIF date data,
+        // fall back to filename so the pick stays deterministic instead of
+        // depending on Map iteration order.
+        const photoWins =
+          photoTime !== null && currentTime !== null
+            ? photoTime > currentTime
+            : photoTime !== null
+              ? true
+              : currentTime === null && photo.fileName > current.fileName
+        if (photoWins) covers.set(tag, photo)
       }
     }
     return { tagCounts: counts, tagCoverPhotos: covers }
-  }, [photos])
+  }, [state.photosByPath])
 
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
 
@@ -527,6 +580,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,
+    setSort,
     updateTags,
     setTagDescription,
     renameTag,

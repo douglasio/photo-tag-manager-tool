@@ -9,6 +9,9 @@ import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
 
 export type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 
+export type GallerySortBy = 'name' | 'dateTaken'
+export type GallerySortOrder = 'asc' | 'desc'
+
 export interface PhotoLibraryState {
   folders: string[]
   rootPath: string | null
@@ -26,6 +29,8 @@ export interface PhotoLibraryState {
   selectedPaths: Set<string>
   selectedFolder: string | null
   selectedTag: string | null
+  sortBy: GallerySortBy
+  sortOrder: GallerySortOrder
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
   tagDescriptions: Map<string, string>
@@ -48,6 +53,8 @@ export const initialState: PhotoLibraryState = {
   selectedPaths: new Set(),
   selectedFolder: null,
   selectedTag: null,
+  sortBy: 'name',
+  sortOrder: 'asc',
   folderCounts: new Map(),
   folderChildren: new Map(),
   tagDescriptions: new Map(),
@@ -71,6 +78,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_FOLDER_FILTER'; folder: string | null }
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
+  | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
   | { type: 'PHOTO_REMOVED'; filePath: string }
   | { type: 'TAG_DESCRIPTIONS_LOADED'; descriptions: Record<string, string> }
@@ -242,6 +250,8 @@ export function photoLibraryReducer(
     // current folder rather than replacing it with a folder-agnostic tag view.
     case 'SET_FOLDER_TAG_FILTER':
       return { ...state, selectedTag: action.tag }
+    case 'SET_SORT':
+      return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'PHOTO_UPSERTED': {
       const rootFolder = findRootFolder(action.photo.filePath, state.folders)
       const photosByPath = new Map(state.photosByPath)

@@ -5,8 +5,11 @@ import {
   getFolders,
   setFolders,
   getGalleryCellWidth,
-  setGalleryCellWidth
+  setGalleryCellWidth,
+  getGallerySort,
+  setGallerySort
 } from '../db/settingsRepository'
+import type { GallerySort } from '../../shared/types'
 import { pruneMissing, renamePhotoPathPrefix } from '../db/photoRepository'
 import { deleteThumbnail } from '../services/thumbnailService'
 import { watchFolder, unwatchFolder } from '../services/watchManager'
@@ -28,6 +31,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setGalleryCellWidth', (_event, width: number): void => {
     setGalleryCellWidth(width)
+  })
+
+  ipcMain.handle('settings:getGallerySort', (): GallerySort | null => getGallerySort())
+
+  ipcMain.handle('settings:setGallerySort', (_event, sort: GallerySort): void => {
+    setGallerySort(sort)
   })
 
   ipcMain.handle('settings:addFolder', (_event, folder: string) => {

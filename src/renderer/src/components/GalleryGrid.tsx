@@ -5,13 +5,14 @@ import {
   Flex,
   Group,
   Loader,
+  Menu,
   Pill,
   Slider,
   Text,
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconPhoto, IconX } from '@tabler/icons-react'
+import { IconArrowsSort, IconCheck, IconPhoto, IconX } from '@tabler/icons-react'
 import {
   useCallback,
   useEffect,
@@ -136,6 +137,7 @@ export function GalleryGrid(): ReactElement {
     tagCounts,
     folderTags,
     setFolderTagFilter,
+    setSort,
     renameFile
   } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -330,22 +332,85 @@ export function GalleryGrid(): ReactElement {
                 {galleryTitle}
               </Title>
             )}
-            {state.selectedPaths.size > 0 && (
-              <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                <Text size="sm" c="dimmed">
-                  {state.selectedPaths.size} selected
-                </Text>
-                <Tooltip label="Clear selection">
-                  <ActionIcon
-                    variant="subtle"
-                    onClick={clearSelection}
-                    aria-label="Clear selection"
+            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+              {state.selectedPaths.size > 0 && (
+                <>
+                  <Text size="sm" c="dimmed">
+                    {state.selectedPaths.size} selected
+                  </Text>
+                  <Tooltip label="Clear selection">
+                    <ActionIcon
+                      variant="subtle"
+                      onClick={clearSelection}
+                      aria-label="Clear selection"
+                    >
+                      <IconX size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                </>
+              )}
+              <Menu shadow="md" position="bottom-end">
+                <Menu.Target>
+                  <Tooltip label="Sort">
+                    <ActionIcon variant="subtle" aria-label="Sort">
+                      <IconArrowsSort size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Label>Sort by</Menu.Label>
+                  <Menu.Item
+                    leftSection={
+                      state.sortBy === 'name' && state.sortOrder === 'asc' ? (
+                        <IconCheck size={14} />
+                      ) : (
+                        <Box w={14} />
+                      )
+                    }
+                    onClick={() => setSort('name', 'asc')}
                   >
-                    <IconX size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
-            )}
+                    Name (A–Z)
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={
+                      state.sortBy === 'name' && state.sortOrder === 'desc' ? (
+                        <IconCheck size={14} />
+                      ) : (
+                        <Box w={14} />
+                      )
+                    }
+                    onClick={() => setSort('name', 'desc')}
+                  >
+                    Name (Z–A)
+                  </Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item
+                    leftSection={
+                      state.sortBy === 'dateTaken' && state.sortOrder === 'desc' ? (
+                        <IconCheck size={14} />
+                      ) : (
+                        <Box w={14} />
+                      )
+                    }
+                    onClick={() => setSort('dateTaken', 'desc')}
+                  >
+                    Date taken (Newest)
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={
+                      state.sortBy === 'dateTaken' && state.sortOrder === 'asc' ? (
+                        <IconCheck size={14} />
+                      ) : (
+                        <Box w={14} />
+                      )
+                    }
+                    onClick={() => setSort('dateTaken', 'asc')}
+                  >
+                    Date taken (Oldest)
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            </Group>
           </Group>
           {isPureTagView && (
             <TagDescriptionEditor
