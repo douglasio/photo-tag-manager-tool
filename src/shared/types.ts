@@ -59,3 +59,8 @@ export interface GallerySort {
   sortBy: 'name' | 'dateTaken'
   sortOrder: 'asc' | 'desc'
 }
+
+export interface MoveProgressEvent {
+  completed: number
+  total: number
+}

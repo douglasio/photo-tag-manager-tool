@@ -10,6 +10,7 @@ import {
   type ReactNode
 } from 'react'
 import { notifications } from '@mantine/notifications'
+import { MoveProgressToast } from '../components/MoveProgressToast'
 import {
   initialState,
   photoLibraryReducer,
@@ -56,6 +57,7 @@ interface PhotoLibraryContextValue {
   clearSelection: () => void
   addTagsToSelection: (tags: string[]) => Promise<void>
   addTagsToPhotos: (tags: string[], filePaths: string[]) => Promise<void>
+  movePhotosToFolder: (filePaths: string[], destFolder: string) => Promise<void>
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
@@ -297,6 +299,77 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const addTagsToSelection = useCallback(
     (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
     [addTagsToPhotos, state.selectedPaths]
+  )
+
+  // Drag-and-drop onto a folder row moves the dragged photo(s) into it. Mirrors
+  // renameFile's dispatch sequence (a cross-folder move is structurally the
+  // same as a rename — same DB row, new full path) for each moved photo, plus
+  // re-pointing selectedPath/selectedPaths from old to new paths since a move
+  // (unlike a same-folder rename) can be triggered on a multi-selection.
+  const movePhotosToFolder = useCallback(
+    async (filePaths: string[], destFolder: string) => {
+      if (filePaths.length === 0) return
+
+      const notificationId = crypto.randomUUID()
+      notifications.show({
+        id: notificationId,
+        color: 'indigo',
+        autoClose: false,
+        withCloseButton: false,
+        message: <MoveProgressToast completed={0} total={filePaths.length} />
+      })
+      const unsubscribe = window.api.onMoveProgress((progress) => {
+        notifications.update({
+          id: notificationId,
+          message: <MoveProgressToast completed={progress.completed} total={progress.total} />
+        })
+      })
+
+      try {
+        const { moved, skipped } = await window.api.movePhotosToFolder(filePaths, destFolder)
+        const pathMap = new Map(moved.map(({ oldPath, photo }) => [oldPath, photo.filePath]))
+
+        for (const { oldPath, photo } of moved) {
+          dispatch({ type: 'RENAME_PHOTO_TAB', oldPath, newPath: photo.filePath })
+          dispatch({ type: 'PHOTO_REMOVED', filePath: oldPath })
+          dispatch({ type: 'PHOTO_UPSERTED', photo })
+        }
+        if (state.selectedPath && pathMap.has(state.selectedPath)) {
+          dispatch({ type: 'SELECT_PHOTO', path: pathMap.get(state.selectedPath)! })
+        }
+        if (state.selectedPaths.size > 0 && moved.some(({ oldPath }) => pathMap.has(oldPath))) {
+          dispatch({
+            type: 'SET_SELECTED_PATHS',
+            paths: Array.from(state.selectedPaths, (path) => pathMap.get(path) ?? path)
+          })
+        }
+
+        notifications.update({
+          id: notificationId,
+          color: moved.length > 0 ? 'teal' : 'yellow',
+          autoClose: 4000,
+          withCloseButton: true,
+          message:
+            moved.length > 0
+              ? `Moved ${pluralize(moved.length, 'photo')} to "${basename(destFolder)}"${
+                  skipped > 0 ? ` (${pluralize(skipped, 'photo')} already there)` : ''
+                }`
+              : `${pluralize(skipped, 'photo')} already in "${basename(destFolder)}"`
+        })
+      } catch (err) {
+        console.error(`failed to move photos to ${destFolder}`, err)
+        notifications.update({
+          id: notificationId,
+          color: 'red',
+          autoClose: 4000,
+          withCloseButton: true,
+          message: 'Failed to move photos'
+        })
+      } finally {
+        unsubscribe()
+      }
+    },
+    [state.selectedPath, state.selectedPaths]
   )
 
   const updateTags = useCallback(
@@ -577,6 +650,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     clearSelection,
     addTagsToSelection,
     addTagsToPhotos,
+    movePhotosToFolder,
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,

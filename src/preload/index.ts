@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import type {
   GallerySort,
   MetadataBatchEvent,
+  MoveProgressEvent,
   PhotoRecord,
   ScanCompleteEvent,
   ScanProgressEvent,
@@ -23,6 +24,13 @@ const api = {
   showItemInFolder: (path: string) => ipcRenderer.invoke('show-item-in-folder', path),
   renamePhoto: (filePath: string, newBaseName: string): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:rename', filePath, newBaseName),
+  movePhotosToFolder: (
+    filePaths: string[],
+    destFolder: string
+  ): Promise<{ moved: { oldPath: string; photo: PhotoRecord }[]; skipped: number }> =>
+    ipcRenderer.invoke('photo:moveToFolder', filePaths, destFolder),
+  onMoveProgress: (callback: (payload: MoveProgressEvent) => void): (() => void) =>
+    subscribe('photo:moveProgress', callback),
   getGalleryCellWidth: (): Promise<number | null> =>
     ipcRenderer.invoke('settings:getGalleryCellWidth'),
   setGalleryCellWidth: (width: number): Promise<void> =>
