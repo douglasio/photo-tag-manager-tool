@@ -8,6 +8,8 @@ import type {
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
+  WatchFolderAddedEvent,
+  WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
   WatchPhotoUpsertedEvent
 } from '../shared/types'
@@ -38,6 +40,9 @@ const api = {
   getGallerySort: (): Promise<GallerySort | null> => ipcRenderer.invoke('settings:getGallerySort'),
   setGallerySort: (sort: GallerySort): Promise<void> =>
     ipcRenderer.invoke('settings:setGallerySort', sort),
+  getShowEmptyFolders: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowEmptyFolders'),
+  setShowEmptyFolders: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setShowEmptyFolders', value),
   addFolder: (folder: string): Promise<void> => ipcRenderer.invoke('settings:addFolder', folder),
   removeFolder: (folder: string): Promise<void> =>
     ipcRenderer.invoke('settings:removeFolder', folder),
@@ -67,7 +72,11 @@ const api = {
   onPhotoUpserted: (callback: (payload: WatchPhotoUpsertedEvent) => void): (() => void) =>
     subscribe('watch:photo-upserted', callback),
   onPhotoRemoved: (callback: (payload: WatchPhotoRemovedEvent) => void): (() => void) =>
-    subscribe('watch:photo-removed', callback)
+    subscribe('watch:photo-removed', callback),
+  onFolderAdded: (callback: (payload: WatchFolderAddedEvent) => void): (() => void) =>
+    subscribe('watch:folder-added', callback),
+  onFolderRemoved: (callback: (payload: WatchFolderRemovedEvent) => void): (() => void) =>
+    subscribe('watch:folder-removed', callback)
 }
 
 export type PhotagApi = typeof api

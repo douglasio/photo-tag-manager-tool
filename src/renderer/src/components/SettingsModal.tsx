@@ -1,4 +1,16 @@
-import { Burger, Button, Group, Modal, Stack, Table, Text, Title, Tooltip } from '@mantine/core'
+import {
+  Burger,
+  Button,
+  Divider,
+  Group,
+  Modal,
+  Stack,
+  Switch,
+  Table,
+  Text,
+  Title,
+  Tooltip
+} from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
@@ -13,7 +25,7 @@ function SectionTitle({ children }: { children: string }): ReactElement {
 }
 
 function FoldersSection(): ReactElement {
-  const { state, addFolder } = usePhotoLibrary()
+  const { state, addFolder, setShowEmptyFolders } = usePhotoLibrary()
 
   return (
     <Stack gap="xs">
@@ -43,6 +55,12 @@ function FoldersSection(): ReactElement {
       <Button onClick={() => void addFolder()} style={{ alignSelf: 'flex-start' }}>
         Add Folder…
       </Button>
+      <Divider my="xs" />
+      <Switch
+        label="Show empty folders"
+        checked={state.showEmptyFolders}
+        onChange={(event) => setShowEmptyFolders(event.currentTarget.checked)}
+      />
     </Stack>
   )
 }

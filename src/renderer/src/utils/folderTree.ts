@@ -105,6 +105,22 @@ export function findRootFolder(filePath: string, folders: string[]): string | nu
   return best
 }
 
+function buildTreeNode(
+  folder: string,
+  childrenOf: Map<string, Set<string>>,
+  counts: Map<string, number>
+): TreeNodeData {
+  const kids = Array.from(childrenOf.get(folder) ?? [])
+    .sort((a, b) => basename(a).localeCompare(basename(b)))
+    .map((child) => buildTreeNode(child, childrenOf, counts))
+  return {
+    value: folder,
+    label: basename(folder) || folder,
+    nodeProps: { fileCount: counts.get(folder) ?? 0 },
+    children: kids.length > 0 ? kids : undefined
+  }
+}
+
 /**
  * Flattens the accumulated counts/hierarchy maps into a Mantine Tree data
  * structure. Cost is O(folders log folders), not O(photos) — folders are
@@ -115,17 +131,31 @@ export function foldersToTreeData(
   counts: Map<string, number>,
   childrenOf: Map<string, Set<string>>
 ): TreeNodeData {
-  function build(folder: string): TreeNodeData {
-    const kids = Array.from(childrenOf.get(folder) ?? [])
-      .sort((a, b) => basename(a).localeCompare(basename(b)))
-      .map(build)
-    return {
-      value: folder,
-      label: basename(folder) || folder,
-      nodeProps: { fileCount: counts.get(folder) ?? 0 },
-      children: kids.length > 0 ? kids : undefined
-    }
+  return buildTreeNode(rootPath, childrenOf, counts)
+}
+
+/**
+ * Same output shape as foldersToTreeData, but built from the full on-disk
+ * folder listing (allFolderPaths, captured separately at scan time) rather
+ * than photo-derived childrenOf — so folders with zero photos in them are
+ * included too. Used when the "show empty folders" setting is on.
+ */
+export function foldersToTreeDataWithEmpty(
+  rootPath: string,
+  allFolderPaths: Set<string>,
+  counts: Map<string, number>
+): TreeNodeData {
+  const childrenOf = new Map<string, Set<string>>()
+  for (const folder of allFolderPaths) {
+    if (!childrenOf.has(folder)) childrenOf.set(folder, new Set())
+  }
+  if (!childrenOf.has(rootPath)) childrenOf.set(rootPath, new Set())
+
+  for (const folder of allFolderPaths) {
+    if (folder === rootPath) continue
+    const parent = dirname(folder)
+    childrenOf.get(parent)?.add(folder)
   }
 
-  return build(rootPath)
+  return buildTreeNode(rootPath, childrenOf, counts)
 }

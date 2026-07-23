@@ -7,7 +7,9 @@ import {
   getGalleryCellWidth,
   setGalleryCellWidth,
   getGallerySort,
-  setGallerySort
+  setGallerySort,
+  getShowEmptyFolders,
+  setShowEmptyFolders
 } from '../db/settingsRepository'
 import type { GallerySort } from '../../shared/types'
 import { pruneMissing, renamePhotoPathPrefix } from '../db/photoRepository'
@@ -37,6 +39,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setGallerySort', (_event, sort: GallerySort): void => {
     setGallerySort(sort)
+  })
+
+  ipcMain.handle('settings:getShowEmptyFolders', (): boolean => getShowEmptyFolders())
+
+  ipcMain.handle('settings:setShowEmptyFolders', (_event, value: boolean): void => {
+    setShowEmptyFolders(value)
   })
 
   ipcMain.handle('settings:addFolder', (_event, folder: string) => {

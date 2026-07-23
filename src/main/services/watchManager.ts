@@ -4,7 +4,12 @@ import { startWatching, stopWatching, stopAllWatchers } from './folderWatcher'
 import { ingestFile } from './photoIngest'
 import { deleteThumbnail } from './thumbnailService'
 import { removePhoto } from '../db/photoRepository'
-import type { WatchPhotoRemovedEvent, WatchPhotoUpsertedEvent } from '../../shared/types'
+import type {
+  WatchFolderAddedEvent,
+  WatchFolderRemovedEvent,
+  WatchPhotoRemovedEvent,
+  WatchPhotoUpsertedEvent
+} from '../../shared/types'
 
 // p-limit is ESM-only; when externalized in the main-process CJS bundle,
 // `require('p-limit')` yields the module namespace object rather than the
@@ -57,6 +62,15 @@ export function watchFolder(rootPath: string): void {
       if (suppressedPaths.delete(filePath)) return
       if (type === 'unlink') void handleRemove(filePath)
       else void handleUpsert(filePath, type)
+    },
+    onDirEvent: (type, dirPath) => {
+      if (type === 'addDir') {
+        const payload: WatchFolderAddedEvent = { folderPath: dirPath }
+        watchTarget?.send('watch:folder-added', payload)
+      } else {
+        const payload: WatchFolderRemovedEvent = { folderPath: dirPath }
+        watchTarget?.send('watch:folder-removed', payload)
+      }
     }
   })
 }

@@ -3,9 +3,14 @@ import { extname } from 'path'
 import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
 
 export type WatchEventType = 'add' | 'change' | 'unlink'
+export type WatchDirEventType = 'addDir' | 'unlinkDir'
 
 interface WatcherHandlers {
   onFileEvent: (type: WatchEventType, filePath: string) => void
+  // Directory add/remove — chokidar already tracks these internally to walk
+  // the tree recursively, so listening for them costs nothing extra beyond
+  // the file events already being watched.
+  onDirEvent: (type: WatchDirEventType, dirPath: string) => void
 }
 
 const watchers = new Map<string, FSWatcher>()
@@ -33,6 +38,12 @@ export function startWatching(rootPath: string, handlers: WatcherHandlers): void
     })
     .on('unlink', (filePath) => {
       if (isSupportedFile(filePath)) handlers.onFileEvent('unlink', filePath)
+    })
+    .on('addDir', (dirPath) => {
+      if (dirPath !== rootPath) handlers.onDirEvent('addDir', dirPath)
+    })
+    .on('unlinkDir', (dirPath) => {
+      if (dirPath !== rootPath) handlers.onDirEvent('unlinkDir', dirPath)
     })
     .on('error', (err) => console.error(`folder watcher error for ${rootPath}`, err))
 

@@ -63,3 +63,11 @@ export function getGallerySort(): GallerySort | null {
 export function setGallerySort(sort: GallerySort): void {
   setSetting('gallerySort', JSON.stringify(sort))
 }
+
+export function getShowEmptyFolders(): boolean {
+  return getSetting('showEmptyFolders') === 'true'
+}
+
+export function setShowEmptyFolders(value: boolean): void {
+  setSetting('showEmptyFolders', String(value))
+}

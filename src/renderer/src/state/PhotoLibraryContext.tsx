@@ -62,6 +62,7 @@ interface PhotoLibraryContextValue {
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
+  setShowEmptyFolders: (value: boolean) => void
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
@@ -142,6 +143,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       dispatch({ type: 'PHOTO_REMOVED', filePath: payload.filePath })
       scheduleWatchNotification('removed')
     })
+    const unsubscribeFolderAdded = window.api.onFolderAdded((payload) => {
+      dispatch({ type: 'WATCH_FOLDER_ADDED', folderPath: payload.folderPath })
+    })
+    const unsubscribeFolderRemoved = window.api.onFolderRemoved((payload) => {
+      dispatch({ type: 'WATCH_FOLDER_REMOVED', folderPath: payload.folderPath })
+    })
 
     return () => {
       unsubscribeProgress()
@@ -149,6 +156,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       unsubscribeComplete()
       unsubscribeUpserted()
       unsubscribeRemoved()
+      unsubscribeFolderAdded()
+      unsubscribeFolderRemoved()
     }
   }, [scheduleWatchNotification])
 
@@ -188,6 +197,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getGallerySort().then((sort) => {
       if (sort) dispatch({ type: 'SET_SORT', sortBy: sort.sortBy, sortOrder: sort.sortOrder })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getShowEmptyFolders().then((value) => {
+      dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
     })
   }, [])
 
@@ -526,6 +541,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setGallerySort({ sortBy, sortOrder })
   }, [])
 
+  const setShowEmptyFolders = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
+    void window.api.setShowEmptyFolders(value)
+  }, [])
+
   // Folder and tag filters stack rather than being mutually exclusive, so a
   // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
   // current folder instead of replacing it with a folder-agnostic tag view.
@@ -655,6 +675,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setTagFilter,
     setFolderTagFilter,
     setSort,
+    setShowEmptyFolders,
     updateTags,
     setTagDescription,
     renameTag,

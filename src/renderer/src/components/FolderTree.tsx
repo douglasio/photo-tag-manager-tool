@@ -16,7 +16,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { IconChevronDown, IconChevronRight, IconPencil } from '@tabler/icons-react'
 import { useState, useMemo, type ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
-import { foldersToTreeData } from '../utils/folderTree'
+import { foldersToTreeData, foldersToTreeDataWithEmpty } from '../utils/folderTree'
 import { splitFolderPath, validateFolderNameBase } from '../utils/folderNameValidation'
 import { activeHoverBackground } from '../utils/listItemStyles'
 import { FolderBadge } from './FolderBadge'
@@ -209,6 +209,8 @@ interface FolderTreeInnerProps {
   rootPath: string
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
+  allFolderPaths: Set<string>
+  showEmptyFolders: boolean
   selectedFolder: string | null
   setFolderFilter: (folder: string | null) => void
   editingFolder: string | null
@@ -221,6 +223,8 @@ function FolderTreeInner({
   rootPath,
   folderCounts,
   folderChildren,
+  allFolderPaths,
+  showEmptyFolders,
   selectedFolder,
   setFolderFilter,
   editingFolder,
@@ -229,8 +233,12 @@ function FolderTreeInner({
   onRenameFolder
 }: FolderTreeInnerProps): ReactElement {
   const treeData = useMemo<TreeNodeData[]>(
-    () => [foldersToTreeData(rootPath, folderCounts, folderChildren)],
-    [rootPath, folderCounts, folderChildren]
+    () => [
+      showEmptyFolders
+        ? foldersToTreeDataWithEmpty(rootPath, allFolderPaths, folderCounts)
+        : foldersToTreeData(rootPath, folderCounts, folderChildren)
+    ],
+    [rootPath, folderCounts, folderChildren, allFolderPaths, showEmptyFolders]
   )
 
   const tree = useTree({
@@ -274,6 +282,8 @@ export function FolderTree(): ReactElement {
           rootPath={folder}
           folderCounts={state.folderCounts}
           folderChildren={state.folderChildren}
+          allFolderPaths={state.allFolderPaths}
+          showEmptyFolders={state.showEmptyFolders}
           selectedFolder={state.selectedFolder}
           setFolderFilter={setFolderFilter}
           editingFolder={editingFolder}

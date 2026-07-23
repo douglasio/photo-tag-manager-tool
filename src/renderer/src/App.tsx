@@ -32,6 +32,7 @@ import { SettingsModal } from './components/SettingsModal'
 import { ScanProgressBar } from './components/ScanProgressBar'
 import { GalleryGrid } from './components/GalleryGrid'
 import { DetailPanel } from './components/DetailPanel'
+import { FolderSettingsMenu } from './components/FolderSettingsMenu'
 import { FolderTree } from './components/FolderTree'
 import { PanelSection } from './components/PanelSection'
 import { PhotoView } from './components/PhotoView'
@@ -216,7 +217,7 @@ function AppLayout(): React.JSX.Element {
             <TagPanel />
           </PanelSection>
           <Divider />
-          <PanelSection title="Folders">
+          <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
             <FolderTree />
           </PanelSection>
         </AppShell.Navbar>

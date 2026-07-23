@@ -1,7 +1,7 @@
 import { ipcMain, type WebContents } from 'electron'
 import { randomUUID } from 'crypto'
 import pLimitImport from 'p-limit'
-import { scanDirectory } from '../services/directoryScanner'
+import { scanAllFolders, scanDirectory } from '../services/directoryScanner'
 import { ingestFile } from '../services/photoIngest'
 import { deleteThumbnail } from '../services/thumbnailService'
 import { pruneMissing } from '../db/photoRepository'
@@ -55,14 +55,19 @@ async function runScan(
   state: ScanState
 ): Promise<void> {
   let filePaths: string[]
+  let allFolders: string[]
   try {
-    filePaths = await scanDirectory(rootPath)
+    ;[filePaths, allFolders] = await Promise.all([
+      scanDirectory(rootPath),
+      scanAllFolders(rootPath)
+    ])
   } catch (err) {
     const completeEvent: ScanCompleteEvent = {
       scanId,
       totalScanned: 0,
       cacheHits: 0,
-      errors: [{ filePath: rootPath, message: err instanceof Error ? err.message : String(err) }]
+      errors: [{ filePath: rootPath, message: err instanceof Error ? err.message : String(err) }],
+      allFolders: []
     }
     sender.send('scan:complete', completeEvent)
     return
@@ -119,7 +124,8 @@ async function runScan(
     scanId,
     totalScanned: filePaths.length,
     cacheHits,
-    errors
+    errors,
+    allFolders
   }
   sender.send('scan:complete', completeEvent)
 }

@@ -44,6 +44,10 @@ export interface ScanCompleteEvent {
   totalScanned: number
   cacheHits: number
   errors: { filePath: string; message: string }[]
+  // Every folder under the scanned root, including empty ones — separate
+  // from photo-derived folder structure, which never includes folders with
+  // no photos in them.
+  allFolders: string[]
 }
 
 export interface WatchPhotoUpsertedEvent {
@@ -53,6 +57,14 @@ export interface WatchPhotoUpsertedEvent {
 
 export interface WatchPhotoRemovedEvent {
   filePath: string
+}
+
+export interface WatchFolderAddedEvent {
+  folderPath: string
+}
+
+export interface WatchFolderRemovedEvent {
+  folderPath: string
 }
 
 export interface GallerySort {

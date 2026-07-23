@@ -33,6 +33,13 @@ export interface PhotoLibraryState {
   sortOrder: GallerySortOrder
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
+  // Every folder discovered on disk under each watched root, including ones
+  // with zero photos in them (photo-derived folderCounts/folderChildren
+  // above never include those). Populated per-root from SCAN_COMPLETE's
+  // allFolders, so it only reflects what's actually on disk as of the last
+  // scan — not live filesystem changes.
+  allFolderPaths: Set<string>
+  showEmptyFolders: boolean
   tagDescriptions: Map<string, string>
   // Ordered list of photo paths open as Photo View tabs. activeTab is either
   // 'gallery' or one of the paths in openTabs.
@@ -57,6 +64,8 @@ export const initialState: PhotoLibraryState = {
   sortOrder: 'asc',
   folderCounts: new Map(),
   folderChildren: new Map(),
+  allFolderPaths: new Set(),
+  showEmptyFolders: false,
   tagDescriptions: new Map(),
   openTabs: [],
   activeTab: 'gallery'
@@ -79,6 +88,9 @@ export type PhotoLibraryAction =
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
+  | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
+  | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
+  | { type: 'WATCH_FOLDER_REMOVED'; folderPath: string }
   | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
   | { type: 'PHOTO_REMOVED'; filePath: string }
   | { type: 'TAG_DESCRIPTIONS_LOADED'; descriptions: Record<string, string> }
@@ -117,6 +129,12 @@ export function photoLibraryReducer(
         if (isPathUnderOrEqual(folder, action.folder)) folderChildren.delete(folder)
       }
 
+      const allFolderPaths = new Set(
+        Array.from(state.allFolderPaths).filter(
+          (folder) => !isPathUnderOrEqual(folder, action.folder)
+        )
+      )
+
       const selectedFolder =
         state.selectedFolder && isPathUnderOrEqual(state.selectedFolder, action.folder)
           ? null
@@ -142,6 +160,7 @@ export function photoLibraryReducer(
         photosByPath,
         folderCounts,
         folderChildren,
+        allFolderPaths,
         selectedFolder,
         selectedPath,
         selectedPaths,
@@ -179,6 +198,8 @@ export function photoLibraryReducer(
         folderChildren.set(rewrite(folder), new Set(Array.from(children, rewrite)))
       }
 
+      const allFolderPaths = new Set(Array.from(state.allFolderPaths, rewrite))
+
       const selectedFolder = state.selectedFolder !== null ? rewrite(state.selectedFolder) : null
       const selectedPath = state.selectedPath !== null ? rewrite(state.selectedPath) : null
       const selectedPaths = new Set(Array.from(state.selectedPaths, rewrite))
@@ -191,6 +212,7 @@ export function photoLibraryReducer(
         photosByPath,
         folderCounts,
         folderChildren,
+        allFolderPaths,
         selectedFolder,
         selectedPath,
         selectedPaths,
@@ -221,13 +243,17 @@ export function photoLibraryReducer(
       }
       return { ...state, photosByPath, folderCounts, folderChildren }
     }
-    case 'SCAN_COMPLETE':
+    case 'SCAN_COMPLETE': {
+      const allFolderPaths = new Set(state.allFolderPaths)
+      for (const folder of action.result.allFolders) allFolderPaths.add(folder)
       return {
         ...state,
         status: 'complete',
         cacheHits: state.cacheHits + action.result.cacheHits,
-        errors: [...state.errors, ...action.result.errors]
+        errors: [...state.errors, ...action.result.errors],
+        allFolderPaths
       }
+    }
     case 'SCAN_CANCELED':
       return { ...state, status: 'canceled' }
     case 'SELECT_PHOTO':
@@ -252,6 +278,26 @@ export function photoLibraryReducer(
       return { ...state, selectedTag: action.tag }
     case 'SET_SORT':
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
+    case 'SET_SHOW_EMPTY_FOLDERS':
+      return { ...state, showEmptyFolders: action.value }
+    case 'WATCH_FOLDER_ADDED': {
+      if (state.allFolderPaths.has(action.folderPath)) return state
+      const allFolderPaths = new Set(state.allFolderPaths)
+      allFolderPaths.add(action.folderPath)
+      return { ...state, allFolderPaths }
+    }
+    // Prunes the removed folder AND anything nested under it — a deleted
+    // folder takes its whole subtree with it, and chokidar fires a separate
+    // unlinkDir per nested level anyway, so this stays correct (a no-op) once
+    // those follow-up events arrive.
+    case 'WATCH_FOLDER_REMOVED': {
+      const allFolderPaths = new Set(
+        Array.from(state.allFolderPaths).filter(
+          (folder) => !isPathUnderOrEqual(folder, action.folderPath)
+        )
+      )
+      return { ...state, allFolderPaths }
+    }
     case 'PHOTO_UPSERTED': {
       const rootFolder = findRootFolder(action.photo.filePath, state.folders)
       const photosByPath = new Map(state.photosByPath)
