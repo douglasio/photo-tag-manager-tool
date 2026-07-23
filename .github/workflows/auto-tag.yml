@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   tag:
@@ -27,14 +26,13 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Pushing the tag below already triggers release.yml on its own
+      # (it has `on.push.tags: v*`), so there's no separate step to kick
+      # that off — doing so explicitly would fire a second, independent
+      # release.yml run for the same tag, racing the first to publish the
+      # same-named assets to the same GitHub release.
       - name: Create and push tag
         if: steps.version.outputs.exists == 'false'
         run: |
           git tag "${{ steps.version.outputs.tag }}"
           git push origin "${{ steps.version.outputs.tag }}"
-
-      - name: Trigger release workflow
-        if: steps.version.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run release.yml --ref "${{ steps.version.outputs.tag }}"
