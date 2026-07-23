@@ -35,6 +35,13 @@ linux:
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
+# electron-builder auto-publishes .snap files to the Snap Store by default,
+# independent of the top-level `publish` config below — that requires
+# snapcraft/store credentials we don't have set up in CI, so disable it here.
+# The .snap artifact itself still gets built and uploaded to the GitHub
+# Release like the other Linux targets.
+snap:
+  publish: null
 npmRebuild: false
 publish:
   provider: github
