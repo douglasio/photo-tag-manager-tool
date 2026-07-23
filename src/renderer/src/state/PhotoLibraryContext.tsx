@@ -71,6 +71,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const scanIdRef = useRef<string | null>(null)
   const pendingWatchCountsRef = useRef({ added: 0, removed: 0 })
   const watchFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // TagsInput's onChange fires a fresh updateTags call per pill added, with
+  // no debounce — saving several tags on the same photo in quick succession
+  // would otherwise fire overlapping exiftool writes to the same file. This
+  // queues writes per file path so each one waits for the previous write to
+  // that same file to finish (writes to different files stay concurrent).
+  const tagWriteQueueRef = useRef(new Map<string, Promise<void>>())
 
   const flushWatchNotification = useCallback(() => {
     watchFlushTimerRef.current = null
@@ -284,14 +290,26 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       const current = state.photosByPath.get(filePath)
       if (current) dispatch({ type: 'PHOTO_UPSERTED', photo: { ...current, tags } })
 
-      try {
-        const photo = await window.api.updateTags(filePath, tags)
-        dispatch({ type: 'PHOTO_UPSERTED', photo })
-      } catch (err) {
-        console.error(`failed to update tags for ${filePath}`, err)
-        notifications.show({ color: 'red', message: 'Failed to save tags' })
-        if (current) dispatch({ type: 'PHOTO_UPSERTED', photo: current })
-      }
+      // Chain onto whatever write is already pending for this same file, so
+      // this one doesn't start until that one has actually finished — tags
+      // is already the full desired list by the time this runs, so writing
+      // it after the prior write completes (rather than concurrently with
+      // it) is always correct, not just a stale-data workaround.
+      const previous = tagWriteQueueRef.current.get(filePath) ?? Promise.resolve()
+      const next = previous
+        .catch(() => {})
+        .then(async () => {
+          try {
+            const photo = await window.api.updateTags(filePath, tags)
+            dispatch({ type: 'PHOTO_UPSERTED', photo })
+          } catch (err) {
+            console.error(`failed to update tags for ${filePath}`, err)
+            notifications.show({ color: 'red', message: 'Failed to save tags' })
+            if (current) dispatch({ type: 'PHOTO_UPSERTED', photo: current })
+          }
+        })
+      tagWriteQueueRef.current.set(filePath, next)
+      await next
     },
     [state.photosByPath]
   )
