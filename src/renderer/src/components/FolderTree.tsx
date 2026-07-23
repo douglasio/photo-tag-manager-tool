@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  Badge,
   Button,
   Stack,
   Text,
@@ -14,11 +13,12 @@ import {
 } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import { IconChevronDown, IconChevronRight, IconPencil } from '@tabler/icons-react'
-import { useState, useMemo, type ReactElement, type ReactNode } from 'react'
+import { useState, useMemo, type ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
 import { foldersToTreeData } from '../utils/folderTree'
 import { splitFolderPath, validateFolderNameBase } from '../utils/folderNameValidation'
 import { activeHoverBackground } from '../utils/listItemStyles'
+import { FolderBadge } from './FolderBadge'
 
 interface ExpandToggleProps {
   hasChildren: boolean
@@ -243,51 +243,6 @@ function FolderTreeInner({
   )
 }
 
-function FolderBadge({
-  isActive,
-  children
-}: {
-  isActive: boolean
-  children: ReactNode
-}): ReactElement {
-  return (
-    <Badge
-      circle
-      variant={isActive ? 'filled' : 'transparent'}
-      color={isActive ? undefined : 'gray'}
-    >
-      {children}
-    </Badge>
-  )
-}
-
-function AllPhotosRow({
-  isActive,
-  count,
-  onClick
-}: {
-  isActive: boolean
-  count: number
-  onClick: () => void
-}): ReactElement {
-  const { hovered, ref } = useHover<HTMLButtonElement>()
-
-  return (
-    <Button
-      ref={ref}
-      onClick={onClick}
-      bg={activeHoverBackground(isActive, hovered)}
-      variant="transparent"
-      justify="space-between"
-      fullWidth
-      // leftSection={<Box w="md" style={{ flexShrink: 0 }} />}
-      rightSection={<FolderBadge isActive={isActive}>{count}</FolderBadge>}
-    >
-      <Text>All Photos</Text>
-    </Button>
-  )
-}
-
 export function FolderTree(): ReactElement {
   const { state, setFolderFilter, renameFolder } = usePhotoLibrary()
   const [editingFolder, setEditingFolder] = useState<string | null>(null)
@@ -298,11 +253,6 @@ export function FolderTree(): ReactElement {
 
   return (
     <Stack gap="md">
-      <AllPhotosRow
-        isActive={state.selectedFolder === null && state.selectedTag === null}
-        count={state.photosByPath.size}
-        onClick={() => setFolderFilter(null)}
-      />
       {state.folders.map((folder) => (
         <FolderTreeInner
           key={folder}

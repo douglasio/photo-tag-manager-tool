@@ -25,6 +25,7 @@ import { getEventCoordinates } from '@dnd-kit/utilities'
 import { IconPhoto, IconX } from '@tabler/icons-react'
 import { useState } from 'react'
 import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
+import { AllPhotosRow } from './components/AllPhotosRow'
 import { AppLogo } from './components/AppLogo'
 import { SettingsModal } from './components/SettingsModal'
 import { ScanProgressBar } from './components/ScanProgressBar'
@@ -187,6 +188,10 @@ function AppLayout(): React.JSX.Element {
           </Group>
         </AppShell.Header>
         <AppShell.Navbar style={{ display: 'flex', flexDirection: 'column' }}>
+          <Box p="md" style={{ flexShrink: 0 }}>
+            <AllPhotosRow />
+          </Box>
+          <Divider />
           <PanelSection title="Tags">
             <TagPanel />
           </PanelSection>
