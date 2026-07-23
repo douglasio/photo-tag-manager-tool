@@ -8,9 +8,10 @@ import {
   Pill,
   Slider,
   Text,
-  Title
+  Title,
+  Tooltip
 } from '@mantine/core'
-import { IconPhoto } from '@tabler/icons-react'
+import { IconPhoto, IconX } from '@tabler/icons-react'
 import {
   useCallback,
   useEffect,
@@ -234,11 +235,13 @@ export function GalleryGrid(): ReactElement {
         selectPhotoRange(path)
       } else if (event.ctrlKey || event.metaKey) {
         toggleSelectPhoto(path)
+      } else if (state.selectedPath === path && state.selectedPaths.size === 1) {
+        selectPhoto(null)
       } else {
         selectPhoto(path)
       }
     },
-    [selectPhoto, toggleSelectPhoto, selectPhotoRange]
+    [selectPhoto, toggleSelectPhoto, selectPhotoRange, state.selectedPath, state.selectedPaths]
   )
 
   // Keep a stable reference so react-window doesn't re-diff every visible
@@ -297,33 +300,53 @@ export function GalleryGrid(): ReactElement {
     <Flex direction="column" flex={1} miw={0} mih={0}>
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
-          {isPureTagView ? (
-            <Group gap={4} wrap="nowrap" align="center">
-              <Box flex={1} miw={0}>
-                <TagNameEditor
+          <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
+            {isPureTagView ? (
+              <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
+                <Box flex={1} miw={0}>
+                  <TagNameEditor
+                    tag={state.selectedTag!}
+                    count={tagCounts.get(state.selectedTag!) ?? 0}
+                    onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
+                  />
+                </Box>
+                <TagDeleteButton
                   tag={state.selectedTag!}
                   count={tagCounts.get(state.selectedTag!) ?? 0}
-                  onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
+                  onDelete={() => deleteTag(state.selectedTag!)}
                 />
-              </Box>
-              <TagDeleteButton
-                tag={state.selectedTag!}
-                count={tagCounts.get(state.selectedTag!) ?? 0}
-                onDelete={() => deleteTag(state.selectedTag!)}
-              />
-            </Group>
-          ) : (
-            <Title
-              order={2}
-              style={{
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {galleryTitle}
-            </Title>
-          )}
+              </Group>
+            ) : (
+              <Title
+                order={2}
+                flex={1}
+                miw={0}
+                style={{
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {galleryTitle}
+              </Title>
+            )}
+            {state.selectedPaths.size > 0 && (
+              <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                <Text size="sm" c="dimmed">
+                  {state.selectedPaths.size} selected
+                </Text>
+                <Tooltip label="Clear selection">
+                  <ActionIcon
+                    variant="subtle"
+                    onClick={clearSelection}
+                    aria-label="Clear selection"
+                  >
+                    <IconX size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+            )}
+          </Group>
           {isPureTagView && (
             <TagDescriptionEditor
               description={tagDescription}

@@ -262,6 +262,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const clearSelection = useCallback(() => {
     dispatch({ type: 'SET_SELECTED_PATHS', paths: [] })
+    dispatch({ type: 'SELECT_PHOTO', path: null })
   }, [])
 
   // General-purpose batch tag-add, shared by the multi-select context menu
