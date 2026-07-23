@@ -1,6 +1,6 @@
 {
   "name": "photo-tag-manager-tool",
-  "version": "0.2.1-alpha",
+  "version": "0.2.2-alpha",
   "description": "Tag Me — a folder-based photo organizer for reading and browsing photo metadata tags",
   "main": "./out/main/index.js",
   "author": "douglasio",
