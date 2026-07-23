@@ -64,7 +64,7 @@ function TagListItem({
         )
       }
       rightSection={
-        <Badge circle variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
+        <Badge circle size="lg" variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
           {count}
         </Badge>
       }

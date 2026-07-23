@@ -11,6 +11,7 @@ export function FolderBadge({
   return (
     <Badge
       circle
+      size="lg"
       variant={isActive ? 'filled' : 'transparent'}
       color={isActive ? undefined : 'gray'}
     >
