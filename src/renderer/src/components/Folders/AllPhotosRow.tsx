@@ -1,8 +1,8 @@
 import { Button, Text } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import type { ReactElement } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
-import { activeHoverBackground } from '../utils/listItemStyles'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { activeHoverBackground } from '../../utils/listItemStyles'
 import { FolderBadge } from './FolderBadge'
 
 /** Top-level navbar item above Tags/Folders, selecting the unfiltered library view. */

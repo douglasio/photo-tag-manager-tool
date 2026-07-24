@@ -1,7 +1,7 @@
 import { Group, Text, TextInput } from '@mantine/core'
 import { useState, type ReactElement } from 'react'
-import { InlineEditField } from './InlineEditField'
-import { splitFolderPath, validateFolderNameBase } from '../utils/folderNameValidation'
+import { InlineEditField } from '../Shared/InlineEditField'
+import { splitFolderPath, validateFolderNameBase } from '../../utils/folderNameValidation'
 
 interface FolderNameEditorProps {
   folder: string

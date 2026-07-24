@@ -1,7 +1,7 @@
 import { DateTimePicker } from '@mantine/dates'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { InlineEditField } from './InlineEditField'
-import { DATE_TAKEN_FORMAT } from '../utils/metadataDisplay'
+import { InlineEditField } from '../Shared/InlineEditField'
+import { DATE_TAKEN_FORMAT } from '../../utils/metadataDisplay'
 
 interface DateTakenEditorProps {
   value: string | null

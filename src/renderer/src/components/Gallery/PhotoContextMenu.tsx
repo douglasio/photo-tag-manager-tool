@@ -1,9 +1,9 @@
 import { Box, Menu, MultiSelect } from '@mantine/core'
 import { IconEdit, IconExternalLink, IconFolderOpen, IconTag } from '@tabler/icons-react'
 import { useState, type ReactElement, type ReactNode } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
-import { isMac } from '../utils/platform'
-import type { PhotoRecord } from '../../../shared/types'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { isMac } from '../../utils/platform'
+import type { PhotoRecord } from '../../../../shared/types'
 
 interface PhotoContextMenuProps {
   photo: PhotoRecord

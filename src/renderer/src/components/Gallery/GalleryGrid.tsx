@@ -23,15 +23,15 @@ import {
   type ReactElement
 } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
-import { useCtrlKeyHeld } from '../hooks/useCtrlKeyHeld'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { useCtrlKeyHeld } from '../../hooks/useCtrlKeyHeld'
 import { PhotoContextMenu } from './PhotoContextMenu'
 import { PhotoThumbnail } from './PhotoThumbnail'
-import { TagDeleteButton } from './TagDeleteButton'
-import { TagDescriptionEditor } from './TagDescriptionEditor'
-import { TagNameEditor } from './TagNameEditor'
-import { basename } from '../utils/folderTree'
-import type { PhotoRecord } from '../../../shared/types'
+import { TagDeleteButton } from '../Tags/TagDeleteButton'
+import { TagDescriptionEditor } from '../Tags/TagDescriptionEditor'
+import { TagNameEditor } from '../Tags/TagNameEditor'
+import { basename } from '../../utils/folderTree'
+import type { PhotoRecord } from '../../../../shared/types'
 
 const DEFAULT_CELL_WIDTH = 168
 // The filename label below each thumbnail takes roughly this much extra

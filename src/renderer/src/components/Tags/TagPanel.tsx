@@ -2,10 +2,10 @@ import { AspectRatio, Badge, Button, Image, Stack, Text } from '@mantine/core'
 import { useHover, useMergedRef } from '@mantine/hooks'
 import { useDroppable } from '@dnd-kit/core'
 import type { ReactElement } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
-import { activeHoverBackground } from '../utils/listItemStyles'
-import { toThumbProtocolUrl } from '../../../shared/protocolUrls'
-import type { PhotoRecord } from '../../../shared/types'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { activeHoverBackground } from '../../utils/listItemStyles'
+import { toThumbProtocolUrl } from '../../../../shared/protocolUrls'
+import type { PhotoRecord } from '../../../../shared/types'
 
 const COVER_SIZE = 28
 

@@ -1,9 +1,9 @@
 import { ActionIcon, Container, Flex, Group, Image, Slider, Tooltip } from '@mantine/core'
 import { IconArrowsMaximize, IconMaximize, IconPhoto } from '@tabler/icons-react'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import type { PhotoRecord } from '../../../shared/types'
-import { toFileProtocolUrl } from '../../../shared/protocolUrls'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import type { PhotoRecord } from '../../../../shared/types'
+import { toFileProtocolUrl } from '../../../../shared/protocolUrls'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 
 const MIN_SCALE = 1
 const MAX_SCALE = 5

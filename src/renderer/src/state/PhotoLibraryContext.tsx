@@ -10,7 +10,7 @@ import {
   type ReactNode
 } from 'react'
 import { notifications } from '@mantine/notifications'
-import { MoveProgressToast } from '../components/MoveProgressToast'
+import { MoveProgressToast } from '../components/Settings/MoveProgressToast'
 import {
   initialState,
   photoLibraryReducer,

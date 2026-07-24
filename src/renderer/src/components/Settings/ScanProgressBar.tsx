@@ -2,7 +2,7 @@ import { Button, Group, Popover, RingProgress, Text, Tooltip } from '@mantine/co
 import { useDisclosure, useHover } from '@mantine/hooks'
 import { IconCheck, IconX } from '@tabler/icons-react'
 import { useEffect, useState, type ReactElement } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 import { ScanLogContent } from './ScanLogContent'
 
 // How long the "just synced" checkmark stays green before fading to a

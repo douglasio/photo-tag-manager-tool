@@ -1,7 +1,7 @@
 import { ActionIcon, Menu, Switch } from '@mantine/core'
 import { IconSettings } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 
 export function FolderSettingsMenu(): ReactElement {
   const { state, setShowEmptyFolders } = usePhotoLibrary()

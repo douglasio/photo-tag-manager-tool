@@ -14,8 +14,8 @@ import {
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import type { ReactElement } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
-import { FolderRemoveButton } from './FolderRemoveButton'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { FolderRemoveButton } from '../Folders/FolderRemoveButton'
 
 function SectionTitle({ children }: { children: string }): ReactElement {
   return (

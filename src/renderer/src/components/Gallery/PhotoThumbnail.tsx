@@ -11,11 +11,11 @@ import {
 import { useDraggable } from '@dnd-kit/core'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
 import { useState, type ComponentPropsWithoutRef, type MouseEvent, type ReactElement } from 'react'
-import type { PhotoRecord } from '../../../shared/types'
-import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../shared/protocolUrls'
+import type { PhotoRecord } from '../../../../shared/types'
+import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../../shared/protocolUrls'
 import { GalleryFileName } from './GalleryFileName'
-import { ctrlKeyLabel } from '../utils/platform'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { ctrlKeyLabel } from '../../utils/platform'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 
 // Preview size at previewScale === 1, in viewport-relative units so it
 // scales with the window rather than a fixed pixel size.
