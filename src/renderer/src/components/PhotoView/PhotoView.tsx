@@ -21,7 +21,7 @@ function clampScale(value: number): number {
 }
 
 export function PhotoView({ photo }: PhotoViewProps): ReactElement {
-  const { state } = usePhotoLibrary()
+  const { state, closePhotoTab } = usePhotoLibrary()
   const [scale, setScale] = useState(1)
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -70,7 +70,12 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (!isActiveRef.current || !event.ctrlKey) return
+      if (!isActiveRef.current) return
+      if (event.key === 'Escape') {
+        closePhotoTab(photo.filePath)
+        return
+      }
+      if (!event.ctrlKey) return
       if (event.key === '+' || event.key === '=') {
         event.preventDefault()
         setScale((prev) => clampScale(prev + SCALE_STEP))
@@ -81,7 +86,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [closePhotoTab, photo.filePath])
 
   return (
     <Container

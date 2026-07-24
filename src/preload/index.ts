@@ -28,6 +28,8 @@ const api = {
     ipcRenderer.invoke('photo:rename', filePath, newBaseName),
   updateDateTaken: (filePath: string, isoDate: string): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:updateDateTaken', filePath, isoDate),
+  updateComment: (filePath: string, comment: string): Promise<PhotoRecord> =>
+    ipcRenderer.invoke('photo:updateComment', filePath, comment),
   movePhotosToFolder: (
     filePaths: string[],
     destFolder: string

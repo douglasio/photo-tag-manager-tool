@@ -79,6 +79,18 @@ export async function writeDateTaken(filePath: string, isoDate: string): Promise
   )
 }
 
+// UserComment (EXIF) and Description (IPTC/XMP) are the two fields
+// readPhotoRecord falls back across when reading — writing both keeps them
+// in sync so other tools looking at either one see the update.
+export async function writeComment(filePath: string, comment: string): Promise<void> {
+  const value = comment.trim() === '' ? null : comment
+  await getExifTool().write(
+    filePath,
+    { UserComment: value, Description: value },
+    { writeArgs: ['-overwrite_original'] }
+  )
+}
+
 export async function readPhotoRecord(filePath: string): Promise<PhotoRecord> {
   const fileStat = await stat(filePath)
   const tags = await getExifTool().read(filePath)

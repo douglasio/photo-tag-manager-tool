@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Blockquote,
   Button,
   createTheme,
   Group,
@@ -36,6 +37,11 @@ export const theme = createTheme({
         styles: {
           root: { transition: 'opacity 120ms ease' }
         }
+      }
+    }),
+    Blockquote: Blockquote.extend({
+      defaultProps: {
+        radius: radiusSize
       }
     }),
     Button: Button.extend({

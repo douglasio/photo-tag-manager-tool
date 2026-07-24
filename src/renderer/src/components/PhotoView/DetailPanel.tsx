@@ -6,7 +6,6 @@ import {
   Center,
   DataList,
   Flex,
-  Group,
   Stack,
   Text,
   Title,
@@ -15,6 +14,7 @@ import {
 import { notifications } from '@mantine/notifications'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { CommentEditor } from './CommentEditor'
 import { DateTakenEditor } from './DateTakenEditor'
 import { FileNameEditor } from './FileNameEditor'
 import { TagList } from '../Tags/TagList'
@@ -22,36 +22,19 @@ import { isNullOrEmpty } from '@renderer/utils/functions'
 import { IconCopy, IconExternalLink, IconPhoto } from '@tabler/icons-react'
 import { useHover } from '@mantine/hooks'
 
-// function formatBytes(bytes: number): string {
-//   if (bytes < 1024) return `${bytes} B`
-//   const units = ['KB', 'MB', 'GB']
-//   let value = bytes / 1024
-//   let unitIndex = 0
-//   while (value >= 1024 && unitIndex < units.length - 1) {
-//     value /= 1024
-//     unitIndex++
-//   }
-//   return `${value.toFixed(1)} ${units[unitIndex]}`
-// }
-
-// function DetailRow({ label, value }: { label: string; value: string }): ReactElement {
-//   return (
-//     <Group justify="space-between" wrap="nowrap" gap="md" align="flex-start">
-//       <Text c="dimmed" style={{ flexShrink: 0 }}>
-//         {label}
-//       </Text>
-//       <Text ta="right" style={{ wordBreak: 'break-word' }}>
-//         {value}
-//       </Text>
-//     </Group>
-//   )
-// }
-
 const metadataDisplayFilters = ['comment', 'dateTaken']
 
 export function DetailPanel(): ReactElement {
-  const { selectedPhoto, allTags, updateTags, renameFile, updateDateTaken, openPhotoTab, state } =
-    usePhotoLibrary()
+  const {
+    selectedPhoto,
+    allTags,
+    updateTags,
+    renameFile,
+    updateDateTaken,
+    updateComment,
+    openPhotoTab,
+    state
+  } = usePhotoLibrary()
   const { hovered, ref } = useHover<HTMLDivElement>()
 
   // Showing one photo's metadata/tags while a multi-selection is active
@@ -83,30 +66,30 @@ export function DetailPanel(): ReactElement {
   return (
     <Stack>
       <Stack>
-        <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
-          <Box flex={1} miw={0}>
-            <FileNameEditor
-              fileName={selectedPhoto.fileName}
-              onRename={(newBaseName) => renameFile(selectedPhoto.filePath, newBaseName)}
-            />
-          </Box>
-          <Tooltip label="Open">
-            <Button
-              leftSection={<IconPhoto size={18} />}
-              onClick={() => openPhotoTab(selectedPhoto.filePath)}
-            >
-              Open
-            </Button>
-          </Tooltip>
-        </Group>
-        {metadata.comment.value && (
-          <DataList orientation="vertical">
-            <DataList.Item>
-              <DataList.ItemLabel>{metadata.comment.label}</DataList.ItemLabel>
-              <DataList.ItemValue>{metadata.comment.displayValue}</DataList.ItemValue>
-            </DataList.Item>
-          </DataList>
-        )}
+        <Tooltip label="Open">
+          <Button
+            leftSection={<IconPhoto size={18} />}
+            onClick={() => openPhotoTab(selectedPhoto.filePath)}
+          >
+            Open
+          </Button>
+        </Tooltip>
+        <Box flex={1} miw={0}>
+          <FileNameEditor
+            fileName={selectedPhoto.fileName}
+            onRename={(newBaseName) => renameFile(selectedPhoto.filePath, newBaseName)}
+          />
+        </Box>
+        <Stack>
+          <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+            Comment
+          </Title>
+          <CommentEditor
+            value={metadata.comment.value}
+            displayValue={metadata.comment.displayValue}
+            onSave={(comment) => updateComment(selectedPhoto.filePath, comment)}
+          />
+        </Stack>
         <Stack>
           <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
             Tags

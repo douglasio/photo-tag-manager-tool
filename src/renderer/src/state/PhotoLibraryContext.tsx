@@ -70,6 +70,7 @@ interface PhotoLibraryContextValue {
   deleteTag: (tag: string) => Promise<void>
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
   updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
+  updateComment: (filePath: string, comment: string) => Promise<void>
   openTabPhotos: PhotoRecord[]
   openPhotoTab: (filePath: string) => void
   closePhotoTab: (filePath: string) => void
@@ -522,6 +523,17 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [])
 
+  const updateComment = useCallback(async (filePath: string, comment: string) => {
+    try {
+      const photo = await window.api.updateComment(filePath, comment)
+      dispatch({ type: 'PHOTO_UPSERTED', photo })
+    } catch (err) {
+      console.error(`failed to update comment for ${filePath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to update comment' })
+      throw err
+    }
+  }, [])
+
   const openPhotoTab = useCallback((filePath: string) => {
     dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
   }, [])
@@ -714,6 +726,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     deleteTag,
     renameFile,
     updateDateTaken,
+    updateComment,
     openTabPhotos,
     openPhotoTab,
     closePhotoTab,
