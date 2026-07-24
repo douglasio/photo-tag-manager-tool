@@ -1,4 +1,13 @@
-import { Box, Center, Image, Portal, Tooltip, UnstyledButton, useMantineTheme } from '@mantine/core'
+import {
+  AspectRatio,
+  Box,
+  Center,
+  Image,
+  Portal,
+  Tooltip,
+  UnstyledButton,
+  useMantineTheme
+} from '@mantine/core'
 import { useDraggable } from '@dnd-kit/core'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
 import { useState, type ComponentPropsWithoutRef, type MouseEvent, type ReactElement } from 'react'
@@ -93,7 +102,7 @@ export function PhotoThumbnail({
         {...listeners}
         ref={setNodeRef}
         title={photo.fileName}
-        style={{ ...rest.style, opacity: isDragging ? 0.4 : undefined }}
+        opacity={isDragging ? 0.4 : undefined}
         className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${!selected && multiSelected ? ' photo-thumbnail--multi-selected' : ''}${className ? ` ${className}` : ''}`}
       >
         <UnstyledButton
@@ -108,13 +117,14 @@ export function PhotoThumbnail({
           style={{ cursor: canPreview ? 'zoom-in' : undefined }}
         >
           {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
-            <Image
-              src={toThumbProtocolUrl(photo.thumbnailKey)}
-              alt={photo.fileName}
-              fit="cover"
-              loading="lazy"
-              style={{ aspectRatio: 1, width: '100%' }}
-            />
+            <AspectRatio ratio={1}>
+              <Image
+                src={toThumbProtocolUrl(photo.thumbnailKey)}
+                alt={photo.fileName}
+                fit="cover"
+                loading="lazy"
+              />
+            </AspectRatio>
           ) : (
             <Center
               className="photo-thumbnail__placeholder"
@@ -131,34 +141,30 @@ export function PhotoThumbnail({
         {canPreview && cursorPos && (
           <Portal>
             <Box
+              pos="fixed"
+              bg="var(--mantine-color-body)"
+              bdrs="md"
+              left={cursorPos.x}
+              top={cursorPos.y}
               style={{
-                position: 'fixed',
-                left: cursorPos.x,
-                top: cursorPos.y,
+                boxShadow: 'var(--mantine-shadow-elevated)',
                 transform: 'translate(-50%, -50%)',
                 // Preview must never intercept the pointer — it sits
                 // directly under the cursor, so any pointer events here
                 // would immediately hide it (mouse "leaving" the thumbnail).
                 pointerEvents: 'none',
-                zIndex: 'var(--mantine-z-index-max)',
-                padding: 4,
-                backgroundColor: 'var(--mantine-color-body)',
-                border: '1px solid var(--mantine-color-default-border)'
+                zIndex: 'var(--mantine-z-index-max)'
               }}
             >
               <Image
                 src={toFileProtocolUrl(photo.filePath)}
                 alt={photo.fileName}
+                bdrs="md"
                 fit="contain"
-                style={{
-                  // Capped against the viewport regardless of zoom, so it
-                  // can never spill past the window edges even centered
-                  // on a cursor near a corner.
-                  maxWidth: `min(${BASE_PREVIEW_WIDTH_VW * previewScale}vw, 92vw)`,
-                  maxHeight: `min(${BASE_PREVIEW_HEIGHT_VH * previewScale}vh, 92vh)`,
-                  width: 'auto',
-                  height: 'auto'
-                }}
+                maw={`min(${BASE_PREVIEW_WIDTH_VW * previewScale}vw, 92vw)`}
+                mah={`min(${BASE_PREVIEW_HEIGHT_VH * previewScale}vh, 92vh)`}
+                w="auto"
+                h="auto"
               />
             </Box>
           </Portal>
