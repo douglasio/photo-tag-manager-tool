@@ -40,6 +40,7 @@ export interface PhotoLibraryState {
   // scan — not live filesystem changes.
   allFolderPaths: Set<string>
   showEmptyFolders: boolean
+  excludePatterns: string[]
   tagDescriptions: Map<string, string>
   // Ordered list of photo paths open as Photo View tabs. activeTab is either
   // 'gallery' or one of the paths in openTabs.
@@ -66,6 +67,7 @@ export const initialState: PhotoLibraryState = {
   folderChildren: new Map(),
   allFolderPaths: new Set(),
   showEmptyFolders: false,
+  excludePatterns: [],
   tagDescriptions: new Map(),
   openTabs: [],
   activeTab: 'gallery'
@@ -89,6 +91,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
+  | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
   | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
   | { type: 'WATCH_FOLDER_REMOVED'; folderPath: string }
   | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
@@ -243,15 +246,71 @@ export function photoLibraryReducer(
       }
       return { ...state, photosByPath, folderCounts, folderChildren }
     }
+    // filePaths (when present — null means the scan aborted before fully
+    // enumerating the root, e.g. it was cancelled or the root vanished) is
+    // the authoritative "what exists under rootPath right now" answer.
+    // METADATA_BATCH already added everything newly found as the scan ran;
+    // this reconciles the other direction — anything this app previously
+    // knew about under rootPath that ISN'T in that set (deleted on disk, or
+    // newly matched by an exclude pattern) gets pruned from state here,
+    // mirroring the DB-side pruneMissing the main process already ran.
     case 'SCAN_COMPLETE': {
-      const allFolderPaths = new Set(state.allFolderPaths)
-      for (const folder of action.result.allFolders) allFolderPaths.add(folder)
+      const { rootPath, filePaths, allFolders } = action.result
+
+      let photosByPath = state.photosByPath
+      let folderCounts = state.folderCounts
+      let folderChildren = state.folderChildren
+      let allFolderPaths = state.allFolderPaths
+      let selectedPath = state.selectedPath
+      let selectedPaths = state.selectedPaths
+      let openTabs = state.openTabs
+      let activeTab = state.activeTab
+
+      if (filePaths) {
+        const keep = new Set(filePaths)
+        const stale = Array.from(photosByPath.keys()).filter(
+          (path) => isPathUnderOrEqual(path, rootPath) && !keep.has(path)
+        )
+        if (stale.length > 0) {
+          photosByPath = new Map(photosByPath)
+          folderCounts = new Map(folderCounts)
+          folderChildren = new Map(folderChildren)
+          for (const filePath of stale) {
+            photosByPath.delete(filePath)
+            removePhotoFromFolderTree(filePath, rootPath, folderCounts, folderChildren)
+          }
+
+          const staleSet = new Set(stale)
+          selectedPath = selectedPath && staleSet.has(selectedPath) ? null : selectedPath
+          selectedPaths = new Set(Array.from(selectedPaths).filter((path) => !staleSet.has(path)))
+          openTabs = openTabs.filter((path) => !staleSet.has(path))
+          activeTab = staleSet.has(activeTab) ? 'gallery' : activeTab
+        }
+
+        // Replace this root's slice of the folder listing with the fresh
+        // set, rather than only ever adding to it.
+        const keptFolders = Array.from(allFolderPaths).filter(
+          (folder) => !isPathUnderOrEqual(folder, rootPath)
+        )
+        allFolderPaths = new Set([...keptFolders, ...allFolders])
+      } else {
+        allFolderPaths = new Set(allFolderPaths)
+        for (const folder of allFolders) allFolderPaths.add(folder)
+      }
+
       return {
         ...state,
         status: 'complete',
         cacheHits: state.cacheHits + action.result.cacheHits,
         errors: [...state.errors, ...action.result.errors],
-        allFolderPaths
+        photosByPath,
+        folderCounts,
+        folderChildren,
+        allFolderPaths,
+        selectedPath,
+        selectedPaths,
+        openTabs,
+        activeTab
       }
     }
     case 'SCAN_CANCELED':
@@ -280,6 +339,8 @@ export function photoLibraryReducer(
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'SET_SHOW_EMPTY_FOLDERS':
       return { ...state, showEmptyFolders: action.value }
+    case 'SET_EXCLUDE_PATTERNS':
+      return { ...state, excludePatterns: action.patterns }
     case 'WATCH_FOLDER_ADDED': {
       if (state.allFolderPaths.has(action.folderPath)) return state
       const allFolderPaths = new Set(state.allFolderPaths)

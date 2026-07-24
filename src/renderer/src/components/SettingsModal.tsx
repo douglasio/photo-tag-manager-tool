@@ -7,6 +7,7 @@ import {
   Stack,
   Switch,
   Table,
+  TagsInput,
   Text,
   Title,
   Tooltip
@@ -65,6 +66,25 @@ function FoldersSection(): ReactElement {
   )
 }
 
+function ExcludePatternsSection(): ReactElement {
+  const { state, setExcludePatterns } = usePhotoLibrary()
+
+  return (
+    <Stack gap="xs">
+      <SectionTitle>Exclude Patterns</SectionTitle>
+      <Text c="dimmed" size="sm">
+        Folders or files whose path contains any of these (case-insensitive) are skipped during
+        scanning.
+      </Text>
+      <TagsInput
+        value={state.excludePatterns}
+        onChange={(patterns) => void setExcludePatterns(patterns)}
+        placeholder="Add a pattern…"
+      />
+    </Stack>
+  )
+}
+
 export function SettingsModal(): ReactElement {
   const { state } = usePhotoLibrary()
   const [opened, { open, close }] = useDisclosure(false)
@@ -89,6 +109,8 @@ export function SettingsModal(): ReactElement {
       <Modal opened={opened} onClose={close} title={<Title order={2}>Settings</Title>} size="lg">
         <Stack gap="lg">
           <FoldersSection />
+          <Divider />
+          <ExcludePatternsSection />
         </Stack>
       </Modal>
     </>

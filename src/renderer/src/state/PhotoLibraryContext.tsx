@@ -63,6 +63,7 @@ interface PhotoLibraryContextValue {
   setFolderTagFilter: (tag: string | null) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setShowEmptyFolders: (value: boolean) => void
+  setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
@@ -204,6 +205,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getShowEmptyFolders().then((value) => {
       dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getExcludePatterns().then((patterns) => {
+      dispatch({ type: 'SET_EXCLUDE_PATTERNS', patterns })
     })
   }, [])
 
@@ -558,6 +565,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setShowEmptyFolders(value)
   }, [])
 
+  // Persists the patterns, then rescans every folder so the library itself
+  // (not just future filesystem events) reflects the change — files/folders
+  // newly matched get pruned out, anything un-excluded gets picked back up.
+  const setExcludePatterns = useCallback(
+    async (patterns: string[]) => {
+      dispatch({ type: 'SET_EXCLUDE_PATTERNS', patterns })
+      await window.api.setExcludePatterns(patterns)
+      await rescanAll()
+    },
+    [rescanAll]
+  )
+
   // Folder and tag filters stack rather than being mutually exclusive, so a
   // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
   // current folder instead of replacing it with a folder-agnostic tag view.
@@ -688,6 +707,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setFolderTagFilter,
     setSort,
     setShowEmptyFolders,
+    setExcludePatterns,
     updateTags,
     setTagDescription,
     renameTag,

@@ -10,10 +10,9 @@ export function FolderBadge({
 }): ReactElement {
   return (
     <Badge
-      circle
-      size="lg"
-      variant={isActive ? 'filled' : 'transparent'}
-      color={isActive ? undefined : 'gray'}
+      size="sm"
+      variant={isActive ? 'filled' : 'light'}
+      color={isActive ? undefined : 'gray.8'}
     >
       {children}
     </Badge>

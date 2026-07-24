@@ -1,11 +1,17 @@
 import { fdir } from 'fdir'
 import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
+import { matchesExcludePattern } from './excludeMatcher'
 
-export async function scanDirectory(rootPath: string): Promise<string[]> {
+export async function scanDirectory(
+  rootPath: string,
+  excludePatterns: string[] = []
+): Promise<string[]> {
   return new fdir()
     .withFullPaths()
+    .exclude((_dirName, dirPath) => matchesExcludePattern(dirPath, excludePatterns))
     .filter((path, isDirectory) => {
       if (isDirectory) return false
+      if (matchesExcludePattern(path, excludePatterns)) return false
       const dot = path.lastIndexOf('.')
       if (dot === -1) return false
       return SUPPORTED_EXTENSIONS.has(path.slice(dot).toLowerCase())
@@ -19,8 +25,16 @@ export async function scanDirectory(rootPath: string): Promise<string[]> {
 // empty folder (or one containing only unsupported files) would never appear
 // anywhere without this separate listing. Includes rootPath itself so a
 // caller doesn't need to special-case adding it back in.
-export async function scanAllFolders(rootPath: string): Promise<string[]> {
-  const dirs = await new fdir().onlyDirs().withFullPaths().crawl(rootPath).withPromise()
+export async function scanAllFolders(
+  rootPath: string,
+  excludePatterns: string[] = []
+): Promise<string[]> {
+  const dirs = await new fdir()
+    .onlyDirs()
+    .withFullPaths()
+    .exclude((_dirName, dirPath) => matchesExcludePattern(dirPath, excludePatterns))
+    .crawl(rootPath)
+    .withPromise()
   // fdir appends a trailing separator to directory entries — strip it so
   // these match the app's path convention (no trailing slash) used
   // everywhere folder paths derived from photo paths already appear.

@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from 'chokidar'
 import { extname } from 'path'
 import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
+import { matchesExcludePattern } from './excludeMatcher'
 
 export type WatchEventType = 'add' | 'change' | 'unlink'
 export type WatchDirEventType = 'addDir' | 'unlinkDir'
@@ -19,11 +20,16 @@ function isSupportedFile(filePath: string): boolean {
   return SUPPORTED_EXTENSIONS.has(extname(filePath).toLowerCase())
 }
 
-export function startWatching(rootPath: string, handlers: WatcherHandlers): void {
+export function startWatching(
+  rootPath: string,
+  handlers: WatcherHandlers,
+  excludePatterns: string[] = []
+): void {
   if (watchers.has(rootPath)) return
 
   const watcher = watch(rootPath, {
     ignoreInitial: true,
+    ignored: (path: string) => matchesExcludePattern(path, excludePatterns),
     // Wait for copies/writes to finish before emitting add/change, so we don't
     // try to read metadata off a partially-written file.
     awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 }

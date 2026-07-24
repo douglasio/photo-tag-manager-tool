@@ -71,3 +71,18 @@ export function getShowEmptyFolders(): boolean {
 export function setShowEmptyFolders(value: boolean): void {
   setSetting('showEmptyFolders', String(value))
 }
+
+export function getExcludePatterns(): string[] {
+  const raw = getSetting('excludePatterns')
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function setExcludePatterns(patterns: string[]): void {
+  setSetting('excludePatterns', JSON.stringify(patterns))
+}

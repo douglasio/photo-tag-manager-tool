@@ -5,6 +5,7 @@ import { scanAllFolders, scanDirectory } from '../services/directoryScanner'
 import { ingestFile } from '../services/photoIngest'
 import { deleteThumbnail } from '../services/thumbnailService'
 import { pruneMissing } from '../db/photoRepository'
+import { getExcludePatterns } from '../db/settingsRepository'
 import type {
   MetadataBatchEvent,
   PhotoRecord,
@@ -57,17 +58,22 @@ async function runScan(
   let filePaths: string[]
   let allFolders: string[]
   try {
+    const excludePatterns = getExcludePatterns()
     ;[filePaths, allFolders] = await Promise.all([
-      scanDirectory(rootPath),
-      scanAllFolders(rootPath)
+      scanDirectory(rootPath, excludePatterns),
+      scanAllFolders(rootPath, excludePatterns)
     ])
   } catch (err) {
     const completeEvent: ScanCompleteEvent = {
       scanId,
+      rootPath,
       totalScanned: 0,
       cacheHits: 0,
       errors: [{ filePath: rootPath, message: err instanceof Error ? err.message : String(err) }],
-      allFolders: []
+      allFolders: [],
+      // Enumeration itself failed — this isn't an authoritative "nothing
+      // exists here" result, so the renderer must not prune based on it.
+      filePaths: null
     }
     sender.send('scan:complete', completeEvent)
     return
@@ -122,10 +128,15 @@ async function runScan(
 
   const completeEvent: ScanCompleteEvent = {
     scanId,
+    rootPath,
     totalScanned: filePaths.length,
     cacheHits,
     errors,
-    allFolders
+    allFolders,
+    // Mirrors the pruneMissing skip above — a cancelled scan didn't finish
+    // reconciling the DB, so the renderer shouldn't reconcile its own state
+    // against a set that DB-side deliberately left unapplied.
+    filePaths: state.cancelled ? null : filePaths
   }
   sender.send('scan:complete', completeEvent)
 }

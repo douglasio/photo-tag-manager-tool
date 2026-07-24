@@ -4,6 +4,7 @@ import { startWatching, stopWatching, stopAllWatchers } from './folderWatcher'
 import { ingestFile } from './photoIngest'
 import { deleteThumbnail } from './thumbnailService'
 import { removePhoto } from '../db/photoRepository'
+import { getExcludePatterns } from '../db/settingsRepository'
 import type {
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
@@ -57,22 +58,34 @@ async function handleRemove(filePath: string): Promise<void> {
 }
 
 export function watchFolder(rootPath: string): void {
-  startWatching(rootPath, {
-    onFileEvent: (type, filePath) => {
-      if (suppressedPaths.delete(filePath)) return
-      if (type === 'unlink') void handleRemove(filePath)
-      else void handleUpsert(filePath, type)
-    },
-    onDirEvent: (type, dirPath) => {
-      if (type === 'addDir') {
-        const payload: WatchFolderAddedEvent = { folderPath: dirPath }
-        watchTarget?.send('watch:folder-added', payload)
-      } else {
-        const payload: WatchFolderRemovedEvent = { folderPath: dirPath }
-        watchTarget?.send('watch:folder-removed', payload)
+  startWatching(
+    rootPath,
+    {
+      onFileEvent: (type, filePath) => {
+        if (suppressedPaths.delete(filePath)) return
+        if (type === 'unlink') void handleRemove(filePath)
+        else void handleUpsert(filePath, type)
+      },
+      onDirEvent: (type, dirPath) => {
+        if (type === 'addDir') {
+          const payload: WatchFolderAddedEvent = { folderPath: dirPath }
+          watchTarget?.send('watch:folder-added', payload)
+        } else {
+          const payload: WatchFolderRemovedEvent = { folderPath: dirPath }
+          watchTarget?.send('watch:folder-removed', payload)
+        }
       }
-    }
-  })
+    },
+    getExcludePatterns()
+  )
+}
+
+// Exclude patterns can't be updated on an already-running chokidar watcher,
+// so applying a change means tearing down and recreating every root's
+// watcher with the current patterns baked in fresh.
+export async function restartAllWatchers(folders: string[]): Promise<void> {
+  await Promise.all(folders.map((folder) => stopWatching(folder)))
+  folders.forEach(watchFolder)
 }
 
 export function unwatchFolder(rootPath: string): Promise<void> {

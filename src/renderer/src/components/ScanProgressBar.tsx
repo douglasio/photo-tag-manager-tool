@@ -60,15 +60,9 @@ export function ScanProgressBar(): ReactElement | null {
               {state.status === 'scanning' && (
                 <>
                   <RingProgress
-                    size={44}
-                    thickness={4}
-                    roundCaps
+                    size={20}
+                    thickness={2}
                     sections={[{ value: percent, color: 'indigo' }]}
-                    label={
-                      <Text size="8px" ta="center" fw={700}>
-                        {processed}/{total || '…'}
-                      </Text>
-                    }
                   />
                   <Text c="dimmed" style={{ whiteSpace: 'nowrap' }}>
                     {processed} / {total || '…'} found
