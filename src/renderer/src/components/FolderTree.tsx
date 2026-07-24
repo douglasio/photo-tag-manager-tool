@@ -198,7 +198,9 @@ function TreeRow({
             styles={{ input: { padding: 0, height: 'auto', minHeight: 'auto' } }}
           />
         ) : (
-          <Text truncate="end">{node.label}</Text>
+          <Tooltip label={node.label} openDelay={700}>
+            <Text truncate="end">{node.label}</Text>
+          </Tooltip>
         )}
       </Button>
     </FolderContextMenu>
