@@ -68,6 +68,7 @@ interface PhotoLibraryContextValue {
   renameTag: (oldTag: string, newTag: string) => Promise<void>
   deleteTag: (tag: string) => Promise<void>
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
+  updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
   openTabPhotos: PhotoRecord[]
   openPhotoTab: (filePath: string) => void
   closePhotoTab: (filePath: string) => void
@@ -503,6 +504,17 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.selectedPath]
   )
 
+  const updateDateTaken = useCallback(async (filePath: string, isoDate: string) => {
+    try {
+      const photo = await window.api.updateDateTaken(filePath, isoDate)
+      dispatch({ type: 'PHOTO_UPSERTED', photo })
+    } catch (err) {
+      console.error(`failed to update date taken for ${filePath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to update date taken' })
+      throw err
+    }
+  }, [])
+
   const openPhotoTab = useCallback((filePath: string) => {
     dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
   }, [])
@@ -681,6 +693,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     renameTag,
     deleteTag,
     renameFile,
+    updateDateTaken,
     openTabPhotos,
     openPhotoTab,
     closePhotoTab,

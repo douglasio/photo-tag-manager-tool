@@ -15,6 +15,7 @@ import {
 import { notifications } from '@mantine/notifications'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { DateTakenEditor } from './DateTakenEditor'
 import { FileNameEditor } from './FileNameEditor'
 import { TagList } from './TagList'
 import { isNullOrEmpty } from '@renderer/utils/functions'
@@ -46,10 +47,11 @@ import { useHover } from '@mantine/hooks'
 //   )
 // }
 
-const metadataDisplayFilters = ['comment']
+const metadataDisplayFilters = ['comment', 'dateTaken']
 
 export function DetailPanel(): ReactElement {
-  const { selectedPhoto, allTags, updateTags, renameFile, openPhotoTab, state } = usePhotoLibrary()
+  const { selectedPhoto, allTags, updateTags, renameFile, updateDateTaken, openPhotoTab, state } =
+    usePhotoLibrary()
   const { hovered, ref } = useHover<HTMLDivElement>()
 
   // Showing one photo's metadata/tags while a multi-selection is active
@@ -120,6 +122,16 @@ export function DetailPanel(): ReactElement {
             Metadata
           </Title>
           <DataList orientation="vertical">
+            <DataList.Item>
+              <DataList.ItemLabel>{metadata.dateTaken.label}</DataList.ItemLabel>
+              <DataList.ItemValue>
+                <DateTakenEditor
+                  value={metadata.dateTaken.value}
+                  displayValue={metadata.dateTaken.displayValue}
+                  onSave={(isoDate) => updateDateTaken(selectedPhoto.filePath, isoDate)}
+                />
+              </DataList.ItemValue>
+            </DataList.Item>
             {Object.entries(metadata)
               .filter(
                 ([key, field]) =>

@@ -26,6 +26,8 @@ const api = {
   showItemInFolder: (path: string) => ipcRenderer.invoke('show-item-in-folder', path),
   renamePhoto: (filePath: string, newBaseName: string): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:rename', filePath, newBaseName),
+  updateDateTaken: (filePath: string, isoDate: string): Promise<PhotoRecord> =>
+    ipcRenderer.invoke('photo:updateDateTaken', filePath, isoDate),
   movePhotosToFolder: (
     filePaths: string[],
     destFolder: string

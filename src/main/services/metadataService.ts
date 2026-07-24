@@ -54,6 +54,31 @@ export async function writeTags(filePath: string, tags: string[]): Promise<void>
   )
 }
 
+// EXIF date/time tags (DateTimeOriginal, CreateDate) are conventionally
+// naive local time with no timezone attached — formatting via the Date
+// object's local getters (rather than toISOString, which would shift to
+// UTC) is what keeps this a lossless round-trip with dateToIso's reverse
+// conversion above, since both run on the same machine/timezone.
+function formatExifDateTime(date: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const y = date.getFullYear()
+  const mo = pad(date.getMonth() + 1)
+  const d = pad(date.getDate())
+  const h = pad(date.getHours())
+  const mi = pad(date.getMinutes())
+  const s = pad(date.getSeconds())
+  return `${y}:${mo}:${d} ${h}:${mi}:${s}`
+}
+
+export async function writeDateTaken(filePath: string, isoDate: string): Promise<void> {
+  const formatted = formatExifDateTime(new Date(isoDate))
+  await getExifTool().write(
+    filePath,
+    { DateTimeOriginal: formatted, CreateDate: formatted },
+    { writeArgs: ['-overwrite_original'] }
+  )
+}
+
 export async function readPhotoRecord(filePath: string): Promise<PhotoRecord> {
   const fileStat = await stat(filePath)
   const tags = await getExifTool().read(filePath)

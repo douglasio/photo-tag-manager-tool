@@ -1,3 +1,4 @@
+import dayjs from 'dayjs'
 import type { PhotoMetadata } from '../../../shared/types'
 
 export interface MetadataField<T> {
@@ -32,11 +33,21 @@ function formatPixels(value: number | null): string {
   return value !== null ? `${value.toLocaleString()} px` : NONE_DISPLAY
 }
 
+// Shared with DateTakenEditor's DateTimePicker (valueFormat) so the edit and
+// view modes never drift apart.
+export const DATE_TAKEN_FORMAT = 'MMM D, YYYY h:mm A'
+
+export function formatDateTaken(value: string | null): string {
+  if (!value) return NONE_DISPLAY
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format(DATE_TAKEN_FORMAT) : NONE_DISPLAY
+}
+
 // Per-field label + display formatting, kept here so DetailPanel (and any
 // future consumer) never has to compute these at render time.
 export function toDisplayMetadata(metadata: PhotoMetadata): DisplayMetadata {
   return {
-    dateTaken: field('Date Taken', metadata.dateTaken, (v) => v ?? NONE_DISPLAY),
+    dateTaken: field('Date Taken', metadata.dateTaken, formatDateTaken),
     cameraMake: field('Camera Make', metadata.cameraMake, (v) => v ?? NONE_DISPLAY),
     cameraModel: field('Camera Model', metadata.cameraModel, (v) => v ?? NONE_DISPLAY),
     widthPx: field('Width (px)', metadata.widthPx, formatPixels),
