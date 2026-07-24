@@ -1,7 +1,7 @@
 import { Text } from '@mantine/core'
 import type { ReactElement } from 'react'
-import { ConfirmDialog } from './ConfirmDialog'
-import { basename } from '../utils/folderTree'
+import { ConfirmDialog } from '../Shared/ConfirmDialog'
+import { basename } from '../../utils/folderTree'
 
 interface FolderRemoveDialogProps {
   folder: string

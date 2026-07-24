@@ -10,7 +10,14 @@ import {
   type ReactNode
 } from 'react'
 import { notifications } from '@mantine/notifications'
-import { initialState, photoLibraryReducer, type PhotoLibraryState } from './photoLibraryReducer'
+import { MoveProgressToast } from '../components/Settings/MoveProgressToast'
+import {
+  initialState,
+  photoLibraryReducer,
+  type GallerySortBy,
+  type GallerySortOrder,
+  type PhotoLibraryState
+} from './photoLibraryReducer'
 import { basename, isPhotoInFolder } from '../utils/folderTree'
 import { toDisplayMetadata, type DisplayMetadata } from '../utils/metadataDisplay'
 import type { PhotoRecord } from '../../../shared/types'
@@ -50,14 +57,19 @@ interface PhotoLibraryContextValue {
   clearSelection: () => void
   addTagsToSelection: (tags: string[]) => Promise<void>
   addTagsToPhotos: (tags: string[], filePaths: string[]) => Promise<void>
+  movePhotosToFolder: (filePaths: string[], destFolder: string) => Promise<void>
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
+  setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
+  setShowEmptyFolders: (value: boolean) => void
+  setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
   deleteTag: (tag: string) => Promise<void>
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
+  updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
   openTabPhotos: PhotoRecord[]
   openPhotoTab: (filePath: string) => void
   closePhotoTab: (filePath: string) => void
@@ -133,6 +145,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       dispatch({ type: 'PHOTO_REMOVED', filePath: payload.filePath })
       scheduleWatchNotification('removed')
     })
+    const unsubscribeFolderAdded = window.api.onFolderAdded((payload) => {
+      dispatch({ type: 'WATCH_FOLDER_ADDED', folderPath: payload.folderPath })
+    })
+    const unsubscribeFolderRemoved = window.api.onFolderRemoved((payload) => {
+      dispatch({ type: 'WATCH_FOLDER_REMOVED', folderPath: payload.folderPath })
+    })
 
     return () => {
       unsubscribeProgress()
@@ -140,6 +158,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       unsubscribeComplete()
       unsubscribeUpserted()
       unsubscribeRemoved()
+      unsubscribeFolderAdded()
+      unsubscribeFolderRemoved()
     }
   }, [scheduleWatchNotification])
 
@@ -173,6 +193,24 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getTagDescriptions().then((descriptions) => {
       dispatch({ type: 'TAG_DESCRIPTIONS_LOADED', descriptions })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getGallerySort().then((sort) => {
+      if (sort) dispatch({ type: 'SET_SORT', sortBy: sort.sortBy, sortOrder: sort.sortOrder })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getShowEmptyFolders().then((value) => {
+      dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getExcludePatterns().then((patterns) => {
+      dispatch({ type: 'SET_EXCLUDE_PATTERNS', patterns })
     })
   }, [])
 
@@ -262,6 +300,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const clearSelection = useCallback(() => {
     dispatch({ type: 'SET_SELECTED_PATHS', paths: [] })
+    dispatch({ type: 'SELECT_PHOTO', path: null })
   }, [])
 
   // General-purpose batch tag-add, shared by the multi-select context menu
@@ -283,6 +322,77 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const addTagsToSelection = useCallback(
     (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
     [addTagsToPhotos, state.selectedPaths]
+  )
+
+  // Drag-and-drop onto a folder row moves the dragged photo(s) into it. Mirrors
+  // renameFile's dispatch sequence (a cross-folder move is structurally the
+  // same as a rename — same DB row, new full path) for each moved photo, plus
+  // re-pointing selectedPath/selectedPaths from old to new paths since a move
+  // (unlike a same-folder rename) can be triggered on a multi-selection.
+  const movePhotosToFolder = useCallback(
+    async (filePaths: string[], destFolder: string) => {
+      if (filePaths.length === 0) return
+
+      const notificationId = crypto.randomUUID()
+      notifications.show({
+        id: notificationId,
+        color: 'indigo',
+        autoClose: false,
+        withCloseButton: false,
+        message: <MoveProgressToast completed={0} total={filePaths.length} />
+      })
+      const unsubscribe = window.api.onMoveProgress((progress) => {
+        notifications.update({
+          id: notificationId,
+          message: <MoveProgressToast completed={progress.completed} total={progress.total} />
+        })
+      })
+
+      try {
+        const { moved, skipped } = await window.api.movePhotosToFolder(filePaths, destFolder)
+        const pathMap = new Map(moved.map(({ oldPath, photo }) => [oldPath, photo.filePath]))
+
+        for (const { oldPath, photo } of moved) {
+          dispatch({ type: 'RENAME_PHOTO_TAB', oldPath, newPath: photo.filePath })
+          dispatch({ type: 'PHOTO_REMOVED', filePath: oldPath })
+          dispatch({ type: 'PHOTO_UPSERTED', photo })
+        }
+        if (state.selectedPath && pathMap.has(state.selectedPath)) {
+          dispatch({ type: 'SELECT_PHOTO', path: pathMap.get(state.selectedPath)! })
+        }
+        if (state.selectedPaths.size > 0 && moved.some(({ oldPath }) => pathMap.has(oldPath))) {
+          dispatch({
+            type: 'SET_SELECTED_PATHS',
+            paths: Array.from(state.selectedPaths, (path) => pathMap.get(path) ?? path)
+          })
+        }
+
+        notifications.update({
+          id: notificationId,
+          color: moved.length > 0 ? 'teal' : 'yellow',
+          autoClose: 4000,
+          withCloseButton: true,
+          message:
+            moved.length > 0
+              ? `Moved ${pluralize(moved.length, 'photo')} to "${basename(destFolder)}"${
+                  skipped > 0 ? ` (${pluralize(skipped, 'photo')} already there)` : ''
+                }`
+              : `${pluralize(skipped, 'photo')} already in "${basename(destFolder)}"`
+        })
+      } catch (err) {
+        console.error(`failed to move photos to ${destFolder}`, err)
+        notifications.update({
+          id: notificationId,
+          color: 'red',
+          autoClose: 4000,
+          withCloseButton: true,
+          message: 'Failed to move photos'
+        })
+      } finally {
+        unsubscribe()
+      }
+    },
+    [state.selectedPath, state.selectedPaths]
   )
 
   const updateTags = useCallback(
@@ -401,6 +511,17 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.selectedPath]
   )
 
+  const updateDateTaken = useCallback(async (filePath: string, isoDate: string) => {
+    try {
+      const photo = await window.api.updateDateTaken(filePath, isoDate)
+      dispatch({ type: 'PHOTO_UPSERTED', photo })
+    } catch (err) {
+      console.error(`failed to update date taken for ${filePath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to update date taken' })
+      throw err
+    }
+  }, [])
+
   const openPhotoTab = useCallback((filePath: string) => {
     dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
   }, [])
@@ -413,10 +534,47 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_ACTIVE_TAB', tab })
   }, [])
 
-  const photos = useMemo(
-    () =>
-      Array.from(state.photosByPath.values()).sort((a, b) => a.fileName.localeCompare(b.fileName)),
-    [state.photosByPath]
+  const photos = useMemo(() => {
+    const direction = state.sortOrder === 'desc' ? -1 : 1
+    const result = Array.from(state.photosByPath.values())
+    if (state.sortBy === 'dateTaken') {
+      // Photos without EXIF date data (screenshots, stripped exports, ...)
+      // always sort to the end regardless of direction, rather than
+      // clustering at whichever end null happens to compare to.
+      result.sort((a, b) => {
+        const aTime = a.metadata.dateTaken ? Date.parse(a.metadata.dateTaken) : null
+        const bTime = b.metadata.dateTaken ? Date.parse(b.metadata.dateTaken) : null
+        if (aTime === null && bTime === null) return a.fileName.localeCompare(b.fileName)
+        if (aTime === null) return 1
+        if (bTime === null) return -1
+        return direction * (aTime - bTime)
+      })
+    } else {
+      result.sort((a, b) => direction * a.fileName.localeCompare(b.fileName))
+    }
+    return result
+  }, [state.photosByPath, state.sortBy, state.sortOrder])
+
+  const setSort = useCallback((sortBy: GallerySortBy, sortOrder: GallerySortOrder) => {
+    dispatch({ type: 'SET_SORT', sortBy, sortOrder })
+    void window.api.setGallerySort({ sortBy, sortOrder })
+  }, [])
+
+  const setShowEmptyFolders = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
+    void window.api.setShowEmptyFolders(value)
+  }, [])
+
+  // Persists the patterns, then rescans every folder so the library itself
+  // (not just future filesystem events) reflects the change — files/folders
+  // newly matched get pruned out, anything un-excluded gets picked back up.
+  const setExcludePatterns = useCallback(
+    async (patterns: string[]) => {
+      dispatch({ type: 'SET_EXCLUDE_PATTERNS', patterns })
+      await window.api.setExcludePatterns(patterns)
+      await rescanAll()
+    },
+    [rescanAll]
   )
 
   // Folder and tag filters stack rather than being mutually exclusive, so a
@@ -464,19 +622,39 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return raw ? { ...raw, metadata: toDisplayMetadata(raw.metadata) } : null
   }, [state.selectedPath, state.photosByPath])
 
-  // photos is already sorted, so the first photo seen for a tag is a stable,
-  // deterministic "cover" pick — no extra pass or bookkeeping required.
+  // Tag covers always pick the most-recently-taken photo, independent of the
+  // gallery's own sort order/direction — otherwise switching gallery sort
+  // would make tag thumbnails jump around. Iterates state.photosByPath
+  // directly (not the sorted `photos`) since order doesn't matter here.
   const { tagCounts, tagCoverPhotos } = useMemo(() => {
     const counts = new Map<string, number>()
     const covers = new Map<string, PhotoRecord>()
-    for (const photo of photos) {
+    for (const photo of state.photosByPath.values()) {
+      const photoTime = photo.metadata.dateTaken ? Date.parse(photo.metadata.dateTaken) : null
       for (const tag of photo.tags) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
-        if (!covers.has(tag)) covers.set(tag, photo)
+        const current = covers.get(tag)
+        if (!current) {
+          covers.set(tag, photo)
+          continue
+        }
+        const currentTime = current.metadata.dateTaken
+          ? Date.parse(current.metadata.dateTaken)
+          : null
+        // Prefer the later dateTaken; if neither photo has EXIF date data,
+        // fall back to filename so the pick stays deterministic instead of
+        // depending on Map iteration order.
+        const photoWins =
+          photoTime !== null && currentTime !== null
+            ? photoTime > currentTime
+            : photoTime !== null
+              ? true
+              : currentTime === null && photo.fileName > current.fileName
+        if (photoWins) covers.set(tag, photo)
       }
     }
     return { tagCounts: counts, tagCoverPhotos: covers }
-  }, [photos])
+  }, [state.photosByPath])
 
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
 
@@ -523,14 +701,19 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     clearSelection,
     addTagsToSelection,
     addTagsToPhotos,
+    movePhotosToFolder,
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,
+    setSort,
+    setShowEmptyFolders,
+    setExcludePatterns,
     updateTags,
     setTagDescription,
     renameTag,
     deleteTag,
     renameFile,
+    updateDateTaken,
     openTabPhotos,
     openPhotoTab,
     closePhotoTab,

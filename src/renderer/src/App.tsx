@@ -15,6 +15,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  pointerWithin,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -25,15 +26,17 @@ import { getEventCoordinates } from '@dnd-kit/utilities'
 import { IconPhoto, IconX } from '@tabler/icons-react'
 import { useState } from 'react'
 import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
-import { AppLogo } from './components/AppLogo'
-import { SettingsModal } from './components/SettingsModal'
-import { ScanProgressBar } from './components/ScanProgressBar'
-import { GalleryGrid } from './components/GalleryGrid'
-import { DetailPanel } from './components/DetailPanel'
-import { FolderTree } from './components/FolderTree'
-import { PanelSection } from './components/PanelSection'
-import { PhotoView } from './components/PhotoView'
-import { TagPanel } from './components/TagPanel'
+import { AllPhotosRow } from './components/Folders/AllPhotosRow'
+import { AppLogo } from './components/Shared/AppLogo'
+import { SettingsModal } from './components/Settings/SettingsModal'
+import { ScanProgressBar } from './components/Settings/ScanProgressBar'
+import { GalleryGrid } from './components/Gallery/GalleryGrid'
+import { DetailPanel } from './components/PhotoView/DetailPanel'
+import { FolderSettingsMenu } from './components/Folders/FolderSettingsMenu'
+import { FolderTree } from './components/Folders/FolderTree'
+import { PanelSection } from './components/Shared/PanelSection'
+import { PhotoView } from './components/PhotoView/PhotoView'
+import { TagPanel } from './components/Tags/TagPanel'
 import { toThumbProtocolUrl } from '../../shared/protocolUrls'
 import type { PhotoRecord } from '../../shared/types'
 
@@ -43,9 +46,12 @@ const DRAG_PREVIEW_SIZE = 64
 // this can happen because the OS cursor's visual hotspot (the actual tip of
 // the arrow glyph) isn't exactly at the clientX/clientY dnd-kit reads, and
 // that gap varies by platform/cursor theme. Positive X moves the preview
-// right, positive Y moves it down; nudge in a few pixels at a time.
+// right, positive Y moves it down; nudge in a few pixels at a time. Keep
+// these small — drop-target hit-testing tracks the actual cursor position,
+// not this visual preview, so a large offset (previously -100 on Y) makes
+// the preview visibly disagree with where a drop will actually register.
 const DRAG_PREVIEW_OFFSET_X = 0
-const DRAG_PREVIEW_OFFSET_Y = -100
+const DRAG_PREVIEW_OFFSET_Y = 0
 
 // dnd-kit's official recipe for snapping the overlay to be centered
 // directly under the pointer, using draggingNodeRect (the overlay's own
@@ -115,7 +121,8 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
 // Split out from App so it can call usePhotoLibrary — a component can't read
 // a context it also renders the Provider for in the same function.
 function AppLayout(): React.JSX.Element {
-  const { state, openTabPhotos, closePhotoTab, setActiveTab, addTagsToPhotos } = usePhotoLibrary()
+  const { state, openTabPhotos, closePhotoTab, setActiveTab, addTagsToPhotos, movePhotosToFolder } =
+    usePhotoLibrary()
   const hasTabs = state.openTabs.length > 0
   // Panels only hide while an actual photo tab is active — switching back to
   // the Gallery tab (with other photo tabs still open in the background)
@@ -138,9 +145,17 @@ function AppLayout(): React.JSX.Element {
     setActiveDragPaths(null)
     const { active, over } = event
     if (!over) return
-    const tag = (over.data.current as { tag?: string } | undefined)?.tag
+    const overData = over.data.current as { tag?: string; folderPath?: string } | undefined
     const paths = (active.data.current as { paths?: string[] } | undefined)?.paths
-    if (!tag || !paths || paths.length === 0) return
+    if (!paths || paths.length === 0) return
+
+    if (overData?.folderPath) {
+      void movePhotosToFolder(paths, overData.folderPath)
+      return
+    }
+
+    const tag = overData?.tag
+    if (!tag) return
     void addTagsToPhotos([tag], paths).then(() => {
       notifications.show({
         color: 'teal',
@@ -154,6 +169,13 @@ function AppLayout(): React.JSX.Element {
   return (
     <DndContext
       sensors={sensors}
+      // Default collision detection (rectIntersection) tests the dragged
+      // thumbnail's own translated bounding box against droppable rects —
+      // that box trails the cursor by however far off-center it was grabbed,
+      // so a drop zone could register well away from the visible pointer.
+      // pointerWithin hit-tests the actual pointer coordinates instead,
+      // matching what the (now cursor-centered) drag preview shows.
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDragPaths(null)}
@@ -187,11 +209,15 @@ function AppLayout(): React.JSX.Element {
           </Group>
         </AppShell.Header>
         <AppShell.Navbar style={{ display: 'flex', flexDirection: 'column' }}>
+          <Box p="md" style={{ flexShrink: 0 }}>
+            <AllPhotosRow />
+          </Box>
+          <Divider />
           <PanelSection title="Tags">
             <TagPanel />
           </PanelSection>
           <Divider />
-          <PanelSection title="Folders">
+          <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
             <FolderTree />
           </PanelSection>
         </AppShell.Navbar>

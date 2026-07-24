@@ -1,7 +1,7 @@
 import { Group, Text, TextInput, Title } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { useState, type ReactElement } from 'react'
-import { InlineEditField } from './InlineEditField'
+import { InlineEditField } from '../Shared/InlineEditField'
 import { TagRenameDialog } from './TagRenameDialog'
 
 interface TagNameEditorProps {

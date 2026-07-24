@@ -1,12 +1,21 @@
-import { Box, Center, Image, Tooltip, UnstyledButton, useMantineTheme } from '@mantine/core'
+import {
+  AspectRatio,
+  Box,
+  Center,
+  Image,
+  Portal,
+  Tooltip,
+  UnstyledButton,
+  useMantineTheme
+} from '@mantine/core'
 import { useDraggable } from '@dnd-kit/core'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
-import type { ComponentPropsWithoutRef, MouseEvent, ReactElement } from 'react'
-import type { PhotoRecord } from '../../../shared/types'
-import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../shared/protocolUrls'
+import { useState, type ComponentPropsWithoutRef, type MouseEvent, type ReactElement } from 'react'
+import type { PhotoRecord } from '../../../../shared/types'
+import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../../shared/protocolUrls'
 import { GalleryFileName } from './GalleryFileName'
-import { ctrlKeyLabel } from '../utils/platform'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { ctrlKeyLabel } from '../../utils/platform'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 
 // Preview size at previewScale === 1, in viewport-relative units so it
 // scales with the window rather than a fixed pixel size.
@@ -58,6 +67,9 @@ export function PhotoThumbnail({
   const theme = useMantineTheme()
   const { openPhotoTab, state } = usePhotoLibrary()
   const canPreview = ctrlHeld && photo.thumbnailStatus === 'ready'
+  // Tracks the cursor so the floating preview below can be centered directly
+  // on it, rather than offset to the side like a regular tooltip.
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
 
   // Dragging a photo that's part of the active multi-selection (2+ photos)
   // carries the whole batch; dragging anything else carries just that one —
@@ -90,65 +102,73 @@ export function PhotoThumbnail({
         {...listeners}
         ref={setNodeRef}
         title={photo.fileName}
-        style={{ ...rest.style, opacity: isDragging ? 0.4 : undefined }}
+        opacity={isDragging ? 0.4 : undefined}
         className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${!selected && multiSelected ? ' photo-thumbnail--multi-selected' : ''}${className ? ` ${className}` : ''}`}
       >
-        <Tooltip.Floating
-          disabled={!canPreview}
-          offset={16}
-          label={
-            <Image
-              src={toFileProtocolUrl(photo.filePath)}
-              alt={photo.fileName}
-              fit="contain"
-              style={{
-                // Capped against the viewport regardless of zoom — otherwise
-                // at high previewScale the image is larger than the window
-                // itself and floating-ui's shift can't reposition it fully
-                // on-screen, so it visibly spills past the window edges.
-                maxWidth: `min(${BASE_PREVIEW_WIDTH_VW * previewScale}vw, 92vw)`,
-                maxHeight: `min(${BASE_PREVIEW_HEIGHT_VH * previewScale}vh, 92vh)`,
-                width: 'auto',
-                height: 'auto'
-              }}
-            />
-          }
-          styles={{
-            tooltip: {
-              padding: 4,
-              backgroundColor: 'var(--mantine-color-body)',
-              border: '1px solid var(--mantine-color-default-border)'
-            }
+        <UnstyledButton
+          className="photo-thumbnail__select-button"
+          onClick={(event) => onSelect(photo.filePath, event)}
+          onDoubleClick={() => openPhotoTab(photo.filePath)}
+          onMouseMove={(event) => {
+            if (canPreview) setCursorPos({ x: event.clientX, y: event.clientY })
           }}
+          onMouseLeave={() => setCursorPos(null)}
+          w="100%"
+          style={{ cursor: canPreview ? 'zoom-in' : undefined }}
         >
-          <UnstyledButton
-            className="photo-thumbnail__select-button"
-            onClick={(event) => onSelect(photo.filePath, event)}
-            onDoubleClick={() => openPhotoTab(photo.filePath)}
-            w="100%"
-          >
-            {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
+          {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
+            <AspectRatio ratio={1}>
               <Image
                 src={toThumbProtocolUrl(photo.thumbnailKey)}
                 alt={photo.fileName}
                 fit="cover"
                 loading="lazy"
-                style={{ aspectRatio: 1, width: '100%' }}
               />
-            ) : (
-              <Center
-                className="photo-thumbnail__placeholder"
-                c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}
-              >
-                {photo.thumbnailStatus === 'error' ? (
-                  <IconAlertTriangle size={theme.spacing.xl} />
-                ) : (
-                  <IconPhoto size={theme.spacing.xl} />
-                )}
-              </Center>
-            )}
-          </UnstyledButton>
-        </Tooltip.Floating>
+            </AspectRatio>
+          ) : (
+            <Center
+              className="photo-thumbnail__placeholder"
+              c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}
+            >
+              {photo.thumbnailStatus === 'error' ? (
+                <IconAlertTriangle size={theme.spacing.xl} />
+              ) : (
+                <IconPhoto size={theme.spacing.xl} />
+              )}
+            </Center>
+          )}
+        </UnstyledButton>
+        {canPreview && cursorPos && (
+          <Portal>
+            <Box
+              pos="fixed"
+              bg="var(--mantine-color-body)"
+              bdrs="md"
+              left={cursorPos.x}
+              top={cursorPos.y}
+              style={{
+                boxShadow: 'var(--mantine-shadow-elevated)',
+                transform: 'translate(-50%, -50%)',
+                // Preview must never intercept the pointer — it sits
+                // directly under the cursor, so any pointer events here
+                // would immediately hide it (mouse "leaving" the thumbnail).
+                pointerEvents: 'none',
+                zIndex: 'var(--mantine-z-index-max)'
+              }}
+            >
+              <Image
+                src={toFileProtocolUrl(photo.filePath)}
+                alt={photo.fileName}
+                bdrs="md"
+                fit="contain"
+                maw={`min(${BASE_PREVIEW_WIDTH_VW * previewScale}vw, 92vw)`}
+                mah={`min(${BASE_PREVIEW_HEIGHT_VH * previewScale}vh, 92vh)`}
+                w="auto"
+                h="auto"
+              />
+            </Box>
+          </Portal>
+        )}
         <Box w="100%">
           <GalleryFileName
             fileName={photo.fileName}

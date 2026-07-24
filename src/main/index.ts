@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, screen } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -28,9 +28,12 @@ if (!app.requestSingleInstanceLock()) {
   let mainWindow: BrowserWindow | null = null
 
   function createWindow(): void {
+    const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
+
     mainWindow = new BrowserWindow({
-      width: 1200,
-      height: 800,
+      width: Math.round(screenWidth * 0.8),
+      height: Math.round(screenHeight * 0.8),
+      center: true,
       show: false,
       autoHideMenuBar: true,
       ...(process.platform === 'linux' ? { icon } : {}),

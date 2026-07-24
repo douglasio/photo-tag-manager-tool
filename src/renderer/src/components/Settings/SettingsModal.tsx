@@ -1,8 +1,21 @@
-import { Burger, Button, Group, Modal, Stack, Table, Text, Title, Tooltip } from '@mantine/core'
+import {
+  Burger,
+  Button,
+  Divider,
+  Group,
+  Modal,
+  Stack,
+  Switch,
+  Table,
+  TagsInput,
+  Text,
+  Title,
+  Tooltip
+} from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import type { ReactElement } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
-import { FolderRemoveButton } from './FolderRemoveButton'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { FolderRemoveButton } from '../Folders/FolderRemoveButton'
 
 function SectionTitle({ children }: { children: string }): ReactElement {
   return (
@@ -13,7 +26,7 @@ function SectionTitle({ children }: { children: string }): ReactElement {
 }
 
 function FoldersSection(): ReactElement {
-  const { state, addFolder } = usePhotoLibrary()
+  const { state, addFolder, setShowEmptyFolders } = usePhotoLibrary()
 
   return (
     <Stack gap="xs">
@@ -43,6 +56,31 @@ function FoldersSection(): ReactElement {
       <Button onClick={() => void addFolder()} style={{ alignSelf: 'flex-start' }}>
         Add Folder…
       </Button>
+      <Divider my="xs" />
+      <Switch
+        label="Show empty folders"
+        checked={state.showEmptyFolders}
+        onChange={(event) => setShowEmptyFolders(event.currentTarget.checked)}
+      />
+    </Stack>
+  )
+}
+
+function ExcludePatternsSection(): ReactElement {
+  const { state, setExcludePatterns } = usePhotoLibrary()
+
+  return (
+    <Stack gap="xs">
+      <SectionTitle>Exclude Patterns</SectionTitle>
+      <Text c="dimmed" size="sm">
+        Folders or files whose path contains any of these (case-insensitive) are skipped during
+        scanning.
+      </Text>
+      <TagsInput
+        value={state.excludePatterns}
+        onChange={(patterns) => void setExcludePatterns(patterns)}
+        placeholder="Add a pattern…"
+      />
     </Stack>
   )
 }
@@ -71,6 +109,8 @@ export function SettingsModal(): ReactElement {
       <Modal opened={opened} onClose={close} title={<Title order={2}>Settings</Title>} size="lg">
         <Stack gap="lg">
           <FoldersSection />
+          <Divider />
+          <ExcludePatternsSection />
         </Stack>
       </Modal>
     </>

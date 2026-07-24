@@ -2,7 +2,7 @@ import { Button, Group, Popover, RingProgress, Text, Tooltip } from '@mantine/co
 import { useDisclosure, useHover } from '@mantine/hooks'
 import { IconCheck, IconX } from '@tabler/icons-react'
 import { useEffect, useState, type ReactElement } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 import { ScanLogContent } from './ScanLogContent'
 
 // How long the "just synced" checkmark stays green before fading to a
@@ -60,15 +60,9 @@ export function ScanProgressBar(): ReactElement | null {
               {state.status === 'scanning' && (
                 <>
                   <RingProgress
-                    size={44}
-                    thickness={4}
-                    roundCaps
+                    size={20}
+                    thickness={2}
                     sections={[{ value: percent, color: 'indigo' }]}
-                    label={
-                      <Text size="8px" ta="center" fw={700}>
-                        {processed}/{total || '…'}
-                      </Text>
-                    }
                   />
                   <Text c="dimmed" style={{ whiteSpace: 'nowrap' }}>
                     {processed} / {total || '…'} found

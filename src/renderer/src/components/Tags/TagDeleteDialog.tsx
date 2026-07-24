@@ -1,6 +1,6 @@
 import { Text } from '@mantine/core'
 import type { ReactElement } from 'react'
-import { ConfirmDialog } from './ConfirmDialog'
+import { ConfirmDialog } from '../Shared/ConfirmDialog'
 
 interface TagDeleteDialogProps {
   tag: string

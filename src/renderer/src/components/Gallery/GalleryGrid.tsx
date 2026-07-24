@@ -5,12 +5,14 @@ import {
   Flex,
   Group,
   Loader,
+  Menu,
   Pill,
   Slider,
   Text,
-  Title
+  Title,
+  Tooltip
 } from '@mantine/core'
-import { IconPhoto } from '@tabler/icons-react'
+import { IconArrowsSort, IconCheck, IconPhoto, IconX } from '@tabler/icons-react'
 import {
   useCallback,
   useEffect,
@@ -21,15 +23,15 @@ import {
   type ReactElement
 } from 'react'
 import { Grid, type CellComponentProps } from 'react-window'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
-import { useCtrlKeyHeld } from '../hooks/useCtrlKeyHeld'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { useCtrlKeyHeld } from '../../hooks/useCtrlKeyHeld'
 import { PhotoContextMenu } from './PhotoContextMenu'
 import { PhotoThumbnail } from './PhotoThumbnail'
-import { TagDeleteButton } from './TagDeleteButton'
-import { TagDescriptionEditor } from './TagDescriptionEditor'
-import { TagNameEditor } from './TagNameEditor'
-import { basename } from '../utils/folderTree'
-import type { PhotoRecord } from '../../../shared/types'
+import { TagDeleteButton } from '../Tags/TagDeleteButton'
+import { TagDescriptionEditor } from '../Tags/TagDescriptionEditor'
+import { TagNameEditor } from '../Tags/TagNameEditor'
+import { basename } from '../../utils/folderTree'
+import type { PhotoRecord } from '../../../../shared/types'
 
 const DEFAULT_CELL_WIDTH = 168
 // The filename label below each thumbnail takes roughly this much extra
@@ -135,6 +137,7 @@ export function GalleryGrid(): ReactElement {
     tagCounts,
     folderTags,
     setFolderTagFilter,
+    setSort,
     renameFile
   } = usePhotoLibrary()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -234,11 +237,13 @@ export function GalleryGrid(): ReactElement {
         selectPhotoRange(path)
       } else if (event.ctrlKey || event.metaKey) {
         toggleSelectPhoto(path)
+      } else if (state.selectedPath === path && state.selectedPaths.size === 1) {
+        selectPhoto(null)
       } else {
         selectPhoto(path)
       }
     },
-    [selectPhoto, toggleSelectPhoto, selectPhotoRange]
+    [selectPhoto, toggleSelectPhoto, selectPhotoRange, state.selectedPath, state.selectedPaths]
   )
 
   // Keep a stable reference so react-window doesn't re-diff every visible
@@ -297,33 +302,116 @@ export function GalleryGrid(): ReactElement {
     <Flex direction="column" flex={1} miw={0} mih={0}>
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
-          {isPureTagView ? (
-            <Group gap={4} wrap="nowrap" align="center">
-              <Box flex={1} miw={0}>
-                <TagNameEditor
+          <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
+            {isPureTagView ? (
+              <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
+                <Box flex={1} miw={0}>
+                  <TagNameEditor
+                    tag={state.selectedTag!}
+                    count={tagCounts.get(state.selectedTag!) ?? 0}
+                    onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
+                  />
+                </Box>
+                <TagDeleteButton
                   tag={state.selectedTag!}
                   count={tagCounts.get(state.selectedTag!) ?? 0}
-                  onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
+                  onDelete={() => deleteTag(state.selectedTag!)}
                 />
-              </Box>
-              <TagDeleteButton
-                tag={state.selectedTag!}
-                count={tagCounts.get(state.selectedTag!) ?? 0}
-                onDelete={() => deleteTag(state.selectedTag!)}
-              />
+              </Group>
+            ) : (
+              <Title
+                order={2}
+                flex={1}
+                miw={0}
+                style={{
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {galleryTitle}
+              </Title>
+            )}
+            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+              {state.selectedPaths.size > 0 && (
+                <>
+                  <Text size="sm" c="dimmed">
+                    {state.selectedPaths.size} selected
+                  </Text>
+                  <Tooltip label="Clear selection">
+                    <ActionIcon
+                      variant="subtle"
+                      onClick={clearSelection}
+                      aria-label="Clear selection"
+                    >
+                      <IconX size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                </>
+              )}
+              <Menu shadow="md" position="bottom-end">
+                <Menu.Target>
+                  <Tooltip label="Sort">
+                    <ActionIcon variant="subtle" aria-label="Sort">
+                      <IconArrowsSort size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Label>Sort by</Menu.Label>
+                  <Menu.Item
+                    leftSection={
+                      state.sortBy === 'name' && state.sortOrder === 'asc' ? (
+                        <IconCheck size={14} />
+                      ) : (
+                        <Box w={14} />
+                      )
+                    }
+                    onClick={() => setSort('name', 'asc')}
+                  >
+                    Name (A–Z)
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={
+                      state.sortBy === 'name' && state.sortOrder === 'desc' ? (
+                        <IconCheck size={14} />
+                      ) : (
+                        <Box w={14} />
+                      )
+                    }
+                    onClick={() => setSort('name', 'desc')}
+                  >
+                    Name (Z–A)
+                  </Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item
+                    leftSection={
+                      state.sortBy === 'dateTaken' && state.sortOrder === 'desc' ? (
+                        <IconCheck size={14} />
+                      ) : (
+                        <Box w={14} />
+                      )
+                    }
+                    onClick={() => setSort('dateTaken', 'desc')}
+                  >
+                    Date taken (Newest)
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={
+                      state.sortBy === 'dateTaken' && state.sortOrder === 'asc' ? (
+                        <IconCheck size={14} />
+                      ) : (
+                        <Box w={14} />
+                      )
+                    }
+                    onClick={() => setSort('dateTaken', 'asc')}
+                  >
+                    Date taken (Oldest)
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
             </Group>
-          ) : (
-            <Title
-              order={2}
-              style={{
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}
-            >
-              {galleryTitle}
-            </Title>
-          )}
+          </Group>
           {isPureTagView && (
             <TagDescriptionEditor
               description={tagDescription}

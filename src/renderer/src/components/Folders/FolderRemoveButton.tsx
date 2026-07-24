@@ -1,7 +1,7 @@
 import { ActionIcon, Tooltip } from '@mantine/core'
 import { IconTrash } from '@tabler/icons-react'
 import { useState, type ReactElement } from 'react'
-import { usePhotoLibrary } from '../state/PhotoLibraryContext'
+import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 import { FolderRemoveDialog } from './FolderRemoveDialog'
 
 interface FolderRemoveButtonProps {

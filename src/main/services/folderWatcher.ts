@@ -1,11 +1,17 @@
 import { watch, type FSWatcher } from 'chokidar'
 import { extname } from 'path'
 import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
+import { matchesExcludePattern } from './excludeMatcher'
 
 export type WatchEventType = 'add' | 'change' | 'unlink'
+export type WatchDirEventType = 'addDir' | 'unlinkDir'
 
 interface WatcherHandlers {
   onFileEvent: (type: WatchEventType, filePath: string) => void
+  // Directory add/remove — chokidar already tracks these internally to walk
+  // the tree recursively, so listening for them costs nothing extra beyond
+  // the file events already being watched.
+  onDirEvent: (type: WatchDirEventType, dirPath: string) => void
 }
 
 const watchers = new Map<string, FSWatcher>()
@@ -14,11 +20,16 @@ function isSupportedFile(filePath: string): boolean {
   return SUPPORTED_EXTENSIONS.has(extname(filePath).toLowerCase())
 }
 
-export function startWatching(rootPath: string, handlers: WatcherHandlers): void {
+export function startWatching(
+  rootPath: string,
+  handlers: WatcherHandlers,
+  excludePatterns: string[] = []
+): void {
   if (watchers.has(rootPath)) return
 
   const watcher = watch(rootPath, {
     ignoreInitial: true,
+    ignored: (path: string) => matchesExcludePattern(path, excludePatterns),
     // Wait for copies/writes to finish before emitting add/change, so we don't
     // try to read metadata off a partially-written file.
     awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 }
@@ -33,6 +44,12 @@ export function startWatching(rootPath: string, handlers: WatcherHandlers): void
     })
     .on('unlink', (filePath) => {
       if (isSupportedFile(filePath)) handlers.onFileEvent('unlink', filePath)
+    })
+    .on('addDir', (dirPath) => {
+      if (dirPath !== rootPath) handlers.onDirEvent('addDir', dirPath)
+    })
+    .on('unlinkDir', (dirPath) => {
+      if (dirPath !== rootPath) handlers.onDirEvent('unlinkDir', dirPath)
     })
     .on('error', (err) => console.error(`folder watcher error for ${rootPath}`, err))
 

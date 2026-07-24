@@ -1,11 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type {
+  GallerySort,
   MetadataBatchEvent,
+  MoveProgressEvent,
   PhotoRecord,
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
+  WatchFolderAddedEvent,
+  WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
   WatchPhotoUpsertedEvent
 } from '../shared/types'
@@ -22,10 +26,28 @@ const api = {
   showItemInFolder: (path: string) => ipcRenderer.invoke('show-item-in-folder', path),
   renamePhoto: (filePath: string, newBaseName: string): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:rename', filePath, newBaseName),
+  updateDateTaken: (filePath: string, isoDate: string): Promise<PhotoRecord> =>
+    ipcRenderer.invoke('photo:updateDateTaken', filePath, isoDate),
+  movePhotosToFolder: (
+    filePaths: string[],
+    destFolder: string
+  ): Promise<{ moved: { oldPath: string; photo: PhotoRecord }[]; skipped: number }> =>
+    ipcRenderer.invoke('photo:moveToFolder', filePaths, destFolder),
+  onMoveProgress: (callback: (payload: MoveProgressEvent) => void): (() => void) =>
+    subscribe('photo:moveProgress', callback),
   getGalleryCellWidth: (): Promise<number | null> =>
     ipcRenderer.invoke('settings:getGalleryCellWidth'),
   setGalleryCellWidth: (width: number): Promise<void> =>
     ipcRenderer.invoke('settings:setGalleryCellWidth', width),
+  getGallerySort: (): Promise<GallerySort | null> => ipcRenderer.invoke('settings:getGallerySort'),
+  setGallerySort: (sort: GallerySort): Promise<void> =>
+    ipcRenderer.invoke('settings:setGallerySort', sort),
+  getShowEmptyFolders: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowEmptyFolders'),
+  setShowEmptyFolders: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setShowEmptyFolders', value),
+  getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
+  setExcludePatterns: (patterns: string[]): Promise<void> =>
+    ipcRenderer.invoke('settings:setExcludePatterns', patterns),
   addFolder: (folder: string): Promise<void> => ipcRenderer.invoke('settings:addFolder', folder),
   removeFolder: (folder: string): Promise<void> =>
     ipcRenderer.invoke('settings:removeFolder', folder),
@@ -55,7 +77,11 @@ const api = {
   onPhotoUpserted: (callback: (payload: WatchPhotoUpsertedEvent) => void): (() => void) =>
     subscribe('watch:photo-upserted', callback),
   onPhotoRemoved: (callback: (payload: WatchPhotoRemovedEvent) => void): (() => void) =>
-    subscribe('watch:photo-removed', callback)
+    subscribe('watch:photo-removed', callback),
+  onFolderAdded: (callback: (payload: WatchFolderAddedEvent) => void): (() => void) =>
+    subscribe('watch:folder-added', callback),
+  onFolderRemoved: (callback: (payload: WatchFolderRemovedEvent) => void): (() => void) =>
+    subscribe('watch:folder-removed', callback)
 }
 
 export type PhotagApi = typeof api

@@ -1,6 +1,6 @@
 import { Text, Textarea } from '@mantine/core'
 import { useState, type ReactElement } from 'react'
-import { InlineEditField } from './InlineEditField'
+import { InlineEditField } from '../Shared/InlineEditField'
 
 interface TagDescriptionEditorProps {
   description: string

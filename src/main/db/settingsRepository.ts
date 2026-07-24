@@ -1,4 +1,5 @@
 import { getDb } from './database'
+import type { GallerySort } from '../../shared/types'
 
 export function getSetting(key: string): string | null {
   const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as
@@ -38,4 +39,50 @@ export function getGalleryCellWidth(): number | null {
 
 export function setGalleryCellWidth(width: number): void {
   setSetting('galleryCellWidth', String(width))
+}
+
+export function getGallerySort(): GallerySort | null {
+  const raw = getSetting('gallerySort')
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      'sortBy' in parsed &&
+      'sortOrder' in parsed
+    ) {
+      return parsed as GallerySort
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function setGallerySort(sort: GallerySort): void {
+  setSetting('gallerySort', JSON.stringify(sort))
+}
+
+export function getShowEmptyFolders(): boolean {
+  return getSetting('showEmptyFolders') === 'true'
+}
+
+export function setShowEmptyFolders(value: boolean): void {
+  setSetting('showEmptyFolders', String(value))
+}
+
+export function getExcludePatterns(): string[] {
+  const raw = getSetting('excludePatterns')
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function setExcludePatterns(patterns: string[]): void {
+  setSetting('excludePatterns', JSON.stringify(patterns))
 }
