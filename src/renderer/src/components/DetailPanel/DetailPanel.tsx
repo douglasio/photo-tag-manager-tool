@@ -40,8 +40,10 @@ export function DetailPanel(): ReactElement {
   // Showing one photo's metadata/tags while a multi-selection is active
   // would misleadingly suggest edits apply to just that one photo (batch
   // edits go through the gallery's right-click menu instead), so this stays
-  // blank whenever more than one photo is selected.
-  if (state.selectedPaths.size > 1) {
+  // blank whenever more than one photo is selected — but only on the gallery
+  // screen; a photo-view tab always has exactly one photo open regardless of
+  // whatever multi-selection is lingering in the background gallery.
+  if (state.activeTab === 'gallery' && state.selectedPaths.size > 1) {
     return (
       <Center h="100%">
         <Text c="dimmed" ta="center">
@@ -62,18 +64,25 @@ export function DetailPanel(): ReactElement {
   }
 
   const { metadata } = selectedPhoto
+  // The panel is already showing this exact photo's details because it's
+  // the open photo-view tab — opening it again would be a no-op, so the
+  // button is redundant there (it stays for the gallery screen, where
+  // selectedPhoto is just the selection cursor, not necessarily open yet).
+  const isViewingThisPhoto = state.activeTab === selectedPhoto.filePath
 
   return (
     <Stack>
       <Stack>
-        <Tooltip label="Open">
-          <Button
-            leftSection={<IconPhoto size={18} />}
-            onClick={() => openPhotoTab(selectedPhoto.filePath)}
-          >
-            Open
-          </Button>
-        </Tooltip>
+        {!isViewingThisPhoto && (
+          <Tooltip label="Open">
+            <Button
+              leftSection={<IconPhoto size={18} />}
+              onClick={() => openPhotoTab(selectedPhoto.filePath)}
+            >
+              Open
+            </Button>
+          </Tooltip>
+        )}
         <Box flex={1} miw={0}>
           <FileNameEditor
             fileName={selectedPhoto.fileName}

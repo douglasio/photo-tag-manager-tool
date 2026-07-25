@@ -47,6 +47,10 @@ const api = {
   getShowEmptyFolders: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowEmptyFolders'),
   setShowEmptyFolders: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowEmptyFolders', value),
+  getDetailsPanelCollapsed: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
+  setDetailsPanelCollapsed: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setDetailsPanelCollapsed', value),
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),

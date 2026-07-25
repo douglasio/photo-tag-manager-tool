@@ -8,7 +8,8 @@ import {
   Group,
   Image,
   Tabs,
-  Title
+  Title,
+  Tooltip
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import {
@@ -23,7 +24,12 @@ import {
   type Modifier
 } from '@dnd-kit/core'
 import { getEventCoordinates } from '@dnd-kit/utilities'
-import { IconPhoto, IconX } from '@tabler/icons-react'
+import {
+  IconLayoutSidebarRightCollapse,
+  IconLayoutSidebarRightExpand,
+  IconPhoto,
+  IconX
+} from '@tabler/icons-react'
 import { useState } from 'react'
 import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
 import { AllPhotosRow } from './components/Folders/AllPhotosRow'
@@ -121,12 +127,21 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
 // Split out from App so it can call usePhotoLibrary — a component can't read
 // a context it also renders the Provider for in the same function.
 function AppLayout(): React.JSX.Element {
-  const { state, openTabPhotos, closePhotoTab, setActiveTab, addTagsToPhotos, movePhotosToFolder } =
-    usePhotoLibrary()
+  const {
+    state,
+    openTabPhotos,
+    closePhotoTab,
+    setActiveTab,
+    addTagsToPhotos,
+    movePhotosToFolder,
+    setDetailsPanelCollapsed
+  } = usePhotoLibrary()
   const hasTabs = state.openTabs.length > 0
-  // Panels only hide while an actual photo tab is active — switching back to
-  // the Gallery tab (with other photo tabs still open in the background)
-  // restores the normal three-pane layout.
+  // The navbar (Tags/Folders) only hides while an actual photo tab is active
+  // — switching back to the Gallery tab (with other photo tabs still open in
+  // the background) restores it. The details aside is independent of this:
+  // it's user-togglable and persisted, shown on both the gallery and
+  // photo-view screens.
   const isPhotoTabActive = state.activeTab !== 'gallery'
 
   const [activeDragPaths, setActiveDragPaths] = useState<string[] | null>(null)
@@ -190,7 +205,7 @@ function AppLayout(): React.JSX.Element {
         aside={{
           width: 320,
           breakpoint: 0,
-          collapsed: { desktop: isPhotoTabActive, mobile: isPhotoTabActive }
+          collapsed: { desktop: state.detailsPanelCollapsed, mobile: state.detailsPanelCollapsed }
         }}
         padding={0}
       >
@@ -204,6 +219,21 @@ function AppLayout(): React.JSX.Element {
             </Group>
             <Group gap="md" wrap="nowrap">
               <ScanProgressBar />
+              <Tooltip
+                label={state.detailsPanelCollapsed ? 'Show details panel' : 'Hide details panel'}
+              >
+                <ActionIcon
+                  variant="subtle"
+                  aria-label="Toggle details panel"
+                  onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
+                >
+                  {state.detailsPanelCollapsed ? (
+                    <IconLayoutSidebarRightExpand size={18} />
+                  ) : (
+                    <IconLayoutSidebarRightCollapse size={18} />
+                  )}
+                </ActionIcon>
+              </Tooltip>
               <SettingsModal />
             </Group>
           </Group>

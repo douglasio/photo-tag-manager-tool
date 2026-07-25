@@ -63,6 +63,7 @@ interface PhotoLibraryContextValue {
   setFolderTagFilter: (tag: string | null) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setShowEmptyFolders: (value: boolean) => void
+  setDetailsPanelCollapsed: (value: boolean) => void
   setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
@@ -212,6 +213,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getExcludePatterns().then((patterns) => {
       dispatch({ type: 'SET_EXCLUDE_PATTERNS', patterns })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getDetailsPanelCollapsed().then((value) => {
+      dispatch({ type: 'SET_DETAILS_PANEL_COLLAPSED', value })
     })
   }, [])
 
@@ -577,6 +584,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setShowEmptyFolders(value)
   }, [])
 
+  const setDetailsPanelCollapsed = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_DETAILS_PANEL_COLLAPSED', value })
+    void window.api.setDetailsPanelCollapsed(value)
+  }, [])
+
   // Persists the patterns, then rescans every folder so the library itself
   // (not just future filesystem events) reflects the change — files/folders
   // newly matched get pruned out, anything un-excluded gets picked back up.
@@ -629,10 +641,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.selectedPath, visiblePhotos]
   )
 
+  // While a photo-view tab is active, DetailPanel should track that tab's
+  // photo (not the gallery's own selection cursor, which keeps whatever it
+  // last was and can point somewhere else entirely) — the active tab's path
+  // wins whenever it isn't the 'gallery' tab itself.
   const selectedPhoto = useMemo(() => {
-    const raw = state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null
+    const path = state.activeTab !== 'gallery' ? state.activeTab : state.selectedPath
+    const raw = path ? (state.photosByPath.get(path) ?? null) : null
     return raw ? { ...raw, metadata: toDisplayMetadata(raw.metadata) } : null
-  }, [state.selectedPath, state.photosByPath])
+  }, [state.selectedPath, state.activeTab, state.photosByPath])
 
   // Tag covers always pick the most-recently-taken photo, independent of the
   // gallery's own sort order/direction — otherwise switching gallery sort
@@ -719,6 +736,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setFolderTagFilter,
     setSort,
     setShowEmptyFolders,
+    setDetailsPanelCollapsed,
     setExcludePatterns,
     updateTags,
     setTagDescription,

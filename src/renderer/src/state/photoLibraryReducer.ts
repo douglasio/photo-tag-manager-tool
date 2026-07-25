@@ -40,6 +40,7 @@ export interface PhotoLibraryState {
   // scan — not live filesystem changes.
   allFolderPaths: Set<string>
   showEmptyFolders: boolean
+  detailsPanelCollapsed: boolean
   excludePatterns: string[]
   tagDescriptions: Map<string, string>
   // Ordered list of photo paths open as Photo View tabs. activeTab is either
@@ -67,6 +68,7 @@ export const initialState: PhotoLibraryState = {
   folderChildren: new Map(),
   allFolderPaths: new Set(),
   showEmptyFolders: false,
+  detailsPanelCollapsed: false,
   excludePatterns: [],
   tagDescriptions: new Map(),
   openTabs: [],
@@ -91,6 +93,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
+  | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
   | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
   | { type: 'WATCH_FOLDER_REMOVED'; folderPath: string }
@@ -339,6 +342,8 @@ export function photoLibraryReducer(
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'SET_SHOW_EMPTY_FOLDERS':
       return { ...state, showEmptyFolders: action.value }
+    case 'SET_DETAILS_PANEL_COLLAPSED':
+      return { ...state, detailsPanelCollapsed: action.value }
     case 'SET_EXCLUDE_PATTERNS':
       return { ...state, excludePatterns: action.patterns }
     case 'WATCH_FOLDER_ADDED': {

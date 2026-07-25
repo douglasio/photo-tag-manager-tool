@@ -72,6 +72,14 @@ export function setShowEmptyFolders(value: boolean): void {
   setSetting('showEmptyFolders', String(value))
 }
 
+export function getDetailsPanelCollapsed(): boolean {
+  return getSetting('detailsPanelCollapsed') === 'true'
+}
+
+export function setDetailsPanelCollapsed(value: boolean): void {
+  setSetting('detailsPanelCollapsed', String(value))
+}
+
 export function getExcludePatterns(): string[] {
   const raw = getSetting('excludePatterns')
   if (!raw) return []
