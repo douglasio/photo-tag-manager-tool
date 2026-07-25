@@ -14,6 +14,8 @@ import {
   setDetailsPanelCollapsed,
   getGalleryAnimationsEnabled,
   setGalleryAnimationsEnabled,
+  getShowFilenames,
+  setShowFilenames,
   getExcludePatterns,
   setExcludePatterns
 } from '../db/settingsRepository'
@@ -65,6 +67,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setGalleryAnimationsEnabled', (_event, value: boolean): void => {
     setGalleryAnimationsEnabled(value)
+  })
+
+  ipcMain.handle('settings:getShowFilenames', (): boolean => getShowFilenames())
+
+  ipcMain.handle('settings:setShowFilenames', (_event, value: boolean): void => {
+    setShowFilenames(value)
   })
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())

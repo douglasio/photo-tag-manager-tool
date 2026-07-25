@@ -91,6 +91,16 @@ export function setGalleryAnimationsEnabled(value: boolean): void {
   setSetting('galleryAnimationsEnabled', String(value))
 }
 
+// Defaults to on, same reasoning as getGalleryAnimationsEnabled above.
+export function getShowFilenames(): boolean {
+  const raw = getSetting('showFilenames')
+  return raw === null ? true : raw === 'true'
+}
+
+export function setShowFilenames(value: boolean): void {
+  setSetting('showFilenames', String(value))
+}
+
 export function getExcludePatterns(): string[] {
   const raw = getSetting('excludePatterns')
   if (!raw) return []

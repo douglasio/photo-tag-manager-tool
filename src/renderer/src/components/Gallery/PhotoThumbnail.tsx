@@ -55,6 +55,9 @@ interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onS
   // while hovering (lifted up to GalleryGrid, not local state, so it's
   // shared across whichever thumbnail is currently being previewed).
   previewScale: number
+  // The "Show filenames" gallery setting. Renaming always shows the field
+  // regardless — otherwise there'd be nowhere to see what's being typed.
+  showFilename: boolean
 }
 
 // The root can't be a single button anymore — GalleryFileName's inline editor
@@ -75,6 +78,7 @@ export function PhotoThumbnail({
   onRename,
   ctrlHeld,
   previewScale,
+  showFilename,
   className,
   ...rest
 }: PhotoThumbnailProps): ReactElement {
@@ -239,15 +243,17 @@ export function PhotoThumbnail({
             </Box>
           </Portal>
         )}
-        <Box w="100%">
-          <GalleryFileName
-            fileName={photo.fileName}
-            editing={renaming}
-            onStartEdit={onStartRename}
-            onStopEdit={onStopRename}
-            onRename={onRename}
-          />
-        </Box>
+        {(showFilename || renaming) && (
+          <Box w="100%">
+            <GalleryFileName
+              fileName={photo.fileName}
+              editing={renaming}
+              onStartEdit={onStartRename}
+              onStopEdit={onStopRename}
+              onRename={onRename}
+            />
+          </Box>
+        )}
       </Box>
     </Tooltip>
   )

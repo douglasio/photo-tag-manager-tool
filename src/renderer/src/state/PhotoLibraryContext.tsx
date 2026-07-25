@@ -65,6 +65,7 @@ interface PhotoLibraryContextValue {
   setShowEmptyFolders: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
+  setShowFilenames: (value: boolean) => void
   setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
@@ -228,6 +229,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getGalleryAnimationsEnabled().then((value) => {
       dispatch({ type: 'SET_GALLERY_ANIMATIONS_ENABLED', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getShowFilenames().then((value) => {
+      dispatch({ type: 'SET_SHOW_FILENAMES', value })
     })
   }, [])
 
@@ -622,6 +629,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setGalleryAnimationsEnabled(value)
   }, [])
 
+  const setShowFilenames = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_SHOW_FILENAMES', value })
+    void window.api.setShowFilenames(value)
+  }, [])
+
   // Persists the patterns, then rescans every folder so the library itself
   // (not just future filesystem events) reflects the change — files/folders
   // newly matched get pruned out, anything un-excluded gets picked back up.
@@ -771,6 +783,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setShowEmptyFolders,
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,
+    setShowFilenames,
     setExcludePatterns,
     updateTags,
     setTagDescription,
