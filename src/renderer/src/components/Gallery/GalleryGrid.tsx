@@ -84,6 +84,13 @@ interface CellProps {
   ctrlHeld: boolean
   previewScale: number
   showFilenames: boolean
+  hoveredPath: string | null
+  // Separate enter/leave callbacks (rather than a single "set to this path or
+  // null") avoid a race when the pointer moves directly from one thumbnail to
+  // an adjacent one: the new thumbnail's enter can fire before the old one's
+  // leave, and a plain "leave clears it" would wipe out the just-set hover.
+  onHoverEnter: (path: string) => void
+  onHoverLeave: (path: string) => void
 }
 
 function PhotoCell({
@@ -101,7 +108,10 @@ function PhotoCell({
   onRename,
   ctrlHeld,
   previewScale,
-  showFilenames
+  showFilenames,
+  hoveredPath,
+  onHoverEnter,
+  onHoverLeave
 }: CellComponentProps<CellProps>): ReactElement {
   const index = rowIndex * columnCount + columnIndex
   const photo = photos[index]
@@ -121,6 +131,10 @@ function PhotoCell({
           ctrlHeld={ctrlHeld}
           previewScale={previewScale}
           showFilename={showFilenames}
+          spotlighted={hoveredPath === photo.filePath}
+          dimmed={hoveredPath !== null && hoveredPath !== photo.filePath}
+          onHoverEnter={() => onHoverEnter(photo.filePath)}
+          onHoverLeave={() => onHoverLeave(photo.filePath)}
         />
       </PhotoContextMenu>
     </Box>
@@ -159,6 +173,17 @@ export function GalleryGrid(): ReactElement {
     ctrlHeldRef.current = ctrlHeld
   }, [ctrlHeld])
   const [previewScale, setPreviewScale] = useState(1)
+  // Drives the spotlight hover effect (PhotoThumbnail): the hovered photo
+  // scales up and saturates while every other visible thumbnail dims and
+  // blurs. Lifted here (rather than each PhotoThumbnail reacting only to its
+  // own hover) since the dim/blur has to apply to every *other* thumbnail,
+  // which only a shared ancestor can know about.
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null)
+  const handleHoverEnter = useCallback((path: string) => setHoveredPath(path), [])
+  const handleHoverLeave = useCallback(
+    (path: string) => setHoveredPath((current) => (current === path ? null : current)),
+    []
+  )
   // Reset the zoom once Ctrl is released, so the next Ctrl+hover session
   // starts fresh — adjusted during render (not a useEffect) per this
   // codebase's pattern for resetting state when an external value changes.
@@ -265,7 +290,10 @@ export function GalleryGrid(): ReactElement {
       onRename: renameFile,
       ctrlHeld,
       previewScale,
-      showFilenames: state.showFilenames
+      showFilenames: state.showFilenames,
+      hoveredPath,
+      onHoverEnter: handleHoverEnter,
+      onHoverLeave: handleHoverLeave
     }),
     [
       photos,
@@ -277,7 +305,10 @@ export function GalleryGrid(): ReactElement {
       renameFile,
       ctrlHeld,
       previewScale,
-      state.showFilenames
+      state.showFilenames,
+      hoveredPath,
+      handleHoverEnter,
+      handleHoverLeave
     ]
   )
 

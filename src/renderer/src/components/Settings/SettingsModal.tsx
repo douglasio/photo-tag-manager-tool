@@ -26,7 +26,7 @@ function SectionTitle({ children }: { children: string }): ReactElement {
 }
 
 function FoldersSection(): ReactElement {
-  const { state, addFolder, setShowEmptyFolders } = usePhotoLibrary()
+  const { state, addFolder } = usePhotoLibrary()
 
   return (
     <Stack gap="xs">
@@ -56,25 +56,24 @@ function FoldersSection(): ReactElement {
       <Button onClick={() => void addFolder()} style={{ alignSelf: 'flex-start' }}>
         Add Folder…
       </Button>
-      <Divider my="xs" />
-      <Switch
-        label="Show empty folders"
-        checked={state.showEmptyFolders}
-        onChange={(event) => setShowEmptyFolders(event.currentTarget.checked)}
-      />
     </Stack>
   )
 }
 
 function GallerySection(): ReactElement {
-  const { state, setGalleryAnimationsEnabled } = usePhotoLibrary()
+  const { state, setGalleryAnimationsEnabled, setShowEmptyFolders } = usePhotoLibrary()
 
   return (
     <Stack gap="xs">
       <SectionTitle>Gallery</SectionTitle>
       <Switch
-        label="Photo hover & zoom animations"
-        description="Thumbnails pan toward the cursor on hover, and photos zoom in when opened or hovered. Automatically off if your system prefers reduced motion."
+        label="Show empty folders"
+        checked={state.showEmptyFolders}
+        onChange={(event) => setShowEmptyFolders(event.currentTarget.checked)}
+      />
+      <Switch
+        label="Photo decorative animations"
+        description="Enable various photo animations in the gallery and photo views. Automatically off if your system prefers reduced motion."
         checked={state.galleryAnimationsEnabled}
         onChange={(event) => setGalleryAnimationsEnabled(event.currentTarget.checked)}
       />
