@@ -18,30 +18,12 @@ import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../../shared/protoc
 import { GalleryFileName } from './GalleryFileName'
 import { ctrlKeyLabel } from '../../utils/platform'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { useThumbnailSpotlight } from '../../hooks/useThumbnailSpotlight'
 
 // Preview size at previewScale === 1, in viewport-relative units so it
 // scales with the window rather than a fixed pixel size.
 const BASE_PREVIEW_WIDTH_VW = 50
 const BASE_PREVIEW_HEIGHT_VH = 70
-
-// Spotlight hover effect: the hovered thumbnail scales up and saturates,
-// while every other visible thumbnail (driven by the `dimmed` prop, set by
-// the shared hover state in GalleryGrid) dims and blurs — a "everything
-// else fades away" effect rather than the previous pan-toward-cursor one.
-const SPOTLIGHT_SCALE = 1.1
-const SPOTLIGHT_SATURATE = 1.3
-const DIM_OPACITY = 0.55
-const DIM_BLUR_PX = 3
-const SPOTLIGHT_SPRING = { stiffness: 300, damping: 26, mass: 0.6 }
-const SPOTLIGHT_VARIANTS = {
-  idle: { scale: 1, opacity: 1, filter: 'blur(0px) saturate(1)' },
-  spotlighted: {
-    scale: SPOTLIGHT_SCALE,
-    opacity: 1,
-    filter: `blur(0px) saturate(${SPOTLIGHT_SATURATE})`
-  },
-  dimmed: { scale: 1, opacity: DIM_OPACITY, filter: `blur(${DIM_BLUR_PX}px) saturate(1)` }
-} as const
 
 interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onSelect'> {
   photo: PhotoRecord
@@ -114,13 +96,7 @@ export function PhotoThumbnail({
   const prefersReducedMotion = useReducedMotion()
   const spotlightEnabled =
     state.galleryAnimationsEnabled && !prefersReducedMotion && photo.thumbnailStatus === 'ready'
-  const spotlightState = !spotlightEnabled
-    ? 'idle'
-    : spotlighted
-      ? 'spotlighted'
-      : dimmed
-        ? 'dimmed'
-        : 'idle'
+  const spotlight = useThumbnailSpotlight(spotlightEnabled, spotlighted, dimmed)
 
   // Dragging a photo that's part of the active multi-selection (2+ photos)
   // carries the whole batch; dragging anything else carries just that one —
@@ -177,8 +153,8 @@ export function PhotoThumbnail({
             <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
               <motion.div
                 initial={false}
-                animate={SPOTLIGHT_VARIANTS[spotlightState]}
-                transition={SPOTLIGHT_SPRING}
+                animate={spotlight.animate}
+                transition={spotlight.transition}
                 style={{ width: '100%', height: '100%' }}
               >
                 <Image
