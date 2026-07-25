@@ -73,8 +73,8 @@ function GallerySection(): ReactElement {
     <Stack gap="xs">
       <SectionTitle>Gallery</SectionTitle>
       <Switch
-        label="Thumbnail hover animations"
-        description="Photos subtly pan toward the cursor on hover. Automatically off if your system prefers reduced motion."
+        label="Photo hover & zoom animations"
+        description="Thumbnails pan toward the cursor on hover, and photos zoom in when opened or hovered. Automatically off if your system prefers reduced motion."
         checked={state.galleryAnimationsEnabled}
         onChange={(event) => setGalleryAnimationsEnabled(event.currentTarget.checked)}
       />
