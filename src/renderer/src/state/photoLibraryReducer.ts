@@ -12,6 +12,8 @@ export type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 export type GallerySortBy = 'name' | 'dateTaken'
 export type GallerySortOrder = 'asc' | 'desc'
 
+export const RECENT_TAGS_LIMIT = 3
+
 export interface PhotoLibraryState {
   folders: string[]
   rootPath: string | null
@@ -43,6 +45,10 @@ export interface PhotoLibraryState {
   detailsPanelCollapsed: boolean
   excludePatterns: string[]
   tagDescriptions: Map<string, string>
+  // Most-recently-assigned tag names, newest first — shown as a shortcut
+  // section at the top of the tag-input dropdown. Session-only (not
+  // persisted): resets on app restart.
+  recentTags: string[]
   // Ordered list of photo paths open as Photo View tabs. activeTab is either
   // 'gallery' or one of the paths in openTabs.
   openTabs: string[]
@@ -71,6 +77,7 @@ export const initialState: PhotoLibraryState = {
   detailsPanelCollapsed: false,
   excludePatterns: [],
   tagDescriptions: new Map(),
+  recentTags: [],
   openTabs: [],
   activeTab: 'gallery'
 }
@@ -94,6 +101,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
+  | { type: 'TAGS_ASSIGNED'; tags: string[] }
   | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
   | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
   | { type: 'WATCH_FOLDER_REMOVED'; folderPath: string }
@@ -344,6 +352,17 @@ export function photoLibraryReducer(
       return { ...state, showEmptyFolders: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':
       return { ...state, detailsPanelCollapsed: action.value }
+    // Newest-first, deduped, capped — a tag already in the list moves to the
+    // front rather than appearing twice.
+    case 'TAGS_ASSIGNED': {
+      const incoming = Array.from(new Set(action.tags))
+      if (incoming.length === 0) return state
+      const recentTags = [
+        ...incoming,
+        ...state.recentTags.filter((tag) => !incoming.includes(tag))
+      ].slice(0, RECENT_TAGS_LIMIT)
+      return { ...state, recentTags }
+    }
     case 'SET_EXCLUDE_PATTERNS':
       return { ...state, excludePatterns: action.patterns }
     case 'WATCH_FOLDER_ADDED': {

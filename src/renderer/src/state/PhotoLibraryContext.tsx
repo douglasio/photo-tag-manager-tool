@@ -321,6 +321,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     try {
       const photos = await window.api.addTagsToPhotos(tags, filePaths)
       dispatch({ type: 'PHOTOS_UPSERTED', photos })
+      dispatch({ type: 'TAGS_ASSIGNED', tags })
     } catch (err) {
       console.error('failed to add tags to photos', err)
       notifications.show({ color: 'red', message: 'Failed to save tags' })
@@ -408,6 +409,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     async (filePath: string, tags: string[]) => {
       const current = state.photosByPath.get(filePath)
       if (current) dispatch({ type: 'PHOTO_UPSERTED', photo: { ...current, tags } })
+
+      const newlyAdded = tags.filter((tag) => !current?.tags.includes(tag))
+      if (newlyAdded.length > 0) dispatch({ type: 'TAGS_ASSIGNED', tags: newlyAdded })
 
       // Chain onto whatever write is already pending for this same file, so
       // this one doesn't start until that one has actually finished — tags

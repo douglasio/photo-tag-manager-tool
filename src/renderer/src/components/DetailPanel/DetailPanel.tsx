@@ -106,6 +106,7 @@ export function DetailPanel(): ReactElement {
           <TagList
             tags={selectedPhoto.tags}
             allTags={allTags}
+            recentTags={state.recentTags}
             onChange={(tags) => void updateTags(selectedPhoto.filePath, tags)}
           />
         </Stack>
