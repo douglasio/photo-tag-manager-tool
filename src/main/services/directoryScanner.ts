@@ -37,6 +37,9 @@ export async function scanAllFolders(
     .withPromise()
   // fdir appends a trailing separator to directory entries — strip it so
   // these match the app's path convention (no trailing slash) used
-  // everywhere folder paths derived from photo paths already appear.
-  return [rootPath, ...dirs.map((dir) => dir.replace(/[/\\]+$/, ''))]
+  // everywhere folder paths derived from photo paths already appear. fdir's
+  // own listing already includes rootPath itself, so it's filtered back out
+  // here before being re-added, rather than ending up listed twice.
+  const stripped = dirs.map((dir) => dir.replace(/[/\\]+$/, ''))
+  return [rootPath, ...stripped.filter((dir) => dir !== rootPath)]
 }

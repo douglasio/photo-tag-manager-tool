@@ -1,8 +1,19 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"],
+  "include": [
+    "electron.vite.config.*",
+    "vitest.config.ts",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*"
+  ],
   "compilerOptions": {
     "composite": true,
+    // See the matching comment in tsconfig.web.json — without this, the
+    // editor's TS server (which evaluates composite: true as-is) would try
+    // to emit a declaration for src/preload/index.ts right next to the
+    // hand-written src/preload/index.d.ts and collide with it.
+    "outDir": "dist/node-types",
     "types": ["electron-vite/node"]
   }
 }
