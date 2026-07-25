@@ -16,6 +16,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  closestCenter,
   pointerWithin,
   useSensor,
   useSensors,
@@ -23,10 +24,12 @@ import {
   type DragStartEvent,
   type Modifier
 } from '@dnd-kit/core'
+import { SortableContext, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { getEventCoordinates } from '@dnd-kit/utilities'
 import {
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
+  IconLibraryPhoto,
   IconPhoto,
   IconX
 } from '@tabler/icons-react'
@@ -42,9 +45,11 @@ import { FolderSettingsMenu } from './components/Folders/FolderSettingsMenu'
 import { FolderTree } from './components/Folders/FolderTree'
 import { PanelSection } from './components/Shared/PanelSection'
 import { PhotoView } from './components/PhotoView/PhotoView'
+import { SortableTab } from './components/Shared/SortableTab'
 import { TagPanel } from './components/Tags/TagPanel'
 import { toThumbProtocolUrl } from '../../shared/protocolUrls'
 import type { PhotoRecord } from '../../shared/types'
+import { radiusSize } from '@renderer/theme'
 
 // True while focus is inside anything the "g" shortcut below shouldn't
 // hijack a keystroke from (text/date inputs, contenteditable, etc.).
@@ -91,11 +96,11 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
   return (
     <Box pos="relative" w={DRAG_PREVIEW_SIZE} h={DRAG_PREVIEW_SIZE}>
       <Box
+        w={DRAG_PREVIEW_SIZE}
+        h={DRAG_PREVIEW_SIZE}
+        opacity={0.75}
+        bdrs={radiusSize}
         style={{
-          width: DRAG_PREVIEW_SIZE,
-          height: DRAG_PREVIEW_SIZE,
-          opacity: 0.75,
-          borderRadius: 'var(--mantine-radius-default)',
           overflow: 'hidden',
           boxShadow: 'var(--mantine-shadow-md)',
           cursor: 'grabbing'
@@ -141,7 +146,8 @@ function AppLayout(): React.JSX.Element {
     setActiveTab,
     addTagsToPhotos,
     movePhotosToFolder,
-    setDetailsPanelCollapsed
+    setDetailsPanelCollapsed,
+    reorderPhotoTabs
   } = usePhotoLibrary()
   const hasTabs = state.openTabs.length > 0
   // The navbar (Tags/Folders) only hides while an actual photo tab is active
@@ -201,6 +207,22 @@ function AppLayout(): React.JSX.Element {
   }
 
   const activeDragPhoto = activeDragPaths ? state.photosByPath.get(activeDragPaths[0]) : undefined
+
+  // Separate, nested DndContext scoped to just the photo-tab row — reordering
+  // tabs is an unrelated drag interaction from the gallery-thumbnail one
+  // above (different collision detection needs: closestCenter suits a
+  // single-axis tab strip, pointerWithin suits dropping a thumbnail onto an
+  // arbitrary tag/folder target) and dnd-kit supports nesting independent
+  // DndContexts like this without them interfering with each other.
+  const tabSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const handleTabDragEnd = (event: DragEndEvent): void => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = state.openTabs.indexOf(String(active.id))
+    const newIndex = state.openTabs.indexOf(String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    reorderPhotoTabs(arrayMove(state.openTabs, oldIndex, newIndex))
+  }
 
   return (
     <DndContext
@@ -287,29 +309,43 @@ function AppLayout(): React.JSX.Element {
                 style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
               >
                 <Tabs.List style={{ flexShrink: 0 }}>
-                  <Tabs.Tab value="gallery">Gallery</Tabs.Tab>
-                  {openTabPhotos.map((photo) => (
-                    <Tabs.Tab
-                      key={photo.filePath}
-                      value={photo.filePath}
-                      rightSection={
-                        <ActionIcon
-                          component="span"
-                          size="xs"
-                          variant="subtle"
-                          color="gray"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            closePhotoTab(photo.filePath)
-                          }}
-                        >
-                          <IconX size={12} />
-                        </ActionIcon>
-                      }
+                  <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto />}>
+                    Gallery
+                  </Tabs.Tab>
+                  <DndContext
+                    sensors={tabSensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleTabDragEnd}
+                  >
+                    <SortableContext
+                      items={state.openTabs}
+                      strategy={horizontalListSortingStrategy}
                     >
-                      {photo.fileName}
-                    </Tabs.Tab>
-                  ))}
+                      {openTabPhotos.map((photo) => (
+                        <SortableTab
+                          key={photo.filePath}
+                          id={photo.filePath}
+                          value={photo.filePath}
+                          rightSection={
+                            <ActionIcon
+                              component="span"
+                              size="xs"
+                              variant="subtle"
+                              color="gray"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                closePhotoTab(photo.filePath)
+                              }}
+                            >
+                              <IconX size={12} />
+                            </ActionIcon>
+                          }
+                        >
+                          {photo.fileName}
+                        </SortableTab>
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 </Tabs.List>
                 <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
                   <GalleryGrid />

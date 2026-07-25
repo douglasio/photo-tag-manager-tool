@@ -77,6 +77,7 @@ interface PhotoLibraryContextValue {
   openPhotoTab: (filePath: string) => void
   closePhotoTab: (filePath: string) => void
   setActiveTab: (tab: string) => void
+  reorderPhotoTabs: (openTabs: string[]) => void
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -569,6 +570,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_ACTIVE_TAB', tab })
   }, [])
 
+  const reorderPhotoTabs = useCallback((openTabs: string[]) => {
+    dispatch({ type: 'REORDER_PHOTO_TABS', openTabs })
+  }, [])
+
   const photos = useMemo(() => {
     const direction = state.sortOrder === 'desc' ? -1 : 1
     const result = Array.from(state.photosByPath.values())
@@ -765,7 +770,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     openTabPhotos,
     openPhotoTab,
     closePhotoTab,
-    setActiveTab
+    setActiveTab,
+    reorderPhotoTabs
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

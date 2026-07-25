@@ -115,6 +115,7 @@ export type PhotoLibraryAction =
   | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
+  | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
 
 export function photoLibraryReducer(
   state: PhotoLibraryState,
@@ -496,6 +497,8 @@ export function photoLibraryReducer(
       const activeTab = state.activeTab === action.oldPath ? action.newPath : state.activeTab
       return { ...state, openTabs, activeTab }
     }
+    case 'REORDER_PHOTO_TABS':
+      return { ...state, openTabs: action.openTabs }
     default:
       return state
   }

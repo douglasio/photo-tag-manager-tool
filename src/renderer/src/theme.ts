@@ -10,7 +10,7 @@ import {
   Tooltip
 } from '@mantine/core'
 
-const radiusSize = 'md'
+export const radiusSize = 'md'
 
 export const theme = createTheme({
   primaryColor: 'indigo',

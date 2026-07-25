@@ -41,7 +41,9 @@ export function CommentEditor({ value, onSave }: CommentEditorProps): ReactEleme
   const blockquoteProps = {
     icon: <IconMessage stroke={1} size={20} />,
     iconSize: 30,
-    ml: 5
+    ml: 5,
+    px: 'md',
+    py: 'sm'
   }
 
   return (
