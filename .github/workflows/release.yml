@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   verify-tag-on-main:
@@ -71,17 +72,23 @@ jobs:
     steps:
       - name: Notify on release failure (create GitHub issue)
         if: ${{ needs.release.result != 'success' }}
-        uses: peter-evans/create-issue@v4
+        uses: actions/github-script@v6
         with:
-          title: 'Release workflow failed for ${{ github.ref_name }}'
-          body: |
-            The Release workflow run for tag `${{ github.ref_name }}` (run id `${{ github.run_id }}`) did not succeed.
-
-            Repository: ${{ github.repository }}
-            Commit: ${{ github.sha }}
-
-            View the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            The failing matrix job(s) may be listed in the run page above.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const ref = github.context.ref || '';
+            const refName = ref.startsWith('refs/tags/') ? ref.replace('refs/tags/', '') : ref.replace('refs/heads/', '');
+            const title = `Release workflow failed for ${refName}`;
+            const body = `The Release workflow run for tag \`${refName}\` (run id \`${process.env.GITHUB_RUN_ID}\`) did not succeed.\n\nRepository: ${github.context.repo.owner}/${github.context.repo.repo}\nCommit: ${process.env.GITHUB_SHA}\n\nView the run: ${process.env.GITHUB_SERVER_URL}/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${process.env.GITHUB_RUN_ID}\n\nThe failing matrix job(s) may be listed in the run page above.`;
+            const owner = github.context.repo.owner;
+            const repo = github.context.repo.repo;
+            // Look for an existing open issue with the same title
+            const listResp = await github.rest.issues.listForRepo({ owner, repo, state: 'open', per_page: 100 });
+            const existing = listResp.data.find(i => i.title === title);
+            if (existing) {
+              console.log(`Found existing issue #${existing.number}, adding a comment.`);
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body: `Release failed again: ${body}` });
+            } else {
+              console.log('No existing issue found, creating one.');
+              await github.rest.issues.create({ owner, repo, title, body });
+            }
