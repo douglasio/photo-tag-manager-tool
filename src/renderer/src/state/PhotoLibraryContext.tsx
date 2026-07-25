@@ -80,6 +80,7 @@ interface PhotoLibraryContextValue {
   closePhotoTab: (filePath: string) => void
   setActiveTab: (tab: string) => void
   reorderPhotoTabs: (openTabs: string[]) => void
+  navigateToPhoto: (fromPath: string, toPath: string) => void
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -588,6 +589,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'REORDER_PHOTO_TABS', openTabs })
   }, [])
 
+  // Swaps which photo a tab points to in place (same slot, same tab-list
+  // position) — e.g. left/right-arrow stepping to the next/previous photo
+  // in gallery order while viewing one. RENAME_PHOTO_TAB's own transform
+  // (replace oldPath with newPath everywhere in openTabs/activeTab) is
+  // exactly what this needs too, so it's reused rather than duplicated.
+  const navigateToPhoto = useCallback((fromPath: string, toPath: string) => {
+    dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: fromPath, newPath: toPath })
+  }, [])
+
   const photos = useMemo(() => {
     const direction = state.sortOrder === 'desc' ? -1 : 1
     const result = Array.from(state.photosByPath.values())
@@ -797,7 +807,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     openPhotoTab,
     closePhotoTab,
     setActiveTab,
-    reorderPhotoTabs
+    reorderPhotoTabs,
+    navigateToPhoto
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

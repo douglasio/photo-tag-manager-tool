@@ -44,7 +44,7 @@ function clampScale(value: number): number {
 }
 
 export function PhotoView({ photo }: PhotoViewProps): ReactElement {
-  const { state, closePhotoTab, rotatePhoto } = usePhotoLibrary()
+  const { state, closePhotoTab, rotatePhoto, visiblePhotos, navigateToPhoto } = usePhotoLibrary()
   const [scale, setScale] = useState(1)
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -124,6 +124,26 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
         closePhotoTab(photo.filePath)
         return
       }
+      // Alt+arrow switches between open tabs instead (handled globally in
+      // App.tsx, works from any tab) — bail out so this handler doesn't
+      // also act on the same keypress.
+      if (event.altKey) return
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        // The zoom slider below has its own native arrow-key handling
+        // (adjust its value) — don't steal that keypress out from under it
+        // when it's the focused element.
+        if ((document.activeElement as HTMLElement | null)?.getAttribute('role') === 'slider') {
+          return
+        }
+        const ordered = visiblePhotos.map((p) => p.filePath)
+        const currentIndex = ordered.indexOf(photo.filePath)
+        if (currentIndex === -1) return
+        const nextIndex = event.key === 'ArrowRight' ? currentIndex + 1 : currentIndex - 1
+        if (nextIndex < 0 || nextIndex >= ordered.length) return
+        event.preventDefault()
+        navigateToPhoto(photo.filePath, ordered[nextIndex])
+        return
+      }
       if (!event.ctrlKey) return
       if (event.key === '+' || event.key === '=') {
         event.preventDefault()
@@ -135,7 +155,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closePhotoTab, photo.filePath])
+  }, [closePhotoTab, photo.filePath, visiblePhotos, navigateToPhoto])
 
   return (
     <Container

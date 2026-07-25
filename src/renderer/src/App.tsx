@@ -171,6 +171,26 @@ function AppLayout(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [setActiveTab])
 
+  // Alt+Left/Right cycles between open tabs (Gallery first, then openTabs in
+  // their current order) regardless of which tab is currently active — a
+  // separate concern from PhotoView's own plain Left/Right, which instead
+  // steps to the next/previous photo within the currently viewed one.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
+      if (isEditableTarget(event.target)) return
+      const order = ['gallery', ...state.openTabs]
+      const currentIndex = order.indexOf(state.activeTab)
+      if (currentIndex === -1) return
+      const nextIndex = event.key === 'ArrowRight' ? currentIndex + 1 : currentIndex - 1
+      if (nextIndex < 0 || nextIndex >= order.length) return
+      event.preventDefault()
+      setActiveTab(order[nextIndex])
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [state.openTabs, state.activeTab, setActiveTab])
+
   const [activeDragPaths, setActiveDragPaths] = useState<string[] | null>(null)
   const sensors = useSensors(
     // Requires a small pointer move before a drag "starts," so an ordinary
