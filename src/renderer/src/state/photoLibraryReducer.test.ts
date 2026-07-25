@@ -437,6 +437,38 @@ describe('photoLibraryReducer', () => {
       expect(next.activeTab).toBe('/a-renamed.jpg')
     })
 
+    it('drops the other occurrence when newPath is already open in a different tab', () => {
+      // Reproduces the "stacked tabs" bug: arrow-key navigation (which
+      // dispatches this same action) stepping onto a photo the user already
+      // has open elsewhere used to leave two tabs pointing at the same path.
+      let state = photoLibraryReducer(initialState, { type: 'OPEN_PHOTO_TAB', filePath: '/a.jpg' })
+      state = photoLibraryReducer(state, { type: 'OPEN_PHOTO_TAB', filePath: '/b.jpg' })
+      state = photoLibraryReducer(state, { type: 'SET_ACTIVE_TAB', tab: '/a.jpg' })
+
+      const next = photoLibraryReducer(state, {
+        type: 'RENAME_PHOTO_TAB',
+        oldPath: '/a.jpg',
+        newPath: '/b.jpg'
+      })
+
+      expect(next.openTabs).toEqual(['/b.jpg'])
+      expect(next.activeTab).toBe('/b.jpg')
+    })
+
+    it('collision-dedup keeps the correct active tab when the pre-existing duplicate was active', () => {
+      let state = photoLibraryReducer(initialState, { type: 'OPEN_PHOTO_TAB', filePath: '/a.jpg' })
+      state = photoLibraryReducer(state, { type: 'OPEN_PHOTO_TAB', filePath: '/b.jpg' })
+      // /b.jpg (opened second) is active; /a.jpg gets renamed onto it from a
+      // background tab (e.g. another tab's own arrow-key step).
+      const next = photoLibraryReducer(state, {
+        type: 'RENAME_PHOTO_TAB',
+        oldPath: '/a.jpg',
+        newPath: '/b.jpg'
+      })
+      expect(next.openTabs).toEqual(['/b.jpg'])
+      expect(next.activeTab).toBe('/b.jpg')
+    })
+
     it('renaming an unopened tab is a no-op', () => {
       const next = photoLibraryReducer(initialState, {
         type: 'RENAME_PHOTO_TAB',

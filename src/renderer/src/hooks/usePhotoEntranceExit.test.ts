@@ -90,4 +90,32 @@ describe('usePhotoEntranceExit', () => {
     expect(first).toHaveBeenCalledTimes(1)
     expect(second).not.toHaveBeenCalled()
   })
+
+  it('rejects a second exit from a stale closure, e.g. OS key-repeat outrunning a re-render', () => {
+    // Captures triggerExit once and calls it twice without re-reading
+    // result.current in between — this is what a keydown listener sees if
+    // two keydown events fire before React re-renders and resubscribes it.
+    // The guard must hold even though both calls read the same (pre-update)
+    // exitDirection from this one closure.
+    const { result } = renderHook(() =>
+      usePhotoEntranceExit({ motionEnabled: true, enterDirection: null })
+    )
+    const staleTriggerExit = result.current.triggerExit
+    const first = vi.fn()
+    const second = vi.fn()
+
+    let firstStarted = false
+    let secondStarted = true
+    act(() => {
+      firstStarted = staleTriggerExit('right', first)
+      secondStarted = staleTriggerExit('left', second)
+    })
+
+    expect(firstStarted).toBe(true)
+    expect(secondStarted).toBe(false)
+
+    act(() => vi.runAllTimers())
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).not.toHaveBeenCalled()
+  })
 })

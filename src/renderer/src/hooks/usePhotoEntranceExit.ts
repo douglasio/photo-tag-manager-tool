@@ -50,6 +50,13 @@ export function usePhotoEntranceExit({
   enterDirection
 }: UsePhotoEntranceExitOptions): UsePhotoEntranceExitResult {
   const [exitDirection, setExitDirection] = useState<NavigationDirection | null>(null)
+  // Mirrors exitDirection for triggerExit's guard below. State alone isn't
+  // enough there: during OS key-repeat, keydown events can fire faster than
+  // React re-renders and re-subscribes the keydown listener, so a stale
+  // closure could still see exitDirection as null and slip past the guard.
+  // A ref is mutated in place and shared by every render's closure, so the
+  // check stays correct regardless of that timing.
+  const exitDirectionRef = useRef<NavigationDirection | null>(null)
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(
     () => () => {
@@ -92,7 +99,8 @@ export function usePhotoEntranceExit({
         }
 
   const triggerExit = (direction: NavigationDirection, onDone: () => void): boolean => {
-    if (exitDirection) return false
+    if (exitDirectionRef.current) return false
+    exitDirectionRef.current = direction
     setExitDirection(direction)
     exitTimeoutRef.current = setTimeout(onDone, EXIT_DURATION_S * 1000)
     return true

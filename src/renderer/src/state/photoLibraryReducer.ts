@@ -501,9 +501,13 @@ export function photoLibraryReducer(
     // pruning it away as if the file had actually disappeared.
     case 'RENAME_PHOTO_TAB': {
       if (!state.openTabs.includes(action.oldPath)) return state
-      const openTabs = state.openTabs.map((path) =>
-        path === action.oldPath ? action.newPath : path
-      )
+      // newPath can already be open in a different tab — most commonly via
+      // navigateToPhoto's arrow-key stepping landing on a photo the user
+      // separately opened elsewhere. Drop that other occurrence rather than
+      // ending up with two tabs pointing at the same photo.
+      const openTabs = state.openTabs
+        .filter((path) => path === action.oldPath || path !== action.newPath)
+        .map((path) => (path === action.oldPath ? action.newPath : path))
       const activeTab = state.activeTab === action.oldPath ? action.newPath : state.activeTab
       return { ...state, openTabs, activeTab }
     }
