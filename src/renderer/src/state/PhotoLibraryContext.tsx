@@ -33,6 +33,11 @@ export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
 // batch into a single toast, so a bulk copy/delete doesn't spam a toast per file.
 const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
 
+// Which arrow key drove a photo-to-photo navigation — 'right' means the
+// photo being navigated to should visually enter from the right (the user
+// stepped forward), 'left' means it enters from the left (stepped back).
+export type NavigationDirection = 'left' | 'right'
+
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
 }
@@ -80,7 +85,13 @@ interface PhotoLibraryContextValue {
   closePhotoTab: (filePath: string) => void
   setActiveTab: (tab: string) => void
   reorderPhotoTabs: (openTabs: string[]) => void
-  navigateToPhoto: (fromPath: string, toPath: string) => void
+  navigateToPhoto: (fromPath: string, toPath: string, direction: NavigationDirection) => void
+  // One-shot lookup for PhotoView's entrance animation: which arrow key (if
+  // any) navigated to this specific photo, so it can slide in from the
+  // matching side. Consuming it removes it — a photo opened normally (double
+  // click, or reopening one you arrow-navigated away from earlier) must not
+  // replay a stale direction.
+  consumeNavDirection: (filePath: string) => NavigationDirection | null
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -589,13 +600,30 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'REORDER_PHOTO_TABS', openTabs })
   }, [])
 
+  // Plain ref (not reducer state) since it's a one-shot side channel read
+  // exactly once by the PhotoView instance that mounts for `toPath` — it
+  // doesn't need to trigger a re-render of its own, and reducer state would
+  // otherwise need a separate "clear it" action to avoid the stale-direction
+  // problem described on consumeNavDirection below.
+  const navDirectionsRef = useRef(new Map<string, NavigationDirection>())
+
   // Swaps which photo a tab points to in place (same slot, same tab-list
   // position) — e.g. left/right-arrow stepping to the next/previous photo
   // in gallery order while viewing one. RENAME_PHOTO_TAB's own transform
   // (replace oldPath with newPath everywhere in openTabs/activeTab) is
   // exactly what this needs too, so it's reused rather than duplicated.
-  const navigateToPhoto = useCallback((fromPath: string, toPath: string) => {
-    dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: fromPath, newPath: toPath })
+  const navigateToPhoto = useCallback(
+    (fromPath: string, toPath: string, direction: NavigationDirection) => {
+      navDirectionsRef.current.set(toPath, direction)
+      dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: fromPath, newPath: toPath })
+    },
+    []
+  )
+
+  const consumeNavDirection = useCallback((filePath: string): NavigationDirection | null => {
+    const direction = navDirectionsRef.current.get(filePath) ?? null
+    navDirectionsRef.current.delete(filePath)
+    return direction
   }, [])
 
   const photos = useMemo(() => {
@@ -808,7 +836,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     closePhotoTab,
     setActiveTab,
     reorderPhotoTabs,
-    navigateToPhoto
+    navigateToPhoto,
+    consumeNavDirection
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

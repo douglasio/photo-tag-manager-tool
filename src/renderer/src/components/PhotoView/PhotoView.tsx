@@ -17,35 +17,31 @@ import { useCtrlKeyHeld } from '../../hooks/useCtrlKeyHeld'
 const MIN_SCALE = 1
 const MAX_SCALE = 5
 const SCALE_STEP = 0.25
-// A typical wheel "notch" reports a deltaY of roughly 100, matching the
-// sensitivity used for the gallery's Ctrl+wheel preview zoom.
+// Matches the sensitivity used for the gallery's Ctrl+wheel preview zoom.
 const WHEEL_ZOOM_SENSITIVITY = 0.025
-// Entrance: photo starts slightly scaled up and blurred, then springs down
-// to its resting scale while sharpening — scale/blur only, no x/y movement,
-// so it reads as the image coming into focus along the z-axis rather than
-// sliding or falling in from a direction.
+// Entrance: scale/blur only, coming into focus along the z-axis.
 const ENTRANCE_SCALE_FROM = 1.08
-const ENTRANCE_BLUR_FROM_PX = 12
+const ENTRANCE_BLUR_FROM_PX = 5
 const ENTRANCE_SPRING = { stiffness: 300, damping: 24, mass: 0.6 } as const
-// Opening a photo tab also collapses the Navbar (and possibly the Aside) via
-// AppShell's own default 200ms width transition, resizing the space this
-// photo is centered in. Starting the entrance animation immediately meant
-// it played while that resize was still happening, which read as the photo
-// "fighting" its own frame — so it waits this long before starting.
+// x-axis slide for arrow-key navigation only (enterDirection is null for a
+// plain tab open, so no offset applies there).
+const ENTRANCE_X_FROM_PX = 100
+// Arrow-key nav remounts a fresh PhotoView, so there's no DOM node to
+// cross-fade against — this plays a brief exit animation on the current
+// photo first, then navigates once it finishes.
+const EXIT_DURATION_S = 0.16
+const EXIT_SCALE_TO = 0.94
+const EXIT_BLUR_TO_PX = 8
+const EXIT_TRANSITION = { duration: EXIT_DURATION_S, ease: 'easeIn' } as const
+// Opening a photo tab also collapses the Navbar/Aside via AppShell's own
+// 200ms transition — wait for that before starting the entrance animation.
 const APP_SHELL_SETTLE_MS = 200
-// Hovering over the photo saturates a soft, feathered circle under the
-// cursor  — achieved by stacking a second, more
-// saturated copy of the image on top and masking it down to a radial
-// gradient that follows the pointer. The gradient's own mid-stop is the
-// feather: solid color out to that point, fading to fully transparent by
-// the outer radius, so there's no visible hard edge.
+// Hover saturates a soft, cursor-centered, feathered circle (a saturated
+// image copy masked by a radial gradient) rather than zooming.
 const SATURATION_RADIUS_PX = 270
 const SATURATION_AMOUNT = 1.5
 const SATURATION_SPRING = { stiffness: 300, damping: 30, mass: 0.5 } as const
-// Holding Ctrl while hovering swaps the saturation effect for a much more
-// pronounced zoom toward the cursor — releasing Ctrl (or leaving the image)
-// drops back to 1x, and the saturation mask stays suppressed the whole time
-// so the two effects never fight each other.
+// Ctrl+hover swaps the saturation effect for a pronounced cursor-zoom.
 const CTRL_ZOOM_SCALE = 4
 const CTRL_ZOOM_SPRING = { stiffness: 300, damping: 30, mass: 0.5 } as const
 
@@ -58,22 +54,30 @@ function clampScale(value: number): number {
 }
 
 export function PhotoView({ photo }: PhotoViewProps): ReactElement {
-  const { state, closePhotoTab, rotatePhoto, visiblePhotos, navigateToPhoto } = usePhotoLibrary()
+  const { state, closePhotoTab, rotatePhoto, visiblePhotos, navigateToPhoto, consumeNavDirection } =
+    usePhotoLibrary()
   const [scale, setScale] = useState(1)
+  // Read once at mount via lazy initializer — this instance is fresh per photo.
+  const [enterDirection] = useState(() => consumeNavDirection(photo.filePath))
+  // Set while the exit animation is playing, just before this instance is
+  // swapped out for the next photo's.
+  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null)
+  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current)
+    },
+    []
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
   const canRotate = ROTATABLE_FORMATS.includes(photo.metadata.format)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
-  // Gates the entrance animation so it only starts once the full-size image
-  // has actually loaded and the container has settled at its final size —
-  // starting it immediately on mount meant the fall/blur-in played while the
-  // frame itself was still resizing around the loading image, undercutting
-  // the effect.
+  // Gates the entrance until the image has actually loaded, so it doesn't
+  // play while the container is still resizing around a loading image.
   const [imageLoaded, setImageLoaded] = useState(false)
-  // Separately gates on the AppShell Navbar/Aside collapse (see
-  // APP_SHELL_SETTLE_MS above) finishing, regardless of how fast the image
-  // itself loads.
+  // Separately gates on the AppShell collapse (APP_SHELL_SETTLE_MS) finishing.
   const [layoutSettled, setLayoutSettled] = useState(false)
   useEffect(() => {
     const timer = setTimeout(() => setLayoutSettled(true), APP_SHELL_SETTLE_MS)
@@ -81,20 +85,16 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   }, [])
   const readyToAnimateIn = imageLoaded && layoutSettled
 
-  // Cursor position (in px, relative to the image wrapper) driving the
-  // saturation mask below — plain motion values so the mask can be
-  // repositioned on every pointer move without a React re-render.
+  // Plain motion values so the saturation mask can follow the cursor
+  // without a React re-render on every pointer move.
   const maskX = useMotionValue(0)
   const maskY = useMotionValue(0)
   const maskOpacity = useMotionValue(0)
   const springMaskOpacity = useSpring(maskOpacity, SATURATION_SPRING)
   const maskImage = useMotionTemplate`radial-gradient(circle ${SATURATION_RADIUS_PX}px at ${maskX}px ${maskY}px, black 0%, black 35%, transparent 100%)`
 
-  // Ctrl-hover zoom: same cursor-relative transform-origin idea as the
-  // saturation mask, but driving a scale instead. Tracked via plain state
-  // (not just motion values) because the effect below needs to react to
-  // ctrlHeld changing while the pointer isn't moving — e.g. pressing Ctrl
-  // after already hovering, with no new mousemove to trigger it from.
+  // Tracked via state (not just a motion value) so the effect below can
+  // react to ctrlHeld changing while the pointer isn't moving.
   const ctrlHeld = useCtrlKeyHeld()
   const [isHovering, setIsHovering] = useState(false)
   const [zoomOrigin, setZoomOrigin] = useState('center center')
@@ -113,9 +113,8 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
 
   const zoomToFit = (): void => setScale(MIN_SCALE)
 
-  // "Original scale" means true 1:1 pixels — natural image size, not just
-  // the current fit-to-container size — so this measures how much the
-  // fit="contain" rendering already shrank/grew the image and compensates.
+  // Compensates for how much fit="contain" already shrank/grew the image,
+  // so "original size" means true 1:1 pixels.
   const zoomToNativeSize = (): void => {
     const img = imgRef.current
     const container = containerRef.current
@@ -128,9 +127,8 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     setScale(clampScale(1 / fitScale))
   }
 
-  // Mantine's Tabs keeps every opened photo's panel mounted (not just the
-  // active one), so a global keydown listener registered by an inactive tab
-  // would otherwise still fire — gate on whether this tab is the one showing.
+  // Every opened photo's panel stays mounted, so gate keydown on whether
+  // this tab is the one actually showing.
   const isActiveRef = useRef(false)
   useEffect(() => {
     isActiveRef.current = state.activeTab === photo.filePath
@@ -139,11 +137,8 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    // Trackpad pinch gestures are reported by Chromium as wheel events with
-    // ctrlKey set to true — there's no separate gesture API in Electron —
-    // so this same listener covers both a real pinch and a deliberate
-    // Ctrl+scroll. React's synthetic onWheel is passive by default, which
-    // silently blocks preventDefault, so this needs a native listener.
+    // Trackpad pinch is reported as ctrl+wheel; React's passive synthetic
+    // onWheel can't preventDefault, so this needs a native listener.
     const handleWheel = (event: WheelEvent): void => {
       if (!isActiveRef.current || !event.ctrlKey) return
       event.preventDefault()
@@ -160,24 +155,32 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
         closePhotoTab(photo.filePath)
         return
       }
-      // Alt+arrow switches between open tabs instead (handled globally in
-      // App.tsx, works from any tab) — bail out so this handler doesn't
-      // also act on the same keypress.
+      // Alt+arrow switches tabs instead (handled globally in App.tsx).
       if (event.altKey) return
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        // The zoom slider below has its own native arrow-key handling
-        // (adjust its value) — don't steal that keypress out from under it
-        // when it's the focused element.
+        // Don't steal the keypress from the zoom slider's own arrow handling.
         if ((document.activeElement as HTMLElement | null)?.getAttribute('role') === 'slider') {
           return
         }
+        // Already mid-exit from a previous press — ignore repeats.
+        if (exitDirection) return
         const ordered = visiblePhotos.map((p) => p.filePath)
         const currentIndex = ordered.indexOf(photo.filePath)
         if (currentIndex === -1) return
-        const nextIndex = event.key === 'ArrowRight' ? currentIndex + 1 : currentIndex - 1
+        const direction = event.key === 'ArrowRight' ? 'right' : 'left'
+        const nextIndex = direction === 'right' ? currentIndex + 1 : currentIndex - 1
         if (nextIndex < 0 || nextIndex >= ordered.length) return
         event.preventDefault()
-        navigateToPhoto(photo.filePath, ordered[nextIndex])
+        const toPath = ordered[nextIndex]
+        if (!motionEnabled) {
+          navigateToPhoto(photo.filePath, toPath, direction)
+          return
+        }
+        // Play the exit animation first, navigate once it finishes.
+        setExitDirection(direction)
+        exitTimeoutRef.current = setTimeout(() => {
+          navigateToPhoto(photo.filePath, toPath, direction)
+        }, EXIT_DURATION_S * 1000)
         return
       }
       if (!event.ctrlKey) return
@@ -191,7 +194,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closePhotoTab, photo.filePath, visiblePhotos, navigateToPhoto])
+  }, [closePhotoTab, photo.filePath, visiblePhotos, navigateToPhoto, exitDirection, motionEnabled])
 
   return (
     <Container
@@ -202,38 +205,54 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
         ref={containerRef}
         fluid
         h="100%"
+        display="flex"
         style={{
-          display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden'
         }}
       >
         <motion.div
-          // initial={false} skips the animation entirely (renders straight
-          // at the `animate` values) when disabled, rather than just
-          // shortening the transition to ~0 — matches the gallery hover
-          // effect's own galleryAnimationsEnabled + reduced-motion gating.
+          // initial={false} renders straight at `animate` when disabled.
           initial={
             motionEnabled
               ? {
                   scale: ENTRANCE_SCALE_FROM,
+                  x:
+                    enterDirection === 'right'
+                      ? ENTRANCE_X_FROM_PX
+                      : enterDirection === 'left'
+                        ? -ENTRANCE_X_FROM_PX
+                        : 0,
                   filter: `blur(${ENTRANCE_BLUR_FROM_PX}px)`
                 }
               : false
           }
-          // Until the image has loaded, this holds at the same values as
-          // `initial` (a no-op "animation") instead of settling early —
-          // the actual scale/unblur only fires once imageLoaded flips true.
+          // Holds at `initial` until the image/layout are ready, then
+          // settles in — or, if exiting, overrides with the exit target.
           animate={
-            !motionEnabled || readyToAnimateIn
-              ? { scale: 1, filter: 'blur(0px)' }
-              : {
-                  scale: ENTRANCE_SCALE_FROM,
-                  filter: `blur(${ENTRANCE_BLUR_FROM_PX}px)`
+            exitDirection
+              ? {
+                  scale: EXIT_SCALE_TO,
+                  x: exitDirection === 'right' ? -ENTRANCE_X_FROM_PX : ENTRANCE_X_FROM_PX,
+                  filter: `blur(${EXIT_BLUR_TO_PX}px)`,
+                  opacity: 0
                 }
+              : !motionEnabled || readyToAnimateIn
+                ? { scale: 1, x: 0, filter: 'blur(0px)', opacity: 1 }
+                : {
+                    scale: ENTRANCE_SCALE_FROM,
+                    x:
+                      enterDirection === 'right'
+                        ? ENTRANCE_X_FROM_PX
+                        : enterDirection === 'left'
+                          ? -ENTRANCE_X_FROM_PX
+                          : 0,
+                    filter: `blur(${ENTRANCE_BLUR_FROM_PX}px)`,
+                    opacity: 1
+                  }
           }
-          transition={ENTRANCE_SPRING}
+          transition={exitDirection ? EXIT_TRANSITION : ENTRANCE_SPRING}
           style={{ maxWidth: '100%', maxHeight: '100%' }}
         >
           <Box
@@ -278,11 +297,8 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                   transformOrigin: 'center'
                 }}
               />
-              {/* Saturated copy of the same image, masked down to a soft
-                  circle that follows the cursor — the feathered mid-stop in
-                  maskImage above is what keeps its edge from ever looking
-                  hard-cut. Suppressed (opacity forced to 0) while the
-                  Ctrl-zoom above is active, so the two effects never overlap. */}
+              {/* Saturated copy masked to a cursor-centered feathered circle;
+                  suppressed while Ctrl-zoom is active. */}
               <motion.div
                 style={{
                   position: 'absolute',
@@ -296,11 +312,11 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                 <Image
                   src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
                   alt=""
+                  display="block"
                   fit="contain"
                   maw="100%"
                   mah="100%"
                   style={{
-                    display: 'block',
                     transform: `scale(${scale})`,
                     transformOrigin: 'center',
                     filter: `saturate(${SATURATION_AMOUNT})`
@@ -335,11 +351,8 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
           <div />
         )}
         <Group bg="gray" p="sm" gap="sm" wrap="nowrap">
-          {/* ActionIcon.Group's seamless merged-pill look depends on every
-              sibling sharing one height, and ActionIcon.GroupSection is meant
-              for a static label/icon (like Button.GroupSection), not a rich
-              control like a Slider — so the Slider stays a plain sibling
-              here rather than living inside the group. */}
+          {/* Slider stays a plain sibling, not inside ActionIcon.Group — that
+              component expects a static label/icon, not a rich control. */}
           <ActionIcon onClick={zoomToFit} aria-label="Zoom to fit">
             <Tooltip label="Zoom to fit">
               <IconMaximize />
