@@ -57,7 +57,8 @@ export function TagDescriptionEditor({
           c="dimmed"
           size="sm"
           fs={description ? undefined : 'italic'}
-          style={{ whiteSpace: 'pre-line', opacity: description ? 1 : 0.5 }}
+          opacity={description ? 1 : 0.5}
+          style={{ whiteSpace: 'pre-line' }}
         >
           {description || 'Add a description…'}
         </Text>

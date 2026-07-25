@@ -65,11 +65,9 @@ export function TagNameEditor({ tag, count, onRename }: TagNameEditorProps): Rea
           <Group gap={2} wrap="nowrap" align="center">
             <Text
               fw={700}
-              style={{
-                flexShrink: 0,
-                fontSize: 'var(--mantine-h2-font-size)',
-                lineHeight: 'var(--mantine-h2-line-height)'
-              }}
+              fz="var(--mantine-h2-font-size)"
+              lh="var(--mantine-h2-line-height)"
+              style={{ flexShrink: 0 }}
             >
               #
             </Text>
@@ -88,7 +86,8 @@ export function TagNameEditor({ tag, count, onRename }: TagNameEditorProps): Rea
                   setEditing(false)
                 }
               }}
-              style={{ flex: 1, minWidth: 0 }}
+              flex={1}
+              miw={0}
               styles={{
                 input: {
                   fontWeight: 700,

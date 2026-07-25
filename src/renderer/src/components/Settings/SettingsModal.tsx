@@ -16,14 +16,7 @@ import { useDisclosure } from '@mantine/hooks'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 import { FolderRemoveButton } from '../Folders/FolderRemoveButton'
-
-function SectionTitle({ children }: { children: string }): ReactElement {
-  return (
-    <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
-      {children}
-    </Title>
-  )
-}
+import { SectionTitle } from '../Shared/SectionTitle'
 
 function FoldersSection(): ReactElement {
   const { state, addFolder } = usePhotoLibrary()

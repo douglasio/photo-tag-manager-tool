@@ -65,7 +65,9 @@ export function FileNameEditor({ fileName, onRename }: FileNameEditorProps): Rea
             <Text
               c="dimmed"
               fw={700}
-              style={{ flexShrink: 0, fontSize: 'var(--mantine-h4-font-size)', paddingTop: 2 }}
+              fz="var(--mantine-h4-font-size)"
+              pt={2}
+              style={{ flexShrink: 0 }}
             >
               {extension}
             </Text>

@@ -129,16 +129,13 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   }, [closePhotoTab, photo.filePath, visiblePhotos, navigateToPhoto, motionEnabled, triggerExit])
 
   return (
-    <Container
-      fluid
-      style={{ position: 'relative', flex: 1, minHeight: 0, minWidth: 0, height: '100%' }}
-    >
+    <Container fluid pos="relative" flex={1} mih={0} miw={0} h="100%">
       <Container
         ref={containerRef}
         fluid
         h="100%"
+        display="flex"
         style={{
-          display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden'
@@ -151,11 +148,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
           transition={transition}
           style={{ maxWidth: '100%', maxHeight: '100%' }}
         >
-          <Box
-            pos="relative"
-            style={{ maxWidth: '100%', maxHeight: '100%' }}
-            {...containerHandlers}
-          >
+          <Box pos="relative" maw="100%" mah="100%" {...containerHandlers}>
             <motion.div style={zoomStyle}>
               <Image
                 ref={imgRef}
@@ -165,8 +158,8 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                 onLoad={handleImageLoad}
                 maw="100%"
                 mah="100%"
+                display="block"
                 style={{
-                  display: 'block',
                   transform: `scale(${scale})`,
                   transformOrigin: 'center'
                 }}
@@ -187,8 +180,8 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                   fit="contain"
                   maw="100%"
                   mah="100%"
+                  display="block"
                   style={{
-                    display: 'block',
                     transform: `scale(${scale})`,
                     transformOrigin: 'center',
                     filter: `saturate(${saturationAmount})`

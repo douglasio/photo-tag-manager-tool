@@ -154,7 +154,8 @@ function TreeRow({
             <>
               <Tooltip label="Rename folder">
                 <ActionIcon
-                  style={{ opacity: hovered ? 0.7 : 0, flexShrink: 0 }}
+                  opacity={hovered ? 0.7 : 0}
+                  style={{ flexShrink: 0 }}
                   onClick={(event) => {
                     event.stopPropagation()
                     onStartEdit()

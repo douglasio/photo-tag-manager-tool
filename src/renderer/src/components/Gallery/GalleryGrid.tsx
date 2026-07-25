@@ -464,13 +464,13 @@ export function GalleryGrid(): ReactElement {
                   <Pill
                     key={tag}
                     onClick={() => setFolderTagFilter(isActive ? null : tag)}
-                    style={{
-                      cursor: 'pointer',
-                      backgroundColor: isActive
+                    bg={
+                      isActive
                         ? 'var(--mantine-primary-color-filled)'
-                        : 'var(--mantine-primary-color-light)',
-                      color: isActive ? 'var(--mantine-color-white)' : undefined
-                    }}
+                        : 'var(--mantine-primary-color-light)'
+                    }
+                    c={isActive ? 'var(--mantine-color-white)' : undefined}
+                    style={{ cursor: 'pointer' }}
                   >
                     {tag}
                   </Pill>
