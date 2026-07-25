@@ -60,6 +60,6 @@ jobs:
 
       - name: Publish (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: npx electron-builder --linux --publish always
+        run: npx electron-builder --linux --publish always --config.linux.target='[deb,rpm,zip]'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
