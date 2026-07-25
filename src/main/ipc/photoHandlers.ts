@@ -2,10 +2,10 @@ import { ipcMain } from 'electron'
 import { copyFile, rename, stat, unlink } from 'fs/promises'
 import { basename, dirname, extname, join } from 'path'
 import { findByPath, renamePhotoPath } from '../db/photoRepository'
-import { writeDateTaken } from '../services/metadataService'
+import { rotatePhoto, writeComment, writeDateTaken } from '../services/metadataService'
 import { ingestFile } from '../services/photoIngest'
 import { suppressNextEvent } from '../services/watchManager'
-import type { MoveProgressEvent, PhotoRecord } from '../../shared/types'
+import type { MoveProgressEvent, PhotoRecord, RotateDirection } from '../../shared/types'
 
 // Conservative cross-platform block list — covers reserved path/filesystem
 // characters on both Windows and Unix rather than just the current OS, since
@@ -84,6 +84,26 @@ export function registerPhotoHandlers(): void {
     async (_event, filePath: string, isoDate: string): Promise<PhotoRecord> => {
       suppressNextEvent(filePath)
       await writeDateTaken(filePath, isoDate)
+      const { photo } = await ingestFile(filePath, (fn) => fn())
+      return photo
+    }
+  )
+
+  ipcMain.handle(
+    'photo:updateComment',
+    async (_event, filePath: string, comment: string): Promise<PhotoRecord> => {
+      suppressNextEvent(filePath)
+      await writeComment(filePath, comment)
+      const { photo } = await ingestFile(filePath, (fn) => fn())
+      return photo
+    }
+  )
+
+  ipcMain.handle(
+    'photo:rotate',
+    async (_event, filePath: string, direction: RotateDirection): Promise<PhotoRecord> => {
+      suppressNextEvent(filePath)
+      await rotatePhoto(filePath, direction)
       const { photo } = await ingestFile(filePath, (fn) => fn())
       return photo
     }

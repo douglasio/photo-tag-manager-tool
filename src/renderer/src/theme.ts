@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Blockquote,
   Button,
   createTheme,
   Group,
@@ -9,7 +10,7 @@ import {
   Tooltip
 } from '@mantine/core'
 
-const radiusSize = 'md'
+export const radiusSize = 'md'
 
 export const theme = createTheme({
   primaryColor: 'indigo',
@@ -36,6 +37,11 @@ export const theme = createTheme({
         styles: {
           root: { transition: 'opacity 120ms ease' }
         }
+      }
+    }),
+    Blockquote: Blockquote.extend({
+      defaultProps: {
+        radius: radiusSize
       }
     }),
     Button: Button.extend({

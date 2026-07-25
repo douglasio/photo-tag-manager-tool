@@ -8,7 +8,9 @@ import {
   UnstyledButton,
   useMantineTheme
 } from '@mantine/core'
+import { useReducedMotion } from '@mantine/hooks'
 import { useDraggable } from '@dnd-kit/core'
+import { motion } from 'motion/react'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
 import { useState, type ComponentPropsWithoutRef, type MouseEvent, type ReactElement } from 'react'
 import type { PhotoRecord } from '../../../../shared/types'
@@ -21,6 +23,25 @@ import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 // scales with the window rather than a fixed pixel size.
 const BASE_PREVIEW_WIDTH_VW = 50
 const BASE_PREVIEW_HEIGHT_VH = 70
+
+// Spotlight hover effect: the hovered thumbnail scales up and saturates,
+// while every other visible thumbnail (driven by the `dimmed` prop, set by
+// the shared hover state in GalleryGrid) dims and blurs — a "everything
+// else fades away" effect rather than the previous pan-toward-cursor one.
+const SPOTLIGHT_SCALE = 1.1
+const SPOTLIGHT_SATURATE = 1.3
+const DIM_OPACITY = 0.55
+const DIM_BLUR_PX = 3
+const SPOTLIGHT_SPRING = { stiffness: 300, damping: 26, mass: 0.6 }
+const SPOTLIGHT_VARIANTS = {
+  idle: { scale: 1, opacity: 1, filter: 'blur(0px) saturate(1)' },
+  spotlighted: {
+    scale: SPOTLIGHT_SCALE,
+    opacity: 1,
+    filter: `blur(0px) saturate(${SPOTLIGHT_SATURATE})`
+  },
+  dimmed: { scale: 1, opacity: DIM_OPACITY, filter: `blur(${DIM_BLUR_PX}px) saturate(1)` }
+} as const
 
 interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onSelect'> {
   photo: PhotoRecord
@@ -41,6 +62,17 @@ interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onS
   // while hovering (lifted up to GalleryGrid, not local state, so it's
   // shared across whichever thumbnail is currently being previewed).
   previewScale: number
+  // The "Show filenames" gallery setting. Renaming always shows the field
+  // regardless — otherwise there'd be nowhere to see what's being typed.
+  showFilename: boolean
+  // Whether *this* thumbnail is the one currently hovered (drives the
+  // scale-up/saturate half of the spotlight effect) and whether some *other*
+  // thumbnail is hovered instead (drives this one's dim/blur half) — both
+  // computed in GalleryGrid from its single shared hoveredPath.
+  spotlighted: boolean
+  dimmed: boolean
+  onHoverEnter: () => void
+  onHoverLeave: () => void
 }
 
 // The root can't be a single button anymore — GalleryFileName's inline editor
@@ -61,6 +93,11 @@ export function PhotoThumbnail({
   onRename,
   ctrlHeld,
   previewScale,
+  showFilename,
+  spotlighted,
+  dimmed,
+  onHoverEnter,
+  onHoverLeave,
   className,
   ...rest
 }: PhotoThumbnailProps): ReactElement {
@@ -70,6 +107,20 @@ export function PhotoThumbnail({
   // Tracks the cursor so the floating preview below can be centered directly
   // on it, rather than offset to the side like a regular tooltip.
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
+
+  // Off when the user has toggled it off in Settings, or when the OS-level
+  // "reduce motion" preference is on — the setting doesn't override that,
+  // it's an additional gate on top of it.
+  const prefersReducedMotion = useReducedMotion()
+  const spotlightEnabled =
+    state.galleryAnimationsEnabled && !prefersReducedMotion && photo.thumbnailStatus === 'ready'
+  const spotlightState = !spotlightEnabled
+    ? 'idle'
+    : spotlighted
+      ? 'spotlighted'
+      : dimmed
+        ? 'dimmed'
+        : 'idle'
 
   // Dragging a photo that's part of the active multi-selection (2+ photos)
   // carries the whole batch; dragging anything else carries just that one —
@@ -109,21 +160,41 @@ export function PhotoThumbnail({
           className="photo-thumbnail__select-button"
           onClick={(event) => onSelect(photo.filePath, event)}
           onDoubleClick={() => openPhotoTab(photo.filePath)}
+          onMouseEnter={() => {
+            if (spotlightEnabled) onHoverEnter()
+          }}
           onMouseMove={(event) => {
             if (canPreview) setCursorPos({ x: event.clientX, y: event.clientY })
           }}
-          onMouseLeave={() => setCursorPos(null)}
+          onMouseLeave={() => {
+            setCursorPos(null)
+            if (spotlightEnabled) onHoverLeave()
+          }}
           w="100%"
           style={{ cursor: canPreview ? 'zoom-in' : undefined }}
         >
           {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
-            <AspectRatio ratio={1}>
-              <Image
-                src={toThumbProtocolUrl(photo.thumbnailKey)}
-                alt={photo.fileName}
-                fit="cover"
-                loading="lazy"
-              />
+            <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
+              <motion.div
+                initial={false}
+                animate={SPOTLIGHT_VARIANTS[spotlightState]}
+                transition={SPOTLIGHT_SPRING}
+                style={{ width: '100%', height: '100%' }}
+              >
+                <Image
+                  src={toThumbProtocolUrl(photo.thumbnailKey)}
+                  alt={photo.fileName}
+                  fit="cover"
+                  loading="lazy"
+                  // AspectRatio normally stretches its direct img child to
+                  // 100% width/height itself (targeting a `> img` selector),
+                  // but Image is now nested inside the motion.div wrapper
+                  // instead, so it no longer gets that sizing for free —
+                  // without it, non-square photos shrink to their natural
+                  // aspect ratio instead of filling the square frame.
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </motion.div>
             </AspectRatio>
           ) : (
             <Center
@@ -157,7 +228,7 @@ export function PhotoThumbnail({
               }}
             >
               <Image
-                src={toFileProtocolUrl(photo.filePath)}
+                src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
                 alt={photo.fileName}
                 bdrs="md"
                 fit="contain"
@@ -169,15 +240,17 @@ export function PhotoThumbnail({
             </Box>
           </Portal>
         )}
-        <Box w="100%">
-          <GalleryFileName
-            fileName={photo.fileName}
-            editing={renaming}
-            onStartEdit={onStartRename}
-            onStopEdit={onStopRename}
-            onRename={onRename}
-          />
-        </Box>
+        {(showFilename || renaming) && (
+          <Box w="100%">
+            <GalleryFileName
+              fileName={photo.fileName}
+              editing={renaming}
+              onStartEdit={onStartRename}
+              onStopEdit={onStopRename}
+              onRename={onRename}
+            />
+          </Box>
+        )}
       </Box>
     </Tooltip>
   )

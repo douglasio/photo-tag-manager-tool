@@ -31,6 +31,7 @@ import { TagDeleteButton } from '../Tags/TagDeleteButton'
 import { TagDescriptionEditor } from '../Tags/TagDescriptionEditor'
 import { TagNameEditor } from '../Tags/TagNameEditor'
 import { basename } from '../../utils/folderTree'
+import { GallerySettingsMenu } from './GallerySettingsMenu'
 import type { PhotoRecord } from '../../../../shared/types'
 
 const DEFAULT_CELL_WIDTH = 168
@@ -82,6 +83,14 @@ interface CellProps {
   onRename: (filePath: string, newBaseName: string) => Promise<void>
   ctrlHeld: boolean
   previewScale: number
+  showFilenames: boolean
+  hoveredPath: string | null
+  // Separate enter/leave callbacks (rather than a single "set to this path or
+  // null") avoid a race when the pointer moves directly from one thumbnail to
+  // an adjacent one: the new thumbnail's enter can fire before the old one's
+  // leave, and a plain "leave clears it" would wipe out the just-set hover.
+  onHoverEnter: (path: string) => void
+  onHoverLeave: (path: string) => void
 }
 
 function PhotoCell({
@@ -98,7 +107,11 @@ function PhotoCell({
   onStopRename,
   onRename,
   ctrlHeld,
-  previewScale
+  previewScale,
+  showFilenames,
+  hoveredPath,
+  onHoverEnter,
+  onHoverLeave
 }: CellComponentProps<CellProps>): ReactElement {
   const index = rowIndex * columnCount + columnIndex
   const photo = photos[index]
@@ -117,6 +130,11 @@ function PhotoCell({
           onRename={(newBaseName) => onRename(photo.filePath, newBaseName)}
           ctrlHeld={ctrlHeld}
           previewScale={previewScale}
+          showFilename={showFilenames}
+          spotlighted={hoveredPath === photo.filePath}
+          dimmed={hoveredPath !== null && hoveredPath !== photo.filePath}
+          onHoverEnter={() => onHoverEnter(photo.filePath)}
+          onHoverLeave={() => onHoverLeave(photo.filePath)}
         />
       </PhotoContextMenu>
     </Box>
@@ -155,6 +173,17 @@ export function GalleryGrid(): ReactElement {
     ctrlHeldRef.current = ctrlHeld
   }, [ctrlHeld])
   const [previewScale, setPreviewScale] = useState(1)
+  // Drives the spotlight hover effect (PhotoThumbnail): the hovered photo
+  // scales up and saturates while every other visible thumbnail dims and
+  // blurs. Lifted here (rather than each PhotoThumbnail reacting only to its
+  // own hover) since the dim/blur has to apply to every *other* thumbnail,
+  // which only a shared ancestor can know about.
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null)
+  const handleHoverEnter = useCallback((path: string) => setHoveredPath(path), [])
+  const handleHoverLeave = useCallback(
+    (path: string) => setHoveredPath((current) => (current === path ? null : current)),
+    []
+  )
   // Reset the zoom once Ctrl is released, so the next Ctrl+hover session
   // starts fresh — adjusted during render (not a useEffect) per this
   // codebase's pattern for resetting state when an external value changes.
@@ -210,7 +239,7 @@ export function GalleryGrid(): ReactElement {
   const availableWidth = Math.max(size.width - SCROLLBAR_RESERVE_PX, 0)
   const columnCount = Math.max(1, Math.round(availableWidth / cellWidth))
   const actualCellWidth = availableWidth > 0 ? availableWidth / columnCount : cellWidth
-  const cellHeight = actualCellWidth + CELL_LABEL_HEIGHT
+  const cellHeight = actualCellWidth + (state.showFilenames ? CELL_LABEL_HEIGHT : 0)
   const rowCount = Math.ceil(photos.length / columnCount)
 
   // The +/- buttons jump between the slider's own SIZE_MARK_VALUES rather
@@ -260,7 +289,11 @@ export function GalleryGrid(): ReactElement {
       onStopRename: () => setRenamingPath(null),
       onRename: renameFile,
       ctrlHeld,
-      previewScale
+      previewScale,
+      showFilenames: state.showFilenames,
+      hoveredPath,
+      onHoverEnter: handleHoverEnter,
+      onHoverLeave: handleHoverLeave
     }),
     [
       photos,
@@ -271,7 +304,11 @@ export function GalleryGrid(): ReactElement {
       renamingPath,
       renameFile,
       ctrlHeld,
-      previewScale
+      previewScale,
+      state.showFilenames,
+      hoveredPath,
+      handleHoverEnter,
+      handleHoverLeave
     ]
   )
 
@@ -410,6 +447,7 @@ export function GalleryGrid(): ReactElement {
                   </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
+              <GallerySettingsMenu />
             </Group>
           </Group>
           {isPureTagView && (

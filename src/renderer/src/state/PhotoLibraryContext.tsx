@@ -20,7 +20,7 @@ import {
 } from './photoLibraryReducer'
 import { basename, isPhotoInFolder } from '../utils/folderTree'
 import { toDisplayMetadata, type DisplayMetadata } from '../utils/metadataDisplay'
-import type { PhotoRecord } from '../../../shared/types'
+import type { PhotoRecord, RotateDirection } from '../../../shared/types'
 
 // selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
 // only it gets the labeled/display-formatted shape — transforming the whole
@@ -32,6 +32,11 @@ export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
 // How long to wait after the last file-watcher event before summarizing the
 // batch into a single toast, so a bulk copy/delete doesn't spam a toast per file.
 const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
+
+// Which arrow key drove a photo-to-photo navigation — 'right' means the
+// photo being navigated to should visually enter from the right (the user
+// stepped forward), 'left' means it enters from the left (stepped back).
+export type NavigationDirection = 'left' | 'right'
 
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
@@ -63,6 +68,9 @@ interface PhotoLibraryContextValue {
   setFolderTagFilter: (tag: string | null) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setShowEmptyFolders: (value: boolean) => void
+  setDetailsPanelCollapsed: (value: boolean) => void
+  setGalleryAnimationsEnabled: (value: boolean) => void
+  setShowFilenames: (value: boolean) => void
   setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
@@ -70,10 +78,20 @@ interface PhotoLibraryContextValue {
   deleteTag: (tag: string) => Promise<void>
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
   updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
+  updateComment: (filePath: string, comment: string) => Promise<void>
+  rotatePhoto: (filePath: string, direction: RotateDirection) => Promise<void>
   openTabPhotos: PhotoRecord[]
   openPhotoTab: (filePath: string) => void
   closePhotoTab: (filePath: string) => void
   setActiveTab: (tab: string) => void
+  reorderPhotoTabs: (openTabs: string[]) => void
+  navigateToPhoto: (fromPath: string, toPath: string, direction: NavigationDirection) => void
+  // One-shot lookup for PhotoView's entrance animation: which arrow key (if
+  // any) navigated to this specific photo, so it can slide in from the
+  // matching side. Consuming it removes it — a photo opened normally (double
+  // click, or reopening one you arrow-navigated away from earlier) must not
+  // replay a stale direction.
+  consumeNavDirection: (filePath: string) => NavigationDirection | null
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -214,6 +232,24 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     })
   }, [])
 
+  useEffect(() => {
+    window.api.getDetailsPanelCollapsed().then((value) => {
+      dispatch({ type: 'SET_DETAILS_PANEL_COLLAPSED', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getGalleryAnimationsEnabled().then((value) => {
+      dispatch({ type: 'SET_GALLERY_ANIMATIONS_ENABLED', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getShowFilenames().then((value) => {
+      dispatch({ type: 'SET_SHOW_FILENAMES', value })
+    })
+  }, [])
+
   const addFolder = useCallback(async () => {
     const rootPath = await window.api.selectFolder()
     if (!rootPath) return
@@ -312,6 +348,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     try {
       const photos = await window.api.addTagsToPhotos(tags, filePaths)
       dispatch({ type: 'PHOTOS_UPSERTED', photos })
+      dispatch({ type: 'TAGS_ASSIGNED', tags })
     } catch (err) {
       console.error('failed to add tags to photos', err)
       notifications.show({ color: 'red', message: 'Failed to save tags' })
@@ -399,6 +436,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     async (filePath: string, tags: string[]) => {
       const current = state.photosByPath.get(filePath)
       if (current) dispatch({ type: 'PHOTO_UPSERTED', photo: { ...current, tags } })
+
+      const newlyAdded = tags.filter((tag) => !current?.tags.includes(tag))
+      if (newlyAdded.length > 0) dispatch({ type: 'TAGS_ASSIGNED', tags: newlyAdded })
 
       // Chain onto whatever write is already pending for this same file, so
       // this one doesn't start until that one has actually finished — tags
@@ -522,6 +562,28 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [])
 
+  const updateComment = useCallback(async (filePath: string, comment: string) => {
+    try {
+      const photo = await window.api.updateComment(filePath, comment)
+      dispatch({ type: 'PHOTO_UPSERTED', photo })
+    } catch (err) {
+      console.error(`failed to update comment for ${filePath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to update comment' })
+      throw err
+    }
+  }, [])
+
+  const rotatePhoto = useCallback(async (filePath: string, direction: RotateDirection) => {
+    try {
+      const photo = await window.api.rotatePhoto(filePath, direction)
+      dispatch({ type: 'PHOTO_UPSERTED', photo })
+    } catch (err) {
+      console.error(`failed to rotate ${filePath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to rotate photo' })
+      throw err
+    }
+  }, [])
+
   const openPhotoTab = useCallback((filePath: string) => {
     dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
   }, [])
@@ -532,6 +594,36 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const setActiveTab = useCallback((tab: string) => {
     dispatch({ type: 'SET_ACTIVE_TAB', tab })
+  }, [])
+
+  const reorderPhotoTabs = useCallback((openTabs: string[]) => {
+    dispatch({ type: 'REORDER_PHOTO_TABS', openTabs })
+  }, [])
+
+  // Plain ref (not reducer state) since it's a one-shot side channel read
+  // exactly once by the PhotoView instance that mounts for `toPath` — it
+  // doesn't need to trigger a re-render of its own, and reducer state would
+  // otherwise need a separate "clear it" action to avoid the stale-direction
+  // problem described on consumeNavDirection below.
+  const navDirectionsRef = useRef(new Map<string, NavigationDirection>())
+
+  // Swaps which photo a tab points to in place (same slot, same tab-list
+  // position) — e.g. left/right-arrow stepping to the next/previous photo
+  // in gallery order while viewing one. RENAME_PHOTO_TAB's own transform
+  // (replace oldPath with newPath everywhere in openTabs/activeTab) is
+  // exactly what this needs too, so it's reused rather than duplicated.
+  const navigateToPhoto = useCallback(
+    (fromPath: string, toPath: string, direction: NavigationDirection) => {
+      navDirectionsRef.current.set(toPath, direction)
+      dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: fromPath, newPath: toPath })
+    },
+    []
+  )
+
+  const consumeNavDirection = useCallback((filePath: string): NavigationDirection | null => {
+    const direction = navDirectionsRef.current.get(filePath) ?? null
+    navDirectionsRef.current.delete(filePath)
+    return direction
   }, [])
 
   const photos = useMemo(() => {
@@ -563,6 +655,21 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const setShowEmptyFolders = useCallback((value: boolean) => {
     dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
     void window.api.setShowEmptyFolders(value)
+  }, [])
+
+  const setDetailsPanelCollapsed = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_DETAILS_PANEL_COLLAPSED', value })
+    void window.api.setDetailsPanelCollapsed(value)
+  }, [])
+
+  const setGalleryAnimationsEnabled = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_GALLERY_ANIMATIONS_ENABLED', value })
+    void window.api.setGalleryAnimationsEnabled(value)
+  }, [])
+
+  const setShowFilenames = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_SHOW_FILENAMES', value })
+    void window.api.setShowFilenames(value)
   }, [])
 
   // Persists the patterns, then rescans every folder so the library itself
@@ -617,10 +724,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.selectedPath, visiblePhotos]
   )
 
+  // While a photo-view tab is active, DetailPanel should track that tab's
+  // photo (not the gallery's own selection cursor, which keeps whatever it
+  // last was and can point somewhere else entirely) — the active tab's path
+  // wins whenever it isn't the 'gallery' tab itself.
   const selectedPhoto = useMemo(() => {
-    const raw = state.selectedPath ? (state.photosByPath.get(state.selectedPath) ?? null) : null
+    const path = state.activeTab !== 'gallery' ? state.activeTab : state.selectedPath
+    const raw = path ? (state.photosByPath.get(path) ?? null) : null
     return raw ? { ...raw, metadata: toDisplayMetadata(raw.metadata) } : null
-  }, [state.selectedPath, state.photosByPath])
+  }, [state.selectedPath, state.activeTab, state.photosByPath])
 
   // Tag covers always pick the most-recently-taken photo, independent of the
   // gallery's own sort order/direction — otherwise switching gallery sort
@@ -707,6 +819,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setFolderTagFilter,
     setSort,
     setShowEmptyFolders,
+    setDetailsPanelCollapsed,
+    setGalleryAnimationsEnabled,
+    setShowFilenames,
     setExcludePatterns,
     updateTags,
     setTagDescription,
@@ -714,10 +829,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     deleteTag,
     renameFile,
     updateDateTaken,
+    updateComment,
+    rotatePhoto,
     openTabPhotos,
     openPhotoTab,
     closePhotoTab,
-    setActiveTab
+    setActiveTab,
+    reorderPhotoTabs,
+    navigateToPhoto,
+    consumeNavDirection
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

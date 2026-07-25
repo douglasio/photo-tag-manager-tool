@@ -38,6 +38,7 @@ export function FileNameEditor({ fileName, onRename }: FileNameEditorProps): Rea
           <TextInput
             autoFocus
             variant="unstyled"
+            flex={1}
             value={draft}
             error={error}
             onChange={(event) => setDraft(event.currentTarget.value)}
@@ -50,7 +51,6 @@ export function FileNameEditor({ fileName, onRename }: FileNameEditorProps): Rea
                 cancel()
               }
             }}
-            style={{ flex: 1, minWidth: 0 }}
             styles={{
               input: {
                 fontWeight: 700,

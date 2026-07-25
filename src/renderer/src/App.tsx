@@ -8,13 +8,15 @@ import {
   Group,
   Image,
   Tabs,
-  Title
+  Title,
+  Tooltip
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  closestCenter,
   pointerWithin,
   useSensor,
   useSensors,
@@ -22,23 +24,39 @@ import {
   type DragStartEvent,
   type Modifier
 } from '@dnd-kit/core'
+import { SortableContext, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { getEventCoordinates } from '@dnd-kit/utilities'
-import { IconPhoto, IconX } from '@tabler/icons-react'
-import { useState } from 'react'
+import {
+  IconLayoutSidebarRightCollapse,
+  IconLayoutSidebarRightExpand,
+  IconLibraryPhoto,
+  IconPhoto,
+  IconX
+} from '@tabler/icons-react'
+import { useEffect, useState } from 'react'
 import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
 import { AllPhotosRow } from './components/Folders/AllPhotosRow'
 import { AppLogo } from './components/Shared/AppLogo'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { ScanProgressBar } from './components/Settings/ScanProgressBar'
 import { GalleryGrid } from './components/Gallery/GalleryGrid'
-import { DetailPanel } from './components/PhotoView/DetailPanel'
+import { DetailPanel } from './components/DetailPanel/DetailPanel'
 import { FolderSettingsMenu } from './components/Folders/FolderSettingsMenu'
 import { FolderTree } from './components/Folders/FolderTree'
 import { PanelSection } from './components/Shared/PanelSection'
 import { PhotoView } from './components/PhotoView/PhotoView'
+import { SortableTab } from './components/Shared/SortableTab'
 import { TagPanel } from './components/Tags/TagPanel'
 import { toThumbProtocolUrl } from '../../shared/protocolUrls'
 import type { PhotoRecord } from '../../shared/types'
+import { radiusSize } from '@renderer/theme'
+
+// True while focus is inside anything the "g" shortcut below shouldn't
+// hijack a keystroke from (text/date inputs, contenteditable, etc.).
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
 
 const HEADER_HEIGHT = 52
 const DRAG_PREVIEW_SIZE = 64
@@ -78,11 +96,11 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
   return (
     <Box pos="relative" w={DRAG_PREVIEW_SIZE} h={DRAG_PREVIEW_SIZE}>
       <Box
+        w={DRAG_PREVIEW_SIZE}
+        h={DRAG_PREVIEW_SIZE}
+        opacity={0.75}
+        bdrs={radiusSize}
         style={{
-          width: DRAG_PREVIEW_SIZE,
-          height: DRAG_PREVIEW_SIZE,
-          opacity: 0.75,
-          borderRadius: 'var(--mantine-radius-default)',
           overflow: 'hidden',
           boxShadow: 'var(--mantine-shadow-md)',
           cursor: 'grabbing'
@@ -121,13 +139,57 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
 // Split out from App so it can call usePhotoLibrary — a component can't read
 // a context it also renders the Provider for in the same function.
 function AppLayout(): React.JSX.Element {
-  const { state, openTabPhotos, closePhotoTab, setActiveTab, addTagsToPhotos, movePhotosToFolder } =
-    usePhotoLibrary()
+  const {
+    state,
+    openTabPhotos,
+    closePhotoTab,
+    setActiveTab,
+    addTagsToPhotos,
+    movePhotosToFolder,
+    setDetailsPanelCollapsed,
+    reorderPhotoTabs
+  } = usePhotoLibrary()
   const hasTabs = state.openTabs.length > 0
-  // Panels only hide while an actual photo tab is active — switching back to
-  // the Gallery tab (with other photo tabs still open in the background)
-  // restores the normal three-pane layout.
+  // The navbar (Tags/Folders) only hides while an actual photo tab is active
+  // — switching back to the Gallery tab (with other photo tabs still open in
+  // the background) restores it. The details aside is independent of this:
+  // it's user-togglable and persisted, shown on both the gallery and
+  // photo-view screens.
   const isPhotoTabActive = state.activeTab !== 'gallery'
+
+  // Universal "back to gallery" shortcut — works regardless of which tab is
+  // active, so it's wired at the layout level rather than inside PhotoView.
+  // Skipped while typing anywhere (rename fields, tag input, comment editor,
+  // date picker, ...) so a literal "g" keystroke isn't hijacked.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'g' || event.metaKey || event.ctrlKey || event.altKey) return
+      if (isEditableTarget(event.target)) return
+      setActiveTab('gallery')
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [setActiveTab])
+
+  // Alt+Left/Right cycles between open tabs (Gallery first, then openTabs in
+  // their current order) regardless of which tab is currently active — a
+  // separate concern from PhotoView's own plain Left/Right, which instead
+  // steps to the next/previous photo within the currently viewed one.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
+      if (isEditableTarget(event.target)) return
+      const order = ['gallery', ...state.openTabs]
+      const currentIndex = order.indexOf(state.activeTab)
+      if (currentIndex === -1) return
+      const nextIndex = event.key === 'ArrowRight' ? currentIndex + 1 : currentIndex - 1
+      if (nextIndex < 0 || nextIndex >= order.length) return
+      event.preventDefault()
+      setActiveTab(order[nextIndex])
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [state.openTabs, state.activeTab, setActiveTab])
 
   const [activeDragPaths, setActiveDragPaths] = useState<string[] | null>(null)
   const sensors = useSensors(
@@ -166,6 +228,22 @@ function AppLayout(): React.JSX.Element {
 
   const activeDragPhoto = activeDragPaths ? state.photosByPath.get(activeDragPaths[0]) : undefined
 
+  // Separate, nested DndContext scoped to just the photo-tab row — reordering
+  // tabs is an unrelated drag interaction from the gallery-thumbnail one
+  // above (different collision detection needs: closestCenter suits a
+  // single-axis tab strip, pointerWithin suits dropping a thumbnail onto an
+  // arbitrary tag/folder target) and dnd-kit supports nesting independent
+  // DndContexts like this without them interfering with each other.
+  const tabSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const handleTabDragEnd = (event: DragEndEvent): void => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = state.openTabs.indexOf(String(active.id))
+    const newIndex = state.openTabs.indexOf(String(over.id))
+    if (oldIndex === -1 || newIndex === -1) return
+    reorderPhotoTabs(arrayMove(state.openTabs, oldIndex, newIndex))
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -190,7 +268,7 @@ function AppLayout(): React.JSX.Element {
         aside={{
           width: 320,
           breakpoint: 0,
-          collapsed: { desktop: isPhotoTabActive, mobile: isPhotoTabActive }
+          collapsed: { desktop: state.detailsPanelCollapsed, mobile: state.detailsPanelCollapsed }
         }}
         padding={0}
       >
@@ -204,6 +282,21 @@ function AppLayout(): React.JSX.Element {
             </Group>
             <Group gap="md" wrap="nowrap">
               <ScanProgressBar />
+              <Tooltip
+                label={state.detailsPanelCollapsed ? 'Show details panel' : 'Hide details panel'}
+              >
+                <ActionIcon
+                  variant="subtle"
+                  aria-label="Toggle details panel"
+                  onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
+                >
+                  {state.detailsPanelCollapsed ? (
+                    <IconLayoutSidebarRightExpand size={18} />
+                  ) : (
+                    <IconLayoutSidebarRightCollapse size={18} />
+                  )}
+                </ActionIcon>
+              </Tooltip>
               <SettingsModal />
             </Group>
           </Group>
@@ -236,29 +329,43 @@ function AppLayout(): React.JSX.Element {
                 style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
               >
                 <Tabs.List style={{ flexShrink: 0 }}>
-                  <Tabs.Tab value="gallery">Gallery</Tabs.Tab>
-                  {openTabPhotos.map((photo) => (
-                    <Tabs.Tab
-                      key={photo.filePath}
-                      value={photo.filePath}
-                      rightSection={
-                        <ActionIcon
-                          component="span"
-                          size="xs"
-                          variant="subtle"
-                          color="gray"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            closePhotoTab(photo.filePath)
-                          }}
-                        >
-                          <IconX size={12} />
-                        </ActionIcon>
-                      }
+                  <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto />}>
+                    Gallery
+                  </Tabs.Tab>
+                  <DndContext
+                    sensors={tabSensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleTabDragEnd}
+                  >
+                    <SortableContext
+                      items={state.openTabs}
+                      strategy={horizontalListSortingStrategy}
                     >
-                      {photo.fileName}
-                    </Tabs.Tab>
-                  ))}
+                      {openTabPhotos.map((photo) => (
+                        <SortableTab
+                          key={photo.filePath}
+                          id={photo.filePath}
+                          value={photo.filePath}
+                          rightSection={
+                            <ActionIcon
+                              component="span"
+                              size="xs"
+                              variant="subtle"
+                              color="gray"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                closePhotoTab(photo.filePath)
+                              }}
+                            >
+                              <IconX size={12} />
+                            </ActionIcon>
+                          }
+                        >
+                          {photo.fileName}
+                        </SortableTab>
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 </Tabs.List>
                 <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
                   <GalleryGrid />

@@ -6,7 +6,6 @@ import {
   Center,
   DataList,
   Flex,
-  Group,
   Stack,
   Text,
   Title,
@@ -15,6 +14,7 @@ import {
 import { notifications } from '@mantine/notifications'
 import type { ReactElement } from 'react'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { CommentEditor } from './CommentEditor'
 import { DateTakenEditor } from './DateTakenEditor'
 import { FileNameEditor } from './FileNameEditor'
 import { TagList } from '../Tags/TagList'
@@ -22,43 +22,28 @@ import { isNullOrEmpty } from '@renderer/utils/functions'
 import { IconCopy, IconExternalLink, IconPhoto } from '@tabler/icons-react'
 import { useHover } from '@mantine/hooks'
 
-// function formatBytes(bytes: number): string {
-//   if (bytes < 1024) return `${bytes} B`
-//   const units = ['KB', 'MB', 'GB']
-//   let value = bytes / 1024
-//   let unitIndex = 0
-//   while (value >= 1024 && unitIndex < units.length - 1) {
-//     value /= 1024
-//     unitIndex++
-//   }
-//   return `${value.toFixed(1)} ${units[unitIndex]}`
-// }
-
-// function DetailRow({ label, value }: { label: string; value: string }): ReactElement {
-//   return (
-//     <Group justify="space-between" wrap="nowrap" gap="md" align="flex-start">
-//       <Text c="dimmed" style={{ flexShrink: 0 }}>
-//         {label}
-//       </Text>
-//       <Text ta="right" style={{ wordBreak: 'break-word' }}>
-//         {value}
-//       </Text>
-//     </Group>
-//   )
-// }
-
 const metadataDisplayFilters = ['comment', 'dateTaken']
 
 export function DetailPanel(): ReactElement {
-  const { selectedPhoto, allTags, updateTags, renameFile, updateDateTaken, openPhotoTab, state } =
-    usePhotoLibrary()
+  const {
+    selectedPhoto,
+    allTags,
+    updateTags,
+    renameFile,
+    updateDateTaken,
+    updateComment,
+    openPhotoTab,
+    state
+  } = usePhotoLibrary()
   const { hovered, ref } = useHover<HTMLDivElement>()
 
   // Showing one photo's metadata/tags while a multi-selection is active
   // would misleadingly suggest edits apply to just that one photo (batch
   // edits go through the gallery's right-click menu instead), so this stays
-  // blank whenever more than one photo is selected.
-  if (state.selectedPaths.size > 1) {
+  // blank whenever more than one photo is selected — but only on the gallery
+  // screen; a photo-view tab always has exactly one photo open regardless of
+  // whatever multi-selection is lingering in the background gallery.
+  if (state.activeTab === 'gallery' && state.selectedPaths.size > 1) {
     return (
       <Center h="100%">
         <Text c="dimmed" ta="center">
@@ -79,17 +64,16 @@ export function DetailPanel(): ReactElement {
   }
 
   const { metadata } = selectedPhoto
+  // The panel is already showing this exact photo's details because it's
+  // the open photo-view tab — opening it again would be a no-op, so the
+  // button is redundant there (it stays for the gallery screen, where
+  // selectedPhoto is just the selection cursor, not necessarily open yet).
+  const isViewingThisPhoto = state.activeTab === selectedPhoto.filePath
 
   return (
     <Stack>
       <Stack>
-        <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
-          <Box flex={1} miw={0}>
-            <FileNameEditor
-              fileName={selectedPhoto.fileName}
-              onRename={(newBaseName) => renameFile(selectedPhoto.filePath, newBaseName)}
-            />
-          </Box>
+        {!isViewingThisPhoto && (
           <Tooltip label="Open">
             <Button
               leftSection={<IconPhoto size={18} />}
@@ -98,15 +82,23 @@ export function DetailPanel(): ReactElement {
               Open
             </Button>
           </Tooltip>
-        </Group>
-        {metadata.comment.value && (
-          <DataList orientation="vertical">
-            <DataList.Item>
-              <DataList.ItemLabel>{metadata.comment.label}</DataList.ItemLabel>
-              <DataList.ItemValue>{metadata.comment.displayValue}</DataList.ItemValue>
-            </DataList.Item>
-          </DataList>
         )}
+        <Box flex={1} miw={0}>
+          <FileNameEditor
+            fileName={selectedPhoto.fileName}
+            onRename={(newBaseName) => renameFile(selectedPhoto.filePath, newBaseName)}
+          />
+        </Box>
+        <Stack>
+          <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
+            Comment
+          </Title>
+          <CommentEditor
+            value={metadata.comment.value}
+            displayValue={metadata.comment.displayValue}
+            onSave={(comment) => updateComment(selectedPhoto.filePath, comment)}
+          />
+        </Stack>
         <Stack>
           <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
             Tags
@@ -114,6 +106,7 @@ export function DetailPanel(): ReactElement {
           <TagList
             tags={selectedPhoto.tags}
             allTags={allTags}
+            recentTags={state.recentTags}
             onChange={(tags) => void updateTags(selectedPhoto.filePath, tags)}
           />
         </Stack>

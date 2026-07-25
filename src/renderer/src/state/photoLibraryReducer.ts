@@ -12,6 +12,8 @@ export type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 export type GallerySortBy = 'name' | 'dateTaken'
 export type GallerySortOrder = 'asc' | 'desc'
 
+export const RECENT_TAGS_LIMIT = 3
+
 export interface PhotoLibraryState {
   folders: string[]
   rootPath: string | null
@@ -40,8 +42,15 @@ export interface PhotoLibraryState {
   // scan — not live filesystem changes.
   allFolderPaths: Set<string>
   showEmptyFolders: boolean
+  detailsPanelCollapsed: boolean
+  galleryAnimationsEnabled: boolean
+  showFilenames: boolean
   excludePatterns: string[]
   tagDescriptions: Map<string, string>
+  // Most-recently-assigned tag names, newest first — shown as a shortcut
+  // section at the top of the tag-input dropdown. Session-only (not
+  // persisted): resets on app restart.
+  recentTags: string[]
   // Ordered list of photo paths open as Photo View tabs. activeTab is either
   // 'gallery' or one of the paths in openTabs.
   openTabs: string[]
@@ -67,8 +76,12 @@ export const initialState: PhotoLibraryState = {
   folderChildren: new Map(),
   allFolderPaths: new Set(),
   showEmptyFolders: false,
+  detailsPanelCollapsed: false,
+  galleryAnimationsEnabled: true,
+  showFilenames: true,
   excludePatterns: [],
   tagDescriptions: new Map(),
+  recentTags: [],
   openTabs: [],
   activeTab: 'gallery'
 }
@@ -91,6 +104,10 @@ export type PhotoLibraryAction =
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
+  | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
+  | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
+  | { type: 'SET_SHOW_FILENAMES'; value: boolean }
+  | { type: 'TAGS_ASSIGNED'; tags: string[] }
   | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
   | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
   | { type: 'WATCH_FOLDER_REMOVED'; folderPath: string }
@@ -104,6 +121,7 @@ export type PhotoLibraryAction =
   | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
+  | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
 
 export function photoLibraryReducer(
   state: PhotoLibraryState,
@@ -339,6 +357,23 @@ export function photoLibraryReducer(
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'SET_SHOW_EMPTY_FOLDERS':
       return { ...state, showEmptyFolders: action.value }
+    case 'SET_DETAILS_PANEL_COLLAPSED':
+      return { ...state, detailsPanelCollapsed: action.value }
+    case 'SET_GALLERY_ANIMATIONS_ENABLED':
+      return { ...state, galleryAnimationsEnabled: action.value }
+    case 'SET_SHOW_FILENAMES':
+      return { ...state, showFilenames: action.value }
+    // Newest-first, deduped, capped — a tag already in the list moves to the
+    // front rather than appearing twice.
+    case 'TAGS_ASSIGNED': {
+      const incoming = Array.from(new Set(action.tags))
+      if (incoming.length === 0) return state
+      const recentTags = [
+        ...incoming,
+        ...state.recentTags.filter((tag) => !incoming.includes(tag))
+      ].slice(0, RECENT_TAGS_LIMIT)
+      return { ...state, recentTags }
+    }
     case 'SET_EXCLUDE_PATTERNS':
       return { ...state, excludePatterns: action.patterns }
     case 'WATCH_FOLDER_ADDED': {
@@ -447,7 +482,16 @@ export function photoLibraryReducer(
     case 'CLOSE_PHOTO_TAB': {
       if (!state.openTabs.includes(action.filePath)) return state
       const openTabs = state.openTabs.filter((path) => path !== action.filePath)
-      const activeTab = state.activeTab === action.filePath ? 'gallery' : state.activeTab
+      let activeTab = state.activeTab
+      if (state.activeTab === action.filePath) {
+        // Falls back to whatever tab was immediately to the left in the
+        // visible tab order (Gallery always first, then openTabs) — Gallery
+        // itself if the closed tab was the leftmost photo tab — rather than
+        // always jumping straight back to Gallery.
+        const order = ['gallery', ...state.openTabs]
+        const closedIndex = order.indexOf(action.filePath)
+        activeTab = order[closedIndex - 1]
+      }
       return { ...state, openTabs, activeTab }
     }
     case 'SET_ACTIVE_TAB':
@@ -463,6 +507,8 @@ export function photoLibraryReducer(
       const activeTab = state.activeTab === action.oldPath ? action.newPath : state.activeTab
       return { ...state, openTabs, activeTab }
     }
+    case 'REORDER_PHOTO_TABS':
+      return { ...state, openTabs: action.openTabs }
     default:
       return state
   }

@@ -72,6 +72,35 @@ export function setShowEmptyFolders(value: boolean): void {
   setSetting('showEmptyFolders', String(value))
 }
 
+export function getDetailsPanelCollapsed(): boolean {
+  return getSetting('detailsPanelCollapsed') === 'true'
+}
+
+export function setDetailsPanelCollapsed(value: boolean): void {
+  setSetting('detailsPanelCollapsed', String(value))
+}
+
+// Defaults to on (unlike the other boolean settings above, which default
+// off) — unset means "never explicitly toggled," not "explicitly disabled."
+export function getGalleryAnimationsEnabled(): boolean {
+  const raw = getSetting('galleryAnimationsEnabled')
+  return raw === null ? true : raw === 'true'
+}
+
+export function setGalleryAnimationsEnabled(value: boolean): void {
+  setSetting('galleryAnimationsEnabled', String(value))
+}
+
+// Defaults to on, same reasoning as getGalleryAnimationsEnabled above.
+export function getShowFilenames(): boolean {
+  const raw = getSetting('showFilenames')
+  return raw === null ? true : raw === 'true'
+}
+
+export function setShowFilenames(value: boolean): void {
+  setSetting('showFilenames', String(value))
+}
+
 export function getExcludePatterns(): string[] {
   const raw = getSetting('excludePatterns')
   if (!raw) return []

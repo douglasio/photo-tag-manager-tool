@@ -52,6 +52,16 @@ if (!app.requestSingleInstanceLock()) {
       return { action: 'deny' }
     })
 
+    // Electron's default (unset) application menu binds Ctrl/Cmd+Plus, Minus,
+    // and 0 to its own built-in whole-page zoom, independent of any renderer
+    // keydown listener — that accelerator was firing alongside PhotoView's
+    // own Ctrl+-/+ zoom-slider shortcuts, which looked like "zoom out doesn't
+    // work" once the slider was already at its minimum and only the native
+    // page-zoom effect remained visible.
+    mainWindow.webContents.on('zoom-changed', (event) => {
+      event.preventDefault()
+    })
+
     if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
       mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
     } else {

@@ -26,7 +26,7 @@ function SectionTitle({ children }: { children: string }): ReactElement {
 }
 
 function FoldersSection(): ReactElement {
-  const { state, addFolder, setShowEmptyFolders } = usePhotoLibrary()
+  const { state, addFolder } = usePhotoLibrary()
 
   return (
     <Stack gap="xs">
@@ -56,11 +56,26 @@ function FoldersSection(): ReactElement {
       <Button onClick={() => void addFolder()} style={{ alignSelf: 'flex-start' }}>
         Add Folder…
       </Button>
-      <Divider my="xs" />
+    </Stack>
+  )
+}
+
+function GallerySection(): ReactElement {
+  const { state, setGalleryAnimationsEnabled, setShowEmptyFolders } = usePhotoLibrary()
+
+  return (
+    <Stack gap="xs">
+      <SectionTitle>Gallery</SectionTitle>
       <Switch
         label="Show empty folders"
         checked={state.showEmptyFolders}
         onChange={(event) => setShowEmptyFolders(event.currentTarget.checked)}
+      />
+      <Switch
+        label="Photo decorative animations"
+        description="Enable various photo animations in the gallery and photo views. Automatically off if your system prefers reduced motion."
+        checked={state.galleryAnimationsEnabled}
+        onChange={(event) => setGalleryAnimationsEnabled(event.currentTarget.checked)}
       />
     </Stack>
   )
@@ -109,6 +124,8 @@ export function SettingsModal(): ReactElement {
       <Modal opened={opened} onClose={close} title={<Title order={2}>Settings</Title>} size="lg">
         <Stack gap="lg">
           <FoldersSection />
+          <Divider />
+          <GallerySection />
           <Divider />
           <ExcludePatternsSection />
         </Stack>

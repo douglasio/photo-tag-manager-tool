@@ -34,6 +34,12 @@ export async function thumbnailFilePath(thumbnailKey: string): Promise<string> {
 export async function generateThumbnail(filePath: string, thumbnailKey: string): Promise<void> {
   const outputPath = await thumbnailFilePath(thumbnailKey)
   await sharp(filePath)
+    // No-arg rotate() auto-orients using the source's EXIF Orientation tag
+    // (then strips it, since the output pixels are now physically correct)
+    // — without this, a photo with a non-default Orientation renders upright
+    // in the full-res view (browsers respect EXIF orientation by default)
+    // but sideways/upside-down in its own thumbnail.
+    .rotate()
     .resize({
       width: THUMBNAIL_LONG_EDGE,
       height: THUMBNAIL_LONG_EDGE,

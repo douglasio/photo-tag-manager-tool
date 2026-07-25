@@ -5,6 +5,7 @@ import type {
   MetadataBatchEvent,
   MoveProgressEvent,
   PhotoRecord,
+  RotateDirection,
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
@@ -28,6 +29,10 @@ const api = {
     ipcRenderer.invoke('photo:rename', filePath, newBaseName),
   updateDateTaken: (filePath: string, isoDate: string): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:updateDateTaken', filePath, isoDate),
+  updateComment: (filePath: string, comment: string): Promise<PhotoRecord> =>
+    ipcRenderer.invoke('photo:updateComment', filePath, comment),
+  rotatePhoto: (filePath: string, direction: RotateDirection): Promise<PhotoRecord> =>
+    ipcRenderer.invoke('photo:rotate', filePath, direction),
   movePhotosToFolder: (
     filePaths: string[],
     destFolder: string
@@ -45,6 +50,17 @@ const api = {
   getShowEmptyFolders: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowEmptyFolders'),
   setShowEmptyFolders: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowEmptyFolders', value),
+  getDetailsPanelCollapsed: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
+  setDetailsPanelCollapsed: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setDetailsPanelCollapsed', value),
+  getGalleryAnimationsEnabled: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:getGalleryAnimationsEnabled'),
+  setGalleryAnimationsEnabled: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setGalleryAnimationsEnabled', value),
+  getShowFilenames: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowFilenames'),
+  setShowFilenames: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setShowFilenames', value),
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),
