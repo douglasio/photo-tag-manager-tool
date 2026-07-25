@@ -63,3 +63,25 @@ jobs:
         run: npx electron-builder --linux --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    needs: release
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify on release failure (create GitHub issue)
+        if: ${{ needs.release.result != 'success' }}
+        uses: peter-evans/create-issue@v4
+        with:
+          title: 'Release workflow failed for ${{ github.ref_name }}'
+          body: |
+            The Release workflow run for tag `${{ github.ref_name }}` (run id `${{ github.run_id }}`) did not succeed.
+
+            Repository: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+
+            View the run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            The failing matrix job(s) may be listed in the run page above.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
