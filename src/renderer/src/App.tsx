@@ -30,7 +30,7 @@ import {
   IconPhoto,
   IconX
 } from '@tabler/icons-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
 import { AllPhotosRow } from './components/Folders/AllPhotosRow'
 import { AppLogo } from './components/Shared/AppLogo'
@@ -45,6 +45,13 @@ import { PhotoView } from './components/PhotoView/PhotoView'
 import { TagPanel } from './components/Tags/TagPanel'
 import { toThumbProtocolUrl } from '../../shared/protocolUrls'
 import type { PhotoRecord } from '../../shared/types'
+
+// True while focus is inside anything the "g" shortcut below shouldn't
+// hijack a keystroke from (text/date inputs, contenteditable, etc.).
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
 
 const HEADER_HEIGHT = 52
 const DRAG_PREVIEW_SIZE = 64
@@ -143,6 +150,20 @@ function AppLayout(): React.JSX.Element {
   // it's user-togglable and persisted, shown on both the gallery and
   // photo-view screens.
   const isPhotoTabActive = state.activeTab !== 'gallery'
+
+  // Universal "back to gallery" shortcut — works regardless of which tab is
+  // active, so it's wired at the layout level rather than inside PhotoView.
+  // Skipped while typing anywhere (rename fields, tag input, comment editor,
+  // date picker, ...) so a literal "g" keystroke isn't hijacked.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'g' || event.metaKey || event.ctrlKey || event.altKey) return
+      if (isEditableTarget(event.target)) return
+      setActiveTab('gallery')
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [setActiveTab])
 
   const [activeDragPaths, setActiveDragPaths] = useState<string[] | null>(null)
   const sensors = useSensors(

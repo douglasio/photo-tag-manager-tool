@@ -452,7 +452,16 @@ export function photoLibraryReducer(
     case 'CLOSE_PHOTO_TAB': {
       if (!state.openTabs.includes(action.filePath)) return state
       const openTabs = state.openTabs.filter((path) => path !== action.filePath)
-      const activeTab = state.activeTab === action.filePath ? 'gallery' : state.activeTab
+      let activeTab = state.activeTab
+      if (state.activeTab === action.filePath) {
+        // Falls back to whatever tab was immediately to the left in the
+        // visible tab order (Gallery always first, then openTabs) — Gallery
+        // itself if the closed tab was the leftmost photo tab — rather than
+        // always jumping straight back to Gallery.
+        const order = ['gallery', ...state.openTabs]
+        const closedIndex = order.indexOf(action.filePath)
+        activeTab = order[closedIndex - 1]
+      }
       return { ...state, openTabs, activeTab }
     }
     case 'SET_ACTIVE_TAB':
