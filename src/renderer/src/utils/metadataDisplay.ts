@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import type { PhotoMetadata } from '../../../shared/types'
 
-export interface MetadataField<T> {
+interface MetadataField<T> {
   label: string
   value: T
   displayValue: string

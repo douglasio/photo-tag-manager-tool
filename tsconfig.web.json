@@ -5,15 +5,22 @@
     "src/renderer/src/**/*",
     "src/renderer/src/**/*.tsx",
     "src/preload/*.d.ts",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "vitest.setup.ts"
   ],
   "compilerOptions": {
     "composite": true,
+    // Typechecking always runs as `tsc --noEmit ... --composite false` (see
+    // package.json's typecheck:web script), so nothing here ever actually
+    // gets written — but the editor's own TS server evaluates this file as-is
+    // (composite: true, so declaration emit is implied), and without an
+    // outDir, composite mode's declaration output would land right next to
+    // its source and collide with the hand-written src/preload/index.d.ts.
+    "outDir": "dist/web-types",
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
       "@renderer/*": [
-        "src/renderer/src/*"
+        "./src/renderer/src/*"
       ]
     }
   }

@@ -1,7 +1,7 @@
 import { net, protocol } from 'electron'
 import { pathToFileURL } from 'url'
 
-export const FILE_PROTOCOL = 'photag-file'
+const FILE_PROTOCOL = 'photag-file'
 
 export function registerFileProtocolScheme(): void {
   protocol.registerSchemesAsPrivileged([
