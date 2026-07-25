@@ -55,7 +55,10 @@ export function getDb(): Database.Database {
   // Bumping THUMBNAIL_GENERATION (e.g. after changing thumbnailService's target
   // size) marks every cached thumbnail stale so the next scan regenerates them
   // at the new size, without needing a full library rescan or cache wipe.
-  const THUMBNAIL_GENERATION = '2'
+  // Bumped to 3: generateThumbnail now auto-orients via EXIF before resizing,
+  // so previously-cached thumbnails for rotated photos were baked in the
+  // wrong orientation and need to be regenerated once.
+  const THUMBNAIL_GENERATION = '3'
   const storedGeneration = db
     .prepare("SELECT value FROM settings WHERE key = 'thumbnailGeneration'")
     .get() as { value: string } | undefined

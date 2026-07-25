@@ -1,9 +1,16 @@
 import { Box, Menu, MultiSelect } from '@mantine/core'
-import { IconEdit, IconExternalLink, IconFolderOpen, IconTag } from '@tabler/icons-react'
+import {
+  IconEdit,
+  IconExternalLink,
+  IconFolderOpen,
+  IconRotate,
+  IconRotateClockwise,
+  IconTag
+} from '@tabler/icons-react'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 import { isMac } from '../../utils/platform'
-import type { PhotoRecord } from '../../../../shared/types'
+import { ROTATABLE_FORMATS, type PhotoRecord } from '../../../../shared/types'
 
 interface PhotoContextMenuProps {
   photo: PhotoRecord
@@ -16,10 +23,11 @@ export function PhotoContextMenu({
   onRename,
   children
 }: PhotoContextMenuProps): ReactElement {
-  const { openPhotoTab, allTags, updateTags, selectPhoto, addTagsToSelection, state } =
+  const { openPhotoTab, allTags, updateTags, selectPhoto, addTagsToSelection, rotatePhoto, state } =
     usePhotoLibrary()
   const [opened, setOpened] = useState(false)
   const [addingTag, setAddingTag] = useState(false)
+  const canRotate = ROTATABLE_FORMATS.includes(photo.metadata.format)
 
   // Right-clicking a photo that's part of the active multi-selection (2+
   // photos) operates on the whole batch; right-clicking anything else
@@ -96,6 +104,22 @@ export function PhotoContextMenu({
               >
                 Show in {isMac ? 'Finder' : 'Explorer'}
               </Menu.Item>
+            )}
+            {!isBatch && canRotate && (
+              <>
+                <Menu.Item
+                  leftSection={<IconRotate size={14} />}
+                  onClick={() => void rotatePhoto(photo.filePath, 'left')}
+                >
+                  Rotate Left
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconRotateClockwise size={14} />}
+                  onClick={() => void rotatePhoto(photo.filePath, 'right')}
+                >
+                  Rotate Right
+                </Menu.Item>
+              </>
             )}
           </>
         )}

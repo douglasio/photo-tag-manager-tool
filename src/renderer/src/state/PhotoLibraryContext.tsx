@@ -20,7 +20,7 @@ import {
 } from './photoLibraryReducer'
 import { basename, isPhotoInFolder } from '../utils/folderTree'
 import { toDisplayMetadata, type DisplayMetadata } from '../utils/metadataDisplay'
-import type { PhotoRecord } from '../../../shared/types'
+import type { PhotoRecord, RotateDirection } from '../../../shared/types'
 
 // selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
 // only it gets the labeled/display-formatted shape — transforming the whole
@@ -72,6 +72,7 @@ interface PhotoLibraryContextValue {
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
   updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
   updateComment: (filePath: string, comment: string) => Promise<void>
+  rotatePhoto: (filePath: string, direction: RotateDirection) => Promise<void>
   openTabPhotos: PhotoRecord[]
   openPhotoTab: (filePath: string) => void
   closePhotoTab: (filePath: string) => void
@@ -541,6 +542,17 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [])
 
+  const rotatePhoto = useCallback(async (filePath: string, direction: RotateDirection) => {
+    try {
+      const photo = await window.api.rotatePhoto(filePath, direction)
+      dispatch({ type: 'PHOTO_UPSERTED', photo })
+    } catch (err) {
+      console.error(`failed to rotate ${filePath}`, err)
+      notifications.show({ color: 'red', message: 'Failed to rotate photo' })
+      throw err
+    }
+  }, [])
+
   const openPhotoTab = useCallback((filePath: string) => {
     dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
   }, [])
@@ -745,6 +757,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     renameFile,
     updateDateTaken,
     updateComment,
+    rotatePhoto,
     openTabPhotos,
     openPhotoTab,
     closePhotoTab,

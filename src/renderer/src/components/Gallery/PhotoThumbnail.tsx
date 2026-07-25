@@ -157,7 +157,7 @@ export function PhotoThumbnail({
               }}
             >
               <Image
-                src={toFileProtocolUrl(photo.filePath)}
+                src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
                 alt={photo.fileName}
                 bdrs="md"
                 fit="contain"

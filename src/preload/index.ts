@@ -5,6 +5,7 @@ import type {
   MetadataBatchEvent,
   MoveProgressEvent,
   PhotoRecord,
+  RotateDirection,
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
@@ -30,6 +31,8 @@ const api = {
     ipcRenderer.invoke('photo:updateDateTaken', filePath, isoDate),
   updateComment: (filePath: string, comment: string): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:updateComment', filePath, comment),
+  rotatePhoto: (filePath: string, direction: RotateDirection): Promise<PhotoRecord> =>
+    ipcRenderer.invoke('photo:rotate', filePath, direction),
   movePhotosToFolder: (
     filePaths: string[],
     destFolder: string

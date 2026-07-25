@@ -1,7 +1,12 @@
 import { ExifTool, type Tags } from 'exiftool-vendored'
 import { stat } from 'fs/promises'
 import { basename, extname } from 'path'
-import type { PhotoMetadata, PhotoRecord, SupportedFormat } from '../../shared/types'
+import type {
+  PhotoMetadata,
+  PhotoRecord,
+  RotateDirection,
+  SupportedFormat
+} from '../../shared/types'
 
 let exifTool: ExifTool | null = null
 
@@ -88,6 +93,37 @@ export async function writeComment(filePath: string, comment: string): Promise<v
     filePath,
     { UserComment: value, Description: value },
     { writeArgs: ['-overwrite_original'] }
+  )
+}
+
+// EXIF Orientation values 1-8, mapping each to what it becomes after a 90°
+// rotation in that direction. Covers the four mirrored orientations (2, 4,
+// 5, 7) too, rotating them in place rather than only handling the four
+// plain (unmirrored) ones — a photo that was already flipped stays flipped.
+const ROTATE_RIGHT_MAP: Record<number, number> = { 1: 6, 6: 3, 3: 8, 8: 1, 2: 7, 7: 4, 4: 5, 5: 2 }
+const ROTATE_LEFT_MAP: Record<number, number> = { 1: 8, 8: 3, 3: 6, 6: 1, 2: 5, 5: 4, 4: 7, 7: 2 }
+
+// Purely a metadata write (EXIF Orientation tag) — no pixels are touched, so
+// this is instant and perfectly lossless, unlike re-encoding the image with
+// sharp. Only meaningful for formats whose Orientation tag viewers actually
+// respect; callers are expected to gate this to JPEG/TIFF (ROTATABLE_FORMATS).
+export async function rotatePhoto(filePath: string, direction: RotateDirection): Promise<void> {
+  const tags = await getExifTool().read(filePath)
+  const current = tags.Orientation ?? 1
+  const map = direction === 'right' ? ROTATE_RIGHT_MAP : ROTATE_LEFT_MAP
+  const next = map[current] ?? 1
+  // -n is required here: without it, exiftool tries to match the raw number
+  // against Orientation's PrintConv table (human-readable strings like
+  // "Rotate 90 CW") and silently no-ops with a "Can't convert IFD0:
+  // Orientation (not in PrintConv)" warning instead of writing anything —
+  // exiftool-vendored doesn't throw on that, so the failure is invisible
+  // unless the write result's `warnings` field is inspected.
+  await getExifTool().write(
+    filePath,
+    { Orientation: next },
+    {
+      writeArgs: ['-overwrite_original', '-n']
+    }
   )
 }
 

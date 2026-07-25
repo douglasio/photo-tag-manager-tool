@@ -1,5 +1,11 @@
 export type SupportedFormat = 'JPEG' | 'PNG' | 'TIFF'
 
+// Lossless EXIF-orientation-flip rotation — only meaningful for formats
+// whose Orientation tag viewers actually respect (JPEG/TIFF; PNG's EXIF
+// support is too inconsistent across viewers to rely on).
+export type RotateDirection = 'left' | 'right'
+export const ROTATABLE_FORMATS: SupportedFormat[] = ['JPEG', 'TIFF']
+
 export interface PhotoMetadata {
   dateTaken: string | null
   cameraMake: string | null

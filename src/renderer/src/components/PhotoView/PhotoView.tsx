@@ -1,7 +1,13 @@
 import { ActionIcon, Container, Flex, Group, Image, Slider, Tooltip } from '@mantine/core'
-import { IconArrowsMaximize, IconMaximize, IconPhoto } from '@tabler/icons-react'
+import {
+  IconArrowsMaximize,
+  IconMaximize,
+  IconPhoto,
+  IconRotate,
+  IconRotateClockwise
+} from '@tabler/icons-react'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import type { PhotoRecord } from '../../../../shared/types'
+import { ROTATABLE_FORMATS, type PhotoRecord } from '../../../../shared/types'
 import { toFileProtocolUrl } from '../../../../shared/protocolUrls'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 
@@ -21,10 +27,11 @@ function clampScale(value: number): number {
 }
 
 export function PhotoView({ photo }: PhotoViewProps): ReactElement {
-  const { state, closePhotoTab } = usePhotoLibrary()
+  const { state, closePhotoTab, rotatePhoto } = usePhotoLibrary()
   const [scale, setScale] = useState(1)
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
+  const canRotate = ROTATABLE_FORMATS.includes(photo.metadata.format)
 
   const zoomToFit = (): void => setScale(MIN_SCALE)
 
@@ -106,7 +113,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
       >
         <Image
           ref={imgRef}
-          src={toFileProtocolUrl(photo.filePath)}
+          src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
           alt={photo.fileName}
           fit="contain"
           maw="100%"
@@ -117,7 +124,29 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
           }}
         />
       </Container>
-      <Flex pos="absolute" bottom={0} left={0} right={0} justify="flex-end" p="md" gap="sm">
+      <Flex pos="absolute" bottom={0} left={0} right={0} justify="space-between" p="md" gap="sm">
+        {canRotate ? (
+          <Group bg="gray" p="sm" gap="sm" wrap="nowrap">
+            <ActionIcon
+              onClick={() => void rotatePhoto(photo.filePath, 'left')}
+              aria-label="Rotate left"
+            >
+              <Tooltip label="Rotate left">
+                <IconRotate size={18} />
+              </Tooltip>
+            </ActionIcon>
+            <ActionIcon
+              onClick={() => void rotatePhoto(photo.filePath, 'right')}
+              aria-label="Rotate right"
+            >
+              <Tooltip label="Rotate right">
+                <IconRotateClockwise size={18} />
+              </Tooltip>
+            </ActionIcon>
+          </Group>
+        ) : (
+          <div />
+        )}
         <Group bg="gray" p="sm" gap="sm" wrap="nowrap">
           {/* ActionIcon.Group's seamless merged-pill look depends on every
               sibling sharing one height, and ActionIcon.GroupSection is meant
