@@ -1,4 +1,6 @@
 import { ActionIcon, Container, Flex, Group, Image, Slider, Tooltip } from '@mantine/core'
+import { useReducedMotion } from '@mantine/hooks'
+import { motion, useMotionValue, useSpring } from 'motion/react'
 import {
   IconArrowsMaximize,
   IconMaximize,
@@ -10,6 +12,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { ROTATABLE_FORMATS, type PhotoRecord } from '../../../../shared/types'
 import { toFileProtocolUrl } from '../../../../shared/protocolUrls'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { useCtrlKeyHeld } from '../../hooks/useCtrlKeyHeld'
 
 const MIN_SCALE = 1
 const MAX_SCALE = 5
@@ -17,6 +20,20 @@ const SCALE_STEP = 0.25
 // A typical wheel "notch" reports a deltaY of roughly 100, matching the
 // sensitivity used for the gallery's Ctrl+wheel preview zoom.
 const WHEEL_ZOOM_SENSITIVITY = 0.025
+// Same animation language as the gallery's Ken Burns hover effect
+// (PhotoThumbnail.tsx): a spring-eased scale, no opacity fade or position
+// slide. Starts zoomed in and settles down to 1, like the image is
+// adjusting into place rather than fading/sliding in.
+const ENTRANCE_SCALE_FROM = 1.15
+const ENTRANCE_SPRING = { stiffness: 400, damping: 22, mass: 0.5 } as const
+// Subtle zoom-toward-cursor on hover, same spring as the entrance/gallery
+// effects — independent of the manual zoom slider (a separate transform on
+// the Image itself), so the two don't fight each other.
+const HOVER_ZOOM_SCALE = 1.08
+// Holding Ctrl while hovering swaps the subtle hover-zoom for a much more
+// pronounced one, still anchored to the cursor — releasing Ctrl drops back
+// to the plain hover-zoom (or to 1 if the cursor's since left).
+const CTRL_ZOOM_SCALE = 4
 
 interface PhotoViewProps {
   photo: PhotoRecord
@@ -32,6 +49,31 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
   const canRotate = ROTATABLE_FORMATS.includes(photo.metadata.format)
+  const prefersReducedMotion = useReducedMotion()
+  const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
+
+  // Where the hover-zoom scales from, as a CSS `transform-origin` percentage
+  // pair — follows the cursor so the zoom feels anchored to whatever part of
+  // the image you're actually looking at, same idea as the gallery's
+  // pan-toward-cursor effect.
+  const [zoomOrigin, setZoomOrigin] = useState('center center')
+  const [isHovering, setIsHovering] = useState(false)
+  const hoverZoom = useMotionValue(1)
+  const springHoverZoom = useSpring(hoverZoom, ENTRANCE_SPRING)
+  const ctrlHeld = useCtrlKeyHeld()
+
+  // Reacts to Ctrl being pressed/released while already hovering (as
+  // opposed to the enter/leave handlers below, which only fire on actual
+  // pointer transitions) — swaps between the two zoom levels, or back to 1
+  // if the cursor isn't over the image at all.
+  useEffect(() => {
+    if (!motionEnabled) return
+    if (!isHovering) {
+      hoverZoom.set(1)
+      return
+    }
+    hoverZoom.set(ctrlHeld ? CTRL_ZOOM_SCALE : HOVER_ZOOM_SCALE)
+  }, [ctrlHeld, isHovering, motionEnabled, hoverZoom])
 
   const zoomToFit = (): void => setScale(MIN_SCALE)
 
@@ -111,18 +153,44 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
           overflow: 'hidden'
         }}
       >
-        <Image
-          ref={imgRef}
-          src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
-          alt={photo.fileName}
-          fit="contain"
-          maw="100%"
-          mah="100%"
-          style={{
-            transform: `scale(${scale})`,
-            transformOrigin: 'center'
-          }}
-        />
+        <motion.div
+          // initial={false} skips the animation entirely (renders straight
+          // at the `animate` values) when disabled, rather than just
+          // shortening the transition to ~0 — matches the gallery hover
+          // effect's own galleryAnimationsEnabled + reduced-motion gating.
+          initial={motionEnabled ? { scale: ENTRANCE_SCALE_FROM } : false}
+          animate={{ scale: 1 }}
+          transition={ENTRANCE_SPRING}
+          // Scaling from the left edge (instead of the default center)
+          // makes the zoom-settle read as coming in from the left.
+          style={{ maxWidth: '100%', maxHeight: '100%', transformOrigin: 'left center' }}
+        >
+          <motion.div
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseMove={(event) => {
+              if (!motionEnabled) return
+              const rect = event.currentTarget.getBoundingClientRect()
+              const x = ((event.clientX - rect.left) / rect.width) * 100
+              const y = ((event.clientY - rect.top) / rect.height) * 100
+              setZoomOrigin(`${x}% ${y}%`)
+            }}
+            onMouseLeave={() => setIsHovering(false)}
+            style={{ scale: springHoverZoom, transformOrigin: zoomOrigin }}
+          >
+            <Image
+              ref={imgRef}
+              src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
+              alt={photo.fileName}
+              fit="contain"
+              maw="100%"
+              mah="100%"
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: 'center'
+              }}
+            />
+          </motion.div>
+        </motion.div>
       </Container>
       <Flex pos="absolute" bottom={0} left={0} right={0} justify="space-between" p="md" gap="sm">
         {canRotate ? (

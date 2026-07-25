@@ -25,12 +25,10 @@ const BASE_PREVIEW_WIDTH_VW = 50
 const BASE_PREVIEW_HEIGHT_VH = 70
 
 // How far (px) the image can pan from center as the cursor moves across the
-// thumbnail, how much it's scaled up beforehand so panning never reveals
-// empty space at the frame's edges, and how far it tilts toward the cursor
-// horizontally for a bit of showing-off flair on top of the pan.
+// thumbnail, and how much it's scaled up beforehand so panning never
+// reveals empty space at the frame's edges.
 const HOVER_PAN_RANGE_PX = 22
 const HOVER_PAN_SCALE = 1.125
-const HOVER_TILT_DEG = 8
 // A bit stiffer/less damped than a plain settle, to match the bigger
 // range above with a snappier, more energetic response instead of a slow
 // drift — still spring-eased rather than linear, just quicker to react.
@@ -97,7 +95,6 @@ export function PhotoThumbnail({
     state.galleryAnimationsEnabled && !prefersReducedMotion && photo.thumbnailStatus === 'ready'
   const panX = useMotionValue(0)
   const panY = useMotionValue(0)
-  const panRotate = useMotionValue(0)
   // Starts at 1 (not HOVER_PAN_SCALE) and only springs up on actual hover —
   // scaling constantly whenever animations are enabled, even at rest, would
   // permanently crop a bit of every thumbnail and blunt the before/after
@@ -105,7 +102,6 @@ export function PhotoThumbnail({
   const panScale = useMotionValue(1)
   const springX = useSpring(panX, HOVER_PAN_SPRING)
   const springY = useSpring(panY, HOVER_PAN_SPRING)
-  const springRotate = useSpring(panRotate, HOVER_PAN_SPRING)
   const springScale = useSpring(panScale, HOVER_PAN_SPRING)
 
   // Dragging a photo that's part of the active multi-selection (2+ photos)
@@ -157,7 +153,6 @@ export function PhotoThumbnail({
               const normalizedY = (event.clientY - rect.top) / rect.height - 0.5
               panX.set(normalizedX * HOVER_PAN_RANGE_PX)
               panY.set(normalizedY * HOVER_PAN_RANGE_PX)
-              panRotate.set(normalizedX * HOVER_TILT_DEG)
             }
           }}
           onMouseLeave={() => {
@@ -165,7 +160,6 @@ export function PhotoThumbnail({
             if (panEnabled) {
               panX.set(0)
               panY.set(0)
-              panRotate.set(0)
               panScale.set(1)
             }
           }}
@@ -180,7 +174,6 @@ export function PhotoThumbnail({
                   height: '100%',
                   x: springX,
                   y: springY,
-                  rotate: springRotate,
                   scale: springScale
                 }}
               >
