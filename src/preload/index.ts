@@ -54,6 +54,10 @@ const api = {
     ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
   setDetailsPanelCollapsed: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setDetailsPanelCollapsed', value),
+  getGalleryAnimationsEnabled: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:getGalleryAnimationsEnabled'),
+  setGalleryAnimationsEnabled: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setGalleryAnimationsEnabled', value),
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),

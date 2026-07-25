@@ -8,7 +8,9 @@ import {
   UnstyledButton,
   useMantineTheme
 } from '@mantine/core'
+import { useReducedMotion } from '@mantine/hooks'
 import { useDraggable } from '@dnd-kit/core'
+import { motion, useMotionValue, useSpring } from 'motion/react'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
 import { useState, type ComponentPropsWithoutRef, type MouseEvent, type ReactElement } from 'react'
 import type { PhotoRecord } from '../../../../shared/types'
@@ -21,6 +23,18 @@ import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 // scales with the window rather than a fixed pixel size.
 const BASE_PREVIEW_WIDTH_VW = 50
 const BASE_PREVIEW_HEIGHT_VH = 70
+
+// How far (px) the image can pan from center as the cursor moves across the
+// thumbnail, how much it's scaled up beforehand so panning never reveals
+// empty space at the frame's edges, and how far it tilts toward the cursor
+// horizontally for a bit of showing-off flair on top of the pan.
+const HOVER_PAN_RANGE_PX = 22
+const HOVER_PAN_SCALE = 1.125
+const HOVER_TILT_DEG = 8
+// A bit stiffer/less damped than a plain settle, to match the bigger
+// range above with a snappier, more energetic response instead of a slow
+// drift — still spring-eased rather than linear, just quicker to react.
+const HOVER_PAN_SPRING = { stiffness: 400, damping: 22, mass: 0.5 }
 
 interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onSelect'> {
   photo: PhotoRecord
@@ -71,6 +85,25 @@ export function PhotoThumbnail({
   // on it, rather than offset to the side like a regular tooltip.
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
 
+  // Off when the user has toggled it off in Settings, or when the OS-level
+  // "reduce motion" preference is on — the setting doesn't override that,
+  // it's an additional gate on top of it.
+  const prefersReducedMotion = useReducedMotion()
+  const panEnabled =
+    state.galleryAnimationsEnabled && !prefersReducedMotion && photo.thumbnailStatus === 'ready'
+  const panX = useMotionValue(0)
+  const panY = useMotionValue(0)
+  const panRotate = useMotionValue(0)
+  // Starts at 1 (not HOVER_PAN_SCALE) and only springs up on actual hover —
+  // scaling constantly whenever animations are enabled, even at rest, would
+  // permanently crop a bit of every thumbnail and blunt the before/after
+  // contrast that makes the hover effect read as dramatic.
+  const panScale = useMotionValue(1)
+  const springX = useSpring(panX, HOVER_PAN_SPRING)
+  const springY = useSpring(panY, HOVER_PAN_SPRING)
+  const springRotate = useSpring(panRotate, HOVER_PAN_SPRING)
+  const springScale = useSpring(panScale, HOVER_PAN_SPRING)
+
   // Dragging a photo that's part of the active multi-selection (2+ photos)
   // carries the whole batch; dragging anything else carries just that one —
   // same "what's actually selected" convention as the right-click menu.
@@ -109,21 +142,58 @@ export function PhotoThumbnail({
           className="photo-thumbnail__select-button"
           onClick={(event) => onSelect(photo.filePath, event)}
           onDoubleClick={() => openPhotoTab(photo.filePath)}
+          onMouseEnter={() => {
+            if (panEnabled) panScale.set(HOVER_PAN_SCALE)
+          }}
           onMouseMove={(event) => {
             if (canPreview) setCursorPos({ x: event.clientX, y: event.clientY })
+            if (panEnabled) {
+              const rect = event.currentTarget.getBoundingClientRect()
+              const normalizedX = (event.clientX - rect.left) / rect.width - 0.5
+              const normalizedY = (event.clientY - rect.top) / rect.height - 0.5
+              panX.set(normalizedX * HOVER_PAN_RANGE_PX)
+              panY.set(normalizedY * HOVER_PAN_RANGE_PX)
+              panRotate.set(normalizedX * HOVER_TILT_DEG)
+            }
           }}
-          onMouseLeave={() => setCursorPos(null)}
+          onMouseLeave={() => {
+            setCursorPos(null)
+            if (panEnabled) {
+              panX.set(0)
+              panY.set(0)
+              panRotate.set(0)
+              panScale.set(1)
+            }
+          }}
           w="100%"
           style={{ cursor: canPreview ? 'zoom-in' : undefined }}
         >
           {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
-            <AspectRatio ratio={1}>
-              <Image
-                src={toThumbProtocolUrl(photo.thumbnailKey)}
-                alt={photo.fileName}
-                fit="cover"
-                loading="lazy"
-              />
+            <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
+              <motion.div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  x: springX,
+                  y: springY,
+                  rotate: springRotate,
+                  scale: springScale
+                }}
+              >
+                <Image
+                  src={toThumbProtocolUrl(photo.thumbnailKey)}
+                  alt={photo.fileName}
+                  fit="cover"
+                  loading="lazy"
+                  // AspectRatio normally stretches its direct img child to
+                  // 100% width/height itself (targeting a `> img` selector),
+                  // but Image is now nested inside the motion.div wrapper
+                  // instead, so it no longer gets that sizing for free —
+                  // without it, non-square photos shrink to their natural
+                  // aspect ratio instead of filling the square frame.
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </motion.div>
             </AspectRatio>
           ) : (
             <Center

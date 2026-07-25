@@ -66,6 +66,22 @@ function FoldersSection(): ReactElement {
   )
 }
 
+function GallerySection(): ReactElement {
+  const { state, setGalleryAnimationsEnabled } = usePhotoLibrary()
+
+  return (
+    <Stack gap="xs">
+      <SectionTitle>Gallery</SectionTitle>
+      <Switch
+        label="Thumbnail hover animations"
+        description="Photos subtly pan toward the cursor on hover. Automatically off if your system prefers reduced motion."
+        checked={state.galleryAnimationsEnabled}
+        onChange={(event) => setGalleryAnimationsEnabled(event.currentTarget.checked)}
+      />
+    </Stack>
+  )
+}
+
 function ExcludePatternsSection(): ReactElement {
   const { state, setExcludePatterns } = usePhotoLibrary()
 
@@ -109,6 +125,8 @@ export function SettingsModal(): ReactElement {
       <Modal opened={opened} onClose={close} title={<Title order={2}>Settings</Title>} size="lg">
         <Stack gap="lg">
           <FoldersSection />
+          <Divider />
+          <GallerySection />
           <Divider />
           <ExcludePatternsSection />
         </Stack>

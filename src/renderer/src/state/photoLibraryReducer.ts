@@ -43,6 +43,7 @@ export interface PhotoLibraryState {
   allFolderPaths: Set<string>
   showEmptyFolders: boolean
   detailsPanelCollapsed: boolean
+  galleryAnimationsEnabled: boolean
   excludePatterns: string[]
   tagDescriptions: Map<string, string>
   // Most-recently-assigned tag names, newest first — shown as a shortcut
@@ -75,6 +76,7 @@ export const initialState: PhotoLibraryState = {
   allFolderPaths: new Set(),
   showEmptyFolders: false,
   detailsPanelCollapsed: false,
+  galleryAnimationsEnabled: true,
   excludePatterns: [],
   tagDescriptions: new Map(),
   recentTags: [],
@@ -101,6 +103,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
+  | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
   | { type: 'TAGS_ASSIGNED'; tags: string[] }
   | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
   | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
@@ -353,6 +356,8 @@ export function photoLibraryReducer(
       return { ...state, showEmptyFolders: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':
       return { ...state, detailsPanelCollapsed: action.value }
+    case 'SET_GALLERY_ANIMATIONS_ENABLED':
+      return { ...state, galleryAnimationsEnabled: action.value }
     // Newest-first, deduped, capped — a tag already in the list moves to the
     // front rather than appearing twice.
     case 'TAGS_ASSIGNED': {

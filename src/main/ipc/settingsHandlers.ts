@@ -12,6 +12,8 @@ import {
   setShowEmptyFolders,
   getDetailsPanelCollapsed,
   setDetailsPanelCollapsed,
+  getGalleryAnimationsEnabled,
+  setGalleryAnimationsEnabled,
   getExcludePatterns,
   setExcludePatterns
 } from '../db/settingsRepository'
@@ -55,6 +57,14 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setDetailsPanelCollapsed', (_event, value: boolean): void => {
     setDetailsPanelCollapsed(value)
+  })
+
+  ipcMain.handle('settings:getGalleryAnimationsEnabled', (): boolean =>
+    getGalleryAnimationsEnabled()
+  )
+
+  ipcMain.handle('settings:setGalleryAnimationsEnabled', (_event, value: boolean): void => {
+    setGalleryAnimationsEnabled(value)
   })
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())

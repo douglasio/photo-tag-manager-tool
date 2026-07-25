@@ -52,6 +52,7 @@
     "dayjs": "^1.11.21",
     "exiftool-vendored": "^36.0.0",
     "fdir": "^6.5.0",
+    "motion": "^12.42.2",
     "p-limit": "^7.3.0",
     "react-window": "^2.2.7",
     "sharp": "^0.35.3"
