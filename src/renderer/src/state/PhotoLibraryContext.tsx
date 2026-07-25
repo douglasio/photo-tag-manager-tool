@@ -25,7 +25,7 @@ import type { PhotoRecord, RotateDirection } from '../../../shared/types'
 // selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
 // only it gets the labeled/display-formatted shape — transforming the whole
 // photos array on every render would be wasted work for fields nothing reads.
-export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
+interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
   metadata: DisplayMetadata
 }
 

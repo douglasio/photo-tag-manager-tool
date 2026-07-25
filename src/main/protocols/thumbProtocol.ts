@@ -2,7 +2,7 @@ import { net, protocol } from 'electron'
 import { pathToFileURL } from 'url'
 import { thumbnailFilePath } from '../services/thumbnailService'
 
-export const THUMB_PROTOCOL = 'photag-thumb'
+const THUMB_PROTOCOL = 'photag-thumb'
 
 export function registerThumbProtocolScheme(): void {
   protocol.registerSchemesAsPrivileged([

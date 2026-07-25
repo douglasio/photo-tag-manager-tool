@@ -7,7 +7,7 @@ import {
 } from '../utils/folderTree'
 import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
 
-export type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
+type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 
 export type GallerySortBy = 'name' | 'dateTaken'
 export type GallerySortOrder = 'asc' | 'desc'

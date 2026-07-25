@@ -3,8 +3,8 @@ import { extname } from 'path'
 import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
 import { matchesExcludePattern } from './excludeMatcher'
 
-export type WatchEventType = 'add' | 'change' | 'unlink'
-export type WatchDirEventType = 'addDir' | 'unlinkDir'
+type WatchEventType = 'add' | 'change' | 'unlink'
+type WatchDirEventType = 'addDir' | 'unlinkDir'
 
 interface WatcherHandlers {
   onFileEvent: (type: WatchEventType, filePath: string) => void

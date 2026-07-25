@@ -10,7 +10,7 @@ import type {
 
 let exifTool: ExifTool | null = null
 
-export function getExifTool(): ExifTool {
+function getExifTool(): ExifTool {
   if (!exifTool) {
     exifTool = new ExifTool({ maxProcs: 4 })
   }
