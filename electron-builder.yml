@@ -29,8 +29,9 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
+    - rpm
+    - zip
   maintainer: douglasio
   category: Utility
 appImage:
