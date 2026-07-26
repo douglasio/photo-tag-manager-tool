@@ -1,6 +1,6 @@
 {
   "name": "photo-tag-manager-tool",
-  "version": "0.3.1-alpha",
+  "version": "0.3.2-alpha",
   "description": "Tag Me — a folder/tag-based photo organizer and enjoyer",
   "main": "./out/main/index.js",
   "author": "douglasio",
@@ -46,6 +46,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@fontsource/bebas-neue": "^5.3.0",
     "@mantine/core": "^9.4.2",
     "@mantine/dates": "^9.4.2",
     "@mantine/hooks": "^9.4.2",

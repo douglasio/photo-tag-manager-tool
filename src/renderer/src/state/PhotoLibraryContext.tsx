@@ -38,6 +38,11 @@ const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
 // stepped forward), 'left' means it enters from the left (stepped back).
 export type NavigationDirection = 'left' | 'right'
 
+// PhotoView's visualization mode ('none' = standard view). Lives here (not
+// just as PhotoView-local state) so it can be threaded across arrow-key
+// navigation below, which remounts a fresh PhotoView per photo.
+export type PhotoVisualization = 'none' | 'magazine'
+
 // One entry per open tab in display order — either a single photo or a
 // compare pair, resolved from state.openTabs/compareTabs against the
 // current photosByPath (an entry drops out if a referenced photo no longer
@@ -94,13 +99,22 @@ interface PhotoLibraryContextValue {
   closePhotoTab: (filePath: string) => void
   setActiveTab: (tab: string) => void
   reorderPhotoTabs: (openTabs: string[]) => void
-  navigateToPhoto: (fromPath: string, toPath: string, direction: NavigationDirection) => void
+  navigateToPhoto: (
+    fromPath: string,
+    toPath: string,
+    direction: NavigationDirection,
+    visualization: PhotoVisualization
+  ) => void
   // One-shot lookup for PhotoView's entrance animation: which arrow key (if
   // any) navigated to this specific photo, so it can slide in from the
   // matching side. Consuming it removes it — a photo opened normally (double
   // click, or reopening one you arrow-navigated away from earlier) must not
   // replay a stale direction.
   consumeNavDirection: (filePath: string) => NavigationDirection | null
+  // Same one-shot pattern as consumeNavDirection, carrying the visualization
+  // mode (e.g. magazine cover) across arrow-key navigation's remount so it
+  // stays active as the user steps through photos.
+  consumeVisualization: (filePath: string) => PhotoVisualization | null
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -613,12 +627,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'REORDER_PHOTO_TABS', openTabs })
   }, [])
 
-  // Plain ref (not reducer state) since it's a one-shot side channel read
-  // exactly once by the PhotoView instance that mounts for `toPath` — it
-  // doesn't need to trigger a re-render of its own, and reducer state would
-  // otherwise need a separate "clear it" action to avoid the stale-direction
-  // problem described on consumeNavDirection below.
+  // Plain refs (not reducer state) since these are one-shot side channels
+  // read exactly once by the PhotoView instance that mounts for `toPath` —
+  // they don't need to trigger a re-render of their own, and reducer state
+  // would otherwise need a separate "clear it" action to avoid the
+  // stale-direction problem described on consumeNavDirection below.
   const navDirectionsRef = useRef(new Map<string, NavigationDirection>())
+  const visualizationsRef = useRef(new Map<string, PhotoVisualization>())
 
   // Swaps which photo a tab points to in place (same slot, same tab-list
   // position) — e.g. left/right-arrow stepping to the next/previous photo
@@ -626,8 +641,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // (replace oldPath with newPath everywhere in openTabs/activeTab) is
   // exactly what this needs too, so it's reused rather than duplicated.
   const navigateToPhoto = useCallback(
-    (fromPath: string, toPath: string, direction: NavigationDirection) => {
+    (
+      fromPath: string,
+      toPath: string,
+      direction: NavigationDirection,
+      visualization: PhotoVisualization
+    ) => {
       navDirectionsRef.current.set(toPath, direction)
+      visualizationsRef.current.set(toPath, visualization)
       dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: fromPath, newPath: toPath })
     },
     []
@@ -637,6 +658,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     const direction = navDirectionsRef.current.get(filePath) ?? null
     navDirectionsRef.current.delete(filePath)
     return direction
+  }, [])
+
+  const consumeVisualization = useCallback((filePath: string): PhotoVisualization | null => {
+    const visualization = visualizationsRef.current.get(filePath) ?? null
+    visualizationsRef.current.delete(filePath)
+    return visualization
   }, [])
 
   const photos = useMemo(() => {
@@ -861,7 +888,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setActiveTab,
     reorderPhotoTabs,
     navigateToPhoto,
-    consumeNavDirection
+    consumeNavDirection,
+    consumeVisualization
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

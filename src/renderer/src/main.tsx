@@ -1,6 +1,7 @@
 import '@mantine/core/styles.css'
 import '@mantine/notifications/styles.css'
 import '@mantine/dates/styles.css'
+import '@fontsource/bebas-neue'
 import './assets/main.css'
 
 import { StrictMode } from 'react'

@@ -195,16 +195,18 @@ describe('PhotoLibraryContext', () => {
       expect(result.current.state.openTabs).toEqual(['/a.jpg'])
     })
 
-    it('navigateToPhoto swaps a tab in place and records the direction for one-shot consumption', () => {
+    it('navigateToPhoto swaps a tab in place and records the direction/visualization for one-shot consumption', () => {
       const { result } = setup()
       act(() => result.current.openPhotoTab('/a.jpg'))
-      act(() => result.current.navigateToPhoto('/a.jpg', '/b.jpg', 'right'))
+      act(() => result.current.navigateToPhoto('/a.jpg', '/b.jpg', 'right', 'magazine'))
 
       expect(result.current.state.openTabs).toEqual(['/b.jpg'])
       expect(result.current.state.activeTab).toBe('/b.jpg')
       expect(result.current.consumeNavDirection('/b.jpg')).toBe('right')
       // Consuming removes it — a second read gets null.
       expect(result.current.consumeNavDirection('/b.jpg')).toBeNull()
+      expect(result.current.consumeVisualization('/b.jpg')).toBe('magazine')
+      expect(result.current.consumeVisualization('/b.jpg')).toBeNull()
     })
   })
 
