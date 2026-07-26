@@ -20,6 +20,9 @@ interface PannableZoomableImageProps {
   // Suppresses the built-in floating toolbar when the caller renders
   // ZoomToolbar itself instead (see `zoom` above).
   hideToolbar?: boolean
+  // CSS filter applied to the image itself — e.g. NewspaperCoverView passes
+  // grayscale() to match the newsprint concept.
+  imageFilter?: string
 }
 
 // A drag-to-pan + wheel-to-zoom image frame — used by the compare view (one
@@ -31,7 +34,8 @@ export function PannableZoomableImage({
   photo,
   zoom,
   overlay,
-  hideToolbar
+  hideToolbar,
+  imageFilter
 }: PannableZoomableImageProps): ReactElement {
   const { containerRef, scale, pan, isDragging, baseSize } = zoom
 
@@ -63,6 +67,7 @@ export function PannableZoomableImage({
             visibility: baseSize ? 'visible' : 'hidden',
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
             transformOrigin: 'center',
+            filter: imageFilter,
             userSelect: 'none',
             WebkitUserDrag: 'none'
           }}

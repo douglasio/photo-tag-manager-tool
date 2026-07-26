@@ -2,7 +2,7 @@ import { ActionIcon, Box, Container, Flex, Group, Image, Portal, Tooltip } from 
 import { useReducedMotion } from '@mantine/hooks'
 import { motion } from 'motion/react'
 import {
-  IconLayoutCollage,
+  IconArticle,
   IconNews,
   IconPhotoStar,
   IconRotate,
@@ -18,6 +18,7 @@ import { usePhotoHoverEffects } from '../../hooks/usePhotoHoverEffects'
 import { usePannableZoom } from '../../hooks/usePannableZoom'
 import { ZoomToolbar } from '../Shared/ZoomToolbar'
 import { MagazineCoverView } from './MagazineCoverView'
+import { NewspaperCoverView } from './NewspaperCoverView'
 
 const MIN_SCALE = 1
 const MAX_SCALE = 5
@@ -50,10 +51,11 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   const [visualization, setVisualization] = useState<PhotoVisualization>(
     () => consumeVisualization(photo.filePath) ?? 'none'
   )
-  // Always called (not just while magazine mode is active) so this stays the
-  // single source of truth for that view's zoom — PhotoView renders its
-  // ZoomToolbar from it directly, rather than each owning a disconnected copy.
+  // Always called (not just while a given mode is active) so these stay the
+  // single source of truth for each view's zoom — PhotoView renders its
+  // ZoomToolbar from them directly, rather than each owning a disconnected copy.
   const magazineZoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  const newspaperZoom = usePannableZoom(photo, { defaultFit: 'cover' })
   // Read once at mount via lazy initializer — this instance is fresh per photo.
   const [enterDirection] = useState(() => consumeNavDirection(photo.filePath))
   const containerRef = useRef<HTMLDivElement>(null)
@@ -65,7 +67,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   const paneRef = useRef<HTMLDivElement>(null)
   const [paneCorner, setPaneCorner] = useState<{ top: number; right: number } | null>(null)
   useEffect(() => {
-    if (visualization !== 'magazine') return
+    if (visualization === 'none') return
     const el = paneRef.current
     if (!el) return
     const updateCorner = (): void => {
@@ -194,9 +196,13 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
 
   return (
     <Container ref={paneRef} fluid pos="relative" flex={1} mih={0} miw={0} h="100%">
-      {visualization === 'magazine' ? (
+      {visualization !== 'none' ? (
         <>
-          <MagazineCoverView photo={photo} zoom={magazineZoom} />
+          {visualization === 'magazine' ? (
+            <MagazineCoverView photo={photo} zoom={magazineZoom} />
+          ) : (
+            <NewspaperCoverView photo={photo} zoom={newspaperZoom} />
+          )}
           {/* AppShell's Header/Navbar/Aside are all position:fixed with
               their own z-index tier, which can sit above ordinary absolutely
               positioned content in Main regardless of DOM order — a Portal
@@ -217,7 +223,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                   top={paneCorner.top + 8}
                   right={paneCorner.right + 8}
                   style={{ zIndex: 'var(--mantine-z-index-max)' }}
-                  aria-label="Exit magazine cover view"
+                  aria-label="Exit visualization view"
                   onClick={() => setVisualization('none')}
                 >
                   <IconX size={20} />
@@ -344,9 +350,13 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
               <IconNews size={18} />
             </ActionIcon>
           </Tooltip>
-          <Tooltip label="Coming soon">
-            <ActionIcon variant="default" disabled aria-label="More visualizations coming soon">
-              <IconLayoutCollage size={18} />
+          <Tooltip label="Newspaper cover">
+            <ActionIcon
+              variant={visualization === 'newspaper' ? 'filled' : 'default'}
+              aria-label="Newspaper cover visualization"
+              onClick={() => setVisualization('newspaper')}
+            >
+              <IconArticle size={18} />
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Coming soon">
@@ -365,6 +375,17 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
             onZoomIn={magazineZoom.zoomIn}
             min={magazineZoom.min}
             max={magazineZoom.max}
+          />
+        ) : visualization === 'newspaper' ? (
+          <ZoomToolbar
+            scale={newspaperZoom.scale}
+            onScaleChange={newspaperZoom.setScale}
+            onZoomToFit={newspaperZoom.zoomToFit}
+            onZoomToNativeSize={newspaperZoom.zoomToNativeSize}
+            onZoomOut={newspaperZoom.zoomOut}
+            onZoomIn={newspaperZoom.zoomIn}
+            min={newspaperZoom.min}
+            max={newspaperZoom.max}
           />
         ) : (
           <ZoomToolbar

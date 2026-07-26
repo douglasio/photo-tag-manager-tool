@@ -41,7 +41,7 @@ export type NavigationDirection = 'left' | 'right'
 // PhotoView's visualization mode ('none' = standard view). Lives here (not
 // just as PhotoView-local state) so it can be threaded across arrow-key
 // navigation below, which remounts a fresh PhotoView per photo.
-export type PhotoVisualization = 'none' | 'magazine'
+export type PhotoVisualization = 'none' | 'magazine' | 'newspaper'
 
 // One entry per open tab in display order — either a single photo or a
 // compare pair, resolved from state.openTabs/compareTabs against the
