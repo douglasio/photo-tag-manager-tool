@@ -5,151 +5,31 @@ import {
   Flex,
   Group,
   Loader,
-  Menu,
   Pill,
   Slider,
   Text,
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowsSort, IconCheck, IconPhoto, IconX } from '@tabler/icons-react'
+import { IconPhoto, IconX } from '@tabler/icons-react'
 import {
   useCallback,
-  useEffect,
   useMemo,
-  useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
   type ReactElement
 } from 'react'
-import { Grid, type CellComponentProps } from 'react-window'
+import { Grid } from 'react-window'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { useCtrlKeyHeld } from '../../hooks/useCtrlKeyHeld'
-import { PhotoContextMenu } from './PhotoContextMenu'
-import { PhotoThumbnail } from './PhotoThumbnail'
+import { useGalleryGridLayout } from '../../hooks/useGalleryGridLayout'
+import { useGalleryPreviewZoom } from '../../hooks/useGalleryPreviewZoom'
+import { GalleryPhotoCell, type GalleryCellProps } from './GalleryPhotoCell'
 import { TagDeleteButton } from '../Tags/TagDeleteButton'
 import { TagDescriptionEditor } from '../Tags/TagDescriptionEditor'
 import { TagNameEditor } from '../Tags/TagNameEditor'
 import { basename } from '../../utils/folderTree'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
-import type { PhotoRecord } from '../../../../shared/types'
-
-const DEFAULT_CELL_WIDTH = 168
-// The filename label below each thumbnail takes roughly this much extra
-// vertical space regardless of thumbnail size, so cell height tracks width
-// with a constant offset rather than a fixed aspect ratio.
-const CELL_LABEL_HEIGHT = 28
-const MIN_CELL_WIDTH = 100
-// Stays under thumbnailService's THUMBNAIL_LONG_EDGE (640px) so the largest
-// setting still displays a natively-generated thumbnail rather than upscaling it.
-const MAX_CELL_WIDTH = 600
-// react-window's Grid renders its own vertical scrollbar inside the width we
-// give it, so column math needs to leave room for it — otherwise the last
-// column overflows the scrollbar's width and the grid gains an unwanted
-// horizontal scrollbar.
-const SCROLLBAR_RESERVE_PX = 16
-const MIN_PREVIEW_SCALE = 0.5
-const MAX_PREVIEW_SCALE = 3
-// A typical wheel "notch" reports a deltaY of roughly 100, so this yields
-// about a 0.15x change per notch — noticeable without feeling twitchy.
-const PREVIEW_ZOOM_SENSITIVITY = 0.0015
-// The gallery stays mounted (just hidden) while a photo tab is active —
-// Mantine's Tabs keeps inactive panels around via React's Activity API —
-// so returning to it re-expands the AppShell Navbar/Aside via their own CSS
-// transition while this grid is already visible. Without debouncing, the
-// ResizeObserver below would fire on every frame of that transition,
-// reflowing thumbnails into new column counts live. A debounce (rather than
-// a fixed delay guessed to match the transition's duration) waits for
-// resize events to actually stop before committing a size, so it self-
-// corrects regardless of how long any given transition takes.
-const RESIZE_SETTLE_MS = 100
-
-function clampCellWidth(value: number): number {
-  return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, value))
-}
-
-// Evenly spaced tick marks spanning the slider's actual min/max range, so
-// they land at real, reachable cell-width values rather than arbitrary points.
-const SIZE_MARK_COUNT = 5
-const SIZE_MARK_VALUES = Array.from(
-  { length: SIZE_MARK_COUNT },
-  (_, index) => MIN_CELL_WIDTH + ((MAX_CELL_WIDTH - MIN_CELL_WIDTH) * index) / (SIZE_MARK_COUNT - 1)
-)
-const SIZE_MARKS = SIZE_MARK_VALUES.map((value) => ({ value }))
-
-function clampPreviewScale(value: number): number {
-  return Math.min(MAX_PREVIEW_SCALE, Math.max(MIN_PREVIEW_SCALE, value))
-}
-
-interface CellProps {
-  photos: PhotoRecord[]
-  columnCount: number
-  selectedPath: string | null
-  selectedPaths: Set<string>
-  onSelect: (path: string, event: ReactMouseEvent) => void
-  renamingPath: string | null
-  onStartRename: (path: string) => void
-  onStopRename: () => void
-  onRename: (filePath: string, newBaseName: string) => Promise<void>
-  ctrlHeld: boolean
-  previewScale: number
-  showFilenames: boolean
-  hoveredPath: string | null
-  // Separate enter/leave callbacks (rather than a single "set to this path or
-  // null") avoid a race when the pointer moves directly from one thumbnail to
-  // an adjacent one: the new thumbnail's enter can fire before the old one's
-  // leave, and a plain "leave clears it" would wipe out the just-set hover.
-  onHoverEnter: (path: string) => void
-  onHoverLeave: (path: string) => void
-}
-
-function PhotoCell({
-  columnIndex,
-  rowIndex,
-  style,
-  photos,
-  columnCount,
-  selectedPath,
-  selectedPaths,
-  onSelect,
-  renamingPath,
-  onStartRename,
-  onStopRename,
-  onRename,
-  ctrlHeld,
-  previewScale,
-  showFilenames,
-  hoveredPath,
-  onHoverEnter,
-  onHoverLeave
-}: CellComponentProps<CellProps>): ReactElement {
-  const index = rowIndex * columnCount + columnIndex
-  const photo = photos[index]
-  if (!photo) return <div style={style} />
-  return (
-    <Box style={style} p={6}>
-      <PhotoContextMenu photo={photo} onRename={() => onStartRename(photo.filePath)}>
-        <PhotoThumbnail
-          photo={photo}
-          selected={photo.filePath === selectedPath}
-          multiSelected={selectedPaths.has(photo.filePath)}
-          onSelect={onSelect}
-          renaming={renamingPath === photo.filePath}
-          onStartRename={() => onStartRename(photo.filePath)}
-          onStopRename={onStopRename}
-          onRename={(newBaseName) => onRename(photo.filePath, newBaseName)}
-          ctrlHeld={ctrlHeld}
-          previewScale={previewScale}
-          showFilename={showFilenames}
-          spotlighted={hoveredPath === photo.filePath}
-          dimmed={hoveredPath !== null && hoveredPath !== photo.filePath}
-          onHoverEnter={() => onHoverEnter(photo.filePath)}
-          onHoverLeave={() => onHoverLeave(photo.filePath)}
-        />
-      </PhotoContextMenu>
-    </Box>
-  )
-}
+import { GallerySortMenu } from './GallerySortMenu'
 
 export function GalleryGrid(): ReactElement {
   const {
@@ -165,24 +45,30 @@ export function GalleryGrid(): ReactElement {
     tagCounts,
     folderTags,
     setFolderTagFilter,
-    setSort,
     renameFile
   } = usePhotoLibrary()
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [size, setSize] = useState({ width: 800, height: 600 })
-  const [cellWidth, setCellWidth] = useState(DEFAULT_CELL_WIDTH)
-  // Lifted up here (not into PhotoCell) since react-window recycles cell
-  // instances across different photos as the user scrolls — per-cell local
-  // state would risk leaking "is renaming" onto the wrong photo.
+
+  const {
+    containerRef,
+    size,
+    cellWidth,
+    minCellWidth,
+    maxCellWidth,
+    sizeMarks,
+    columnCount,
+    actualCellWidth,
+    cellHeight,
+    rowCount,
+    setCellWidth,
+    setCellWidthPersisted,
+    stepToMark
+  } = useGalleryGridLayout({ photoCount: photos.length, showFilenames: state.showFilenames })
+  const { ctrlHeld, previewScale } = useGalleryPreviewZoom(containerRef)
+
+  // Lifted up here (not into GalleryPhotoCell) since react-window recycles
+  // cell instances across different photos as the user scrolls — per-cell
+  // local state would risk leaking "is renaming" onto the wrong photo.
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
-  const ctrlHeld = useCtrlKeyHeld()
-  // A ref mirror of ctrlHeld so the native wheel listener below (attached
-  // once) always reads the latest value without needing to re-subscribe.
-  const ctrlHeldRef = useRef(ctrlHeld)
-  useEffect(() => {
-    ctrlHeldRef.current = ctrlHeld
-  }, [ctrlHeld])
-  const [previewScale, setPreviewScale] = useState(1)
   // Drives the spotlight hover effect (PhotoThumbnail): the hovered photo
   // scales up and saturates while every other visible thumbnail dims and
   // blurs. Lifted here (rather than each PhotoThumbnail reacting only to its
@@ -194,84 +80,6 @@ export function GalleryGrid(): ReactElement {
     (path: string) => setHoveredPath((current) => (current === path ? null : current)),
     []
   )
-  // Reset the zoom once Ctrl is released, so the next Ctrl+hover session
-  // starts fresh — adjusted during render (not a useEffect) per this
-  // codebase's pattern for resetting state when an external value changes.
-  const [wasCtrlHeld, setWasCtrlHeld] = useState(ctrlHeld)
-  if (ctrlHeld !== wasCtrlHeld) {
-    setWasCtrlHeld(ctrlHeld)
-    if (!ctrlHeld) setPreviewScale(1)
-  }
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    // React's synthetic onWheel attaches its DOM listener as passive, so
-    // event.preventDefault() inside it is silently ignored by the browser
-    // (Chrome just logs a "preventDefault inside passive listener" warning)
-    // and the grid keeps scrolling underneath the zoom. A manually attached
-    // { passive: false } listener is the only way to actually cancel it.
-    const handleWheel = (event: WheelEvent): void => {
-      if (!ctrlHeldRef.current) return
-      event.preventDefault()
-      setPreviewScale((scale) => clampPreviewScale(scale - event.deltaY * PREVIEW_ZOOM_SENSITIVITY))
-    }
-    el.addEventListener('wheel', handleWheel, { passive: false })
-    return () => el.removeEventListener('wheel', handleWheel)
-  }, [])
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    let settleTimer: ReturnType<typeof setTimeout> | null = null
-    const observer = new ResizeObserver(([entry]) => {
-      if (!entry) return
-      const { width, height } = entry.contentRect
-      if (settleTimer) clearTimeout(settleTimer)
-      settleTimer = setTimeout(() => setSize({ width, height }), RESIZE_SETTLE_MS)
-    })
-    observer.observe(el)
-    return () => {
-      observer.disconnect()
-      if (settleTimer) clearTimeout(settleTimer)
-    }
-  }, [])
-
-  useEffect(() => {
-    window.api.getGalleryCellWidth().then((width) => {
-      if (width !== null) setCellWidth(clampCellWidth(width))
-    })
-  }, [])
-
-  const setCellWidthPersisted = (width: number): void => {
-    const clamped = clampCellWidth(width)
-    setCellWidth(clamped)
-    void window.api.setGalleryCellWidth(clamped)
-  }
-
-  // Pick the column count closest to the target cell width, then stretch each
-  // column to exactly fill the available width — avoids a leftover sliver of
-  // empty space on the right that a plain floor-division would leave behind.
-  const availableWidth = Math.max(size.width - SCROLLBAR_RESERVE_PX, 0)
-  const columnCount = Math.max(1, Math.round(availableWidth / cellWidth))
-  const actualCellWidth = availableWidth > 0 ? availableWidth / columnCount : cellWidth
-  const cellHeight = actualCellWidth + (state.showFilenames ? CELL_LABEL_HEIGHT : 0)
-  const rowCount = Math.ceil(photos.length / columnCount)
-
-  // The +/- buttons jump between the slider's own SIZE_MARK_VALUES rather
-  // than stepping by a fixed pixel amount, so they always land exactly on a
-  // mark instead of somewhere between two of them.
-  const stepToMark = (delta: number): void => {
-    const closestIndex = SIZE_MARK_VALUES.reduce(
-      (closest, value, index) =>
-        Math.abs(value - cellWidth) < Math.abs(SIZE_MARK_VALUES[closest] - cellWidth)
-          ? index
-          : closest,
-      0
-    )
-    const nextIndex = Math.min(SIZE_MARK_VALUES.length - 1, Math.max(0, closestIndex + delta))
-    setCellWidthPersisted(SIZE_MARK_VALUES[nextIndex])
-  }
 
   // Ctrl/Cmd+click toggles the photo in/out of the batch selection;
   // Shift+click extends a range from the current selectedPath; a plain click
@@ -293,7 +101,7 @@ export function GalleryGrid(): ReactElement {
 
   // Keep a stable reference so react-window doesn't re-diff every visible
   // cell whenever GalleryGrid re-renders for an unrelated reason.
-  const cellProps = useMemo(
+  const cellProps: GalleryCellProps = useMemo(
     () => ({
       photos,
       columnCount,
@@ -402,67 +210,7 @@ export function GalleryGrid(): ReactElement {
                   </Tooltip>
                 </>
               )}
-              <Menu shadow="md" position="bottom-end">
-                <Menu.Target>
-                  <Tooltip label="Sort">
-                    <ActionIcon variant="subtle" aria-label="Sort">
-                      <IconArrowsSort size={16} />
-                    </ActionIcon>
-                  </Tooltip>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Label>Sort by</Menu.Label>
-                  <Menu.Item
-                    leftSection={
-                      state.sortBy === 'name' && state.sortOrder === 'asc' ? (
-                        <IconCheck size={14} />
-                      ) : (
-                        <Box w={14} />
-                      )
-                    }
-                    onClick={() => setSort('name', 'asc')}
-                  >
-                    Name (A–Z)
-                  </Menu.Item>
-                  <Menu.Item
-                    leftSection={
-                      state.sortBy === 'name' && state.sortOrder === 'desc' ? (
-                        <IconCheck size={14} />
-                      ) : (
-                        <Box w={14} />
-                      )
-                    }
-                    onClick={() => setSort('name', 'desc')}
-                  >
-                    Name (Z–A)
-                  </Menu.Item>
-                  <Menu.Divider />
-                  <Menu.Item
-                    leftSection={
-                      state.sortBy === 'dateTaken' && state.sortOrder === 'desc' ? (
-                        <IconCheck size={14} />
-                      ) : (
-                        <Box w={14} />
-                      )
-                    }
-                    onClick={() => setSort('dateTaken', 'desc')}
-                  >
-                    Date taken (Newest)
-                  </Menu.Item>
-                  <Menu.Item
-                    leftSection={
-                      state.sortBy === 'dateTaken' && state.sortOrder === 'asc' ? (
-                        <IconCheck size={14} />
-                      ) : (
-                        <Box w={14} />
-                      )
-                    }
-                    onClick={() => setSort('dateTaken', 'asc')}
-                  >
-                    Date taken (Oldest)
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
+              <GallerySortMenu />
               <GallerySettingsMenu />
             </Group>
           </Group>
@@ -520,8 +268,8 @@ export function GalleryGrid(): ReactElement {
             )}
           </Center>
         ) : (
-          <Grid<CellProps>
-            cellComponent={PhotoCell}
+          <Grid<GalleryCellProps>
+            cellComponent={GalleryPhotoCell}
             cellProps={cellProps}
             columnCount={columnCount}
             columnWidth={actualCellWidth}
@@ -542,10 +290,10 @@ export function GalleryGrid(): ReactElement {
             value={cellWidth}
             onChange={setCellWidth}
             onChangeEnd={setCellWidthPersisted}
-            min={MIN_CELL_WIDTH}
-            max={MAX_CELL_WIDTH}
+            min={minCellWidth}
+            max={maxCellWidth}
             step={4}
-            marks={SIZE_MARKS}
+            marks={sizeMarks}
             label={null}
             w={120}
             restrictToMarks
