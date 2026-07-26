@@ -53,6 +53,16 @@ const MAX_PREVIEW_SCALE = 3
 // A typical wheel "notch" reports a deltaY of roughly 100, so this yields
 // about a 0.15x change per notch — noticeable without feeling twitchy.
 const PREVIEW_ZOOM_SENSITIVITY = 0.0015
+// The gallery stays mounted (just hidden) while a photo tab is active —
+// Mantine's Tabs keeps inactive panels around via React's Activity API —
+// so returning to it re-expands the AppShell Navbar/Aside via their own CSS
+// transition while this grid is already visible. Without debouncing, the
+// ResizeObserver below would fire on every frame of that transition,
+// reflowing thumbnails into new column counts live. A debounce (rather than
+// a fixed delay guessed to match the transition's duration) waits for
+// resize events to actually stop before committing a size, so it self-
+// corrects regardless of how long any given transition takes.
+const RESIZE_SETTLE_MS = 100
 
 function clampCellWidth(value: number): number {
   return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, value))
@@ -213,12 +223,18 @@ export function GalleryGrid(): ReactElement {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    let settleTimer: ReturnType<typeof setTimeout> | null = null
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return
-      setSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+      const { width, height } = entry.contentRect
+      if (settleTimer) clearTimeout(settleTimer)
+      settleTimer = setTimeout(() => setSize({ width, height }), RESIZE_SETTLE_MS)
     })
     observer.observe(el)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (settleTimer) clearTimeout(settleTimer)
+    }
   }, [])
 
   useEffect(() => {
