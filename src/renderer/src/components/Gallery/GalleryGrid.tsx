@@ -11,7 +11,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconPhoto, IconX } from '@tabler/icons-react'
+import { IconColumns2, IconPhoto, IconX } from '@tabler/icons-react'
 import {
   useCallback,
   useMemo,
@@ -45,7 +45,8 @@ export function GalleryGrid(): ReactElement {
     tagCounts,
     folderTags,
     setFolderTagFilter,
-    renameFile
+    renameFile,
+    openCompareTab
   } = usePhotoLibrary()
 
   const {
@@ -199,6 +200,20 @@ export function GalleryGrid(): ReactElement {
                   <Text size="sm" c="dimmed">
                     {state.selectedPaths.size} selected
                   </Text>
+                  {state.selectedPaths.size === 2 && (
+                    <Tooltip label="Compare photos">
+                      <ActionIcon
+                        variant="subtle"
+                        aria-label="Compare photos"
+                        onClick={() => {
+                          const [pathA, pathB] = state.selectedPaths
+                          openCompareTab(pathA, pathB)
+                        }}
+                      >
+                        <IconColumns2 size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
                   <Tooltip label="Clear selection">
                     <ActionIcon
                       variant="subtle"

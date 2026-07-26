@@ -1,19 +1,14 @@
-import { ActionIcon, Box, Container, Flex, Group, Image, Slider, Tooltip } from '@mantine/core'
+import { ActionIcon, Box, Container, Flex, Group, Image, Tooltip } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { motion } from 'motion/react'
-import {
-  IconArrowsMaximize,
-  IconMaximize,
-  IconPhoto,
-  IconRotate,
-  IconRotateClockwise
-} from '@tabler/icons-react'
+import { IconRotate, IconRotateClockwise } from '@tabler/icons-react'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { ROTATABLE_FORMATS, type PhotoRecord } from '../../../../shared/types'
 import { toFileProtocolUrl } from '../../../../shared/protocolUrls'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 import { usePhotoEntranceExit } from '../../hooks/usePhotoEntranceExit'
 import { usePhotoHoverEffects } from '../../hooks/usePhotoHoverEffects'
+import { ZoomToolbar } from '../Shared/ZoomToolbar'
 
 const MIN_SCALE = 1
 const MAX_SCALE = 5
@@ -250,45 +245,16 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
         ) : (
           <div />
         )}
-        <Group bg="gray" p="sm" gap="sm" wrap="nowrap">
-          {/* Slider stays a plain sibling, not inside ActionIcon.Group — that
-              component expects a static label/icon, not a rich control. */}
-          <ActionIcon onClick={zoomToFit} aria-label="Zoom to fit">
-            <Tooltip label="Zoom to fit">
-              <IconMaximize />
-            </Tooltip>
-          </ActionIcon>
-          <ActionIcon onClick={zoomToNativeSize} aria-label="Original size">
-            <Tooltip label="Original size">
-              <IconArrowsMaximize />
-            </Tooltip>
-          </ActionIcon>
-          <ActionIcon
-            onClick={() => setScale((prev) => clampScale(prev - SCALE_STEP))}
-            aria-label="Zoom out"
-          >
-            <Tooltip label="Zoom out">
-              <IconPhoto size={12} />
-            </Tooltip>
-          </ActionIcon>
-          <Slider
-            value={scale}
-            onChange={setScale}
-            min={MIN_SCALE}
-            max={MAX_SCALE}
-            step={0.1}
-            label={null}
-            w={120}
-          />
-          <ActionIcon
-            onClick={() => setScale((prev) => clampScale(prev + SCALE_STEP))}
-            aria-label="Zoom in"
-          >
-            <Tooltip label="Zoom in">
-              <IconPhoto size={22} />
-            </Tooltip>
-          </ActionIcon>
-        </Group>
+        <ZoomToolbar
+          scale={scale}
+          onScaleChange={setScale}
+          onZoomToFit={zoomToFit}
+          onZoomToNativeSize={zoomToNativeSize}
+          onZoomOut={() => setScale((prev) => clampScale(prev - SCALE_STEP))}
+          onZoomIn={() => setScale((prev) => clampScale(prev + SCALE_STEP))}
+          min={MIN_SCALE}
+          max={MAX_SCALE}
+        />
       </Flex>
     </Container>
   )

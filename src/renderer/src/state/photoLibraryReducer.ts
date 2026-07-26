@@ -14,6 +14,12 @@ export type GallerySortOrder = 'asc' | 'desc'
 
 export const RECENT_TAGS_LIMIT = 3
 
+// Deterministic (order-independent) so opening the same pair twice reuses
+// the existing compare tab instead of duplicating it.
+export function compareTabId(pathA: string, pathB: string): string {
+  return `compare:${[pathA, pathB].sort().join('::')}`
+}
+
 export interface PhotoLibraryState {
   folders: string[]
   rootPath: string | null
@@ -52,9 +58,14 @@ export interface PhotoLibraryState {
   // persisted): resets on app restart.
   recentTags: string[]
   // Ordered list of photo paths open as Photo View tabs. activeTab is either
-  // 'gallery' or one of the paths in openTabs.
+  // 'gallery' or one of the paths in openTabs (which can also hold compare-
+  // tab ids — see compareTabs below).
   openTabs: string[]
   activeTab: string
+  // Compare-tabs live in openTabs/activeTab alongside single-photo tabs,
+  // identified by a synthetic id (not a real file path) that this map
+  // resolves to the actual pair of photos being compared.
+  compareTabs: Map<string, [string, string]>
 }
 
 export const initialState: PhotoLibraryState = {
@@ -83,7 +94,8 @@ export const initialState: PhotoLibraryState = {
   tagDescriptions: new Map(),
   recentTags: [],
   openTabs: [],
-  activeTab: 'gallery'
+  activeTab: 'gallery',
+  compareTabs: new Map()
 }
 
 export type PhotoLibraryAction =
@@ -118,6 +130,7 @@ export type PhotoLibraryAction =
   | { type: 'TAG_RENAMED'; oldTag: string; newTag: string; photos: PhotoRecord[] }
   | { type: 'TAG_DELETED'; tag: string; photos: PhotoRecord[] }
   | { type: 'OPEN_PHOTO_TAB'; filePath: string }
+  | { type: 'OPEN_COMPARE_TAB'; pathA: string; pathB: string }
   | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
@@ -479,6 +492,13 @@ export function photoLibraryReducer(
         : [...state.openTabs, action.filePath]
       return { ...state, openTabs, activeTab: action.filePath }
     }
+    case 'OPEN_COMPARE_TAB': {
+      const id = compareTabId(action.pathA, action.pathB)
+      const openTabs = state.openTabs.includes(id) ? state.openTabs : [...state.openTabs, id]
+      const compareTabs = new Map(state.compareTabs)
+      compareTabs.set(id, [action.pathA, action.pathB])
+      return { ...state, openTabs, activeTab: id, compareTabs }
+    }
     case 'CLOSE_PHOTO_TAB': {
       if (!state.openTabs.includes(action.filePath)) return state
       const openTabs = state.openTabs.filter((path) => path !== action.filePath)
@@ -492,7 +512,12 @@ export function photoLibraryReducer(
         const closedIndex = order.indexOf(action.filePath)
         activeTab = order[closedIndex - 1]
       }
-      return { ...state, openTabs, activeTab }
+      let compareTabs = state.compareTabs
+      if (compareTabs.has(action.filePath)) {
+        compareTabs = new Map(compareTabs)
+        compareTabs.delete(action.filePath)
+      }
+      return { ...state, openTabs, activeTab, compareTabs }
     }
     case 'SET_ACTIVE_TAB':
       return { ...state, activeTab: action.tab }

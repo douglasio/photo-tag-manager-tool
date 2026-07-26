@@ -38,6 +38,14 @@ const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
 // stepped forward), 'left' means it enters from the left (stepped back).
 export type NavigationDirection = 'left' | 'right'
 
+// One entry per open tab in display order — either a single photo or a
+// compare pair, resolved from state.openTabs/compareTabs against the
+// current photosByPath (an entry drops out if a referenced photo no longer
+// exists, e.g. after a delete).
+export type OpenTabEntry =
+  | { kind: 'photo'; id: string; photo: PhotoRecord }
+  | { kind: 'compare'; id: string; photoA: PhotoRecord; photoB: PhotoRecord }
+
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
 }
@@ -80,8 +88,9 @@ interface PhotoLibraryContextValue {
   updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
   updateComment: (filePath: string, comment: string) => Promise<void>
   rotatePhoto: (filePath: string, direction: RotateDirection) => Promise<void>
-  openTabPhotos: PhotoRecord[]
+  openTabEntries: OpenTabEntry[]
   openPhotoTab: (filePath: string) => void
+  openCompareTab: (pathA: string, pathB: string) => void
   closePhotoTab: (filePath: string) => void
   setActiveTab: (tab: string) => void
   reorderPhotoTabs: (openTabs: string[]) => void
@@ -588,6 +597,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
   }, [])
 
+  const openCompareTab = useCallback((pathA: string, pathB: string) => {
+    dispatch({ type: 'OPEN_COMPARE_TAB', pathA, pathB })
+  }, [])
+
   const closePhotoTab = useCallback((filePath: string) => {
     dispatch({ type: 'CLOSE_PHOTO_TAB', filePath })
   }, [])
@@ -785,12 +798,22 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   // Resolved in openTabs order (not sorted) so tabs stay in the order they
   // were opened rather than jumping around as the user opens more.
-  const openTabPhotos = useMemo(
+  const openTabEntries = useMemo(
     () =>
       state.openTabs
-        .map((path) => state.photosByPath.get(path))
-        .filter((photo): photo is PhotoRecord => photo != null),
-    [state.openTabs, state.photosByPath]
+        .map((id): OpenTabEntry | null => {
+          const pair = state.compareTabs.get(id)
+          if (pair) {
+            const photoA = state.photosByPath.get(pair[0])
+            const photoB = state.photosByPath.get(pair[1])
+            if (!photoA || !photoB) return null
+            return { kind: 'compare', id, photoA, photoB }
+          }
+          const photo = state.photosByPath.get(id)
+          return photo ? { kind: 'photo', id, photo } : null
+        })
+        .filter((entry): entry is OpenTabEntry => entry != null),
+    [state.openTabs, state.compareTabs, state.photosByPath]
   )
 
   const value: PhotoLibraryContextValue = {
@@ -831,8 +854,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     updateDateTaken,
     updateComment,
     rotatePhoto,
-    openTabPhotos,
+    openTabEntries,
     openPhotoTab,
+    openCompareTab,
     closePhotoTab,
     setActiveTab,
     reorderPhotoTabs,

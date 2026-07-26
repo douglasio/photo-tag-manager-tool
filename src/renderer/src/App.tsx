@@ -27,6 +27,7 @@ import {
 import { SortableContext, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { getEventCoordinates } from '@dnd-kit/utilities'
 import {
+  IconColumns2,
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
   IconLibraryPhoto,
@@ -40,6 +41,7 @@ import { AppLogo } from './components/Shared/AppLogo'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { ScanProgressBar } from './components/Settings/ScanProgressBar'
 import { GalleryGrid } from './components/Gallery/GalleryGrid'
+import { CompareView } from './components/Compare/CompareView'
 import { DetailPanel } from './components/DetailPanel/DetailPanel'
 import { FolderSettingsMenu } from './components/Folders/FolderSettingsMenu'
 import { FolderTree } from './components/Folders/FolderTree'
@@ -141,7 +143,7 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
 function AppLayout(): React.JSX.Element {
   const {
     state,
-    openTabPhotos,
+    openTabEntries,
     closePhotoTab,
     setActiveTab,
     addTagsToPhotos,
@@ -342,11 +344,14 @@ function AppLayout(): React.JSX.Element {
                       items={state.openTabs}
                       strategy={horizontalListSortingStrategy}
                     >
-                      {openTabPhotos.map((photo) => (
+                      {openTabEntries.map((entry) => (
                         <SortableTab
-                          key={photo.filePath}
-                          id={photo.filePath}
-                          value={photo.filePath}
+                          key={entry.id}
+                          id={entry.id}
+                          value={entry.id}
+                          leftSection={
+                            entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
+                          }
                           rightSection={
                             <ActionIcon
                               component="span"
@@ -355,14 +360,16 @@ function AppLayout(): React.JSX.Element {
                               color="gray"
                               onClick={(event) => {
                                 event.stopPropagation()
-                                closePhotoTab(photo.filePath)
+                                closePhotoTab(entry.id)
                               }}
                             >
                               <IconX size={12} />
                             </ActionIcon>
                           }
                         >
-                          {photo.fileName}
+                          {entry.kind === 'compare'
+                            ? `${entry.photoA.fileName} vs ${entry.photoB.fileName}`
+                            : entry.photo.fileName}
                         </SortableTab>
                       ))}
                     </SortableContext>
@@ -371,13 +378,17 @@ function AppLayout(): React.JSX.Element {
                 <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
                   <GalleryGrid />
                 </Tabs.Panel>
-                {openTabPhotos.map((photo) => (
+                {openTabEntries.map((entry) => (
                   <Tabs.Panel
-                    key={photo.filePath}
-                    value={photo.filePath}
+                    key={entry.id}
+                    value={entry.id}
                     style={{ flex: 1, minHeight: 0, display: 'flex' }}
                   >
-                    <PhotoView photo={photo} />
+                    {entry.kind === 'compare' ? (
+                      <CompareView photoA={entry.photoA} photoB={entry.photoB} />
+                    ) : (
+                      <PhotoView photo={entry.photo} />
+                    )}
                   </Tabs.Panel>
                 ))}
               </Tabs>
@@ -390,14 +401,6 @@ function AppLayout(): React.JSX.Element {
           <DetailPanel />
         </AppShell.Aside>
       </AppShell>
-      {/* DragOverlay's wrapper element is sized to the ORIGINAL dragged
-          node's bounding box by default (the full gallery thumbnail card),
-          not to whatever content is rendered inside it — so our much
-          smaller DragPreview was rendering pinned to the corner of that
-          oversized, invisible box, and the centering modifier above was
-          also computing its offset from that same wrong-sized rect. This
-          style override forces the wrapper itself to match the preview's
-          actual size, fixing both. */}
       <DragOverlay
         modifiers={[snapCenterToCursor]}
         style={{ width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }}
