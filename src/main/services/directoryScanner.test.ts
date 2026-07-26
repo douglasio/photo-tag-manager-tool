@@ -27,7 +27,7 @@ describe('directoryScanner', () => {
     it('finds only supported image files, case-insensitively', async () => {
       const found = await scanDirectory(root)
       const relative = found.map((p) => p.slice(root.length + 1)).sort()
-      expect(relative).toEqual(['a.jpg', 'excluded/c.jpg', join('sub', 'b.PNG')].sort())
+      expect(relative).toEqual(['a.jpg', join('excluded', 'c.jpg'), join('sub', 'b.PNG')].sort())
     })
 
     it('excludes files/folders matching an exclude pattern', async () => {
