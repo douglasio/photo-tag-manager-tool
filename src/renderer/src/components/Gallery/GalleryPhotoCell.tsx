@@ -15,7 +15,7 @@ export interface GalleryCellProps {
   onStartRename: (path: string) => void
   onStopRename: () => void
   onRename: (filePath: string, newBaseName: string) => Promise<void>
-  ctrlHeld: boolean
+  previewTriggerHeld: boolean
   previewScale: number
   showFilenames: boolean
 }
@@ -34,7 +34,7 @@ export function GalleryPhotoCell({
   onStartRename,
   onStopRename,
   onRename,
-  ctrlHeld,
+  previewTriggerHeld,
   previewScale,
   showFilenames
 }: CellComponentProps<GalleryCellProps>): ReactElement {
@@ -53,7 +53,7 @@ export function GalleryPhotoCell({
           onStartRename={() => onStartRename(photo.filePath)}
           onStopRename={onStopRename}
           onRename={(newBaseName) => onRename(photo.filePath, newBaseName)}
-          ctrlHeld={ctrlHeld}
+          previewTriggerHeld={previewTriggerHeld}
           previewScale={previewScale}
           showFilename={showFilenames}
         />

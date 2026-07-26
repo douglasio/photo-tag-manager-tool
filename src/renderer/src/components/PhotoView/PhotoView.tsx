@@ -20,11 +20,18 @@ import { ZoomToolbar } from '../Shared/ZoomToolbar'
 import { MagazineCoverView } from './MagazineCoverView'
 import { NewspaperCoverView } from './NewspaperCoverView'
 
-const MIN_SCALE = 1
+// 0.5 (not 1) so zooming out can go beyond the fitted size, matching
+// usePannableZoom's range — 1 used to double as both "fitted" and "as far
+// out as you can go," which left no room to shrink further.
+const MIN_SCALE = 0.5
 const MAX_SCALE = 5
 const SCALE_STEP = 0.25
-// Matches the sensitivity used for the gallery's Ctrl+wheel preview zoom.
+// Matches the sensitivity used for the gallery's preview-trigger+wheel zoom.
 const WHEEL_ZOOM_SENSITIVITY = 0.025
+// Short enough to stay responsive during continuous input (wheel, dragging
+// the slider) rather than feeling laggy, but still smooths out discrete
+// jumps — the toolbar buttons, zoomToFit, zoomToNativeSize, keyboard +/-.
+const ZOOM_TRANSITION = 'transform 150ms ease-out'
 
 interface PhotoViewProps {
   photo: PhotoRecord
@@ -95,6 +102,14 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   // the image's true rendered box so we can feed the real aspect-ratio back
   // to the visible images below, overriding what object-fit assumes.
   const [nativeSize, setNativeSize] = useState<{ width: number; height: number } | null>(null)
+  // The actual contain-fit pixel size to render the image at, computed once
+  // the probe above resolves nativeSize — same approach as usePannableZoom's
+  // baseSize. Rendering at this explicit size (rather than maw/mah
+  // percentages) is what makes scale=1 mean "fitted": a percentage box has
+  // no fitted size of its own to be scale=1 *of*, which is why the image
+  // used to open at whatever size the percentages happened to produce
+  // instead of the frame-fit size zoomToFit is supposed to return to.
+  const [baseSize, setBaseSize] = useState<{ width: number; height: number } | null>(null)
   // Reset (during render, not an effect, per this codebase's convention for
   // resetting state when an external value changes) whenever the file is
   // rewritten — e.g. after a rotate — so the probe re-measures.
@@ -102,22 +117,33 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   if (measuredForKey !== photo.thumbnailKey) {
     setMeasuredForKey(photo.thumbnailKey)
     setNativeSize(null)
+    setBaseSize(null)
   }
-  const aspectRatio = nativeSize ? `${nativeSize.width} / ${nativeSize.height}` : undefined
 
-  const zoomToFit = (): void => setScale(MIN_SCALE)
-
-  // True 1:1 pixels, using the probe-measured size above rather than
-  // naturalWidth/naturalHeight (see the comment on nativeSize).
-  const zoomToNativeSize = (): void => {
+  useEffect(() => {
+    if (!nativeSize) return
     const container = containerRef.current
-    if (!container || !nativeSize) return
-    const fitScale = Math.min(
+    if (!container) return
+    // Capped at 1 so a photo smaller than the frame renders at its real
+    // size instead of being blurrily upscaled to fill it.
+    const containScale = Math.min(
+      1,
       container.clientWidth / nativeSize.width,
       container.clientHeight / nativeSize.height
     )
-    if (!fitScale) return
-    setScale(clampScale(1 / fitScale))
+    setBaseSize({
+      width: nativeSize.width * containScale,
+      height: nativeSize.height * containScale
+    })
+  }, [nativeSize])
+
+  const zoomToFit = (): void => setScale(1)
+
+  // True 1:1 pixels — the ratio between the probe-measured native size and
+  // the fitted size scale=1 already renders at.
+  const zoomToNativeSize = (): void => {
+    if (!nativeSize || !baseSize) return
+    setScale(clampScale(nativeSize.width / baseSize.width))
   }
 
   // Every opened photo's panel stays mounted, so gate keydown on whether
@@ -207,7 +233,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
               their own z-index tier, which can sit above ordinary absolutely
               positioned content in Main regardless of DOM order — a Portal
               (rendered straight to document.body, same as the drag preview
-              in App.tsx and the Ctrl+hover preview in PhotoThumbnail.tsx)
+              in App.tsx and the trigger+hover preview in PhotoThumbnail.tsx)
               plus the app's own "definitely on top" z-index token sidesteps
               that entirely instead of trying to out-stack it locally.
               Positioned from paneCorner (this pane's own measured
@@ -273,19 +299,20 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                   fit="contain"
                   onLoad={handleImageLoad}
                   draggable={false}
-                  maw="100%"
-                  mah="100%"
+                  w={baseSize?.width}
+                  h={baseSize?.height}
                   display="block"
                   style={{
-                    aspectRatio,
+                    visibility: baseSize ? 'visible' : 'hidden',
                     transform: `scale(${scale})`,
                     transformOrigin: 'center',
+                    transition: motionEnabled ? ZOOM_TRANSITION : undefined,
                     userSelect: 'none',
                     WebkitUserDrag: 'none'
                   }}
                 />
                 {/* Saturated copy masked to a cursor-centered feathered circle;
-                    suppressed while Ctrl-zoom is active. */}
+                    suppressed while the trigger-zoom is active. */}
                 <motion.div
                   style={{
                     position: 'absolute',
@@ -299,13 +326,14 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                     alt=""
                     fit="contain"
                     draggable={false}
-                    maw="100%"
-                    mah="100%"
+                    w={baseSize?.width}
+                    h={baseSize?.height}
                     display="block"
                     style={{
-                      aspectRatio,
+                      visibility: baseSize ? 'visible' : 'hidden',
                       transform: `scale(${scale})`,
                       transformOrigin: 'center',
+                      transition: motionEnabled ? ZOOM_TRANSITION : undefined,
                       filter: `saturate(${saturationAmount})`,
                       userSelect: 'none',
                       WebkitUserDrag: 'none'

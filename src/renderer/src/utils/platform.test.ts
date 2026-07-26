@@ -14,18 +14,16 @@ describe('platform', () => {
     stubPlatform('darwin')
   })
 
-  it('labels the Ctrl key with the Mac glyph on darwin', async () => {
+  it('detects darwin as Mac', async () => {
     stubPlatform('darwin')
-    const { isMac, ctrlKeyLabel } = await import('./platform')
+    const { isMac } = await import('./platform')
     expect(isMac).toBe(true)
-    expect(ctrlKeyLabel).toBe('Ctrl (⌃)')
   })
 
-  it('uses a plain "Ctrl" label on non-Mac platforms', async () => {
+  it('does not detect other platforms as Mac', async () => {
     vi.resetModules()
     stubPlatform('win32')
-    const { isMac, ctrlKeyLabel } = await import('./platform')
+    const { isMac } = await import('./platform')
     expect(isMac).toBe(false)
-    expect(ctrlKeyLabel).toBe('Ctrl')
   })
 })

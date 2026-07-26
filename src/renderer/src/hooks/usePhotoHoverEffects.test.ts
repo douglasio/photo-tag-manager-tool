@@ -44,16 +44,16 @@ describe('usePhotoHoverEffects', () => {
     expect(result.current.zoomStyle.transformOrigin).toBe('25% 75%')
   })
 
-  it('mouse leave resets without throwing, including after Ctrl-zoom was active', () => {
+  it('mouse leave resets without throwing, including after trigger-zoom was active', () => {
     const { result } = renderHook(() => usePhotoHoverEffects(true))
     act(() => {
       result.current.containerHandlers.onMouseEnter()
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }))
       result.current.containerHandlers.onMouseMove(fakeMouseEvent(10, 10))
     })
     expect(() => {
       act(() => {
-        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control' }))
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }))
         result.current.containerHandlers.onMouseLeave()
       })
     }).not.toThrow()

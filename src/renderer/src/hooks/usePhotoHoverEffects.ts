@@ -1,6 +1,7 @@
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { useMotionTemplate, useMotionValue, useSpring } from 'motion/react'
-import { useCtrlKeyHeld } from './useCtrlKeyHeld'
+import { useKeyHeld } from './useKeyHeld'
+import { PREVIEW_TRIGGER_KEY } from '../utils/previewTrigger'
 
 // Hover saturates a soft, cursor-centered, feathered circle (a saturated
 // image copy masked by a radial gradient) rather than zooming.
@@ -8,9 +9,10 @@ const SATURATION_RADIUS_PX = 270
 const SATURATION_AMOUNT = 1.5
 const SATURATION_SPRING = { stiffness: 300, damping: 30, mass: 0.5 } as const
 
-// Ctrl+hover swaps the saturation effect for a pronounced cursor-zoom.
-const CTRL_ZOOM_SCALE = 4
-const CTRL_ZOOM_SPRING = { stiffness: 300, damping: 30, mass: 0.5 } as const
+// Holding the trigger key while hovering swaps the saturation effect for a
+// pronounced cursor-zoom.
+const TRIGGER_ZOOM_SCALE = 4
+const TRIGGER_ZOOM_SPRING = { stiffness: 300, damping: 30, mass: 0.5 } as const
 
 interface UsePhotoHoverEffectsResult {
   saturationAmount: number
@@ -28,7 +30,8 @@ interface UsePhotoHoverEffectsResult {
 }
 
 // Drives PhotoView's two mutually-exclusive hover effects: a cursor-centered
-// saturation mask by default, or a pronounced cursor-zoom while Ctrl is held.
+// saturation mask by default, or a pronounced cursor-zoom while the preview
+// trigger key is held.
 export function usePhotoHoverEffects(motionEnabled: boolean): UsePhotoHoverEffectsResult {
   const maskX = useMotionValue(0)
   const maskY = useMotionValue(0)
@@ -36,21 +39,21 @@ export function usePhotoHoverEffects(motionEnabled: boolean): UsePhotoHoverEffec
   const springMaskOpacity = useSpring(maskOpacity, SATURATION_SPRING)
   const maskImage = useMotionTemplate`radial-gradient(circle ${SATURATION_RADIUS_PX}px at ${maskX}px ${maskY}px, black 0%, black 35%, transparent 100%)`
 
-  const ctrlHeld = useCtrlKeyHeld()
+  const triggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const [isHovering, setIsHovering] = useState(false)
   const [zoomOrigin, setZoomOrigin] = useState('center center')
   const zoomScale = useMotionValue(1)
-  const springZoomScale = useSpring(zoomScale, CTRL_ZOOM_SPRING)
+  const springZoomScale = useSpring(zoomScale, TRIGGER_ZOOM_SPRING)
 
   useEffect(() => {
     if (!motionEnabled) return
-    if (isHovering && ctrlHeld) {
-      zoomScale.set(CTRL_ZOOM_SCALE)
+    if (isHovering && triggerHeld) {
+      zoomScale.set(TRIGGER_ZOOM_SCALE)
       maskOpacity.set(0)
     } else {
       zoomScale.set(1)
     }
-  }, [ctrlHeld, isHovering, motionEnabled, zoomScale, maskOpacity])
+  }, [triggerHeld, isHovering, motionEnabled, zoomScale, maskOpacity])
 
   return {
     saturationAmount: SATURATION_AMOUNT,
@@ -61,7 +64,7 @@ export function usePhotoHoverEffects(motionEnabled: boolean): UsePhotoHoverEffec
         const xPct = ((event.clientX - rect.left) / rect.width) * 100
         const yPct = ((event.clientY - rect.top) / rect.height) * 100
         setZoomOrigin(`${xPct}% ${yPct}%`)
-        if (ctrlHeld) {
+        if (triggerHeld) {
           maskOpacity.set(0)
         } else {
           maskX.set(event.clientX - rect.left)
@@ -72,7 +75,7 @@ export function usePhotoHoverEffects(motionEnabled: boolean): UsePhotoHoverEffec
       onMouseEnter: () => {
         if (!motionEnabled) return
         setIsHovering(true)
-        if (!ctrlHeld) maskOpacity.set(1)
+        if (!triggerHeld) maskOpacity.set(1)
       },
       onMouseLeave: () => {
         setIsHovering(false)

@@ -64,7 +64,7 @@ export function GalleryGrid(): ReactElement {
     setCellWidthPersisted,
     stepToMark
   } = useGalleryGridLayout({ photoCount: photos.length, showFilenames: state.showFilenames })
-  const { ctrlHeld, previewScale } = useGalleryPreviewZoom(containerRef)
+  const { previewTriggerHeld, previewScale } = useGalleryPreviewZoom(containerRef)
 
   // Lifted up here (not into GalleryPhotoCell) since react-window recycles
   // cell instances across different photos as the user scrolls — per-cell
@@ -102,7 +102,7 @@ export function GalleryGrid(): ReactElement {
       onStartRename: setRenamingPath,
       onStopRename: () => setRenamingPath(null),
       onRename: renameFile,
-      ctrlHeld,
+      previewTriggerHeld,
       previewScale,
       showFilenames: state.showFilenames
     }),
@@ -114,7 +114,7 @@ export function GalleryGrid(): ReactElement {
       handleSelect,
       renamingPath,
       renameFile,
-      ctrlHeld,
+      previewTriggerHeld,
       previewScale,
       state.showFilenames
     ]
