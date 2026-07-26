@@ -1,25 +1,37 @@
-import { ActionIcon, Box, Container, Flex, Group, Image, Slider, Tooltip } from '@mantine/core'
+import { ActionIcon, Box, Container, Flex, Group, Image, Portal, Tooltip } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { motion } from 'motion/react'
 import {
-  IconArrowsMaximize,
-  IconMaximize,
-  IconPhoto,
+  IconArticle,
+  IconNews,
+  IconPhotoStar,
   IconRotate,
-  IconRotateClockwise
+  IconRotateClockwise,
+  IconX
 } from '@tabler/icons-react'
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { ROTATABLE_FORMATS, type PhotoRecord } from '../../../../shared/types'
 import { toFileProtocolUrl } from '../../../../shared/protocolUrls'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { usePhotoLibrary, type PhotoVisualization } from '../../state/PhotoLibraryContext'
 import { usePhotoEntranceExit } from '../../hooks/usePhotoEntranceExit'
 import { usePhotoHoverEffects } from '../../hooks/usePhotoHoverEffects'
+import { usePannableZoom } from '../../hooks/usePannableZoom'
+import { ZoomToolbar } from '../Shared/ZoomToolbar'
+import { MagazineCoverView } from './MagazineCoverView'
+import { NewspaperCoverView } from './NewspaperCoverView'
 
-const MIN_SCALE = 1
+// 0.5 (not 1) so zooming out can go beyond the fitted size, matching
+// usePannableZoom's range — 1 used to double as both "fitted" and "as far
+// out as you can go," which left no room to shrink further.
+const MIN_SCALE = 0.5
 const MAX_SCALE = 5
 const SCALE_STEP = 0.25
-// Matches the sensitivity used for the gallery's Ctrl+wheel preview zoom.
+// Matches the sensitivity used for the gallery's preview-trigger+wheel zoom.
 const WHEEL_ZOOM_SENSITIVITY = 0.025
+// Short enough to stay responsive during continuous input (wheel, dragging
+// the slider) rather than feeling laggy, but still smooths out discrete
+// jumps — the toolbar buttons, zoomToFit, zoomToNativeSize, keyboard +/-.
+const ZOOM_TRANSITION = 'transform 150ms ease-out'
 
 interface PhotoViewProps {
   photo: PhotoRecord
@@ -30,13 +42,50 @@ function clampScale(value: number): number {
 }
 
 export function PhotoView({ photo }: PhotoViewProps): ReactElement {
-  const { state, closePhotoTab, rotatePhoto, visiblePhotos, navigateToPhoto, consumeNavDirection } =
-    usePhotoLibrary()
+  const {
+    state,
+    closePhotoTab,
+    rotatePhoto,
+    visiblePhotos,
+    navigateToPhoto,
+    consumeNavDirection,
+    consumeVisualization
+  } = usePhotoLibrary()
   const [scale, setScale] = useState(1)
+  // Read once at mount via lazy initializer, same pattern as enterDirection
+  // below — carried across arrow-key navigation's remount so the mode stays
+  // active as the user steps through photos.
+  const [visualization, setVisualization] = useState<PhotoVisualization>(
+    () => consumeVisualization(photo.filePath) ?? 'none'
+  )
+  // Always called (not just while a given mode is active) so these stay the
+  // single source of truth for each view's zoom — PhotoView renders its
+  // ZoomToolbar from them directly, rather than each owning a disconnected copy.
+  const magazineZoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  const newspaperZoom = usePannableZoom(photo, { defaultFit: 'cover' })
   // Read once at mount via lazy initializer — this instance is fresh per photo.
   const [enterDirection] = useState(() => consumeNavDirection(photo.filePath))
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
+  // Tracks the whole PhotoView pane's own box (tabs above, details panel to
+  // the right already excluded by AppShell's layout) so the Portal-rendered
+  // exit button below can be pinned to ITS actual top-right corner rather
+  // than a guessed viewport offset.
+  const paneRef = useRef<HTMLDivElement>(null)
+  const [paneCorner, setPaneCorner] = useState<{ top: number; right: number } | null>(null)
+  useEffect(() => {
+    if (visualization === 'none') return
+    const el = paneRef.current
+    if (!el) return
+    const updateCorner = (): void => {
+      const rect = el.getBoundingClientRect()
+      setPaneCorner({ top: rect.top, right: window.innerWidth - rect.right })
+    }
+    updateCorner()
+    const observer = new ResizeObserver(updateCorner)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [visualization])
   const canRotate = ROTATABLE_FORMATS.includes(photo.metadata.format)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -48,20 +97,53 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   const { saturationAmount, containerHandlers, zoomStyle, saturationOverlayStyle } =
     usePhotoHoverEffects(motionEnabled)
 
-  const zoomToFit = (): void => setScale(MIN_SCALE)
+  // Chromium's object-fit ignores EXIF rotation in its own fit/crop math
+  // (though painting respects it) — this hidden, unconstrained probe measures
+  // the image's true rendered box so we can feed the real aspect-ratio back
+  // to the visible images below, overriding what object-fit assumes.
+  const [nativeSize, setNativeSize] = useState<{ width: number; height: number } | null>(null)
+  // The actual contain-fit pixel size to render the image at, computed once
+  // the probe above resolves nativeSize — same approach as usePannableZoom's
+  // baseSize. Rendering at this explicit size (rather than maw/mah
+  // percentages) is what makes scale=1 mean "fitted": a percentage box has
+  // no fitted size of its own to be scale=1 *of*, which is why the image
+  // used to open at whatever size the percentages happened to produce
+  // instead of the frame-fit size zoomToFit is supposed to return to.
+  const [baseSize, setBaseSize] = useState<{ width: number; height: number } | null>(null)
+  // Reset (during render, not an effect, per this codebase's convention for
+  // resetting state when an external value changes) whenever the file is
+  // rewritten — e.g. after a rotate — so the probe re-measures.
+  const [measuredForKey, setMeasuredForKey] = useState(photo.thumbnailKey)
+  if (measuredForKey !== photo.thumbnailKey) {
+    setMeasuredForKey(photo.thumbnailKey)
+    setNativeSize(null)
+    setBaseSize(null)
+  }
 
-  // Compensates for how much fit="contain" already shrank/grew the image,
-  // so "original size" means true 1:1 pixels.
-  const zoomToNativeSize = (): void => {
-    const img = imgRef.current
+  useEffect(() => {
+    if (!nativeSize) return
     const container = containerRef.current
-    if (!img || !container || !img.naturalWidth || !img.naturalHeight) return
-    const fitScale = Math.min(
-      container.clientWidth / img.naturalWidth,
-      container.clientHeight / img.naturalHeight
+    if (!container) return
+    // Capped at 1 so a photo smaller than the frame renders at its real
+    // size instead of being blurrily upscaled to fill it.
+    const containScale = Math.min(
+      1,
+      container.clientWidth / nativeSize.width,
+      container.clientHeight / nativeSize.height
     )
-    if (!fitScale) return
-    setScale(clampScale(1 / fitScale))
+    setBaseSize({
+      width: nativeSize.width * containScale,
+      height: nativeSize.height * containScale
+    })
+  }, [nativeSize])
+
+  const zoomToFit = (): void => setScale(1)
+
+  // True 1:1 pixels — the ratio between the probe-measured native size and
+  // the fitted size scale=1 already renders at.
+  const zoomToNativeSize = (): void => {
+    if (!nativeSize || !baseSize) return
+    setScale(clampScale(nativeSize.width / baseSize.width))
   }
 
   // Every opened photo's panel stays mounted, so gate keydown on whether
@@ -108,11 +190,13 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
         event.preventDefault()
         const toPath = ordered[nextIndex]
         if (!motionEnabled) {
-          navigateToPhoto(photo.filePath, toPath, direction)
+          navigateToPhoto(photo.filePath, toPath, direction, visualization)
           return
         }
         // Play the exit animation first, navigate once it finishes.
-        triggerExit(direction, () => navigateToPhoto(photo.filePath, toPath, direction))
+        triggerExit(direction, () =>
+          navigateToPhoto(photo.filePath, toPath, direction, visualization)
+        )
         return
       }
       if (!event.ctrlKey) return
@@ -126,72 +210,141 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closePhotoTab, photo.filePath, visiblePhotos, navigateToPhoto, motionEnabled, triggerExit])
+  }, [
+    closePhotoTab,
+    photo.filePath,
+    visiblePhotos,
+    navigateToPhoto,
+    motionEnabled,
+    triggerExit,
+    visualization
+  ])
 
   return (
-    <Container fluid pos="relative" flex={1} mih={0} miw={0} h="100%">
-      <Container
-        ref={containerRef}
-        fluid
-        h="100%"
-        display="flex"
-        style={{
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden'
-        }}
-      >
-        <motion.div
-          // initial={false} renders straight at `animate` when disabled.
-          initial={initial}
-          animate={animate}
-          transition={transition}
-          style={{ maxWidth: '100%', maxHeight: '100%' }}
+    <Container ref={paneRef} fluid pos="relative" flex={1} mih={0} miw={0} h="100%">
+      {visualization !== 'none' ? (
+        <>
+          {visualization === 'magazine' ? (
+            <MagazineCoverView photo={photo} zoom={magazineZoom} />
+          ) : (
+            <NewspaperCoverView photo={photo} zoom={newspaperZoom} />
+          )}
+          {/* AppShell's Header/Navbar/Aside are all position:fixed with
+              their own z-index tier, which can sit above ordinary absolutely
+              positioned content in Main regardless of DOM order — a Portal
+              (rendered straight to document.body, same as the drag preview
+              in App.tsx and the trigger+hover preview in PhotoThumbnail.tsx)
+              plus the app's own "definitely on top" z-index token sidesteps
+              that entirely instead of trying to out-stack it locally.
+              Positioned from paneCorner (this pane's own measured
+              top-right), so it lands exactly where the tab row and details
+              panel edge intersect rather than a guessed offset. */}
+          {paneCorner && (
+            <Portal>
+              <Tooltip label="Standard view">
+                <ActionIcon
+                  variant="filled"
+                  size="lg"
+                  pos="fixed"
+                  top={paneCorner.top + 8}
+                  right={paneCorner.right + 8}
+                  style={{ zIndex: 'var(--mantine-z-index-max)' }}
+                  aria-label="Exit visualization view"
+                  onClick={() => setVisualization('none')}
+                >
+                  <IconX size={20} />
+                </ActionIcon>
+              </Tooltip>
+            </Portal>
+          )}
+        </>
+      ) : (
+        <Container
+          ref={containerRef}
+          fluid
+          h="100%"
+          display="flex"
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+          }}
         >
-          <Box pos="relative" maw="100%" mah="100%" {...containerHandlers}>
-            <motion.div style={zoomStyle}>
-              <Image
-                ref={imgRef}
-                src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
-                alt={photo.fileName}
-                fit="contain"
-                onLoad={handleImageLoad}
-                maw="100%"
-                mah="100%"
-                display="block"
-                style={{
-                  transform: `scale(${scale})`,
-                  transformOrigin: 'center'
-                }}
-              />
-              {/* Saturated copy masked to a cursor-centered feathered circle;
-                  suppressed while Ctrl-zoom is active. */}
-              <motion.div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  pointerEvents: 'none',
-                  ...saturationOverlayStyle
-                }}
-              >
+          <Image
+            src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
+            alt=""
+            aria-hidden="true"
+            pos="absolute"
+            maw="none"
+            mah="none"
+            style={{ visibility: 'hidden' }}
+            onLoad={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect()
+              setNativeSize({ width: rect.width, height: rect.height })
+            }}
+          />
+          <motion.div
+            // initial={false} renders straight at `animate` when disabled.
+            initial={initial}
+            animate={animate}
+            transition={transition}
+            style={{ maxWidth: '100%', maxHeight: '100%' }}
+          >
+            <Box pos="relative" maw="100%" mah="100%" {...containerHandlers}>
+              <motion.div style={zoomStyle}>
                 <Image
+                  ref={imgRef}
                   src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
-                  alt=""
+                  alt={photo.fileName}
                   fit="contain"
-                  maw="100%"
-                  mah="100%"
+                  onLoad={handleImageLoad}
+                  draggable={false}
+                  w={baseSize?.width}
+                  h={baseSize?.height}
                   display="block"
                   style={{
+                    visibility: baseSize ? 'visible' : 'hidden',
                     transform: `scale(${scale})`,
                     transformOrigin: 'center',
-                    filter: `saturate(${saturationAmount})`
+                    transition: motionEnabled ? ZOOM_TRANSITION : undefined,
+                    userSelect: 'none',
+                    WebkitUserDrag: 'none'
                   }}
                 />
+                {/* Saturated copy masked to a cursor-centered feathered circle;
+                    suppressed while the trigger-zoom is active. */}
+                <motion.div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    pointerEvents: 'none',
+                    ...saturationOverlayStyle
+                  }}
+                >
+                  <Image
+                    src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
+                    alt=""
+                    fit="contain"
+                    draggable={false}
+                    w={baseSize?.width}
+                    h={baseSize?.height}
+                    display="block"
+                    style={{
+                      visibility: baseSize ? 'visible' : 'hidden',
+                      transform: `scale(${scale})`,
+                      transformOrigin: 'center',
+                      transition: motionEnabled ? ZOOM_TRANSITION : undefined,
+                      filter: `saturate(${saturationAmount})`,
+                      userSelect: 'none',
+                      WebkitUserDrag: 'none'
+                    }}
+                  />
+                </motion.div>
               </motion.div>
-            </motion.div>
-          </Box>
-        </motion.div>
-      </Container>
+            </Box>
+          </motion.div>
+        </Container>
+      )}
       <Flex pos="absolute" bottom={0} left={0} right={0} justify="space-between" p="md" gap="sm">
         {canRotate ? (
           <Group bg="gray" p="sm" gap="sm" wrap="nowrap">
@@ -216,44 +369,64 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
           <div />
         )}
         <Group bg="gray" p="sm" gap="sm" wrap="nowrap">
-          {/* Slider stays a plain sibling, not inside ActionIcon.Group — that
-              component expects a static label/icon, not a rich control. */}
-          <ActionIcon onClick={zoomToFit} aria-label="Zoom to fit">
-            <Tooltip label="Zoom to fit">
-              <IconMaximize />
-            </Tooltip>
-          </ActionIcon>
-          <ActionIcon onClick={zoomToNativeSize} aria-label="Original size">
-            <Tooltip label="Original size">
-              <IconArrowsMaximize />
-            </Tooltip>
-          </ActionIcon>
-          <ActionIcon
-            onClick={() => setScale((prev) => clampScale(prev - SCALE_STEP))}
-            aria-label="Zoom out"
-          >
-            <Tooltip label="Zoom out">
-              <IconPhoto size={12} />
-            </Tooltip>
-          </ActionIcon>
-          <Slider
-            value={scale}
-            onChange={setScale}
+          <Tooltip label="Magazine cover">
+            <ActionIcon
+              variant={visualization === 'magazine' ? 'filled' : 'default'}
+              aria-label="Magazine cover visualization"
+              onClick={() => setVisualization('magazine')}
+            >
+              <IconNews size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Newspaper cover">
+            <ActionIcon
+              variant={visualization === 'newspaper' ? 'filled' : 'default'}
+              aria-label="Newspaper cover visualization"
+              onClick={() => setVisualization('newspaper')}
+            >
+              <IconArticle size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Coming soon">
+            <ActionIcon variant="default" disabled aria-label="More visualizations coming soon">
+              <IconPhotoStar size={18} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+        {visualization === 'magazine' ? (
+          <ZoomToolbar
+            scale={magazineZoom.scale}
+            onScaleChange={magazineZoom.setScale}
+            onZoomToFit={magazineZoom.zoomToFit}
+            onZoomToNativeSize={magazineZoom.zoomToNativeSize}
+            onZoomOut={magazineZoom.zoomOut}
+            onZoomIn={magazineZoom.zoomIn}
+            min={magazineZoom.min}
+            max={magazineZoom.max}
+          />
+        ) : visualization === 'newspaper' ? (
+          <ZoomToolbar
+            scale={newspaperZoom.scale}
+            onScaleChange={newspaperZoom.setScale}
+            onZoomToFit={newspaperZoom.zoomToFit}
+            onZoomToNativeSize={newspaperZoom.zoomToNativeSize}
+            onZoomOut={newspaperZoom.zoomOut}
+            onZoomIn={newspaperZoom.zoomIn}
+            min={newspaperZoom.min}
+            max={newspaperZoom.max}
+          />
+        ) : (
+          <ZoomToolbar
+            scale={scale}
+            onScaleChange={setScale}
+            onZoomToFit={zoomToFit}
+            onZoomToNativeSize={zoomToNativeSize}
+            onZoomOut={() => setScale((prev) => clampScale(prev - SCALE_STEP))}
+            onZoomIn={() => setScale((prev) => clampScale(prev + SCALE_STEP))}
             min={MIN_SCALE}
             max={MAX_SCALE}
-            step={0.1}
-            label={null}
-            w={120}
           />
-          <ActionIcon
-            onClick={() => setScale((prev) => clampScale(prev + SCALE_STEP))}
-            aria-label="Zoom in"
-          >
-            <Tooltip label="Zoom in">
-              <IconPhoto size={22} />
-            </Tooltip>
-          </ActionIcon>
-        </Group>
+        )}
       </Flex>
     </Container>
   )

@@ -134,6 +134,35 @@ describe('PhotoLibraryContext', () => {
     expect(result.current.state.folders).toEqual(['/root'])
   })
 
+  it('flips initialLoadComplete only once every folder finishes its startup scan', async () => {
+    mockApi.getFolders.mockResolvedValue(['/root'])
+    const { result } = setup()
+
+    await waitFor(() => expect(mockApi.startScan).toHaveBeenCalledWith('/root'))
+    expect(result.current.state.initialLoadComplete).toBe(false)
+
+    act(() => {
+      subscriptions.onScanComplete({
+        scanId: 'scan-1',
+        rootPath: '/root',
+        totalScanned: 0,
+        cacheHits: 0,
+        errors: [],
+        allFolders: [],
+        filePaths: []
+      })
+    })
+
+    await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+  })
+
+  it('sets initialLoadComplete immediately when there are no folders to scan', async () => {
+    mockApi.getFolders.mockResolvedValue([])
+    const { result } = setup()
+
+    await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+  })
+
   describe('selection', () => {
     it('selectPhoto replaces both selectedPath and the multi-selection', () => {
       const { result } = setup()
@@ -195,16 +224,18 @@ describe('PhotoLibraryContext', () => {
       expect(result.current.state.openTabs).toEqual(['/a.jpg'])
     })
 
-    it('navigateToPhoto swaps a tab in place and records the direction for one-shot consumption', () => {
+    it('navigateToPhoto swaps a tab in place and records the direction/visualization for one-shot consumption', () => {
       const { result } = setup()
       act(() => result.current.openPhotoTab('/a.jpg'))
-      act(() => result.current.navigateToPhoto('/a.jpg', '/b.jpg', 'right'))
+      act(() => result.current.navigateToPhoto('/a.jpg', '/b.jpg', 'right', 'magazine'))
 
       expect(result.current.state.openTabs).toEqual(['/b.jpg'])
       expect(result.current.state.activeTab).toBe('/b.jpg')
       expect(result.current.consumeNavDirection('/b.jpg')).toBe('right')
       // Consuming removes it — a second read gets null.
       expect(result.current.consumeNavDirection('/b.jpg')).toBeNull()
+      expect(result.current.consumeVisualization('/b.jpg')).toBe('magazine')
+      expect(result.current.consumeVisualization('/b.jpg')).toBeNull()
     })
   })
 

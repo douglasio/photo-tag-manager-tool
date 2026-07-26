@@ -104,6 +104,12 @@ describe('photoLibraryReducer', () => {
       expect(state.status).toBe('canceled')
     })
 
+    it('flips initialLoadComplete to true and stays there', () => {
+      expect(initialState.initialLoadComplete).toBe(false)
+      const state = photoLibraryReducer(initialState, { type: 'INITIAL_LOAD_COMPLETE' })
+      expect(state.initialLoadComplete).toBe(true)
+    })
+
     it('returns the same state reference for a no-op progress update', () => {
       const state = { ...initialState, filesFound: 5 }
       const next = photoLibraryReducer(state, { type: 'SCAN_PROGRESS', filesFound: 5 })
@@ -486,6 +492,110 @@ describe('photoLibraryReducer', () => {
         openTabs: ['/b.jpg', '/a.jpg']
       })
       expect(next.openTabs).toEqual(['/b.jpg', '/a.jpg'])
+    })
+  })
+
+  describe('compare tabs', () => {
+    it('opens a compare tab and makes it active', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'OPEN_COMPARE_TAB',
+        paths: ['/a.jpg', '/b.jpg']
+      })
+      expect(state.openTabs).toHaveLength(1)
+      const id = state.openTabs[0]
+      expect(state.activeTab).toBe(id)
+      expect(state.compareTabs.get(id)).toEqual(['/a.jpg', '/b.jpg'])
+    })
+
+    it('opens a compare tab with 3 or 4 photos', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'OPEN_COMPARE_TAB',
+        paths: ['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg']
+      })
+      const id = state.openTabs[0]
+      expect(state.compareTabs.get(id)).toEqual(['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg'])
+    })
+
+    it('dedupes and caps at MAX_COMPARE_PHOTOS regardless of what the caller sends', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'OPEN_COMPARE_TAB',
+        paths: ['/a.jpg', '/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg', '/e.jpg']
+      })
+      const id = state.openTabs[0]
+      expect(state.compareTabs.get(id)).toEqual(['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg'])
+    })
+
+    it('opening the same set again (any order) reuses the existing compare tab', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'OPEN_COMPARE_TAB',
+        paths: ['/a.jpg', '/b.jpg']
+      })
+      state = photoLibraryReducer(state, { type: 'SET_ACTIVE_TAB', tab: 'gallery' })
+      state = photoLibraryReducer(state, {
+        type: 'OPEN_COMPARE_TAB',
+        paths: ['/b.jpg', '/a.jpg']
+      })
+      expect(state.openTabs).toHaveLength(1)
+      expect(state.activeTab).toBe(state.openTabs[0])
+    })
+
+    it('closing a compare tab removes it from compareTabs', () => {
+      const opened = photoLibraryReducer(initialState, {
+        type: 'OPEN_COMPARE_TAB',
+        paths: ['/a.jpg', '/b.jpg']
+      })
+      const id = opened.openTabs[0]
+      const next = photoLibraryReducer(opened, { type: 'CLOSE_PHOTO_TAB', filePath: id })
+      expect(next.openTabs).toEqual([])
+      expect(next.compareTabs.has(id)).toBe(false)
+      expect(next.activeTab).toBe('gallery')
+    })
+
+    describe('removing a photo from a compare tab', () => {
+      it('shrinks the list when enough photos remain', () => {
+        const opened = photoLibraryReducer(initialState, {
+          type: 'OPEN_COMPARE_TAB',
+          paths: ['/a.jpg', '/b.jpg', '/c.jpg']
+        })
+        const id = opened.openTabs[0]
+        const next = photoLibraryReducer(opened, {
+          type: 'REMOVE_FROM_COMPARE_TAB',
+          tabId: id,
+          filePath: '/c.jpg'
+        })
+        expect(next.compareTabs.get(id)).toEqual(['/a.jpg', '/b.jpg'])
+        expect(next.openTabs).toEqual([id])
+      })
+
+      it('closes the whole tab once fewer than MIN_COMPARE_PHOTOS would remain', () => {
+        const opened = photoLibraryReducer(initialState, {
+          type: 'OPEN_COMPARE_TAB',
+          paths: ['/a.jpg', '/b.jpg']
+        })
+        const id = opened.openTabs[0]
+        const next = photoLibraryReducer(opened, {
+          type: 'REMOVE_FROM_COMPARE_TAB',
+          tabId: id,
+          filePath: '/b.jpg'
+        })
+        expect(next.compareTabs.has(id)).toBe(false)
+        expect(next.openTabs).toEqual([])
+        expect(next.activeTab).toBe('gallery')
+      })
+
+      it('is a no-op for an unknown tab or a photo not in it', () => {
+        const opened = photoLibraryReducer(initialState, {
+          type: 'OPEN_COMPARE_TAB',
+          paths: ['/a.jpg', '/b.jpg']
+        })
+        const id = opened.openTabs[0]
+        const next = photoLibraryReducer(opened, {
+          type: 'REMOVE_FROM_COMPARE_TAB',
+          tabId: id,
+          filePath: '/not-in-this-tab.jpg'
+        })
+        expect(next).toBe(opened)
+      })
     })
   })
 

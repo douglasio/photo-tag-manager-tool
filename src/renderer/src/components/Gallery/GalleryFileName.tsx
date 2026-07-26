@@ -1,4 +1,4 @@
-import { Text, TextInput } from '@mantine/core'
+import { Text, TextInput, Tooltip } from '@mantine/core'
 import { useState, type ReactElement } from 'react'
 import { InlineEditField } from '../Shared/InlineEditField'
 import { splitFileName, validateFileNameBase } from '../../utils/fileNameValidation'
@@ -82,9 +82,13 @@ export function GalleryFileName({
           }}
         />
       ) : (
-        <Text c="dimmed" truncate="end" ta="center" w="100%">
-          {fileName}
-        </Text>
+        // truncate="end" ellipsizes long names — the tooltip is how the full
+        // name stays available rather than just being cut off.
+        <Tooltip label={fileName}>
+          <Text c="dimmed" truncate="end" ta="center" w="100%">
+            {fileName}
+          </Text>
+        </Tooltip>
       )}
     </InlineEditField>
   )

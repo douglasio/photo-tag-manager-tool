@@ -2,19 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import type { TargetAndTransition } from 'motion/react'
 import type { NavigationDirection } from '../state/PhotoLibraryContext'
 
-// Entrance: scale/blur only, coming into focus along the z-axis. An x-axis
-// slide is layered on top only for arrow-key navigation (enterDirection).
-const ENTRANCE_SCALE_FROM = 1.08
-const ENTRANCE_BLUR_FROM_PX = 5
-const ENTRANCE_X_FROM_PX = 100
-const ENTRANCE_SPRING = { stiffness: 300, damping: 24, mass: 0.6 } as const
+// A simple fade + slide crossfade — no scale/blur, just opacity and a small
+// horizontal offset in the direction navigated from/to.
+const SLIDE_X_PX = 48
+const ENTRANCE_TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
 
 // Arrow-key nav remounts a fresh PhotoView, so there's no DOM node to
 // cross-fade against — this plays a brief exit animation on the current
 // photo first, then navigates once it finishes.
-const EXIT_DURATION_S = 0.16
-const EXIT_SCALE_TO = 0.94
-const EXIT_BLUR_TO_PX = 8
+const EXIT_DURATION_S = 0.14
 const EXIT_TRANSITION = { duration: EXIT_DURATION_S, ease: 'easeIn' } as const
 
 // Opening a photo tab also collapses the Navbar/Aside via AppShell's own
@@ -29,7 +25,7 @@ interface UsePhotoEntranceExitOptions {
 interface UsePhotoEntranceExitResult {
   initial: TargetAndTransition | false
   animate: TargetAndTransition
-  transition: typeof ENTRANCE_SPRING | typeof EXIT_TRANSITION
+  transition: typeof ENTRANCE_TRANSITION | typeof EXIT_TRANSITION
   exitDirection: NavigationDirection | null
   handleImageLoad: () => void
   // Plays the exit animation, then calls onDone once it finishes. Returns
@@ -38,13 +34,13 @@ interface UsePhotoEntranceExitResult {
 }
 
 function xFor(direction: NavigationDirection | null): number {
-  if (direction === 'right') return ENTRANCE_X_FROM_PX
-  if (direction === 'left') return -ENTRANCE_X_FROM_PX
+  if (direction === 'right') return SLIDE_X_PX
+  if (direction === 'left') return -SLIDE_X_PX
   return 0
 }
 
-// Drives PhotoView's scale/blur/slide entrance (gated on the image loading
-// and the AppShell layout settling) and its arrow-key-navigation exit.
+// Drives PhotoView's fade/slide entrance (gated on the image loading and the
+// AppShell layout settling) and its arrow-key-navigation exit.
 export function usePhotoEntranceExit({
   motionEnabled,
   enterDirection
@@ -74,29 +70,14 @@ export function usePhotoEntranceExit({
   const readyToAnimateIn = imageLoaded && layoutSettled
 
   const initial: TargetAndTransition | false = motionEnabled
-    ? {
-        scale: ENTRANCE_SCALE_FROM,
-        x: xFor(enterDirection),
-        filter: `blur(${ENTRANCE_BLUR_FROM_PX}px)`,
-        opacity: 1
-      }
+    ? { x: xFor(enterDirection), opacity: 0 }
     : false
 
   const animate: TargetAndTransition = exitDirection
-    ? {
-        scale: EXIT_SCALE_TO,
-        x: exitDirection === 'right' ? -ENTRANCE_X_FROM_PX : ENTRANCE_X_FROM_PX,
-        filter: `blur(${EXIT_BLUR_TO_PX}px)`,
-        opacity: 0
-      }
+    ? { x: exitDirection === 'right' ? -SLIDE_X_PX : SLIDE_X_PX, opacity: 0 }
     : !motionEnabled || readyToAnimateIn
-      ? { scale: 1, x: 0, filter: 'blur(0px)', opacity: 1 }
-      : {
-          scale: ENTRANCE_SCALE_FROM,
-          x: xFor(enterDirection),
-          filter: `blur(${ENTRANCE_BLUR_FROM_PX}px)`,
-          opacity: 1
-        }
+      ? { x: 0, opacity: 1 }
+      : { x: xFor(enterDirection), opacity: 0 }
 
   const triggerExit = (direction: NavigationDirection, onDone: () => void): boolean => {
     if (exitDirectionRef.current) return false
@@ -109,7 +90,7 @@ export function usePhotoEntranceExit({
   return {
     initial,
     animate,
-    transition: exitDirection ? EXIT_TRANSITION : ENTRANCE_SPRING,
+    transition: exitDirection ? EXIT_TRANSITION : ENTRANCE_TRANSITION,
     exitDirection,
     handleImageLoad: () => setImageLoaded(true),
     triggerExit

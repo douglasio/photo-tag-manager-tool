@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { useCtrlKeyHeld } from './useCtrlKeyHeld'
+import { useKeyHeld } from './useKeyHeld'
+import { PREVIEW_TRIGGER_KEY } from '../utils/previewTrigger'
 
 const MIN_PREVIEW_SCALE = 0.5
 const MAX_PREVIEW_SCALE = 3
@@ -12,34 +13,35 @@ function clampPreviewScale(value: number): number {
 }
 
 interface UseGalleryPreviewZoomResult {
-  ctrlHeld: boolean
+  previewTriggerHeld: boolean
   previewScale: number
 }
 
-// Ctrl+hover-and-scroll zoom for the floating photo preview (PhotoThumbnail)
-// — Ctrl+wheel over the grid adjusts previewScale, shared across whichever
-// thumbnail is currently being previewed since it's lifted up here rather
-// than local to each one.
+// Trigger-key-held-and-scroll zoom for the floating photo preview
+// (PhotoThumbnail) — holding the trigger key and scrolling over the grid
+// adjusts previewScale, shared across whichever thumbnail is currently being
+// previewed since it's lifted up here rather than local to each one.
 export function useGalleryPreviewZoom(
   containerRef: RefObject<HTMLDivElement | null>
 ): UseGalleryPreviewZoomResult {
-  const ctrlHeld = useCtrlKeyHeld()
-  // A ref mirror of ctrlHeld so the native wheel listener below (attached
-  // once) always reads the latest value without needing to re-subscribe.
-  const ctrlHeldRef = useRef(ctrlHeld)
+  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  // A ref mirror of previewTriggerHeld so the native wheel listener below
+  // (attached once) always reads the latest value without needing to
+  // re-subscribe.
+  const previewTriggerHeldRef = useRef(previewTriggerHeld)
   useEffect(() => {
-    ctrlHeldRef.current = ctrlHeld
-  }, [ctrlHeld])
+    previewTriggerHeldRef.current = previewTriggerHeld
+  }, [previewTriggerHeld])
 
   const [previewScale, setPreviewScale] = useState(1)
 
-  // Reset the zoom once Ctrl is released, so the next Ctrl+hover session
-  // starts fresh — adjusted during render (not a useEffect) per this
+  // Reset the zoom once the trigger key is released, so the next preview
+  // session starts fresh — adjusted during render (not a useEffect) per this
   // codebase's pattern for resetting state when an external value changes.
-  const [wasCtrlHeld, setWasCtrlHeld] = useState(ctrlHeld)
-  if (ctrlHeld !== wasCtrlHeld) {
-    setWasCtrlHeld(ctrlHeld)
-    if (!ctrlHeld) setPreviewScale(1)
+  const [wasTriggerHeld, setWasTriggerHeld] = useState(previewTriggerHeld)
+  if (previewTriggerHeld !== wasTriggerHeld) {
+    setWasTriggerHeld(previewTriggerHeld)
+    if (!previewTriggerHeld) setPreviewScale(1)
   }
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export function useGalleryPreviewZoom(
     // and the grid keeps scrolling underneath the zoom. A manually attached
     // { passive: false } listener is the only way to actually cancel it.
     const handleWheel = (event: WheelEvent): void => {
-      if (!ctrlHeldRef.current) return
+      if (!previewTriggerHeldRef.current) return
       event.preventDefault()
       setPreviewScale((scale) => clampPreviewScale(scale - event.deltaY * PREVIEW_ZOOM_SENSITIVITY))
     }
@@ -59,5 +61,5 @@ export function useGalleryPreviewZoom(
     return () => el.removeEventListener('wheel', handleWheel)
   }, [containerRef])
 
-  return { ctrlHeld, previewScale }
+  return { previewTriggerHeld, previewScale }
 }

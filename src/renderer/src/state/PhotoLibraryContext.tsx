@@ -13,6 +13,7 @@ import { notifications } from '@mantine/notifications'
 import { MoveProgressToast } from '../components/Settings/MoveProgressToast'
 import {
   initialState,
+  MIN_COMPARE_PHOTOS,
   photoLibraryReducer,
   type GallerySortBy,
   type GallerySortOrder,
@@ -37,6 +38,20 @@ const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
 // photo being navigated to should visually enter from the right (the user
 // stepped forward), 'left' means it enters from the left (stepped back).
 export type NavigationDirection = 'left' | 'right'
+
+// PhotoView's visualization mode ('none' = standard view). Lives here (not
+// just as PhotoView-local state) so it can be threaded across arrow-key
+// navigation below, which remounts a fresh PhotoView per photo.
+export type PhotoVisualization = 'none' | 'magazine' | 'newspaper'
+
+// One entry per open tab in display order — either a single photo or a
+// compare set (2-4 photos), resolved from state.openTabs/compareTabs against
+// the current photosByPath (a missing photo drops out of a compare entry's
+// list; the whole entry drops out if fewer than MIN_COMPARE_PHOTOS remain,
+// same as a single-photo tab dropping out entirely after a delete).
+export type OpenTabEntry =
+  | { kind: 'photo'; id: string; photo: PhotoRecord }
+  | { kind: 'compare'; id: string; photos: PhotoRecord[] }
 
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
@@ -80,18 +95,29 @@ interface PhotoLibraryContextValue {
   updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
   updateComment: (filePath: string, comment: string) => Promise<void>
   rotatePhoto: (filePath: string, direction: RotateDirection) => Promise<void>
-  openTabPhotos: PhotoRecord[]
+  openTabEntries: OpenTabEntry[]
   openPhotoTab: (filePath: string) => void
+  openCompareTab: (paths: string[]) => void
+  removeFromCompareTab: (tabId: string, filePath: string) => void
   closePhotoTab: (filePath: string) => void
   setActiveTab: (tab: string) => void
   reorderPhotoTabs: (openTabs: string[]) => void
-  navigateToPhoto: (fromPath: string, toPath: string, direction: NavigationDirection) => void
+  navigateToPhoto: (
+    fromPath: string,
+    toPath: string,
+    direction: NavigationDirection,
+    visualization: PhotoVisualization
+  ) => void
   // One-shot lookup for PhotoView's entrance animation: which arrow key (if
   // any) navigated to this specific photo, so it can slide in from the
   // matching side. Consuming it removes it — a photo opened normally (double
   // click, or reopening one you arrow-navigated away from earlier) must not
   // replay a stale direction.
   consumeNavDirection: (filePath: string) => NavigationDirection | null
+  // Same one-shot pattern as consumeNavDirection, carrying the visualization
+  // mode (e.g. magazine cover) across arrow-key navigation's remount so it
+  // stays active as the user steps through photos.
+  consumeVisualization: (filePath: string) => PhotoVisualization | null
 }
 
 const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
@@ -205,6 +231,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       for (const folder of folders) {
         await startScanFor(folder)
       }
+      dispatch({ type: 'INITIAL_LOAD_COMPLETE' })
     })
   }, [startScanFor])
 
@@ -588,6 +615,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
   }, [])
 
+  const openCompareTab = useCallback((paths: string[]) => {
+    dispatch({ type: 'OPEN_COMPARE_TAB', paths })
+  }, [])
+
+  const removeFromCompareTab = useCallback((tabId: string, filePath: string) => {
+    dispatch({ type: 'REMOVE_FROM_COMPARE_TAB', tabId, filePath })
+  }, [])
+
   const closePhotoTab = useCallback((filePath: string) => {
     dispatch({ type: 'CLOSE_PHOTO_TAB', filePath })
   }, [])
@@ -600,12 +635,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'REORDER_PHOTO_TABS', openTabs })
   }, [])
 
-  // Plain ref (not reducer state) since it's a one-shot side channel read
-  // exactly once by the PhotoView instance that mounts for `toPath` — it
-  // doesn't need to trigger a re-render of its own, and reducer state would
-  // otherwise need a separate "clear it" action to avoid the stale-direction
-  // problem described on consumeNavDirection below.
+  // Plain refs (not reducer state) since these are one-shot side channels
+  // read exactly once by the PhotoView instance that mounts for `toPath` —
+  // they don't need to trigger a re-render of their own, and reducer state
+  // would otherwise need a separate "clear it" action to avoid the
+  // stale-direction problem described on consumeNavDirection below.
   const navDirectionsRef = useRef(new Map<string, NavigationDirection>())
+  const visualizationsRef = useRef(new Map<string, PhotoVisualization>())
 
   // Swaps which photo a tab points to in place (same slot, same tab-list
   // position) — e.g. left/right-arrow stepping to the next/previous photo
@@ -613,8 +649,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // (replace oldPath with newPath everywhere in openTabs/activeTab) is
   // exactly what this needs too, so it's reused rather than duplicated.
   const navigateToPhoto = useCallback(
-    (fromPath: string, toPath: string, direction: NavigationDirection) => {
+    (
+      fromPath: string,
+      toPath: string,
+      direction: NavigationDirection,
+      visualization: PhotoVisualization
+    ) => {
       navDirectionsRef.current.set(toPath, direction)
+      visualizationsRef.current.set(toPath, visualization)
       dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: fromPath, newPath: toPath })
     },
     []
@@ -624,6 +666,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     const direction = navDirectionsRef.current.get(filePath) ?? null
     navDirectionsRef.current.delete(filePath)
     return direction
+  }, [])
+
+  const consumeVisualization = useCallback((filePath: string): PhotoVisualization | null => {
+    const visualization = visualizationsRef.current.get(filePath) ?? null
+    visualizationsRef.current.delete(filePath)
+    return visualization
   }, [])
 
   const photos = useMemo(() => {
@@ -785,12 +833,22 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   // Resolved in openTabs order (not sorted) so tabs stay in the order they
   // were opened rather than jumping around as the user opens more.
-  const openTabPhotos = useMemo(
+  const openTabEntries = useMemo(
     () =>
       state.openTabs
-        .map((path) => state.photosByPath.get(path))
-        .filter((photo): photo is PhotoRecord => photo != null),
-    [state.openTabs, state.photosByPath]
+        .map((id): OpenTabEntry | null => {
+          const paths = state.compareTabs.get(id)
+          if (paths) {
+            const photos = paths
+              .map((path) => state.photosByPath.get(path))
+              .filter((photo): photo is PhotoRecord => photo != null)
+            return photos.length >= MIN_COMPARE_PHOTOS ? { kind: 'compare', id, photos } : null
+          }
+          const photo = state.photosByPath.get(id)
+          return photo ? { kind: 'photo', id, photo } : null
+        })
+        .filter((entry): entry is OpenTabEntry => entry != null),
+    [state.openTabs, state.compareTabs, state.photosByPath]
   )
 
   const value: PhotoLibraryContextValue = {
@@ -831,13 +889,16 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     updateDateTaken,
     updateComment,
     rotatePhoto,
-    openTabPhotos,
+    openTabEntries,
     openPhotoTab,
+    openCompareTab,
+    removeFromCompareTab,
     closePhotoTab,
     setActiveTab,
     reorderPhotoTabs,
     navigateToPhoto,
-    consumeNavDirection
+    consumeNavDirection,
+    consumeVisualization
   }
 
   return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>

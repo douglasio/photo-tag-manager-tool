@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { join } from 'path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockGetPath, mockMkdir, mockUnlink, mockToFile, mockSharp } = vi.hoisted(() => {
@@ -59,8 +60,10 @@ describe('thumbnailService', () => {
   describe('thumbnailFilePath', () => {
     it('builds a .jpg path under the userData thumbnails directory, creating it once', async () => {
       const first = await thumbnailFilePath('abc123')
-      expect(first).toBe('/tmp/userData/thumbnails/abc123.jpg')
-      expect(mockMkdir).toHaveBeenCalledWith('/tmp/userData/thumbnails', { recursive: true })
+      expect(first).toBe(join('/tmp/userData', 'thumbnails', 'abc123.jpg'))
+      expect(mockMkdir).toHaveBeenCalledWith(join('/tmp/userData', 'thumbnails'), {
+        recursive: true
+      })
 
       await thumbnailFilePath('key2')
       // thumbnailDir is cached at module scope after the first call, so a
@@ -73,14 +76,14 @@ describe('thumbnailService', () => {
     it('auto-rotates, resizes, and writes a jpeg to the thumbnail path', async () => {
       await generateThumbnail('/source.jpg', 'thekey')
       expect(mockSharp).toHaveBeenCalledWith('/source.jpg')
-      expect(mockToFile).toHaveBeenCalledWith('/tmp/userData/thumbnails/thekey.jpg')
+      expect(mockToFile).toHaveBeenCalledWith(join('/tmp/userData', 'thumbnails', 'thekey.jpg'))
     })
   })
 
   describe('deleteThumbnail', () => {
     it('unlinks the thumbnail file', async () => {
       await deleteThumbnail('thekey')
-      expect(mockUnlink).toHaveBeenCalledWith('/tmp/userData/thumbnails/thekey.jpg')
+      expect(mockUnlink).toHaveBeenCalledWith(join('/tmp/userData', 'thumbnails', 'thekey.jpg'))
     })
 
     it('swallows an unlink failure (e.g. already-deleted file)', async () => {

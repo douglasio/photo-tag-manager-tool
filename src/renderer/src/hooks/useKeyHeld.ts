@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 
-// Tracked globally (not per-element) since the gallery's Ctrl+hover preview
-// needs a single shared answer to "is Ctrl currently down" regardless of
-// which thumbnail the cursor is over.
-export function useCtrlKeyHeld(): boolean {
+// Tracked globally (not per-element) since callers like the gallery's
+// preview-on-hover need a single shared answer to "is this key currently
+// down" regardless of which element the cursor is over.
+export function useKeyHeld(key: string): boolean {
   const [held, setHeld] = useState(false)
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Control') setHeld(true)
+      if (event.key === key) setHeld(true)
     }
     const handleKeyUp = (event: KeyboardEvent): void => {
-      if (event.key === 'Control') setHeld(false)
+      if (event.key === key) setHeld(false)
     }
     // Guards against a "stuck" held state if focus leaves the window (e.g.
     // an OS-level app switch) while the key is down, since keyup would then
@@ -26,7 +26,7 @@ export function useCtrlKeyHeld(): boolean {
       window.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('blur', handleBlur)
     }
-  }, [])
+  }, [key])
 
   return held
 }

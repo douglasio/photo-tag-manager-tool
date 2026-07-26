@@ -14,20 +14,28 @@ export type GallerySortOrder = 'asc' | 'desc'
 
 export const RECENT_TAGS_LIMIT = 3
 
+export const MAX_COMPARE_PHOTOS = 4
+export const MIN_COMPARE_PHOTOS = 2
+
+// Order-independent so opening the same set twice reuses the same tab.
+export function compareTabId(paths: string[]): string {
+  return `compare:${[...paths].sort().join('::')}`
+}
+
 export interface PhotoLibraryState {
   folders: string[]
   rootPath: string | null
   scanId: string | null
   status: ScanStatus
+  // False until every folder's initial startup scan has resolved
+  initialLoadComplete: boolean
   filesFound: number
   photosByPath: Map<string, PhotoRecord>
   cacheHits: number
   errors: ScanCompleteEvent['errors']
   selectedPath: string | null
-  // Batch/multi-select in the gallery (Ctrl/Cmd+click toggle, Shift+click
-  // range). Kept in sync with selectedPath (which stays the "last-engaged"
-  // photo for DetailPanel) rather than replacing it, so existing
-  // single-selection call sites are unaffected.
+  // Multi-select batch, kept alongside selectedPath (the "last-engaged"
+  // photo for DetailPanel) rather than replacing it.
   selectedPaths: Set<string>
   selectedFolder: string | null
   selectedTag: string | null
@@ -35,11 +43,9 @@ export interface PhotoLibraryState {
   sortOrder: GallerySortOrder
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
-  // Every folder discovered on disk under each watched root, including ones
-  // with zero photos in them (photo-derived folderCounts/folderChildren
-  // above never include those). Populated per-root from SCAN_COMPLETE's
-  // allFolders, so it only reflects what's actually on disk as of the last
-  // scan — not live filesystem changes.
+  // Every folder on disk per watched root, including empty ones (folderCounts/
+  // folderChildren above never include those). From SCAN_COMPLETE's
+  // allFolders, so it's as of the last scan, not live filesystem changes.
   allFolderPaths: Set<string>
   showEmptyFolders: boolean
   detailsPanelCollapsed: boolean
@@ -47,14 +53,15 @@ export interface PhotoLibraryState {
   showFilenames: boolean
   excludePatterns: string[]
   tagDescriptions: Map<string, string>
-  // Most-recently-assigned tag names, newest first — shown as a shortcut
-  // section at the top of the tag-input dropdown. Session-only (not
-  // persisted): resets on app restart.
+  // Newest-first shortcut list for the tag-input dropdown. Session-only.
   recentTags: string[]
-  // Ordered list of photo paths open as Photo View tabs. activeTab is either
-  // 'gallery' or one of the paths in openTabs.
+  // Open tab ids — photo paths or compare-tab ids (see compareTabs).
+  // activeTab is 'gallery' or one of these.
   openTabs: string[]
   activeTab: string
+  // Resolves a compare-tab's synthetic id (from openTabs/activeTab) to its
+  // actual photo paths (MIN_COMPARE_PHOTOS to MAX_COMPARE_PHOTOS of them).
+  compareTabs: Map<string, string[]>
 }
 
 export const initialState: PhotoLibraryState = {
@@ -62,6 +69,7 @@ export const initialState: PhotoLibraryState = {
   rootPath: null,
   scanId: null,
   status: 'idle',
+  initialLoadComplete: false,
   filesFound: 0,
   photosByPath: new Map(),
   cacheHits: 0,
@@ -83,7 +91,8 @@ export const initialState: PhotoLibraryState = {
   tagDescriptions: new Map(),
   recentTags: [],
   openTabs: [],
-  activeTab: 'gallery'
+  activeTab: 'gallery',
+  compareTabs: new Map()
 }
 
 export type PhotoLibraryAction =
@@ -96,6 +105,7 @@ export type PhotoLibraryAction =
   | { type: 'METADATA_BATCH'; photos: PhotoRecord[] }
   | { type: 'SCAN_COMPLETE'; result: ScanCompleteEvent }
   | { type: 'SCAN_CANCELED' }
+  | { type: 'INITIAL_LOAD_COMPLETE' }
   | { type: 'SELECT_PHOTO'; path: string | null }
   | { type: 'SET_SELECTED_PATHS'; paths: string[] }
   | { type: 'PHOTOS_UPSERTED'; photos: PhotoRecord[] }
@@ -118,10 +128,30 @@ export type PhotoLibraryAction =
   | { type: 'TAG_RENAMED'; oldTag: string; newTag: string; photos: PhotoRecord[] }
   | { type: 'TAG_DELETED'; tag: string; photos: PhotoRecord[] }
   | { type: 'OPEN_PHOTO_TAB'; filePath: string }
+  | { type: 'OPEN_COMPARE_TAB'; paths: string[] }
+  | { type: 'REMOVE_FROM_COMPARE_TAB'; tabId: string; filePath: string }
   | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
+
+// Shared by CLOSE_PHOTO_TAB and REMOVE_FROM_COMPARE_TAB (which closes its
+// whole tab once too few photos remain) — falls back to the tab immediately
+// left in the visible order (Gallery first, then openTabs) rather than
+// always jumping to Gallery.
+function closeTab(
+  state: PhotoLibraryState,
+  tabId: string
+): Pick<PhotoLibraryState, 'openTabs' | 'activeTab'> {
+  const openTabs = state.openTabs.filter((id) => id !== tabId)
+  let activeTab = state.activeTab
+  if (state.activeTab === tabId) {
+    const order = ['gallery', ...state.openTabs]
+    const closedIndex = order.indexOf(tabId)
+    activeTab = order[closedIndex - 1]
+  }
+  return { openTabs, activeTab }
+}
 
 export function photoLibraryReducer(
   state: PhotoLibraryState,
@@ -189,11 +219,9 @@ export function photoLibraryReducer(
         activeTab
       }
     }
-    // The folder itself was renamed on disk — every photo nested under it
-    // keeps its own fileName, but its filePath/id (and every other
-    // path-shaped bit of state) needs the oldFolder prefix swapped for
-    // newFolder. rewritePathPrefix is a no-op for anything unrelated, so it's
-    // safe to apply unconditionally across every map/array/string below.
+    // Folder renamed on disk — every path-shaped bit of state needs oldFolder
+    // swapped for newFolder. rewritePathPrefix no-ops on anything unrelated,
+    // so it's safe to apply everywhere below.
     case 'FOLDER_RENAMED': {
       const { oldFolder, newFolder } = action
       const rewrite = (path: string): string => rewritePathPrefix(path, oldFolder, newFolder)
@@ -264,14 +292,10 @@ export function photoLibraryReducer(
       }
       return { ...state, photosByPath, folderCounts, folderChildren }
     }
-    // filePaths (when present — null means the scan aborted before fully
-    // enumerating the root, e.g. it was cancelled or the root vanished) is
-    // the authoritative "what exists under rootPath right now" answer.
-    // METADATA_BATCH already added everything newly found as the scan ran;
-    // this reconciles the other direction — anything this app previously
-    // knew about under rootPath that ISN'T in that set (deleted on disk, or
-    // newly matched by an exclude pattern) gets pruned from state here,
-    // mirroring the DB-side pruneMissing the main process already ran.
+    // filePaths (null if the scan aborted before finishing) is authoritative
+    // for what exists under rootPath. METADATA_BATCH already added new
+    // finds; this prunes anything previously known that's now missing,
+    // mirroring the main process's own pruneMissing.
     case 'SCAN_COMPLETE': {
       const { rootPath, filePaths, allFolders } = action.result
 
@@ -305,8 +329,7 @@ export function photoLibraryReducer(
           activeTab = staleSet.has(activeTab) ? 'gallery' : activeTab
         }
 
-        // Replace this root's slice of the folder listing with the fresh
-        // set, rather than only ever adding to it.
+        // Replaces this root's folder listing rather than only adding to it.
         const keptFolders = Array.from(allFolderPaths).filter(
           (folder) => !isPathUnderOrEqual(folder, rootPath)
         )
@@ -333,6 +356,8 @@ export function photoLibraryReducer(
     }
     case 'SCAN_CANCELED':
       return { ...state, status: 'canceled' }
+    case 'INITIAL_LOAD_COMPLETE':
+      return { ...state, initialLoadComplete: true }
     case 'SELECT_PHOTO':
       return { ...state, selectedPath: action.path }
     case 'SET_SELECTED_PATHS':
@@ -348,9 +373,8 @@ export function photoLibraryReducer(
       return { ...state, selectedFolder: action.folder, selectedTag: null }
     case 'SET_TAG_FILTER':
       return { ...state, selectedTag: action.tag, selectedFolder: null }
-    // Unlike SET_TAG_FILTER, this keeps selectedFolder intact — used by the
-    // per-folder tag pills in the gallery header, which narrow within the
-    // current folder rather than replacing it with a folder-agnostic tag view.
+    // Unlike SET_TAG_FILTER, keeps selectedFolder intact — for the
+    // per-folder tag pills that narrow within a folder rather than replace it.
     case 'SET_FOLDER_TAG_FILTER':
       return { ...state, selectedTag: action.tag }
     case 'SET_SORT':
@@ -363,8 +387,8 @@ export function photoLibraryReducer(
       return { ...state, galleryAnimationsEnabled: action.value }
     case 'SET_SHOW_FILENAMES':
       return { ...state, showFilenames: action.value }
-    // Newest-first, deduped, capped — a tag already in the list moves to the
-    // front rather than appearing twice.
+    // Newest-first, deduped, capped — an already-listed tag moves to the
+    // front instead of duplicating.
     case 'TAGS_ASSIGNED': {
       const incoming = Array.from(new Set(action.tags))
       if (incoming.length === 0) return state
@@ -382,10 +406,8 @@ export function photoLibraryReducer(
       allFolderPaths.add(action.folderPath)
       return { ...state, allFolderPaths }
     }
-    // Prunes the removed folder AND anything nested under it — a deleted
-    // folder takes its whole subtree with it, and chokidar fires a separate
-    // unlinkDir per nested level anyway, so this stays correct (a no-op) once
-    // those follow-up events arrive.
+    // Prunes the folder and everything nested under it — a no-op once
+    // chokidar's per-level unlinkDir follow-ups arrive.
     case 'WATCH_FOLDER_REMOVED': {
       const allFolderPaths = new Set(
         Array.from(state.allFolderPaths).filter(
@@ -479,32 +501,50 @@ export function photoLibraryReducer(
         : [...state.openTabs, action.filePath]
       return { ...state, openTabs, activeTab: action.filePath }
     }
+    case 'OPEN_COMPARE_TAB': {
+      // Deduped and capped defensively — callers are expected to already
+      // enforce MIN/MAX_COMPARE_PHOTOS, but the reducer shouldn't trust that.
+      const paths = Array.from(new Set(action.paths)).slice(0, MAX_COMPARE_PHOTOS)
+      const id = compareTabId(paths)
+      const openTabs = state.openTabs.includes(id) ? state.openTabs : [...state.openTabs, id]
+      const compareTabs = new Map(state.compareTabs)
+      compareTabs.set(id, paths)
+      return { ...state, openTabs, activeTab: id, compareTabs }
+    }
+    // Drops one photo from an open compare tab, closing the whole tab
+    // instead once fewer than MIN_COMPARE_PHOTOS would remain.
+    case 'REMOVE_FROM_COMPARE_TAB': {
+      const current = state.compareTabs.get(action.tabId)
+      if (!current || !current.includes(action.filePath)) return state
+      const remaining = current.filter((path) => path !== action.filePath)
+      if (remaining.length < MIN_COMPARE_PHOTOS) {
+        const { openTabs, activeTab } = closeTab(state, action.tabId)
+        const compareTabs = new Map(state.compareTabs)
+        compareTabs.delete(action.tabId)
+        return { ...state, openTabs, activeTab, compareTabs }
+      }
+      const compareTabs = new Map(state.compareTabs)
+      compareTabs.set(action.tabId, remaining)
+      return { ...state, compareTabs }
+    }
     case 'CLOSE_PHOTO_TAB': {
       if (!state.openTabs.includes(action.filePath)) return state
-      const openTabs = state.openTabs.filter((path) => path !== action.filePath)
-      let activeTab = state.activeTab
-      if (state.activeTab === action.filePath) {
-        // Falls back to whatever tab was immediately to the left in the
-        // visible tab order (Gallery always first, then openTabs) — Gallery
-        // itself if the closed tab was the leftmost photo tab — rather than
-        // always jumping straight back to Gallery.
-        const order = ['gallery', ...state.openTabs]
-        const closedIndex = order.indexOf(action.filePath)
-        activeTab = order[closedIndex - 1]
+      const { openTabs, activeTab } = closeTab(state, action.filePath)
+      let compareTabs = state.compareTabs
+      if (compareTabs.has(action.filePath)) {
+        compareTabs = new Map(compareTabs)
+        compareTabs.delete(action.filePath)
       }
-      return { ...state, openTabs, activeTab }
+      return { ...state, openTabs, activeTab, compareTabs }
     }
     case 'SET_ACTIVE_TAB':
       return { ...state, activeTab: action.tab }
-    // Keeps a photo's tab (and active-tab pointer, if it was the active one)
-    // pointed at its new path across a rename, instead of PHOTO_REMOVED
-    // pruning it away as if the file had actually disappeared.
+    // Repoints a renamed photo's tab (and active-tab pointer) at its new
+    // path, instead of letting PHOTO_REMOVED prune it as if deleted.
     case 'RENAME_PHOTO_TAB': {
       if (!state.openTabs.includes(action.oldPath)) return state
-      // newPath can already be open in a different tab — most commonly via
-      // navigateToPhoto's arrow-key stepping landing on a photo the user
-      // separately opened elsewhere. Drop that other occurrence rather than
-      // ending up with two tabs pointing at the same photo.
+      // newPath may already be open elsewhere (e.g. arrow-key navigation
+      // landing on it) — drop that occurrence instead of duplicating the tab.
       const openTabs = state.openTabs
         .filter((path) => path === action.oldPath || path !== action.newPath)
         .map((path) => (path === action.oldPath ? action.newPath : path))

@@ -11,7 +11,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconPhoto, IconX } from '@tabler/icons-react'
+import { IconColumns2, IconPhoto, IconX } from '@tabler/icons-react'
 import {
   useCallback,
   useMemo,
@@ -21,6 +21,7 @@ import {
 } from 'react'
 import { Grid } from 'react-window'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '../../state/photoLibraryReducer'
 import { useGalleryGridLayout } from '../../hooks/useGalleryGridLayout'
 import { useGalleryPreviewZoom } from '../../hooks/useGalleryPreviewZoom'
 import { GalleryPhotoCell, type GalleryCellProps } from './GalleryPhotoCell'
@@ -45,7 +46,8 @@ export function GalleryGrid(): ReactElement {
     tagCounts,
     folderTags,
     setFolderTagFilter,
-    renameFile
+    renameFile,
+    openCompareTab
   } = usePhotoLibrary()
 
   const {
@@ -63,27 +65,14 @@ export function GalleryGrid(): ReactElement {
     setCellWidthPersisted,
     stepToMark
   } = useGalleryGridLayout({ photoCount: photos.length, showFilenames: state.showFilenames })
-  const { ctrlHeld, previewScale } = useGalleryPreviewZoom(containerRef)
+  const { previewTriggerHeld, previewScale } = useGalleryPreviewZoom(containerRef)
 
-  // Lifted up here (not into GalleryPhotoCell) since react-window recycles
-  // cell instances across different photos as the user scrolls — per-cell
-  // local state would risk leaking "is renaming" onto the wrong photo.
+  // Lifted here (not into GalleryPhotoCell) — react-window recycles cell
+  // instances, so per-cell state would leak "is renaming" onto the wrong photo.
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
-  // Drives the spotlight hover effect (PhotoThumbnail): the hovered photo
-  // scales up and saturates while every other visible thumbnail dims and
-  // blurs. Lifted here (rather than each PhotoThumbnail reacting only to its
-  // own hover) since the dim/blur has to apply to every *other* thumbnail,
-  // which only a shared ancestor can know about.
-  const [hoveredPath, setHoveredPath] = useState<string | null>(null)
-  const handleHoverEnter = useCallback((path: string) => setHoveredPath(path), [])
-  const handleHoverLeave = useCallback(
-    (path: string) => setHoveredPath((current) => (current === path ? null : current)),
-    []
-  )
 
-  // Ctrl/Cmd+click toggles the photo in/out of the batch selection;
-  // Shift+click extends a range from the current selectedPath; a plain click
-  // replaces the whole selection with just this photo.
+  // Ctrl/Cmd+click toggles selection; Shift+click extends a range from
+  // selectedPath; a plain click replaces the selection with just this photo.
   const handleSelect = useCallback(
     (path: string, event: ReactMouseEvent): void => {
       if (event.shiftKey) {
@@ -99,8 +88,8 @@ export function GalleryGrid(): ReactElement {
     [selectPhoto, toggleSelectPhoto, selectPhotoRange, state.selectedPath, state.selectedPaths]
   )
 
-  // Keep a stable reference so react-window doesn't re-diff every visible
-  // cell whenever GalleryGrid re-renders for an unrelated reason.
+  // Stable reference so react-window doesn't re-diff every cell on an
+  // unrelated re-render.
   const cellProps: GalleryCellProps = useMemo(
     () => ({
       photos,
@@ -112,12 +101,9 @@ export function GalleryGrid(): ReactElement {
       onStartRename: setRenamingPath,
       onStopRename: () => setRenamingPath(null),
       onRename: renameFile,
-      ctrlHeld,
+      previewTriggerHeld,
       previewScale,
-      showFilenames: state.showFilenames,
-      hoveredPath,
-      onHoverEnter: handleHoverEnter,
-      onHoverLeave: handleHoverLeave
+      showFilenames: state.showFilenames
     }),
     [
       photos,
@@ -127,19 +113,15 @@ export function GalleryGrid(): ReactElement {
       handleSelect,
       renamingPath,
       renameFile,
-      ctrlHeld,
+      previewTriggerHeld,
       previewScale,
-      state.showFilenames,
-      hoveredPath,
-      handleHoverEnter,
-      handleHoverLeave
+      state.showFilenames
     ]
   )
 
-  // A "pure" tag view (navigated via the Tags panel, no folder context) shows
-  // the tag's own name/description editing UI. A folder view — with or
-  // without an additional tag pill narrowing it — shows the folder as the
-  // primary title instead, since the tag there is just a filter layered on top.
+  // A "pure" tag view (via the Tags panel, no folder) shows the tag's own
+  // name/description UI; a folder view shows the folder as the title
+  // instead, since the tag there is just a filter.
   const isPureTagView = state.selectedTag !== null && state.selectedFolder === null
 
   const galleryTitle = isPureTagView
@@ -153,13 +135,10 @@ export function GalleryGrid(): ReactElement {
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
   return (
-    // mih=0 (in addition to miw=0) is required because this component is
-    // mounted as a flex item in different parent orientations depending on
-    // context (a row-flex Box outside Tabs, a column-flex Tabs when photo
-    // tabs are open) — without it, its main axis defaults to its content's
-    // intrinsic size in a column parent, overflowing past the fixed-height
-    // ancestor instead of shrinking to fit, which hides the footer and
-    // breaks the internal grid's own scroll container.
+    // mih=0 (with miw=0) — this mounts in both row-flex and column-flex
+    // parents depending on context; without it, a column parent lets this
+    // overflow past its fixed height instead of shrinking, hiding the
+    // footer and breaking the grid's own scroll container.
     <Flex direction="column" flex={1} miw={0} mih={0}>
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
@@ -199,10 +178,33 @@ export function GalleryGrid(): ReactElement {
                   <Text size="sm" c="dimmed">
                     {state.selectedPaths.size} selected
                   </Text>
+                  {state.selectedPaths.size >= MIN_COMPARE_PHOTOS &&
+                    state.selectedPaths.size <= MAX_COMPARE_PHOTOS && (
+                      <Tooltip label="Compare photos">
+                        <ActionIcon
+                          variant="subtle"
+                          aria-label="Compare photos"
+                          onClick={(event) => {
+                            // Blurs before the tab switch below unmounts this
+                            // button, so the tooltip closes instead of being
+                            // orphaned open.
+                            event.currentTarget.blur()
+                            openCompareTab(Array.from(state.selectedPaths))
+                          }}
+                        >
+                          <IconColumns2 size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
                   <Tooltip label="Clear selection">
                     <ActionIcon
                       variant="subtle"
-                      onClick={clearSelection}
+                      onClick={(event) => {
+                        // Same orphaned-tooltip issue as above — this button
+                        // disappears once the selection is cleared.
+                        event.currentTarget.blur()
+                        clearSelection()
+                      }}
                       aria-label="Clear selection"
                     >
                       <IconX size={16} />
@@ -250,9 +252,8 @@ export function GalleryGrid(): ReactElement {
         miw={0}
         style={{ overflow: 'hidden' }}
         onClick={(event) => {
-          // Only clears when the click lands directly on this empty
-          // container (not bubbled up from a thumbnail), matching the usual
-          // "click empty space to deselect" convention.
+          // Only clears on a direct click here (not bubbled from a
+          // thumbnail) — the usual "click empty space to deselect" convention.
           if (event.target === event.currentTarget) clearSelection()
         }}
       >

@@ -3,67 +3,48 @@ import {
   Box,
   Center,
   Image,
-  Portal,
+  Kbd,
   Tooltip,
   UnstyledButton,
   useMantineTheme
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { useDraggable } from '@dnd-kit/core'
-import { motion } from 'motion/react'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
-import { useState, type ComponentPropsWithoutRef, type MouseEvent, type ReactElement } from 'react'
+import type { ComponentPropsWithoutRef, MouseEvent, ReactElement } from 'react'
 import type { PhotoRecord } from '../../../../shared/types'
-import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../../shared/protocolUrls'
+import { toThumbProtocolUrl } from '../../../../shared/protocolUrls'
 import { GalleryFileName } from './GalleryFileName'
-import { ctrlKeyLabel } from '../../utils/platform'
+import { GalleryHoverPreview } from './GalleryHoverPreview'
+import { PREVIEW_TRIGGER_KEY_LABEL } from '../../utils/previewTrigger'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { useThumbnailSpotlight } from '../../hooks/useThumbnailSpotlight'
-
-// Preview size at previewScale === 1, in viewport-relative units so it
-// scales with the window rather than a fixed pixel size.
-const BASE_PREVIEW_WIDTH_VW = 50
-const BASE_PREVIEW_HEIGHT_VH = 70
+import { useHoverPreview } from '../../hooks/useHoverPreview'
 
 interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onSelect'> {
   photo: PhotoRecord
   selected: boolean
-  // Part of the active multi-selection, but not the DetailPanel-primary
-  // photo — gets a distinct (lighter) highlight from `selected`.
+  // Distinct (lighter) highlight from `selected` for the rest of a
+  // multi-selection.
   multiSelected: boolean
   onSelect: (path: string, event: MouseEvent) => void
   renaming: boolean
   onStartRename: () => void
   onStopRename: () => void
   onRename: (newBaseName: string) => Promise<void>
-  // Whether Ctrl is currently held anywhere in the gallery — gates the
-  // larger floating preview so it only shows during an intentional
-  // Ctrl+hover, not on every ordinary hover.
-  ctrlHeld: boolean
-  // Multiplier applied to the base preview size, adjusted via Ctrl+wheel
-  // while hovering (lifted up to GalleryGrid, not local state, so it's
-  // shared across whichever thumbnail is currently being previewed).
+  // Whether the preview trigger key (utils/previewTrigger) is held anywhere
+  // in the gallery.
+  previewTriggerHeld: boolean
+  // Preview zoom multiplier, lifted to GalleryGrid so it's shared across
+  // whichever thumbnail is being previewed.
   previewScale: number
-  // The "Show filenames" gallery setting. Renaming always shows the field
-  // regardless — otherwise there'd be nowhere to see what's being typed.
+  // Renaming always shows the filename field regardless of this setting.
   showFilename: boolean
-  // Whether *this* thumbnail is the one currently hovered (drives the
-  // scale-up/saturate half of the spotlight effect) and whether some *other*
-  // thumbnail is hovered instead (drives this one's dim/blur half) — both
-  // computed in GalleryGrid from its single shared hoveredPath.
-  spotlighted: boolean
-  dimmed: boolean
-  onHoverEnter: () => void
-  onHoverLeave: () => void
 }
 
-// The root can't be a single button anymore — GalleryFileName's inline editor
-// (via InlineEditField) renders its own nested pencil ActionIcon button, and a
-// button can't be nested inside another button. So the image gets its own
-// inner button for click-to-select, while the filename is a sibling. `...rest`
-// (needed for PhotoContextMenu's onContextMenu/onMouseDown injection) moves to
-// this outer, non-button container since right-click should work anywhere on
-// the thumbnail.
+// Not a single root button — GalleryFileName's own edit button can't nest
+// inside another button, so the image gets its own inner button while the
+// filename stays a sibling. `...rest` carries PhotoContextMenu's injected
+// handlers onto the outer container so right-click works anywhere on the cell.
 export function PhotoThumbnail({
   photo,
   selected,
@@ -73,43 +54,28 @@ export function PhotoThumbnail({
   onStartRename,
   onStopRename,
   onRename,
-  ctrlHeld,
+  previewTriggerHeld,
   previewScale,
   showFilename,
-  spotlighted,
-  dimmed,
-  onHoverEnter,
-  onHoverLeave,
   className,
   ...rest
 }: PhotoThumbnailProps): ReactElement {
   const theme = useMantineTheme()
   const { openPhotoTab, state } = usePhotoLibrary()
-  const canPreview = ctrlHeld && photo.thumbnailStatus === 'ready'
-  // Tracks the cursor so the floating preview below can be centered directly
-  // on it, rather than offset to the side like a regular tooltip.
-  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
-
-  // Off when the user has toggled it off in Settings, or when the OS-level
-  // "reduce motion" preference is on — the setting doesn't override that,
-  // it's an additional gate on top of it.
   const prefersReducedMotion = useReducedMotion()
-  const spotlightEnabled =
-    state.galleryAnimationsEnabled && !prefersReducedMotion && photo.thumbnailStatus === 'ready'
-  const spotlight = useThumbnailSpotlight(spotlightEnabled, spotlighted, dimmed)
+  const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
+  const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
+  const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
 
-  // Dragging a photo that's part of the active multi-selection (2+ photos)
-  // carries the whole batch; dragging anything else carries just that one —
-  // same "what's actually selected" convention as the right-click menu.
+  // Drag carries the whole multi-selection if this photo is part of it,
+  // otherwise just this one — same convention as the right-click menu.
   const dragPaths =
     state.selectedPaths.has(photo.filePath) && state.selectedPaths.size > 1
       ? Array.from(state.selectedPaths)
       : [photo.filePath]
 
-  // dnd-kit tracks the drag via pointer events rather than the native HTML5
-  // drag API, so the ghost that follows the cursor is a real DOM element
-  // (see App.tsx's DragOverlay) instead of a browser/OS drag-image
-  // snapshot — no more canvas/setDragImage workarounds needed.
+  // Pointer-based (not native HTML5 drag), so the ghost that follows the
+  // cursor is a real DOM element — see App.tsx's DragOverlay.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: photo.filePath,
     data: { paths: dragPaths }
@@ -117,18 +83,18 @@ export function PhotoThumbnail({
 
   return (
     <Tooltip
-      label={`Hold ${ctrlKeyLabel} to preview, hold ${ctrlKeyLabel} and scroll to zoom in or out`}
-      openDelay={2000}
-      // Hidden once Ctrl is actually held, since the larger floating image
-      // preview takes over at that point and this hint would just overlap it.
-      disabled={ctrlHeld || photo.thumbnailStatus !== 'ready'}
+      label={
+        <>Hold {<Kbd>{PREVIEW_TRIGGER_KEY_LABEL}</Kbd>} to preview, and scroll to zoom in or out</>
+      }
+      openDelay={5000}
+      // Hidden once the preview itself is showing, so the hint doesn't overlap it.
+      disabled={previewTriggerHeld || photo.thumbnailStatus !== 'ready'}
     >
       <Box
         {...rest}
         {...attributes}
         {...listeners}
         ref={setNodeRef}
-        title={photo.fileName}
         opacity={isDragging ? 0.4 : undefined}
         className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${!selected && multiSelected ? ' photo-thumbnail--multi-selected' : ''}${className ? ` ${className}` : ''}`}
       >
@@ -136,42 +102,21 @@ export function PhotoThumbnail({
           className="photo-thumbnail__select-button"
           onClick={(event) => onSelect(photo.filePath, event)}
           onDoubleClick={() => openPhotoTab(photo.filePath)}
-          onMouseEnter={() => {
-            if (spotlightEnabled) onHoverEnter()
-          }}
-          onMouseMove={(event) => {
-            if (canPreview) setCursorPos({ x: event.clientX, y: event.clientY })
-          }}
-          onMouseLeave={() => {
-            setCursorPos(null)
-            if (spotlightEnabled) onHoverLeave()
-          }}
+          onMouseMove={onMouseMove}
+          onMouseLeave={onMouseLeave}
           w="100%"
           style={{ cursor: canPreview ? 'zoom-in' : undefined }}
         >
           {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
             <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
-              <motion.div
-                initial={false}
-                animate={spotlight.animate}
-                transition={spotlight.transition}
-                style={{ width: '100%', height: '100%' }}
-              >
-                <Image
-                  src={toThumbProtocolUrl(photo.thumbnailKey)}
-                  alt={photo.fileName}
-                  fit="cover"
-                  loading="lazy"
-                  // AspectRatio normally stretches its direct img child to
-                  // 100% width/height itself (targeting a `> img` selector),
-                  // but Image is now nested inside the motion.div wrapper
-                  // instead, so it no longer gets that sizing for free —
-                  // without it, non-square photos shrink to their natural
-                  // aspect ratio instead of filling the square frame.
-                  w="100%"
-                  h="100%"
-                />
-              </motion.div>
+              <Image
+                src={toThumbProtocolUrl(photo.thumbnailKey)}
+                alt={photo.fileName}
+                fit="cover"
+                loading="lazy"
+                w="100%"
+                h="100%"
+              />
             </AspectRatio>
           ) : (
             <Center
@@ -186,37 +131,12 @@ export function PhotoThumbnail({
             </Center>
           )}
         </UnstyledButton>
-        {canPreview && cursorPos && (
-          <Portal>
-            <Box
-              pos="fixed"
-              bg="var(--mantine-color-body)"
-              bdrs="md"
-              left={cursorPos.x}
-              top={cursorPos.y}
-              style={{
-                boxShadow: 'var(--mantine-shadow-elevated)',
-                transform: 'translate(-50%, -50%)',
-                // Preview must never intercept the pointer — it sits
-                // directly under the cursor, so any pointer events here
-                // would immediately hide it (mouse "leaving" the thumbnail).
-                pointerEvents: 'none',
-                zIndex: 'var(--mantine-z-index-max)'
-              }}
-            >
-              <Image
-                src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
-                alt={photo.fileName}
-                bdrs="md"
-                fit="contain"
-                maw={`min(${BASE_PREVIEW_WIDTH_VW * previewScale}vw, 92vw)`}
-                mah={`min(${BASE_PREVIEW_HEIGHT_VH * previewScale}vh, 92vh)`}
-                w="auto"
-                h="auto"
-              />
-            </Box>
-          </Portal>
-        )}
+        <GalleryHoverPreview
+          photo={photo}
+          position={canPreview ? position : null}
+          scale={previewScale}
+          motionEnabled={motionEnabled}
+        />
         {(showFilename || renaming) && (
           <Box w="100%">
             <GalleryFileName

@@ -15,16 +15,9 @@ export interface GalleryCellProps {
   onStartRename: (path: string) => void
   onStopRename: () => void
   onRename: (filePath: string, newBaseName: string) => Promise<void>
-  ctrlHeld: boolean
+  previewTriggerHeld: boolean
   previewScale: number
   showFilenames: boolean
-  hoveredPath: string | null
-  // Separate enter/leave callbacks (rather than a single "set to this path or
-  // null") avoid a race when the pointer moves directly from one thumbnail to
-  // an adjacent one: the new thumbnail's enter can fire before the old one's
-  // leave, and a plain "leave clears it" would wipe out the just-set hover.
-  onHoverEnter: (path: string) => void
-  onHoverLeave: (path: string) => void
 }
 
 /** react-window cell renderer for GalleryGrid — one photo thumbnail per cell. */
@@ -41,12 +34,9 @@ export function GalleryPhotoCell({
   onStartRename,
   onStopRename,
   onRename,
-  ctrlHeld,
+  previewTriggerHeld,
   previewScale,
-  showFilenames,
-  hoveredPath,
-  onHoverEnter,
-  onHoverLeave
+  showFilenames
 }: CellComponentProps<GalleryCellProps>): ReactElement {
   const index = rowIndex * columnCount + columnIndex
   const photo = photos[index]
@@ -63,13 +53,9 @@ export function GalleryPhotoCell({
           onStartRename={() => onStartRename(photo.filePath)}
           onStopRename={onStopRename}
           onRename={(newBaseName) => onRename(photo.filePath, newBaseName)}
-          ctrlHeld={ctrlHeld}
+          previewTriggerHeld={previewTriggerHeld}
           previewScale={previewScale}
           showFilename={showFilenames}
-          spotlighted={hoveredPath === photo.filePath}
-          dimmed={hoveredPath !== null && hoveredPath !== photo.filePath}
-          onHoverEnter={() => onHoverEnter(photo.filePath)}
-          onHoverLeave={() => onHoverLeave(photo.filePath)}
         />
       </PhotoContextMenu>
     </Box>

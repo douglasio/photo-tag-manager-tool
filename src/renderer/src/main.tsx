@@ -1,6 +1,11 @@
 import '@mantine/core/styles.css'
 import '@mantine/notifications/styles.css'
 import '@mantine/dates/styles.css'
+import '@fontsource/bebas-neue'
+import '@fontsource/playfair-display/400.css'
+import '@fontsource/playfair-display/400-italic.css'
+import '@fontsource/playfair-display/700.css'
+import '@fontsource/playfair-display/900.css'
 import './assets/main.css'
 
 import { StrictMode } from 'react'

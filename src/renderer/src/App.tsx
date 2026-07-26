@@ -7,7 +7,11 @@ import {
   Divider,
   Group,
   Image,
+  Loader,
+  Scroller,
+  Stack,
   Tabs,
+  Text,
   Title,
   Tooltip
 } from '@mantine/core'
@@ -27,6 +31,7 @@ import {
 import { SortableContext, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { getEventCoordinates } from '@dnd-kit/utilities'
 import {
+  IconColumns2,
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
   IconLibraryPhoto,
@@ -40,12 +45,14 @@ import { AppLogo } from './components/Shared/AppLogo'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { ScanProgressBar } from './components/Settings/ScanProgressBar'
 import { GalleryGrid } from './components/Gallery/GalleryGrid'
+import { CompareView } from './components/Compare/CompareView'
 import { DetailPanel } from './components/DetailPanel/DetailPanel'
 import { FolderSettingsMenu } from './components/Folders/FolderSettingsMenu'
 import { FolderTree } from './components/Folders/FolderTree'
 import { PanelSection } from './components/Shared/PanelSection'
 import { PhotoView } from './components/PhotoView/PhotoView'
 import { SortableTab } from './components/Shared/SortableTab'
+import { CompareTabLabel, TabLabel } from './components/Shared/TabLabel'
 import { TagPanel } from './components/Tags/TagPanel'
 import { toThumbProtocolUrl } from '../../shared/protocolUrls'
 import type { PhotoRecord } from '../../shared/types'
@@ -60,20 +67,10 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 const HEADER_HEIGHT = 52
 const DRAG_PREVIEW_SIZE = 64
-// Fine-tune knobs if the preview still looks off-center after the size fix —
-// this can happen because the OS cursor's visual hotspot (the actual tip of
-// the arrow glyph) isn't exactly at the clientX/clientY dnd-kit reads, and
-// that gap varies by platform/cursor theme. Positive X moves the preview
-// right, positive Y moves it down; nudge in a few pixels at a time. Keep
-// these small — drop-target hit-testing tracks the actual cursor position,
-// not this visual preview, so a large offset (previously -100 on Y) makes
-// the preview visibly disagree with where a drop will actually register.
 const DRAG_PREVIEW_OFFSET_X = 0
 const DRAG_PREVIEW_OFFSET_Y = 0
 
-// dnd-kit's official recipe for snapping the overlay to be centered
-// directly under the pointer, using draggingNodeRect (the overlay's own
-// measured rect) rather than the original dragged element's rect.
+// dnd-kit's official recipe for snapping the overlay to be centered directly under the pointer, using draggingNodeRect (the overlay's own measured rect) rather than the original dragged element's rect.
 const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
   if (draggingNodeRect && activatorEvent) {
     const activatorCoordinates = getEventCoordinates(activatorEvent)
@@ -89,9 +86,7 @@ const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transf
   return transform
 }
 
-// The DragOverlay ghost that follows the cursor while a gallery thumbnail is
-// being dragged onto a tag — a real DOM element (unlike the browser's native
-// drag-image snapshot), so ordinary CSS covers translucency/sizing/badges.
+// The DragOverlay ghost that follows the cursor while a gallery thumbnail is being dragged onto a tag
 function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): React.JSX.Element {
   return (
     <Box pos="relative" w={DRAG_PREVIEW_SIZE} h={DRAG_PREVIEW_SIZE}>
@@ -141,7 +136,7 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
 function AppLayout(): React.JSX.Element {
   const {
     state,
-    openTabPhotos,
+    openTabEntries,
     closePhotoTab,
     setActiveTab,
     addTagsToPhotos,
@@ -150,17 +145,12 @@ function AppLayout(): React.JSX.Element {
     reorderPhotoTabs
   } = usePhotoLibrary()
   const hasTabs = state.openTabs.length > 0
-  // The navbar (Tags/Folders) only hides while an actual photo tab is active
-  // — switching back to the Gallery tab (with other photo tabs still open in
-  // the background) restores it. The details aside is independent of this:
-  // it's user-togglable and persisted, shown on both the gallery and
-  // photo-view screens.
+  // The navbar (Tags/Folders) only hides while an actual photo tab is active — switching back to the Gallery tab (with other photo tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
   const isPhotoTabActive = state.activeTab !== 'gallery'
+  // Compare View always hides the details panel outright
+  const isCompareTabActive = state.compareTabs.has(state.activeTab)
 
-  // Universal "back to gallery" shortcut — works regardless of which tab is
-  // active, so it's wired at the layout level rather than inside PhotoView.
-  // Skipped while typing anywhere (rename fields, tag input, comment editor,
-  // date picker, ...) so a literal "g" keystroke isn't hijacked.
+  // Universal "back to gallery" shortcut
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'g' || event.metaKey || event.ctrlKey || event.altKey) return
@@ -171,10 +161,7 @@ function AppLayout(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [setActiveTab])
 
-  // Alt+Left/Right cycles between open tabs (Gallery first, then openTabs in
-  // their current order) regardless of which tab is currently active — a
-  // separate concern from PhotoView's own plain Left/Right, which instead
-  // steps to the next/previous photo within the currently viewed one.
+  // Alt+Left/Right cycles between open tabs
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
@@ -228,12 +215,7 @@ function AppLayout(): React.JSX.Element {
 
   const activeDragPhoto = activeDragPaths ? state.photosByPath.get(activeDragPaths[0]) : undefined
 
-  // Separate, nested DndContext scoped to just the photo-tab row — reordering
-  // tabs is an unrelated drag interaction from the gallery-thumbnail one
-  // above (different collision detection needs: closestCenter suits a
-  // single-axis tab strip, pointerWithin suits dropping a thumbnail onto an
-  // arbitrary tag/folder target) and dnd-kit supports nesting independent
-  // DndContexts like this without them interfering with each other.
+  // DndContext scoped to just the photo-tab row
   const tabSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const handleTabDragEnd = (event: DragEndEvent): void => {
     const { active, over } = event
@@ -247,12 +229,6 @@ function AppLayout(): React.JSX.Element {
   return (
     <DndContext
       sensors={sensors}
-      // Default collision detection (rectIntersection) tests the dragged
-      // thumbnail's own translated bounding box against droppable rects —
-      // that box trails the cursor by however far off-center it was grabbed,
-      // so a drop zone could register well away from the visible pointer.
-      // pointerWithin hit-tests the actual pointer coordinates instead,
-      // matching what the (now cursor-centered) drag preview shows.
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
@@ -268,7 +244,10 @@ function AppLayout(): React.JSX.Element {
         aside={{
           width: 320,
           breakpoint: 0,
-          collapsed: { desktop: state.detailsPanelCollapsed, mobile: state.detailsPanelCollapsed }
+          collapsed: {
+            desktop: state.detailsPanelCollapsed || isCompareTabActive,
+            mobile: state.detailsPanelCollapsed || isCompareTabActive
+          }
         }}
         padding={0}
       >
@@ -283,14 +262,21 @@ function AppLayout(): React.JSX.Element {
             <Group gap="md" wrap="nowrap">
               <ScanProgressBar />
               <Tooltip
-                label={state.detailsPanelCollapsed ? 'Show details panel' : 'Hide details panel'}
+                label={
+                  isCompareTabActive
+                    ? 'Not available in Compare View'
+                    : state.detailsPanelCollapsed
+                      ? 'Show details panel'
+                      : 'Hide details panel'
+                }
               >
                 <ActionIcon
                   variant="subtle"
                   aria-label="Toggle details panel"
+                  disabled={isCompareTabActive}
                   onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
                 >
-                  {state.detailsPanelCollapsed ? (
+                  {state.detailsPanelCollapsed || isCompareTabActive ? (
                     <IconLayoutSidebarRightExpand size={18} />
                   ) : (
                     <IconLayoutSidebarRightCollapse size={18} />
@@ -329,55 +315,70 @@ function AppLayout(): React.JSX.Element {
                 mih={0}
                 style={{ flexDirection: 'column' }}
               >
-                <Tabs.List style={{ flexShrink: 0 }}>
-                  <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto />}>
-                    Gallery
-                  </Tabs.Tab>
-                  <DndContext
-                    sensors={tabSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleTabDragEnd}
-                  >
-                    <SortableContext
-                      items={state.openTabs}
-                      strategy={horizontalListSortingStrategy}
+                <Tabs.List style={{ flexShrink: 0, flexWrap: 'nowrap' }}>
+                  <Scroller>
+                    <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto />}>
+                      Gallery
+                    </Tabs.Tab>
+                    <DndContext
+                      sensors={tabSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleTabDragEnd}
                     >
-                      {openTabPhotos.map((photo) => (
-                        <SortableTab
-                          key={photo.filePath}
-                          id={photo.filePath}
-                          value={photo.filePath}
-                          rightSection={
-                            <ActionIcon
-                              component="span"
-                              size="xs"
-                              variant="subtle"
-                              color="gray"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                closePhotoTab(photo.filePath)
-                              }}
-                            >
-                              <IconX size={12} />
-                            </ActionIcon>
-                          }
-                        >
-                          {photo.fileName}
-                        </SortableTab>
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                      <SortableContext
+                        items={state.openTabs}
+                        strategy={horizontalListSortingStrategy}
+                      >
+                        {openTabEntries.map((entry) => (
+                          <SortableTab
+                            key={entry.id}
+                            id={entry.id}
+                            value={entry.id}
+                            leftSection={
+                              entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
+                            }
+                            rightSection={
+                              <ActionIcon
+                                component="span"
+                                size="xs"
+                                variant="subtle"
+                                color="gray"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  closePhotoTab(entry.id)
+                                }}
+                              >
+                                <IconX size={12} />
+                              </ActionIcon>
+                            }
+                          >
+                            {entry.kind === 'compare' ? (
+                              <CompareTabLabel
+                                fileNames={entry.photos.map((photo) => photo.fileName)}
+                              />
+                            ) : (
+                              <TabLabel fileName={entry.photo.fileName} />
+                            )}
+                          </SortableTab>
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                  </Scroller>
                 </Tabs.List>
                 <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
                   <GalleryGrid />
                 </Tabs.Panel>
-                {openTabPhotos.map((photo) => (
+                {openTabEntries.map((entry) => (
                   <Tabs.Panel
-                    key={photo.filePath}
-                    value={photo.filePath}
+                    key={entry.id}
+                    value={entry.id}
                     style={{ flex: 1, minHeight: 0, display: 'flex' }}
                   >
-                    <PhotoView photo={photo} />
+                    {entry.kind === 'compare' ? (
+                      <CompareView id={entry.id} photos={entry.photos} />
+                    ) : (
+                      <PhotoView photo={entry.photo} />
+                    )}
                   </Tabs.Panel>
                 ))}
               </Tabs>
@@ -390,14 +391,6 @@ function AppLayout(): React.JSX.Element {
           <DetailPanel />
         </AppShell.Aside>
       </AppShell>
-      {/* DragOverlay's wrapper element is sized to the ORIGINAL dragged
-          node's bounding box by default (the full gallery thumbnail card),
-          not to whatever content is rendered inside it — so our much
-          smaller DragPreview was rendering pinned to the corner of that
-          oversized, invisible box, and the centering modifier above was
-          also computing its offset from that same wrong-sized rect. This
-          style override forces the wrapper itself to match the preview's
-          actual size, fixing both. */}
       <DragOverlay
         modifiers={[snapCenterToCursor]}
         style={{ width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }}
@@ -410,10 +403,31 @@ function AppLayout(): React.JSX.Element {
   )
 }
 
+// Shown until every watched folder's initial scan resolves, instead of the gallery appearing empty and filling in photo-by-photo as the sync job runs.
+function StartupLoadingScreen(): React.JSX.Element {
+  return (
+    <Center h="100vh">
+      <Stack align="center" gap="md">
+        <AppLogo />
+        <Group gap="xs">
+          <Loader size="sm" />
+          <Text c="dimmed">Loading your library…</Text>
+        </Group>
+      </Stack>
+    </Center>
+  )
+}
+
+// Reads context to decide between the two screens above — kept separate from AppLayout so that component's hooks (keyboard shortcuts, drag sensors, etc.) are never conditionally skipped, which switching on a value inside AppLayout itself would do once initialLoadComplete flips partway through its lifetime.
+function AppGate(): React.JSX.Element {
+  const { state } = usePhotoLibrary()
+  return state.initialLoadComplete ? <AppLayout /> : <StartupLoadingScreen />
+}
+
 function App(): React.JSX.Element {
   return (
     <PhotoLibraryProvider>
-      <AppLayout />
+      <AppGate />
     </PhotoLibraryProvider>
   )
 }
