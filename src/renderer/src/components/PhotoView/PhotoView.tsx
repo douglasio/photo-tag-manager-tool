@@ -48,17 +48,31 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   const { saturationAmount, containerHandlers, zoomStyle, saturationOverlayStyle } =
     usePhotoHoverEffects(motionEnabled)
 
+  // Chromium's object-fit ignores EXIF rotation in its own fit/crop math
+  // (though painting respects it) — this hidden, unconstrained probe measures
+  // the image's true rendered box so we can feed the real aspect-ratio back
+  // to the visible images below, overriding what object-fit assumes.
+  const [nativeSize, setNativeSize] = useState<{ width: number; height: number } | null>(null)
+  // Reset (during render, not an effect, per this codebase's convention for
+  // resetting state when an external value changes) whenever the file is
+  // rewritten — e.g. after a rotate — so the probe re-measures.
+  const [measuredForKey, setMeasuredForKey] = useState(photo.thumbnailKey)
+  if (measuredForKey !== photo.thumbnailKey) {
+    setMeasuredForKey(photo.thumbnailKey)
+    setNativeSize(null)
+  }
+  const aspectRatio = nativeSize ? `${nativeSize.width} / ${nativeSize.height}` : undefined
+
   const zoomToFit = (): void => setScale(MIN_SCALE)
 
-  // Compensates for how much fit="contain" already shrank/grew the image,
-  // so "original size" means true 1:1 pixels.
+  // True 1:1 pixels, using the probe-measured size above rather than
+  // naturalWidth/naturalHeight (see the comment on nativeSize).
   const zoomToNativeSize = (): void => {
-    const img = imgRef.current
     const container = containerRef.current
-    if (!img || !container || !img.naturalWidth || !img.naturalHeight) return
+    if (!container || !nativeSize) return
     const fitScale = Math.min(
-      container.clientWidth / img.naturalWidth,
-      container.clientHeight / img.naturalHeight
+      container.clientWidth / nativeSize.width,
+      container.clientHeight / nativeSize.height
     )
     if (!fitScale) return
     setScale(clampScale(1 / fitScale))
@@ -141,6 +155,19 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
           overflow: 'hidden'
         }}
       >
+        <Image
+          src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
+          alt=""
+          aria-hidden="true"
+          pos="absolute"
+          maw="none"
+          mah="none"
+          style={{ visibility: 'hidden' }}
+          onLoad={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setNativeSize({ width: rect.width, height: rect.height })
+          }}
+        />
         <motion.div
           // initial={false} renders straight at `animate` when disabled.
           initial={initial}
@@ -156,12 +183,16 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                 alt={photo.fileName}
                 fit="contain"
                 onLoad={handleImageLoad}
+                draggable={false}
                 maw="100%"
                 mah="100%"
                 display="block"
                 style={{
+                  aspectRatio,
                   transform: `scale(${scale})`,
-                  transformOrigin: 'center'
+                  transformOrigin: 'center',
+                  userSelect: 'none',
+                  WebkitUserDrag: 'none'
                 }}
               />
               {/* Saturated copy masked to a cursor-centered feathered circle;
@@ -178,13 +209,17 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                   src={toFileProtocolUrl(photo.filePath, photo.thumbnailKey)}
                   alt=""
                   fit="contain"
+                  draggable={false}
                   maw="100%"
                   mah="100%"
                   display="block"
                   style={{
+                    aspectRatio,
                     transform: `scale(${scale})`,
                     transformOrigin: 'center',
-                    filter: `saturate(${saturationAmount})`
+                    filter: `saturate(${saturationAmount})`,
+                    userSelect: 'none',
+                    WebkitUserDrag: 'none'
                   }}
                 />
               </motion.div>
