@@ -37,17 +37,14 @@ export function PannableZoomableImage({
   hideToolbar,
   imageFilter
 }: PannableZoomableImageProps): ReactElement {
-  const { containerRef, scale, pan, isDragging, baseSize } = zoom
+  const { containerRef, scale, pan, isDragging, baseSize, anchor } = zoom
 
   return (
     <Box ref={containerRef} pos="relative" h="100%" w="100%" style={{ overflow: 'hidden' }}>
       <Box
-        h="100%"
-        w="100%"
-        display="flex"
+        pos="absolute"
         style={{
-          alignItems: 'center',
-          justifyContent: 'center',
+          inset: 0,
           touchAction: 'none',
           cursor: isDragging ? 'grabbing' : 'grab'
         }}
@@ -61,11 +58,18 @@ export function PannableZoomableImage({
           alt={photo.fileName}
           onLoad={zoom.handleImageLoad}
           draggable={false}
+          pos="absolute"
           w={baseSize?.width}
           h={baseSize?.height}
           style={{
-            visibility: baseSize ? 'visible' : 'hidden',
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+            visibility: baseSize && anchor ? 'visible' : 'hidden',
+            // Positioned at the container's center as measured when the
+            // image loaded (see usePannableZoom's anchor), not the
+            // container's live size — so resizing the pane crops the image
+            // at its edges instead of visibly recentering/sliding it.
+            left: anchor?.x,
+            top: anchor?.y,
+            transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
             transformOrigin: 'center',
             filter: imageFilter,
             userSelect: 'none',

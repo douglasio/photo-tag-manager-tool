@@ -14,9 +14,12 @@ export type GallerySortOrder = 'asc' | 'desc'
 
 export const RECENT_TAGS_LIMIT = 3
 
-// Order-independent so opening the same pair twice reuses the same tab.
-export function compareTabId(pathA: string, pathB: string): string {
-  return `compare:${[pathA, pathB].sort().join('::')}`
+export const MAX_COMPARE_PHOTOS = 4
+export const MIN_COMPARE_PHOTOS = 2
+
+// Order-independent so opening the same set twice reuses the same tab.
+export function compareTabId(paths: string[]): string {
+  return `compare:${[...paths].sort().join('::')}`
 }
 
 export interface PhotoLibraryState {
@@ -57,8 +60,8 @@ export interface PhotoLibraryState {
   openTabs: string[]
   activeTab: string
   // Resolves a compare-tab's synthetic id (from openTabs/activeTab) to its
-  // actual photo pair.
-  compareTabs: Map<string, [string, string]>
+  // actual photo paths (MIN_COMPARE_PHOTOS to MAX_COMPARE_PHOTOS of them).
+  compareTabs: Map<string, string[]>
 }
 
 export const initialState: PhotoLibraryState = {
@@ -125,11 +128,30 @@ export type PhotoLibraryAction =
   | { type: 'TAG_RENAMED'; oldTag: string; newTag: string; photos: PhotoRecord[] }
   | { type: 'TAG_DELETED'; tag: string; photos: PhotoRecord[] }
   | { type: 'OPEN_PHOTO_TAB'; filePath: string }
-  | { type: 'OPEN_COMPARE_TAB'; pathA: string; pathB: string }
+  | { type: 'OPEN_COMPARE_TAB'; paths: string[] }
+  | { type: 'REMOVE_FROM_COMPARE_TAB'; tabId: string; filePath: string }
   | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
+
+// Shared by CLOSE_PHOTO_TAB and REMOVE_FROM_COMPARE_TAB (which closes its
+// whole tab once too few photos remain) — falls back to the tab immediately
+// left in the visible order (Gallery first, then openTabs) rather than
+// always jumping to Gallery.
+function closeTab(
+  state: PhotoLibraryState,
+  tabId: string
+): Pick<PhotoLibraryState, 'openTabs' | 'activeTab'> {
+  const openTabs = state.openTabs.filter((id) => id !== tabId)
+  let activeTab = state.activeTab
+  if (state.activeTab === tabId) {
+    const order = ['gallery', ...state.openTabs]
+    const closedIndex = order.indexOf(tabId)
+    activeTab = order[closedIndex - 1]
+  }
+  return { openTabs, activeTab }
+}
 
 export function photoLibraryReducer(
   state: PhotoLibraryState,
@@ -480,23 +502,34 @@ export function photoLibraryReducer(
       return { ...state, openTabs, activeTab: action.filePath }
     }
     case 'OPEN_COMPARE_TAB': {
-      const id = compareTabId(action.pathA, action.pathB)
+      // Deduped and capped defensively — callers are expected to already
+      // enforce MIN/MAX_COMPARE_PHOTOS, but the reducer shouldn't trust that.
+      const paths = Array.from(new Set(action.paths)).slice(0, MAX_COMPARE_PHOTOS)
+      const id = compareTabId(paths)
       const openTabs = state.openTabs.includes(id) ? state.openTabs : [...state.openTabs, id]
       const compareTabs = new Map(state.compareTabs)
-      compareTabs.set(id, [action.pathA, action.pathB])
+      compareTabs.set(id, paths)
       return { ...state, openTabs, activeTab: id, compareTabs }
+    }
+    // Drops one photo from an open compare tab, closing the whole tab
+    // instead once fewer than MIN_COMPARE_PHOTOS would remain.
+    case 'REMOVE_FROM_COMPARE_TAB': {
+      const current = state.compareTabs.get(action.tabId)
+      if (!current || !current.includes(action.filePath)) return state
+      const remaining = current.filter((path) => path !== action.filePath)
+      if (remaining.length < MIN_COMPARE_PHOTOS) {
+        const { openTabs, activeTab } = closeTab(state, action.tabId)
+        const compareTabs = new Map(state.compareTabs)
+        compareTabs.delete(action.tabId)
+        return { ...state, openTabs, activeTab, compareTabs }
+      }
+      const compareTabs = new Map(state.compareTabs)
+      compareTabs.set(action.tabId, remaining)
+      return { ...state, compareTabs }
     }
     case 'CLOSE_PHOTO_TAB': {
       if (!state.openTabs.includes(action.filePath)) return state
-      const openTabs = state.openTabs.filter((path) => path !== action.filePath)
-      let activeTab = state.activeTab
-      if (state.activeTab === action.filePath) {
-        // Falls back to the tab immediately left in the visible order
-        // (Gallery first, then openTabs) rather than always jumping to Gallery.
-        const order = ['gallery', ...state.openTabs]
-        const closedIndex = order.indexOf(action.filePath)
-        activeTab = order[closedIndex - 1]
-      }
+      const { openTabs, activeTab } = closeTab(state, action.filePath)
       let compareTabs = state.compareTabs
       if (compareTabs.has(action.filePath)) {
         compareTabs = new Map(compareTabs)

@@ -13,6 +13,7 @@ import { notifications } from '@mantine/notifications'
 import { MoveProgressToast } from '../components/Settings/MoveProgressToast'
 import {
   initialState,
+  MIN_COMPARE_PHOTOS,
   photoLibraryReducer,
   type GallerySortBy,
   type GallerySortOrder,
@@ -44,12 +45,13 @@ export type NavigationDirection = 'left' | 'right'
 export type PhotoVisualization = 'none' | 'magazine' | 'newspaper'
 
 // One entry per open tab in display order — either a single photo or a
-// compare pair, resolved from state.openTabs/compareTabs against the
-// current photosByPath (an entry drops out if a referenced photo no longer
-// exists, e.g. after a delete).
+// compare set (2-4 photos), resolved from state.openTabs/compareTabs against
+// the current photosByPath (a missing photo drops out of a compare entry's
+// list; the whole entry drops out if fewer than MIN_COMPARE_PHOTOS remain,
+// same as a single-photo tab dropping out entirely after a delete).
 export type OpenTabEntry =
   | { kind: 'photo'; id: string; photo: PhotoRecord }
-  | { kind: 'compare'; id: string; photoA: PhotoRecord; photoB: PhotoRecord }
+  | { kind: 'compare'; id: string; photos: PhotoRecord[] }
 
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
@@ -95,7 +97,8 @@ interface PhotoLibraryContextValue {
   rotatePhoto: (filePath: string, direction: RotateDirection) => Promise<void>
   openTabEntries: OpenTabEntry[]
   openPhotoTab: (filePath: string) => void
-  openCompareTab: (pathA: string, pathB: string) => void
+  openCompareTab: (paths: string[]) => void
+  removeFromCompareTab: (tabId: string, filePath: string) => void
   closePhotoTab: (filePath: string) => void
   setActiveTab: (tab: string) => void
   reorderPhotoTabs: (openTabs: string[]) => void
@@ -612,8 +615,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'OPEN_PHOTO_TAB', filePath })
   }, [])
 
-  const openCompareTab = useCallback((pathA: string, pathB: string) => {
-    dispatch({ type: 'OPEN_COMPARE_TAB', pathA, pathB })
+  const openCompareTab = useCallback((paths: string[]) => {
+    dispatch({ type: 'OPEN_COMPARE_TAB', paths })
+  }, [])
+
+  const removeFromCompareTab = useCallback((tabId: string, filePath: string) => {
+    dispatch({ type: 'REMOVE_FROM_COMPARE_TAB', tabId, filePath })
   }, [])
 
   const closePhotoTab = useCallback((filePath: string) => {
@@ -830,12 +837,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     () =>
       state.openTabs
         .map((id): OpenTabEntry | null => {
-          const pair = state.compareTabs.get(id)
-          if (pair) {
-            const photoA = state.photosByPath.get(pair[0])
-            const photoB = state.photosByPath.get(pair[1])
-            if (!photoA || !photoB) return null
-            return { kind: 'compare', id, photoA, photoB }
+          const paths = state.compareTabs.get(id)
+          if (paths) {
+            const photos = paths
+              .map((path) => state.photosByPath.get(path))
+              .filter((photo): photo is PhotoRecord => photo != null)
+            return photos.length >= MIN_COMPARE_PHOTOS ? { kind: 'compare', id, photos } : null
           }
           const photo = state.photosByPath.get(id)
           return photo ? { kind: 'photo', id, photo } : null
@@ -885,6 +892,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     openTabEntries,
     openPhotoTab,
     openCompareTab,
+    removeFromCompareTab,
     closePhotoTab,
     setActiveTab,
     reorderPhotoTabs,

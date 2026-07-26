@@ -29,6 +29,7 @@ export interface UsePannableZoomResult {
   pan: { x: number; y: number }
   isDragging: boolean
   baseSize: Size | null
+  anchor: { x: number; y: number } | null
   handlePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
   handlePointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void
   stopDragging: () => void
@@ -73,6 +74,12 @@ export function usePannableZoom(
   // invert exactly the same fit ratio.
   const [baseSize, setBaseSize] = useState<Size | null>(null)
   const [naturalSize, setNaturalSize] = useState<Size | null>(null)
+  // The container's center at that same load-time moment, likewise frozen —
+  // PannableZoomableImage positions the image at this fixed pixel point
+  // (not live percentage centering), so a resizing container (e.g. dragging
+  // the compare view's Splitter) crops the image at its edges instead of
+  // visibly recentering/sliding it.
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null)
 
   // Reset pan/zoom/base-size whenever the photo changes, adjusted during
   // render per this codebase's convention for resetting state on prop change.
@@ -83,6 +90,7 @@ export function usePannableZoom(
     setPan({ x: 0, y: 0 })
     setBaseSize(null)
     setNaturalSize(null)
+    setAnchor(null)
   }
 
   useEffect(() => {
@@ -128,6 +136,7 @@ export function usePannableZoom(
       container.clientHeight / naturalHeight
     )
     setBaseSize({ width: naturalWidth * containScale, height: naturalHeight * containScale })
+    setAnchor({ x: container.clientWidth / 2, y: container.clientHeight / 2 })
     if (defaultFit === 'contain') {
       // baseSize is already the contain-fit size, so no pre-zoom needed —
       // the whole frame is visible at scale 1.
@@ -160,6 +169,7 @@ export function usePannableZoom(
     pan,
     isDragging,
     baseSize,
+    anchor,
     handlePointerDown,
     handlePointerMove,
     stopDragging,

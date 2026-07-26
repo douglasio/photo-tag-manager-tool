@@ -21,6 +21,7 @@ import {
 } from 'react'
 import { Grid } from 'react-window'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '../../state/photoLibraryReducer'
 import { useGalleryGridLayout } from '../../hooks/useGalleryGridLayout'
 import { useGalleryPreviewZoom } from '../../hooks/useGalleryPreviewZoom'
 import { GalleryPhotoCell, type GalleryCellProps } from './GalleryPhotoCell'
@@ -177,24 +178,24 @@ export function GalleryGrid(): ReactElement {
                   <Text size="sm" c="dimmed">
                     {state.selectedPaths.size} selected
                   </Text>
-                  {state.selectedPaths.size === 2 && (
-                    <Tooltip label="Compare photos">
-                      <ActionIcon
-                        variant="subtle"
-                        aria-label="Compare photos"
-                        onClick={(event) => {
-                          // Blurs before the tab switch below unmounts this
-                          // button, so the tooltip closes instead of being
-                          // orphaned open.
-                          event.currentTarget.blur()
-                          const [pathA, pathB] = state.selectedPaths
-                          openCompareTab(pathA, pathB)
-                        }}
-                      >
-                        <IconColumns2 size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
+                  {state.selectedPaths.size >= MIN_COMPARE_PHOTOS &&
+                    state.selectedPaths.size <= MAX_COMPARE_PHOTOS && (
+                      <Tooltip label="Compare photos">
+                        <ActionIcon
+                          variant="subtle"
+                          aria-label="Compare photos"
+                          onClick={(event) => {
+                            // Blurs before the tab switch below unmounts this
+                            // button, so the tooltip closes instead of being
+                            // orphaned open.
+                            event.currentTarget.blur()
+                            openCompareTab(Array.from(state.selectedPaths))
+                          }}
+                        >
+                          <IconColumns2 size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
                   <Tooltip label="Clear selection">
                     <ActionIcon
                       variant="subtle"
