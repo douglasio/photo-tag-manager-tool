@@ -70,17 +70,6 @@ export function GalleryGrid(): ReactElement {
   // cell instances across different photos as the user scrolls — per-cell
   // local state would risk leaking "is renaming" onto the wrong photo.
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
-  // Drives the spotlight hover effect (PhotoThumbnail): the hovered photo
-  // scales up and saturates while every other visible thumbnail dims and
-  // blurs. Lifted here (rather than each PhotoThumbnail reacting only to its
-  // own hover) since the dim/blur has to apply to every *other* thumbnail,
-  // which only a shared ancestor can know about.
-  const [hoveredPath, setHoveredPath] = useState<string | null>(null)
-  const handleHoverEnter = useCallback((path: string) => setHoveredPath(path), [])
-  const handleHoverLeave = useCallback(
-    (path: string) => setHoveredPath((current) => (current === path ? null : current)),
-    []
-  )
 
   // Ctrl/Cmd+click toggles the photo in/out of the batch selection;
   // Shift+click extends a range from the current selectedPath; a plain click
@@ -115,10 +104,7 @@ export function GalleryGrid(): ReactElement {
       onRename: renameFile,
       ctrlHeld,
       previewScale,
-      showFilenames: state.showFilenames,
-      hoveredPath,
-      onHoverEnter: handleHoverEnter,
-      onHoverLeave: handleHoverLeave
+      showFilenames: state.showFilenames
     }),
     [
       photos,
@@ -130,10 +116,7 @@ export function GalleryGrid(): ReactElement {
       renameFile,
       ctrlHeld,
       previewScale,
-      state.showFilenames,
-      hoveredPath,
-      handleHoverEnter,
-      handleHoverLeave
+      state.showFilenames
     ]
   )
 

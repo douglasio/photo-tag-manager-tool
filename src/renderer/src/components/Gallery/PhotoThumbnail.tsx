@@ -8,9 +8,7 @@ import {
   UnstyledButton,
   useMantineTheme
 } from '@mantine/core'
-import { useReducedMotion } from '@mantine/hooks'
 import { useDraggable } from '@dnd-kit/core'
-import { motion } from 'motion/react'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
 import { useState, type ComponentPropsWithoutRef, type MouseEvent, type ReactElement } from 'react'
 import type { PhotoRecord } from '../../../../shared/types'
@@ -18,7 +16,6 @@ import { toFileProtocolUrl, toThumbProtocolUrl } from '../../../../shared/protoc
 import { GalleryFileName } from './GalleryFileName'
 import { ctrlKeyLabel } from '../../utils/platform'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { useThumbnailSpotlight } from '../../hooks/useThumbnailSpotlight'
 
 // Preview size at previewScale === 1, in viewport-relative units so it
 // scales with the window rather than a fixed pixel size.
@@ -47,14 +44,6 @@ interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onS
   // The "Show filenames" gallery setting. Renaming always shows the field
   // regardless — otherwise there'd be nowhere to see what's being typed.
   showFilename: boolean
-  // Whether *this* thumbnail is the one currently hovered (drives the
-  // scale-up/saturate half of the spotlight effect) and whether some *other*
-  // thumbnail is hovered instead (drives this one's dim/blur half) — both
-  // computed in GalleryGrid from its single shared hoveredPath.
-  spotlighted: boolean
-  dimmed: boolean
-  onHoverEnter: () => void
-  onHoverLeave: () => void
 }
 
 // The root can't be a single button anymore — GalleryFileName's inline editor
@@ -76,10 +65,6 @@ export function PhotoThumbnail({
   ctrlHeld,
   previewScale,
   showFilename,
-  spotlighted,
-  dimmed,
-  onHoverEnter,
-  onHoverLeave,
   className,
   ...rest
 }: PhotoThumbnailProps): ReactElement {
@@ -89,14 +74,6 @@ export function PhotoThumbnail({
   // Tracks the cursor so the floating preview below can be centered directly
   // on it, rather than offset to the side like a regular tooltip.
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
-
-  // Off when the user has toggled it off in Settings, or when the OS-level
-  // "reduce motion" preference is on — the setting doesn't override that,
-  // it's an additional gate on top of it.
-  const prefersReducedMotion = useReducedMotion()
-  const spotlightEnabled =
-    state.galleryAnimationsEnabled && !prefersReducedMotion && photo.thumbnailStatus === 'ready'
-  const spotlight = useThumbnailSpotlight(spotlightEnabled, spotlighted, dimmed)
 
   // Dragging a photo that's part of the active multi-selection (2+ photos)
   // carries the whole batch; dragging anything else carries just that one —
@@ -136,42 +113,23 @@ export function PhotoThumbnail({
           className="photo-thumbnail__select-button"
           onClick={(event) => onSelect(photo.filePath, event)}
           onDoubleClick={() => openPhotoTab(photo.filePath)}
-          onMouseEnter={() => {
-            if (spotlightEnabled) onHoverEnter()
-          }}
           onMouseMove={(event) => {
             if (canPreview) setCursorPos({ x: event.clientX, y: event.clientY })
           }}
-          onMouseLeave={() => {
-            setCursorPos(null)
-            if (spotlightEnabled) onHoverLeave()
-          }}
+          onMouseLeave={() => setCursorPos(null)}
           w="100%"
           style={{ cursor: canPreview ? 'zoom-in' : undefined }}
         >
           {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
             <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
-              <motion.div
-                initial={false}
-                animate={spotlight.animate}
-                transition={spotlight.transition}
-                style={{ width: '100%', height: '100%' }}
-              >
-                <Image
-                  src={toThumbProtocolUrl(photo.thumbnailKey)}
-                  alt={photo.fileName}
-                  fit="cover"
-                  loading="lazy"
-                  // AspectRatio normally stretches its direct img child to
-                  // 100% width/height itself (targeting a `> img` selector),
-                  // but Image is now nested inside the motion.div wrapper
-                  // instead, so it no longer gets that sizing for free —
-                  // without it, non-square photos shrink to their natural
-                  // aspect ratio instead of filling the square frame.
-                  w="100%"
-                  h="100%"
-                />
-              </motion.div>
+              <Image
+                src={toThumbProtocolUrl(photo.thumbnailKey)}
+                alt={photo.fileName}
+                fit="cover"
+                loading="lazy"
+                w="100%"
+                h="100%"
+              />
             </AspectRatio>
           ) : (
             <Center

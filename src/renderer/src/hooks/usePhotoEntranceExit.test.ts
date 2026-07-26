@@ -15,10 +15,10 @@ describe('usePhotoEntranceExit', () => {
       usePhotoEntranceExit({ motionEnabled: false, enterDirection: null })
     )
     expect(result.current.initial).toBe(false)
-    expect(result.current.animate).toEqual({ scale: 1, x: 0, filter: 'blur(0px)', opacity: 1 })
+    expect(result.current.animate).toEqual({ x: 0, opacity: 1 })
   })
 
-  it('holds at the initial (blurred/scaled) target until ready', () => {
+  it('holds at the initial (faded/offset) target until ready', () => {
     const { result } = renderHook(() =>
       usePhotoEntranceExit({ motionEnabled: true, enterDirection: null })
     )
@@ -48,7 +48,7 @@ describe('usePhotoEntranceExit', () => {
     expect(result.current.animate).toEqual(result.current.initial)
 
     act(() => vi.runAllTimers())
-    expect(result.current.animate).toEqual({ scale: 1, x: 0, filter: 'blur(0px)', opacity: 1 })
+    expect(result.current.animate).toEqual({ x: 0, opacity: 1 })
   })
 
   it('triggerExit switches to the exit target and fires onDone after the exit duration', () => {

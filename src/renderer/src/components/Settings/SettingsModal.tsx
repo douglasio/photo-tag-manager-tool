@@ -65,8 +65,8 @@ function GallerySection(): ReactElement {
         onChange={(event) => setShowEmptyFolders(event.currentTarget.checked)}
       />
       <Switch
-        label="Photo decorative animations"
-        description="Enable various photo animations in the gallery and photo views. Automatically off if your system prefers reduced motion."
+        label="Enable animations"
+        description="Show various animations when navigating the app. Automatically off if your system prefers reduced motion."
         checked={state.galleryAnimationsEnabled}
         onChange={(event) => setGalleryAnimationsEnabled(event.currentTarget.checked)}
       />
