@@ -301,7 +301,7 @@ function AppLayout(): React.JSX.Element {
             </Group>
           </Group>
         </AppShell.Header>
-        <AppShell.Navbar style={{ display: 'flex', flexDirection: 'column' }}>
+        <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
           <Box p="md" style={{ flexShrink: 0 }}>
             <AllPhotosRow />
           </Box>
@@ -316,17 +316,18 @@ function AppLayout(): React.JSX.Element {
         </AppShell.Navbar>
         <AppShell.Main>
           <Box
-            style={{
-              height: `calc(100dvh - ${HEADER_HEIGHT}px)`,
-              display: 'flex',
-              flexDirection: 'column'
-            }}
+            h={`calc(100dvh - ${HEADER_HEIGHT}px)`}
+            display="flex"
+            style={{ flexDirection: 'column' }}
           >
             {hasTabs ? (
               <Tabs
                 value={state.activeTab}
                 onChange={(value) => value && setActiveTab(value)}
-                style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+                display="flex"
+                flex={1}
+                mih={0}
+                style={{ flexDirection: 'column' }}
               >
                 <Tabs.List style={{ flexShrink: 0 }}>
                   <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto />}>

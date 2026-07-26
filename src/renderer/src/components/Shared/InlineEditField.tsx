@@ -41,19 +41,18 @@ export function InlineEditField({
           onDoubleClick={() => {
             if (!editing) onStartEdit()
           }}
-          style={{ width: '100%', minWidth: 0 }}
+          w="100%"
+          miw={0}
         >
           {children}
         </Box>
         {!editing && (
           <ActionIcon
-            style={{
-              position: 'absolute',
-              top: '50%',
-              right: 0,
-              transform: 'translateY(-50%)',
-              opacity: hovered ? 0.7 : 0
-            }}
+            pos="absolute"
+            top="50%"
+            right={0}
+            opacity={hovered ? 0.7 : 0}
+            style={{ transform: 'translateY(-50%)' }}
             onClick={onStartEdit}
           >
             <IconPencil />
@@ -69,17 +68,13 @@ export function InlineEditField({
         onDoubleClick={() => {
           if (!editing) onStartEdit()
         }}
-        style={{ flex: editing ? 1 : 'initial', minWidth: 0 }}
+        flex={editing ? 1 : 'initial'}
+        miw={0}
       >
         {children}
       </Box>
       {!editing && (
-        <ActionIcon
-          style={{
-            opacity: hovered ? 0.7 : 0
-          }}
-          onClick={onStartEdit}
-        >
+        <ActionIcon opacity={hovered ? 0.7 : 0} onClick={onStartEdit}>
           <IconPencil />
         </ActionIcon>
       )}

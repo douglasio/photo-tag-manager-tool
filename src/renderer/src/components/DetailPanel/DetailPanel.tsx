@@ -8,7 +8,6 @@ import {
   Flex,
   Stack,
   Text,
-  Title,
   Tooltip
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
@@ -21,6 +20,7 @@ import { TagList } from '../Tags/TagList'
 import { isNullOrEmpty } from '@renderer/utils/functions'
 import { IconCopy, IconExternalLink, IconPhoto } from '@tabler/icons-react'
 import { useHover } from '@mantine/hooks'
+import { SectionTitle } from '../Shared/SectionTitle'
 
 const metadataDisplayFilters = ['comment', 'dateTaken']
 
@@ -90,9 +90,7 @@ export function DetailPanel(): ReactElement {
           />
         </Box>
         <Stack>
-          <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
-            Comment
-          </Title>
+          <SectionTitle>Comment</SectionTitle>
           <CommentEditor
             value={metadata.comment.value}
             displayValue={metadata.comment.displayValue}
@@ -100,9 +98,7 @@ export function DetailPanel(): ReactElement {
           />
         </Stack>
         <Stack>
-          <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
-            Tags
-          </Title>
+          <SectionTitle>Tags</SectionTitle>
           <TagList
             tags={selectedPhoto.tags}
             allTags={allTags}
@@ -111,9 +107,7 @@ export function DetailPanel(): ReactElement {
           />
         </Stack>
         <Stack>
-          <Title order={6} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
-            Metadata
-          </Title>
+          <SectionTitle>Metadata</SectionTitle>
           <DataList orientation="vertical">
             <DataList.Item>
               <DataList.ItemLabel>{metadata.dateTaken.label}</DataList.ItemLabel>

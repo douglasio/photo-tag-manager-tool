@@ -40,9 +40,7 @@ export function TagDeleteButton({ tag, count, onDelete }: TagDeleteButtonProps):
           ref={ref}
           color="red"
           size="md"
-          style={{
-            opacity: hovered ? 0.7 : 0.25
-          }}
+          opacity={hovered ? 0.7 : 0.25}
           onClick={() => setConfirming(true)}
           aria-label="Delete tag"
         >

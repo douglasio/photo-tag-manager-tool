@@ -168,7 +168,8 @@ export function PhotoThumbnail({
                   // instead, so it no longer gets that sizing for free —
                   // without it, non-square photos shrink to their natural
                   // aspect ratio instead of filling the square frame.
-                  style={{ width: '100%', height: '100%' }}
+                  w="100%"
+                  h="100%"
                 />
               </motion.div>
             </AspectRatio>
