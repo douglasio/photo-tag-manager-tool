@@ -8,6 +8,7 @@ import {
   Group,
   Image,
   Loader,
+  Scroller,
   Stack,
   Tabs,
   Text,
@@ -51,6 +52,7 @@ import { FolderTree } from './components/Folders/FolderTree'
 import { PanelSection } from './components/Shared/PanelSection'
 import { PhotoView } from './components/PhotoView/PhotoView'
 import { SortableTab } from './components/Shared/SortableTab'
+import { CompareTabLabel, TabLabel } from './components/Shared/TabLabel'
 import { TagPanel } from './components/Tags/TagPanel'
 import { toThumbProtocolUrl } from '../../shared/protocolUrls'
 import type { PhotoRecord } from '../../shared/types'
@@ -334,49 +336,56 @@ function AppLayout(): React.JSX.Element {
                 mih={0}
                 style={{ flexDirection: 'column' }}
               >
-                <Tabs.List style={{ flexShrink: 0 }}>
-                  <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto />}>
-                    Gallery
-                  </Tabs.Tab>
-                  <DndContext
-                    sensors={tabSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleTabDragEnd}
-                  >
-                    <SortableContext
-                      items={state.openTabs}
-                      strategy={horizontalListSortingStrategy}
+                <Tabs.List style={{ flexShrink: 0, flexWrap: 'nowrap' }}>
+                  <Scroller>
+                    <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto />}>
+                      Gallery
+                    </Tabs.Tab>
+                    <DndContext
+                      sensors={tabSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleTabDragEnd}
                     >
-                      {openTabEntries.map((entry) => (
-                        <SortableTab
-                          key={entry.id}
-                          id={entry.id}
-                          value={entry.id}
-                          leftSection={
-                            entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
-                          }
-                          rightSection={
-                            <ActionIcon
-                              component="span"
-                              size="xs"
-                              variant="subtle"
-                              color="gray"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                closePhotoTab(entry.id)
-                              }}
-                            >
-                              <IconX size={12} />
-                            </ActionIcon>
-                          }
-                        >
-                          {entry.kind === 'compare'
-                            ? `${entry.photoA.fileName} vs ${entry.photoB.fileName}`
-                            : entry.photo.fileName}
-                        </SortableTab>
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                      <SortableContext
+                        items={state.openTabs}
+                        strategy={horizontalListSortingStrategy}
+                      >
+                        {openTabEntries.map((entry) => (
+                          <SortableTab
+                            key={entry.id}
+                            id={entry.id}
+                            value={entry.id}
+                            leftSection={
+                              entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
+                            }
+                            rightSection={
+                              <ActionIcon
+                                component="span"
+                                size="xs"
+                                variant="subtle"
+                                color="gray"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  closePhotoTab(entry.id)
+                                }}
+                              >
+                                <IconX size={12} />
+                              </ActionIcon>
+                            }
+                          >
+                            {entry.kind === 'compare' ? (
+                              <CompareTabLabel
+                                fileNameA={entry.photoA.fileName}
+                                fileNameB={entry.photoB.fileName}
+                              />
+                            ) : (
+                              <TabLabel fileName={entry.photo.fileName} />
+                            )}
+                          </SortableTab>
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                  </Scroller>
                 </Tabs.List>
                 <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
                   <GalleryGrid />
