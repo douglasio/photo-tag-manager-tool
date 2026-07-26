@@ -228,6 +228,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       for (const folder of folders) {
         await startScanFor(folder)
       }
+      dispatch({ type: 'INITIAL_LOAD_COMPLETE' })
     })
   }, [startScanFor])
 

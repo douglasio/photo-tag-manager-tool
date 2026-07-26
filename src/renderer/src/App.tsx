@@ -7,7 +7,10 @@ import {
   Divider,
   Group,
   Image,
+  Loader,
+  Stack,
   Tabs,
+  Text,
   Title,
   Tooltip
 } from '@mantine/core'
@@ -413,10 +416,36 @@ function AppLayout(): React.JSX.Element {
   )
 }
 
+// Shown until every watched folder's initial scan resolves, instead of the
+// gallery appearing empty and filling in photo-by-photo as the sync job runs.
+function StartupLoadingScreen(): React.JSX.Element {
+  return (
+    <Center h="100vh">
+      <Stack align="center" gap="md">
+        <AppLogo />
+        <Group gap="xs">
+          <Loader size="sm" />
+          <Text c="dimmed">Loading your library…</Text>
+        </Group>
+      </Stack>
+    </Center>
+  )
+}
+
+// Reads context to decide between the two screens above — kept separate from
+// AppLayout so that component's hooks (keyboard shortcuts, drag sensors,
+// etc.) are never conditionally skipped, which switching on a value inside
+// AppLayout itself would do once initialLoadComplete flips partway through
+// its lifetime.
+function AppGate(): React.JSX.Element {
+  const { state } = usePhotoLibrary()
+  return state.initialLoadComplete ? <AppLayout /> : <StartupLoadingScreen />
+}
+
 function App(): React.JSX.Element {
   return (
     <PhotoLibraryProvider>
-      <AppLayout />
+      <AppGate />
     </PhotoLibraryProvider>
   )
 }

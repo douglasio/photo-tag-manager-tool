@@ -104,6 +104,12 @@ describe('photoLibraryReducer', () => {
       expect(state.status).toBe('canceled')
     })
 
+    it('flips initialLoadComplete to true and stays there', () => {
+      expect(initialState.initialLoadComplete).toBe(false)
+      const state = photoLibraryReducer(initialState, { type: 'INITIAL_LOAD_COMPLETE' })
+      expect(state.initialLoadComplete).toBe(true)
+    })
+
     it('returns the same state reference for a no-op progress update', () => {
       const state = { ...initialState, filesFound: 5 }
       const next = photoLibraryReducer(state, { type: 'SCAN_PROGRESS', filesFound: 5 })
