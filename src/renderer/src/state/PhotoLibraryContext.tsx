@@ -86,6 +86,8 @@ interface PhotoLibraryContextValue {
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
   setShowFilenames: (value: boolean) => void
+  setMagazineTitle: (value: string) => void
+  setNewspaperTitle: (value: string) => void
   setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
@@ -274,6 +276,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getShowFilenames().then((value) => {
       dispatch({ type: 'SET_SHOW_FILENAMES', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getMagazineTitle().then((value) => {
+      dispatch({ type: 'SET_MAGAZINE_TITLE', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getNewspaperTitle().then((value) => {
+      dispatch({ type: 'SET_NEWSPAPER_TITLE', value })
     })
   }, [])
 
@@ -720,6 +734,16 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setShowFilenames(value)
   }, [])
 
+  const setMagazineTitle = useCallback((value: string) => {
+    dispatch({ type: 'SET_MAGAZINE_TITLE', value })
+    void window.api.setMagazineTitle(value)
+  }, [])
+
+  const setNewspaperTitle = useCallback((value: string) => {
+    dispatch({ type: 'SET_NEWSPAPER_TITLE', value })
+    void window.api.setNewspaperTitle(value)
+  }, [])
+
   // Persists the patterns, then rescans every folder so the library itself
   // (not just future filesystem events) reflects the change — files/folders
   // newly matched get pruned out, anything un-excluded gets picked back up.
@@ -880,6 +904,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,
     setShowFilenames,
+    setMagazineTitle,
+    setNewspaperTitle,
     setExcludePatterns,
     updateTags,
     setTagDescription,

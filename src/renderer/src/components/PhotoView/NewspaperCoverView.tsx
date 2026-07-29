@@ -10,6 +10,8 @@ interface NewspaperCoverViewProps {
   // Owned by PhotoView so it can render the matching ZoomToolbar in its own
   // footer bar instead of a separate floating one here.
   zoom: UsePannableZoomResult
+  // Global masthead text, editable in Settings.
+  mastheadTitle: string
 }
 
 // Playfair Display (self-hosted via @fontsource/playfair-display, imported
@@ -28,7 +30,11 @@ const COVER_ASPECT_RATIO = '5 / 7'
 // dateline, photo "box," and a headline/caption below it (rather than
 // overlaid on the image, like a real front-page cutline) — reusing
 // PannableZoomableImage for the drag-to-pan + wheel-to-zoom photo.
-export function NewspaperCoverView({ photo, zoom }: NewspaperCoverViewProps): ReactElement {
+export function NewspaperCoverView({
+  photo,
+  zoom,
+  mastheadTitle
+}: NewspaperCoverViewProps): ReactElement {
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken ? formatDateTaken(photo.metadata.dateTaken) : null
 
@@ -76,7 +82,7 @@ export function NewspaperCoverView({ photo, zoom }: NewspaperCoverViewProps): Re
               lineHeight: 1.05
             }}
           >
-            The Tag Me Times
+            {mastheadTitle}
           </Text>
           <Box
             display="flex"

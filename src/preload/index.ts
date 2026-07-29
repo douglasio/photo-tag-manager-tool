@@ -61,6 +61,12 @@ const api = {
   getShowFilenames: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowFilenames'),
   setShowFilenames: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowFilenames', value),
+  getMagazineTitle: (): Promise<string> => ipcRenderer.invoke('settings:getMagazineTitle'),
+  setMagazineTitle: (value: string): Promise<void> =>
+    ipcRenderer.invoke('settings:setMagazineTitle', value),
+  getNewspaperTitle: (): Promise<string> => ipcRenderer.invoke('settings:getNewspaperTitle'),
+  setNewspaperTitle: (value: string): Promise<void> =>
+    ipcRenderer.invoke('settings:setNewspaperTitle', value),
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),

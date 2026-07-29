@@ -17,7 +17,11 @@ import {
   getShowFilenames,
   setShowFilenames,
   getExcludePatterns,
-  setExcludePatterns
+  setExcludePatterns,
+  getMagazineTitle,
+  setMagazineTitle,
+  getNewspaperTitle,
+  setNewspaperTitle
 } from '../db/settingsRepository'
 import type { GallerySort } from '../../shared/types'
 import { pruneMissing, renamePhotoPathPrefix } from '../db/photoRepository'
@@ -73,6 +77,18 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setShowFilenames', (_event, value: boolean): void => {
     setShowFilenames(value)
+  })
+
+  ipcMain.handle('settings:getMagazineTitle', (): string => getMagazineTitle())
+
+  ipcMain.handle('settings:setMagazineTitle', (_event, value: string): void => {
+    setMagazineTitle(value)
+  })
+
+  ipcMain.handle('settings:getNewspaperTitle', (): string => getNewspaperTitle())
+
+  ipcMain.handle('settings:setNewspaperTitle', (_event, value: string): void => {
+    setNewspaperTitle(value)
   })
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())

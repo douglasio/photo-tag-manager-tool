@@ -9,11 +9,12 @@ import {
   Table,
   TagsInput,
   Text,
+  TextInput,
   Title,
   Tooltip
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
 import { FolderRemoveButton } from '../Folders/FolderRemoveButton'
 import { SectionTitle } from '../Shared/SectionTitle'
@@ -93,6 +94,53 @@ function ExcludePatternsSection(): ReactElement {
   )
 }
 
+function VisualizationsSection(): ReactElement {
+  const { state, setMagazineTitle, setNewspaperTitle } = usePhotoLibrary()
+  const [magazineDraft, setMagazineDraft] = useState(state.magazineTitle)
+  const [newspaperDraft, setNewspaperDraft] = useState(state.newspaperTitle)
+
+  // Resync the drafts if the persisted values change from outside this
+  // component (e.g. hydration finishing after mount) — adjusted during
+  // render per this codebase's convention, rather than a useEffect.
+  const [syncedMagazine, setSyncedMagazine] = useState(state.magazineTitle)
+  if (syncedMagazine !== state.magazineTitle) {
+    setSyncedMagazine(state.magazineTitle)
+    setMagazineDraft(state.magazineTitle)
+  }
+  const [syncedNewspaper, setSyncedNewspaper] = useState(state.newspaperTitle)
+  if (syncedNewspaper !== state.newspaperTitle) {
+    setSyncedNewspaper(state.newspaperTitle)
+    setNewspaperDraft(state.newspaperTitle)
+  }
+
+  return (
+    <Stack gap="xs">
+      <SectionTitle>Visualizations</SectionTitle>
+      <Text c="dimmed" size="sm">
+        Masthead text shown on the Photo view&apos;s magazine and newspaper cover visualizations.
+      </Text>
+      <TextInput
+        label="Magazine title"
+        value={magazineDraft}
+        onChange={(event) => setMagazineDraft(event.currentTarget.value)}
+        onBlur={() => setMagazineTitle(magazineDraft.trim())}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur()
+        }}
+      />
+      <TextInput
+        label="Newspaper title"
+        value={newspaperDraft}
+        onChange={(event) => setNewspaperDraft(event.currentTarget.value)}
+        onBlur={() => setNewspaperTitle(newspaperDraft.trim())}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur()
+        }}
+      />
+    </Stack>
+  )
+}
+
 export function SettingsModal(): ReactElement {
   const { state } = usePhotoLibrary()
   const [opened, { open, close }] = useDisclosure(false)
@@ -119,6 +167,8 @@ export function SettingsModal(): ReactElement {
           <FoldersSection />
           <Divider />
           <GallerySection />
+          <Divider />
+          <VisualizationsSection />
           <Divider />
           <ExcludePatternsSection />
         </Stack>

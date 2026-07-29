@@ -225,9 +225,17 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
       {visualization !== 'none' ? (
         <>
           {visualization === 'magazine' ? (
-            <MagazineCoverView photo={photo} zoom={magazineZoom} />
+            <MagazineCoverView
+              photo={photo}
+              zoom={magazineZoom}
+              mastheadTitle={state.magazineTitle}
+            />
           ) : (
-            <NewspaperCoverView photo={photo} zoom={newspaperZoom} />
+            <NewspaperCoverView
+              photo={photo}
+              zoom={newspaperZoom}
+              mastheadTitle={state.newspaperTitle}
+            />
           )}
           {/* AppShell's Header/Navbar/Aside are all position:fixed with
               their own z-index tier, which can sit above ordinary absolutely

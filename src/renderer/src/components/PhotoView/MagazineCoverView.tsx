@@ -10,6 +10,8 @@ interface MagazineCoverViewProps {
   // Owned by PhotoView so it can render the matching ZoomToolbar in its own
   // footer bar instead of a separate floating one here.
   zoom: UsePannableZoomResult
+  // Global masthead text, editable in Settings.
+  mastheadTitle: string
 }
 
 // Bebas Neue (self-hosted via @fontsource/bebas-neue, imported once in
@@ -46,7 +48,11 @@ function CoverBarcode(): ReactElement {
 // cover's furniture — reusing PannableZoomableImage for the drag-to-pan +
 // wheel-to-zoom background, scoped to the frame rather than the whole
 // PhotoView area.
-export function MagazineCoverView({ photo, zoom }: MagazineCoverViewProps): ReactElement {
+export function MagazineCoverView({
+  photo,
+  zoom,
+  mastheadTitle
+}: MagazineCoverViewProps): ReactElement {
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken ? formatDateTaken(photo.metadata.dateTaken) : null
 
@@ -103,7 +109,7 @@ export function MagazineCoverView({ photo, zoom }: MagazineCoverViewProps): Reac
                     textShadow: TEXT_SHADOW
                   }}
                 >
-                  TAG ME
+                  {mastheadTitle}
                 </Text>
                 {dateDisplay && (
                   <Text

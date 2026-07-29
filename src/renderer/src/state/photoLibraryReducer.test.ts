@@ -225,6 +225,22 @@ describe('photoLibraryReducer', () => {
       })
       expect(state.excludePatterns).toEqual(['.trash'])
     })
+
+    it('sets the magazine masthead title', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_MAGAZINE_TITLE',
+        value: 'Custom Mag'
+      })
+      expect(state.magazineTitle).toBe('Custom Mag')
+    })
+
+    it('sets the newspaper masthead title', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_NEWSPAPER_TITLE',
+        value: 'Custom Paper'
+      })
+      expect(state.newspaperTitle).toBe('Custom Paper')
+    })
   })
 
   describe('recent tags', () => {
