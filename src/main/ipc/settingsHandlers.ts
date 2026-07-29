@@ -21,7 +21,9 @@ import {
   getMagazineTitle,
   setMagazineTitle,
   getNewspaperTitle,
-  setNewspaperTitle
+  setNewspaperTitle,
+  getDvdStudioName,
+  setDvdStudioName
 } from '../db/settingsRepository'
 import type { GallerySort } from '../../shared/types'
 import { pruneMissing, renamePhotoPathPrefix } from '../db/photoRepository'
@@ -89,6 +91,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setNewspaperTitle', (_event, value: string): void => {
     setNewspaperTitle(value)
+  })
+
+  ipcMain.handle('settings:getDvdStudioName', (): string => getDvdStudioName())
+
+  ipcMain.handle('settings:setDvdStudioName', (_event, value: string): void => {
+    setDvdStudioName(value)
   })
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())

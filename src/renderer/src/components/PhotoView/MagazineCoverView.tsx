@@ -4,6 +4,7 @@ import type { PhotoRecord } from '../../../../shared/types'
 import { formatDateTaken } from '../../utils/metadataDisplay'
 import type { UsePannableZoomResult } from '../../hooks/usePannableZoom'
 import { PannableZoomableImage } from '../Shared/PannableZoomableImage'
+import { CoverBarcode } from '../Shared/CoverBarcode'
 
 interface MagazineCoverViewProps {
   photo: PhotoRecord
@@ -28,26 +29,6 @@ const COVER_ASPECT_RATIO = '3 / 4'
 // Punchier, more saturated/contrasty than the source photo — real cover
 // photography is always retouched for pop, not shown flat.
 const COVER_IMAGE_FILTER = 'saturate(1.35) contrast(1.12) brightness(1.03)'
-
-// A repeating-gradient barcode — the corner decoration nearly every real
-// magazine cover carries — purely decorative, no real data encoded.
-function CoverBarcode(): ReactElement {
-  return (
-    <Box bg="white" p={4} style={{ display: 'inline-block' }}>
-      <Box
-        w={44}
-        h={26}
-        style={{
-          background:
-            'repeating-linear-gradient(90deg, #000 0, #000 2px, #fff 2px, #fff 3px, #000 3px, #000 4px, #fff 4px, #fff 6px)'
-        }}
-      />
-      <Text c="black" fz={8} ta="center" style={{ fontFamily: DISPLAY_FONT, letterSpacing: 1 }}>
-        01
-      </Text>
-    </Box>
-  )
-}
 
 // The circular "burst" sticker real covers (SI's swimsuit issue, People's
 // "special") pin to a top corner — tilted, bold, high-contrast.

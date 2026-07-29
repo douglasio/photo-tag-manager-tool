@@ -241,6 +241,14 @@ describe('photoLibraryReducer', () => {
       })
       expect(state.newspaperTitle).toBe('Custom Paper')
     })
+
+    it('sets the DVD studio name', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_DVD_STUDIO_NAME',
+        value: 'Custom Studio'
+      })
+      expect(state.dvdStudioName).toBe('Custom Studio')
+    })
   })
 
   describe('recent tags', () => {

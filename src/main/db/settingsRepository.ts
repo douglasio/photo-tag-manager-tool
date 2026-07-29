@@ -118,6 +118,7 @@ export function setExcludePatterns(patterns: string[]): void {
 
 const DEFAULT_MAGAZINE_TITLE = 'TAG ME'
 const DEFAULT_NEWSPAPER_TITLE = 'The Tag Me Times'
+const DEFAULT_DVD_STUDIO_NAME = 'TAG ME PICTURES'
 
 export function getMagazineTitle(): string {
   return getSetting('magazineTitle') ?? DEFAULT_MAGAZINE_TITLE
@@ -133,4 +134,12 @@ export function getNewspaperTitle(): string {
 
 export function setNewspaperTitle(value: string): void {
   setSetting('newspaperTitle', value)
+}
+
+export function getDvdStudioName(): string {
+  return getSetting('dvdStudioName') ?? DEFAULT_DVD_STUDIO_NAME
+}
+
+export function setDvdStudioName(value: string): void {
+  setSetting('dvdStudioName', value)
 }

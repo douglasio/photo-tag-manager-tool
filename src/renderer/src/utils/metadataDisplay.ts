@@ -61,8 +61,8 @@ export function toDisplayMetadata(metadata: PhotoMetadata): DisplayMetadata {
     dateTaken: field('Date Taken', metadata.dateTaken, formatDateTaken),
     cameraMake: field('Camera Make', metadata.cameraMake, (v) => v ?? NONE_DISPLAY),
     cameraModel: field('Camera Model', metadata.cameraModel, (v) => v ?? NONE_DISPLAY),
-    widthPx: field('Width (px)', metadata.widthPx, formatPixels),
-    heightPx: field('Height (px)', metadata.heightPx, formatPixels),
+    widthPx: field('Width', metadata.widthPx, formatPixels),
+    heightPx: field('Height', metadata.heightPx, formatPixels),
     fileSizeBytes: field('File Size', metadata.fileSizeBytes, formatBytes),
     format: field('Format', metadata.format, (v) => v),
     comment: field('Comment', metadata.comment, (v) => v ?? NONE_DISPLAY)

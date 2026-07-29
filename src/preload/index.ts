@@ -67,6 +67,9 @@ const api = {
   getNewspaperTitle: (): Promise<string> => ipcRenderer.invoke('settings:getNewspaperTitle'),
   setNewspaperTitle: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setNewspaperTitle', value),
+  getDvdStudioName: (): Promise<string> => ipcRenderer.invoke('settings:getDvdStudioName'),
+  setDvdStudioName: (value: string): Promise<void> =>
+    ipcRenderer.invoke('settings:setDvdStudioName', value),
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),

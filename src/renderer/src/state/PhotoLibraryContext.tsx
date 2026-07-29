@@ -42,7 +42,7 @@ export type NavigationDirection = 'left' | 'right'
 // PhotoView's visualization mode ('none' = standard view). Lives here (not
 // just as PhotoView-local state) so it can be threaded across arrow-key
 // navigation below, which remounts a fresh PhotoView per photo.
-export type PhotoVisualization = 'none' | 'magazine' | 'newspaper'
+export type PhotoVisualization = 'none' | 'magazine' | 'newspaper' | 'dvd'
 
 // One entry per open tab in display order — either a single photo or a
 // compare set (2-4 photos), resolved from state.openTabs/compareTabs against
@@ -88,6 +88,7 @@ interface PhotoLibraryContextValue {
   setShowFilenames: (value: boolean) => void
   setMagazineTitle: (value: string) => void
   setNewspaperTitle: (value: string) => void
+  setDvdStudioName: (value: string) => void
   setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
@@ -288,6 +289,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getNewspaperTitle().then((value) => {
       dispatch({ type: 'SET_NEWSPAPER_TITLE', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getDvdStudioName().then((value) => {
+      dispatch({ type: 'SET_DVD_STUDIO_NAME', value })
     })
   }, [])
 
@@ -744,6 +751,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setNewspaperTitle(value)
   }, [])
 
+  const setDvdStudioName = useCallback((value: string) => {
+    dispatch({ type: 'SET_DVD_STUDIO_NAME', value })
+    void window.api.setDvdStudioName(value)
+  }, [])
+
   // Persists the patterns, then rescans every folder so the library itself
   // (not just future filesystem events) reflects the change — files/folders
   // newly matched get pruned out, anything un-excluded gets picked back up.
@@ -906,6 +918,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setShowFilenames,
     setMagazineTitle,
     setNewspaperTitle,
+    setDvdStudioName,
     setExcludePatterns,
     updateTags,
     setTagDescription,

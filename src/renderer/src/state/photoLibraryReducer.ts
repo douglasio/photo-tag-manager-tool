@@ -51,10 +51,11 @@ export interface PhotoLibraryState {
   detailsPanelCollapsed: boolean
   galleryAnimationsEnabled: boolean
   showFilenames: boolean
-  // Global masthead text for PhotoView's magazine/newspaper visualizations,
-  // editable from Settings.
+  // Global masthead/studio text for PhotoView's magazine/newspaper/DVD
+  // visualizations, editable from Settings.
   magazineTitle: string
   newspaperTitle: string
+  dvdStudioName: string
   excludePatterns: string[]
   tagDescriptions: Map<string, string>
   // Newest-first shortcut list for the tag-input dropdown. Session-only.
@@ -93,6 +94,7 @@ export const initialState: PhotoLibraryState = {
   showFilenames: true,
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
+  dvdStudioName: 'TAG ME PICTURES',
   excludePatterns: [],
   tagDescriptions: new Map(),
   recentTags: [],
@@ -125,6 +127,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_SHOW_FILENAMES'; value: boolean }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
+  | { type: 'SET_DVD_STUDIO_NAME'; value: string }
   | { type: 'TAGS_ASSIGNED'; tags: string[] }
   | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
   | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
@@ -399,6 +402,8 @@ export function photoLibraryReducer(
       return { ...state, magazineTitle: action.value }
     case 'SET_NEWSPAPER_TITLE':
       return { ...state, newspaperTitle: action.value }
+    case 'SET_DVD_STUDIO_NAME':
+      return { ...state, dvdStudioName: action.value }
     // Newest-first, deduped, capped — an already-listed tag moves to the
     // front instead of duplicating.
     case 'TAGS_ASSIGNED': {

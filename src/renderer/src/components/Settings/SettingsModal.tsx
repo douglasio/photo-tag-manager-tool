@@ -95,9 +95,10 @@ function ExcludePatternsSection(): ReactElement {
 }
 
 function VisualizationsSection(): ReactElement {
-  const { state, setMagazineTitle, setNewspaperTitle } = usePhotoLibrary()
+  const { state, setMagazineTitle, setNewspaperTitle, setDvdStudioName } = usePhotoLibrary()
   const [magazineDraft, setMagazineDraft] = useState(state.magazineTitle)
   const [newspaperDraft, setNewspaperDraft] = useState(state.newspaperTitle)
+  const [dvdDraft, setDvdDraft] = useState(state.dvdStudioName)
 
   // Resync the drafts if the persisted values change from outside this
   // component (e.g. hydration finishing after mount) — adjusted during
@@ -112,12 +113,18 @@ function VisualizationsSection(): ReactElement {
     setSyncedNewspaper(state.newspaperTitle)
     setNewspaperDraft(state.newspaperTitle)
   }
+  const [syncedDvd, setSyncedDvd] = useState(state.dvdStudioName)
+  if (syncedDvd !== state.dvdStudioName) {
+    setSyncedDvd(state.dvdStudioName)
+    setDvdDraft(state.dvdStudioName)
+  }
 
   return (
     <Stack gap="xs">
       <SectionTitle>Visualizations</SectionTitle>
       <Text c="dimmed" size="sm">
-        Masthead text shown on the Photo view&apos;s magazine and newspaper cover visualizations.
+        Masthead/studio text shown on the Photo view&apos;s magazine, newspaper, and DVD cover
+        visualizations.
       </Text>
       <TextInput
         label="Magazine title"
@@ -133,6 +140,15 @@ function VisualizationsSection(): ReactElement {
         value={newspaperDraft}
         onChange={(event) => setNewspaperDraft(event.currentTarget.value)}
         onBlur={() => setNewspaperTitle(newspaperDraft.trim())}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur()
+        }}
+      />
+      <TextInput
+        label="DVD production studio"
+        value={dvdDraft}
+        onChange={(event) => setDvdDraft(event.currentTarget.value)}
+        onBlur={() => setDvdStudioName(dvdDraft.trim())}
         onKeyDown={(event) => {
           if (event.key === 'Enter') event.currentTarget.blur()
         }}

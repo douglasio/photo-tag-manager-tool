@@ -3,8 +3,8 @@ import { useReducedMotion } from '@mantine/hooks'
 import { motion } from 'motion/react'
 import {
   IconArticle,
+  IconMovie,
   IconNews,
-  IconPhotoStar,
   IconRotate,
   IconRotateClockwise,
   IconX
@@ -19,6 +19,7 @@ import { usePannableZoom } from '../../hooks/usePannableZoom'
 import { ZoomToolbar } from '../Shared/ZoomToolbar'
 import { MagazineCoverView } from './MagazineCoverView'
 import { NewspaperCoverView } from './NewspaperCoverView'
+import { DvdCoverView } from './DvdCoverView'
 
 // 0.5 (not 1) so zooming out can go beyond the fitted size, matching
 // usePannableZoom's range — 1 used to double as both "fitted" and "as far
@@ -63,6 +64,7 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   // ZoomToolbar from them directly, rather than each owning a disconnected copy.
   const magazineZoom = usePannableZoom(photo, { defaultFit: 'cover' })
   const newspaperZoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  const dvdZoom = usePannableZoom(photo, { defaultFit: 'cover' })
   // Read once at mount via lazy initializer — this instance is fresh per photo.
   const [enterDirection] = useState(() => consumeNavDirection(photo.filePath))
   const containerRef = useRef<HTMLDivElement>(null)
@@ -230,12 +232,14 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
               zoom={magazineZoom}
               mastheadTitle={state.magazineTitle}
             />
-          ) : (
+          ) : visualization === 'newspaper' ? (
             <NewspaperCoverView
               photo={photo}
               zoom={newspaperZoom}
               mastheadTitle={state.newspaperTitle}
             />
+          ) : (
+            <DvdCoverView photo={photo} zoom={dvdZoom} studioName={state.dvdStudioName} />
           )}
           {/* AppShell's Header/Navbar/Aside are all position:fixed with
               their own z-index tier, which can sit above ordinary absolutely
@@ -395,9 +399,13 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
               <IconArticle size={18} />
             </ActionIcon>
           </Tooltip>
-          <Tooltip label="Coming soon">
-            <ActionIcon variant="default" disabled aria-label="More visualizations coming soon">
-              <IconPhotoStar size={18} />
+          <Tooltip label="DVD cover">
+            <ActionIcon
+              variant={visualization === 'dvd' ? 'filled' : 'default'}
+              aria-label="DVD cover visualization"
+              onClick={() => setVisualization('dvd')}
+            >
+              <IconMovie size={18} />
             </ActionIcon>
           </Tooltip>
         </Group>
@@ -422,6 +430,17 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
             onZoomIn={newspaperZoom.zoomIn}
             min={newspaperZoom.min}
             max={newspaperZoom.max}
+          />
+        ) : visualization === 'dvd' ? (
+          <ZoomToolbar
+            scale={dvdZoom.scale}
+            onScaleChange={dvdZoom.setScale}
+            onZoomToFit={dvdZoom.zoomToFit}
+            onZoomToNativeSize={dvdZoom.zoomToNativeSize}
+            onZoomOut={dvdZoom.zoomOut}
+            onZoomIn={dvdZoom.zoomIn}
+            min={dvdZoom.min}
+            max={dvdZoom.max}
           />
         ) : (
           <ZoomToolbar
