@@ -36,7 +36,9 @@ export function NewspaperCoverView({
   mastheadTitle
 }: NewspaperCoverViewProps): ReactElement {
   const title = photo.fileName.replace(/\.[^./]+$/, '')
-  const dateDisplay = photo.metadata.dateTaken ? formatDateTaken(photo.metadata.dateTaken) : null
+  const dateDisplay = photo.metadata.dateTaken
+    ? formatDateTaken(photo.metadata.dateTaken, 'dateOnly')
+    : null
 
   return (
     <Box

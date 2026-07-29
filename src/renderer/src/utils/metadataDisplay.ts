@@ -37,10 +37,21 @@ function formatPixels(value: number | null): string {
 // view modes never drift apart.
 export const DATE_TAKEN_FORMAT = 'MMM D, YYYY h:mm A'
 
-export function formatDateTaken(value: string | null): string {
+type DateTakenStyle = 'full' | 'dateOnly' | 'monthYear'
+
+// dayjs format string per style — 'full' matches DATE_TAKEN_FORMAT above;
+// 'dateOnly' drops the time-of-day (used by the newspaper cover's dateline);
+// 'monthYear' reads like a real magazine issue date ("MARCH 2026").
+const DATE_TAKEN_STYLE_FORMATS: Record<DateTakenStyle, string> = {
+  full: DATE_TAKEN_FORMAT,
+  dateOnly: 'MMM D, YYYY',
+  monthYear: 'MMMM YYYY'
+}
+
+export function formatDateTaken(value: string | null, style: DateTakenStyle = 'full'): string {
   if (!value) return NONE_DISPLAY
   const parsed = dayjs(value)
-  return parsed.isValid() ? parsed.format(DATE_TAKEN_FORMAT) : NONE_DISPLAY
+  return parsed.isValid() ? parsed.format(DATE_TAKEN_STYLE_FORMATS[style]) : NONE_DISPLAY
 }
 
 // Per-field label + display formatting, kept here so DetailPanel (and any
