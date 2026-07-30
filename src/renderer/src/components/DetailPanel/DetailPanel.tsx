@@ -11,11 +11,11 @@ import {
   Tooltip
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { CommentEditor } from './CommentEditor'
-import { DateTakenEditor } from './DateTakenEditor'
-import { FileNameEditor } from './FileNameEditor'
+import { CommentField } from '../EditableFields/CommentField'
+import { DateTakenField } from '../EditableFields/DateTakenField'
+import { FileNameField } from '../EditableFields/FileNameField'
 import { TagList } from '../Tags/TagList'
 import { isNullOrEmpty } from '@renderer/utils/functions'
 import { IconCopy, IconExternalLink, IconPhoto } from '@tabler/icons-react'
@@ -36,6 +36,7 @@ export function DetailPanel(): ReactElement {
     state
   } = usePhotoLibrary()
   const { hovered, ref } = useHover<HTMLDivElement>()
+  const [editingFileName, setEditingFileName] = useState(false)
 
   // Showing one photo's metadata/tags while a multi-selection is active
   // would misleadingly suggest edits apply to just that one photo (batch
@@ -84,14 +85,18 @@ export function DetailPanel(): ReactElement {
           </Tooltip>
         )}
         <Box flex={1} miw={0}>
-          <FileNameEditor
+          <FileNameField
             fileName={selectedPhoto.fileName}
+            editing={editingFileName}
+            onStartEdit={() => setEditingFileName(true)}
+            onStopEdit={() => setEditingFileName(false)}
             onRename={(newBaseName) => renameFile(selectedPhoto.filePath, newBaseName)}
+            variant="panel"
           />
         </Box>
         <Stack>
           <SectionTitle>Comment</SectionTitle>
-          <CommentEditor
+          <CommentField
             value={metadata.comment.value}
             displayValue={metadata.comment.displayValue}
             onSave={(comment) => updateComment(selectedPhoto.filePath, comment)}
@@ -112,7 +117,7 @@ export function DetailPanel(): ReactElement {
             <DataList.Item>
               <DataList.ItemLabel>{metadata.dateTaken.label}</DataList.ItemLabel>
               <DataList.ItemValue>
-                <DateTakenEditor
+                <DateTakenField
                   value={metadata.dateTaken.value}
                   displayValue={metadata.dateTaken.displayValue}
                   onSave={(isoDate) => updateDateTaken(selectedPhoto.filePath, isoDate)}

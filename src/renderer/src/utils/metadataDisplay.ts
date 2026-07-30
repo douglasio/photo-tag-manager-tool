@@ -33,7 +33,7 @@ function formatPixels(value: number | null): string {
   return value !== null ? `${value.toLocaleString()} px` : NONE_DISPLAY
 }
 
-// Shared with DateTakenEditor's DateTimePicker (valueFormat) so the edit and
+// Shared with DateTakenField's DateTimePicker (valueFormat) so the edit and
 // view modes never drift apart.
 export const DATE_TAKEN_FORMAT = 'MMM D, YYYY h:mm A'
 

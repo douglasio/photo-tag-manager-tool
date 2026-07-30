@@ -14,7 +14,7 @@ import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
 import type { ComponentPropsWithoutRef, MouseEvent, ReactElement } from 'react'
 import type { PhotoRecord } from '../../../../shared/types'
 import { toThumbProtocolUrl } from '../../../../shared/protocolUrls'
-import { GalleryFileName } from './GalleryFileName'
+import { FileNameField } from '../EditableFields/FileNameField'
 import { GalleryHoverPreview } from './GalleryHoverPreview'
 import { PREVIEW_TRIGGER_KEY_LABEL } from '../../utils/previewTrigger'
 import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
@@ -41,7 +41,7 @@ interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onS
   showFilename: boolean
 }
 
-// Not a single root button — GalleryFileName's own edit button can't nest
+// Not a single root button — FileNameField's own edit button can't nest
 // inside another button, so the image gets its own inner button while the
 // filename stays a sibling. `...rest` carries PhotoContextMenu's injected
 // handlers onto the outer container so right-click works anywhere on the cell.
@@ -139,12 +139,13 @@ export function PhotoThumbnail({
         />
         {(showFilename || renaming) && (
           <Box w="100%">
-            <GalleryFileName
+            <FileNameField
               fileName={photo.fileName}
               editing={renaming}
               onStartEdit={onStartRename}
               onStopEdit={onStopRename}
               onRename={onRename}
+              variant="grid"
             />
           </Box>
         )}

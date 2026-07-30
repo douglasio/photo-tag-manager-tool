@@ -88,7 +88,7 @@ function TreeRow({
   const [draft, setDraft] = useState(base)
   // Adjust-during-render reset (not a useEffect) for when editing is
   // triggered externally by the pencil icon rather than by this row itself —
-  // same pattern used by GalleryFileName for the gallery's rename flow.
+  // same pattern used by FileNameField for the gallery's rename flow.
   const [wasEditing, setWasEditing] = useState(editing)
   if (editing !== wasEditing) {
     setWasEditing(editing)

@@ -26,8 +26,8 @@ import { useGalleryGridLayout } from '../../hooks/useGalleryGridLayout'
 import { useGalleryPreviewZoom } from '../../hooks/useGalleryPreviewZoom'
 import { GalleryPhotoCell, type GalleryCellProps } from './GalleryPhotoCell'
 import { TagDeleteButton } from '../Tags/TagDeleteButton'
-import { TagDescriptionEditor } from '../Tags/TagDescriptionEditor'
-import { TagNameEditor } from '../Tags/TagNameEditor'
+import { TagDescriptionField } from '../EditableFields/TagDescriptionField'
+import { TagNameField } from '../EditableFields/TagNameField'
 import { basename } from '../../utils/folderTree'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
@@ -146,7 +146,7 @@ export function GalleryGrid(): ReactElement {
             {isPureTagView ? (
               <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
                 <Box flex={1} miw={0}>
-                  <TagNameEditor
+                  <TagNameField
                     tag={state.selectedTag!}
                     count={tagCounts.get(state.selectedTag!) ?? 0}
                     onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
@@ -217,7 +217,7 @@ export function GalleryGrid(): ReactElement {
             </Group>
           </Group>
           {isPureTagView && (
-            <TagDescriptionEditor
+            <TagDescriptionField
               description={tagDescription}
               onSave={(description) => void setTagDescription(state.selectedTag!, description)}
             />

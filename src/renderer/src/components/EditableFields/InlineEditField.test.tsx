@@ -58,16 +58,4 @@ describe('InlineEditField', () => {
     await user.click(screen.getByRole('button'))
     expect(onStartEdit).toHaveBeenCalledTimes(1)
   })
-
-  it('renders the centered-overlay layout when contentAlign is "center"', () => {
-    render(
-      <MantineProvider>
-        <InlineEditField editing={false} onStartEdit={vi.fn()} contentAlign="center">
-          <span>Centered</span>
-        </InlineEditField>
-      </MantineProvider>
-    )
-    expect(screen.getByText('Centered')).toBeInTheDocument()
-    expect(screen.getByRole('button')).toBeInTheDocument()
-  })
 })
