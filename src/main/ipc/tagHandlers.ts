@@ -1,15 +1,16 @@
 import { ipcMain } from 'electron'
 import pLimitImport from 'p-limit'
-import { writeTags } from '../services/metadataService'
-import { ingestFile } from '../services/photoIngest'
-import { findByPath } from '../db/photoRepository'
-import { suppressNextEvent } from '../services/watchManager'
+
+import { findByPath } from '@main/db/photoRepository'
 import {
   getAllTagDescriptions,
-  setTagDescription,
-  renameTagDescription
-} from '../db/tagMetadataRepository'
-import type { PhotoRecord } from '../../shared/types'
+  renameTagDescription,
+  setTagDescription
+} from '@main/db/tagMetadataRepository'
+import { writeTags } from '@main/services/metadataService'
+import { ingestFile } from '@main/services/photoIngest'
+import { suppressNextEvent } from '@main/services/watchManager'
+import type { PhotoRecord } from '@shared/types'
 
 // p-limit is ESM-only; when externalized in the main-process CJS bundle,
 // `require('p-limit')` yields the module namespace object rather than the

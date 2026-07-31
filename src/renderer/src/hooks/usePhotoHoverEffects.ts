@@ -1,7 +1,10 @@
-import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { type MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
+
 import { useMotionTemplate, useMotionValue, useSpring } from 'motion/react'
+
+import { PREVIEW_TRIGGER_KEY } from '@utils'
+
 import { useKeyHeld } from './useKeyHeld'
-import { PREVIEW_TRIGGER_KEY } from '../utils/previewTrigger'
 
 // Hover saturates a soft, cursor-centered, feathered circle (a saturated
 // image copy masked by a radial gradient) rather than zooming.

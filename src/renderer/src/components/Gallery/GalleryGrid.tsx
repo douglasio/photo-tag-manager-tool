@@ -1,4 +1,12 @@
 import {
+  type MouseEvent as ReactMouseEvent,
+  type ReactElement,
+  useCallback,
+  useMemo,
+  useState
+} from 'react'
+
+import {
   ActionIcon,
   Box,
   Center,
@@ -12,23 +20,16 @@ import {
   Tooltip
 } from '@mantine/core'
 import { IconColumns2, IconPhoto, IconX } from '@tabler/icons-react'
-import {
-  useCallback,
-  useMemo,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type ReactElement
-} from 'react'
 import { Grid } from 'react-window'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '../../state/photoLibraryReducer'
-import { useGalleryGridLayout } from '../../hooks/useGalleryGridLayout'
-import { useGalleryPreviewZoom } from '../../hooks/useGalleryPreviewZoom'
-import { GalleryPhotoCell, type GalleryCellProps } from './GalleryPhotoCell'
-import { TagDeleteButton } from '../Tags/TagDeleteButton'
-import { TagDescriptionEditor } from '../Tags/TagDescriptionEditor'
-import { TagNameEditor } from '../Tags/TagNameEditor'
-import { basename } from '../../utils/folderTree'
+
+import { TagDeleteButton, TagDescriptionField } from '@components'
+import { useGalleryGridLayout } from '@hooks'
+import { useGalleryPreviewZoom } from '@hooks'
+import { usePhotoLibrary } from '@state'
+import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '@state'
+import { basename } from '@utils'
+
+import { type GalleryCellProps, GalleryPhotoCell } from './GalleryPhotoCell'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
 
@@ -41,7 +42,6 @@ export function GalleryGrid(): ReactElement {
     selectPhotoRange,
     clearSelection,
     setTagDescription,
-    renameTag,
     deleteTag,
     tagCounts,
     folderTags,
@@ -143,22 +143,7 @@ export function GalleryGrid(): ReactElement {
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
           <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
-            {isPureTagView ? (
-              <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
-                <Box flex={1} miw={0}>
-                  <TagNameEditor
-                    tag={state.selectedTag!}
-                    count={tagCounts.get(state.selectedTag!) ?? 0}
-                    onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
-                  />
-                </Box>
-                <TagDeleteButton
-                  tag={state.selectedTag!}
-                  count={tagCounts.get(state.selectedTag!) ?? 0}
-                  onDelete={() => deleteTag(state.selectedTag!)}
-                />
-              </Group>
-            ) : (
+            <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
               <Title
                 order={2}
                 flex={1}
@@ -171,7 +156,14 @@ export function GalleryGrid(): ReactElement {
               >
                 {galleryTitle}
               </Title>
-            )}
+              {isPureTagView && (
+                <TagDeleteButton
+                  tag={state.selectedTag!}
+                  count={tagCounts.get(state.selectedTag!) ?? 0}
+                  onDelete={() => deleteTag(state.selectedTag!)}
+                />
+              )}
+            </Group>
             <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
               {state.selectedPaths.size > 0 && (
                 <>
@@ -217,7 +209,7 @@ export function GalleryGrid(): ReactElement {
             </Group>
           </Group>
           {isPureTagView && (
-            <TagDescriptionEditor
+            <TagDescriptionField
               description={tagDescription}
               onSave={(description) => void setTagDescription(state.selectedTag!, description)}
             />

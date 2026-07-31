@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { splitFileName, validateFileNameBase } from './fileNameValidation'
 
 describe('splitFileName', () => {

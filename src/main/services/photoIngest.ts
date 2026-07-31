@@ -1,8 +1,10 @@
 import { stat } from 'fs/promises'
+
+import { findByPath, updateThumbnail, upsertPhoto } from '@main/db/photoRepository'
+import type { PhotoRecord } from '@shared/types'
+
 import { readPhotoRecord } from './metadataService'
 import { generateThumbnail, thumbnailKeyFor } from './thumbnailService'
-import { findByPath, upsertPhoto, updateThumbnail } from '../db/photoRepository'
-import type { PhotoRecord } from '../../shared/types'
 
 export async function ingestFile(
   filePath: string,

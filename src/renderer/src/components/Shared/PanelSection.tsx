@@ -1,5 +1,6 @@
 import { Box, Group } from '@mantine/core'
 import type { ReactElement, ReactNode } from 'react'
+
 import { SectionTitle } from './SectionTitle'
 
 interface PanelSectionProps {

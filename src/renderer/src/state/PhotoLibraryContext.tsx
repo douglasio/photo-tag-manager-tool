@@ -1,27 +1,30 @@
 import {
   createContext,
+  type ReactElement,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useReducer,
-  useRef,
-  type ReactElement,
-  type ReactNode
+  useRef
 } from 'react'
+
 import { notifications } from '@mantine/notifications'
-import { MoveProgressToast } from '../components/Settings/MoveProgressToast'
+
+import { MoveProgressToast } from '@components'
+import type { PhotoRecord, RotateDirection } from '@shared/types'
+import { basename, isPhotoInFolder } from '@utils'
+import { type DisplayMetadata, toDisplayMetadata } from '@utils'
+
 import {
+  type GallerySortBy,
+  type GallerySortOrder,
   initialState,
   MIN_COMPARE_PHOTOS,
   photoLibraryReducer,
-  type GallerySortBy,
-  type GallerySortOrder,
   type PhotoLibraryState
 } from './photoLibraryReducer'
-import { basename, isPhotoInFolder } from '../utils/folderTree'
-import { toDisplayMetadata, type DisplayMetadata } from '../utils/metadataDisplay'
-import type { PhotoRecord, RotateDirection } from '../../../shared/types'
 
 // selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
 // only it gets the labeled/display-formatted shape — transforming the whole
@@ -42,7 +45,7 @@ export type NavigationDirection = 'left' | 'right'
 // PhotoView's visualization mode ('none' = standard view). Lives here (not
 // just as PhotoView-local state) so it can be threaded across arrow-key
 // navigation below, which remounts a fresh PhotoView per photo.
-export type PhotoVisualization = 'none' | 'magazine' | 'newspaper'
+export type PhotoVisualization = 'none' | 'magazine' | 'newspaper' | 'dvd'
 
 // One entry per open tab in display order — either a single photo or a
 // compare set (2-4 photos), resolved from state.openTabs/compareTabs against
@@ -86,6 +89,9 @@ interface PhotoLibraryContextValue {
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
   setShowFilenames: (value: boolean) => void
+  setMagazineTitle: (value: string) => void
+  setNewspaperTitle: (value: string) => void
+  setDvdStudioName: (value: string) => void
   setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
@@ -274,6 +280,24 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getShowFilenames().then((value) => {
       dispatch({ type: 'SET_SHOW_FILENAMES', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getMagazineTitle().then((value) => {
+      dispatch({ type: 'SET_MAGAZINE_TITLE', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getNewspaperTitle().then((value) => {
+      dispatch({ type: 'SET_NEWSPAPER_TITLE', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getDvdStudioName().then((value) => {
+      dispatch({ type: 'SET_DVD_STUDIO_NAME', value })
     })
   }, [])
 
@@ -720,6 +744,21 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setShowFilenames(value)
   }, [])
 
+  const setMagazineTitle = useCallback((value: string) => {
+    dispatch({ type: 'SET_MAGAZINE_TITLE', value })
+    void window.api.setMagazineTitle(value)
+  }, [])
+
+  const setNewspaperTitle = useCallback((value: string) => {
+    dispatch({ type: 'SET_NEWSPAPER_TITLE', value })
+    void window.api.setNewspaperTitle(value)
+  }, [])
+
+  const setDvdStudioName = useCallback((value: string) => {
+    dispatch({ type: 'SET_DVD_STUDIO_NAME', value })
+    void window.api.setDvdStudioName(value)
+  }, [])
+
   // Persists the patterns, then rescans every folder so the library itself
   // (not just future filesystem events) reflects the change — files/folders
   // newly matched get pruned out, anything un-excluded gets picked back up.
@@ -880,6 +919,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,
     setShowFilenames,
+    setMagazineTitle,
+    setNewspaperTitle,
+    setDvdStudioName,
     setExcludePatterns,
     updateTags,
     setTagDescription,

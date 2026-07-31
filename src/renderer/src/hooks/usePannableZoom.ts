@@ -1,12 +1,13 @@
 import {
-  useEffect,
-  useRef,
-  useState,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
-  type SyntheticEvent
+  type SyntheticEvent,
+  useEffect,
+  useRef,
+  useState
 } from 'react'
-import type { PhotoRecord } from '../../../shared/types'
+
+import type { PhotoRecord } from '@shared/types'
 
 const MIN_SCALE = 0.5
 const MAX_SCALE = 5

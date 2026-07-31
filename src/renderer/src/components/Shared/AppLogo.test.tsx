@@ -1,6 +1,7 @@
-import { render } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
+import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+
 import { AppLogo } from './AppLogo'
 
 describe('AppLogo', () => {

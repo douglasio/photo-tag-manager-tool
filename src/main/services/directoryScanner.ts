@@ -1,6 +1,7 @@
 import { fdir } from 'fdir'
-import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
+
 import { matchesExcludePattern } from './excludeMatcher'
+import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
 
 export async function scanDirectory(
   rootPath: string,

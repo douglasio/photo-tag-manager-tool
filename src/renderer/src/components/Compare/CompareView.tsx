@@ -1,10 +1,11 @@
 import { ActionIcon, Box, Splitter } from '@mantine/core'
 import { IconX } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
-import type { PhotoRecord } from '../../../../shared/types'
-import { usePannableZoom } from '../../hooks/usePannableZoom'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { PannableZoomableImage } from '../Shared/PannableZoomableImage'
+
+import { PannableZoomableImage } from '@components'
+import { usePannableZoom } from '@hooks'
+import type { PhotoRecord } from '@shared/types'
+import { usePhotoLibrary } from '@state'
 
 interface ComparePaneProps {
   photo: PhotoRecord

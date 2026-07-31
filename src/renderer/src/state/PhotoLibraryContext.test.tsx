@@ -1,8 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import type { PhotoRecord } from '@shared/types'
+
 import { PhotoLibraryProvider, usePhotoLibrary } from './PhotoLibraryContext'
-import type { PhotoRecord } from '../../../shared/types'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {
@@ -64,6 +66,12 @@ function createMockApi(): {
     setGalleryAnimationsEnabled: vi.fn().mockResolvedValue(undefined),
     getShowFilenames: vi.fn().mockResolvedValue(true),
     setShowFilenames: vi.fn().mockResolvedValue(undefined),
+    getMagazineTitle: vi.fn().mockResolvedValue('TAG ME'),
+    setMagazineTitle: vi.fn().mockResolvedValue(undefined),
+    getNewspaperTitle: vi.fn().mockResolvedValue('The Tag Me Times'),
+    setNewspaperTitle: vi.fn().mockResolvedValue(undefined),
+    getDvdStudioName: vi.fn().mockResolvedValue('TAG ME PICTURES'),
+    setDvdStudioName: vi.fn().mockResolvedValue(undefined),
     getExcludePatterns: vi.fn().mockResolvedValue([]),
     setExcludePatterns: vi.fn().mockResolvedValue(undefined),
     addFolder: vi.fn().mockResolvedValue(undefined),
@@ -115,6 +123,9 @@ describe('PhotoLibraryContext', () => {
     mockApi.getDetailsPanelCollapsed.mockResolvedValue(true)
     mockApi.getExcludePatterns.mockResolvedValue(['.trash'])
     mockApi.getTagDescriptions.mockResolvedValue({ vacation: 'Beach trips' })
+    mockApi.getMagazineTitle.mockResolvedValue('Custom Mag')
+    mockApi.getNewspaperTitle.mockResolvedValue('Custom Paper')
+    mockApi.getDvdStudioName.mockResolvedValue('Custom Studio')
 
     const { result } = setup()
 
@@ -124,6 +135,9 @@ describe('PhotoLibraryContext', () => {
     expect(result.current.state.detailsPanelCollapsed).toBe(true)
     expect(result.current.state.excludePatterns).toEqual(['.trash'])
     expect(result.current.state.tagDescriptions.get('vacation')).toBe('Beach trips')
+    await waitFor(() => expect(result.current.state.magazineTitle).toBe('Custom Mag'))
+    expect(result.current.state.newspaperTitle).toBe('Custom Paper')
+    expect(result.current.state.dvdStudioName).toBe('Custom Studio')
   })
 
   it('scans every loaded folder on mount', async () => {
@@ -245,6 +259,27 @@ describe('PhotoLibraryContext', () => {
       act(() => result.current.setShowFilenames(false))
       expect(result.current.state.showFilenames).toBe(false)
       expect(mockApi.setShowFilenames).toHaveBeenCalledWith(false)
+    })
+
+    it('setMagazineTitle dispatches and persists', () => {
+      const { result } = setup()
+      act(() => result.current.setMagazineTitle('Custom Mag'))
+      expect(result.current.state.magazineTitle).toBe('Custom Mag')
+      expect(mockApi.setMagazineTitle).toHaveBeenCalledWith('Custom Mag')
+    })
+
+    it('setNewspaperTitle dispatches and persists', () => {
+      const { result } = setup()
+      act(() => result.current.setNewspaperTitle('Custom Paper'))
+      expect(result.current.state.newspaperTitle).toBe('Custom Paper')
+      expect(mockApi.setNewspaperTitle).toHaveBeenCalledWith('Custom Paper')
+    })
+
+    it('setDvdStudioName dispatches and persists', () => {
+      const { result } = setup()
+      act(() => result.current.setDvdStudioName('Custom Studio'))
+      expect(result.current.state.dvdStudioName).toBe('Custom Studio')
+      expect(mockApi.setDvdStudioName).toHaveBeenCalledWith('Custom Studio')
     })
 
     it('setGalleryAnimationsEnabled dispatches and persists', () => {

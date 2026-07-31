@@ -1,6 +1,6 @@
 {
   "name": "photo-tag-manager-tool",
-  "version": "0.3.2-alpha",
+  "version": "0.4.0-beta",
   "description": "Tag Me — a folder/tag-based photo organizer and enjoyer",
   "main": "./out/main/index.js",
   "author": "douglasio",
@@ -46,6 +46,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@fontsource/anton": "^5.3.0",
     "@fontsource/bebas-neue": "^5.3.0",
     "@fontsource/playfair-display": "^5.3.0",
     "@mantine/core": "^9.4.2",
@@ -82,6 +83,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "knip": "^6.29.0",

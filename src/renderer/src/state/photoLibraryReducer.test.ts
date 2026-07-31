@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
+
+import type { PhotoRecord, ScanCompleteEvent } from '@shared/types'
+
 import {
   initialState,
   photoLibraryReducer,
-  RECENT_TAGS_LIMIT,
-  type PhotoLibraryState
+  type PhotoLibraryState,
+  RECENT_TAGS_LIMIT
 } from './photoLibraryReducer'
-import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {
@@ -224,6 +226,30 @@ describe('photoLibraryReducer', () => {
         patterns: ['.trash']
       })
       expect(state.excludePatterns).toEqual(['.trash'])
+    })
+
+    it('sets the magazine masthead title', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_MAGAZINE_TITLE',
+        value: 'Custom Mag'
+      })
+      expect(state.magazineTitle).toBe('Custom Mag')
+    })
+
+    it('sets the newspaper masthead title', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_NEWSPAPER_TITLE',
+        value: 'Custom Paper'
+      })
+      expect(state.newspaperTitle).toBe('Custom Paper')
+    })
+
+    it('sets the DVD studio name', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_DVD_STUDIO_NAME',
+        value: 'Custom Studio'
+      })
+      expect(state.dvdStudioName).toBe('Custom Studio')
     })
   })
 

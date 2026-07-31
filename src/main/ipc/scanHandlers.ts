@@ -1,17 +1,18 @@
-import { ipcMain, type WebContents } from 'electron'
 import { randomUUID } from 'crypto'
+import { ipcMain, type WebContents } from 'electron'
 import pLimitImport from 'p-limit'
-import { scanAllFolders, scanDirectory } from '../services/directoryScanner'
-import { ingestFile } from '../services/photoIngest'
-import { deleteThumbnail } from '../services/thumbnailService'
-import { pruneMissing } from '../db/photoRepository'
-import { getExcludePatterns } from '../db/settingsRepository'
+
+import { pruneMissing } from '@main/db/photoRepository'
+import { getExcludePatterns } from '@main/db/settingsRepository'
+import { scanAllFolders, scanDirectory } from '@main/services/directoryScanner'
+import { ingestFile } from '@main/services/photoIngest'
+import { deleteThumbnail } from '@main/services/thumbnailService'
 import type {
   MetadataBatchEvent,
   PhotoRecord,
   ScanCompleteEvent,
   ScanProgressEvent
-} from '../../shared/types'
+} from '@shared/types'
 
 // p-limit is ESM-only; when externalized in the main-process CJS bundle,
 // `require('p-limit')` yields the module namespace object rather than the

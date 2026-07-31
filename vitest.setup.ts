@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
-import { afterEach } from 'vitest'
+
 import { cleanup } from '@testing-library/react'
+import { afterEach } from 'vitest'
 
 // globals: false in vitest.config.ts, so RTL's own auto-cleanup (which
 // relies on detecting a global afterEach) doesn't kick in — wire it up

@@ -1,4 +1,4 @@
-import { TagsInput, type ComboboxData } from '@mantine/core'
+import { type ComboboxData, TagsInput } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 interface TagListProps {

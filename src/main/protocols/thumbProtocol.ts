@@ -1,6 +1,7 @@
 import { net, protocol } from 'electron'
 import { pathToFileURL } from 'url'
-import { thumbnailFilePath } from '../services/thumbnailService'
+
+import { thumbnailFilePath } from '@main/services/thumbnailService'
 
 const THUMB_PROTOCOL = 'photag-thumb'
 

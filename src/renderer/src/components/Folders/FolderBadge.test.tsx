@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+
 import { FolderBadge } from './FolderBadge'
 
 describe('FolderBadge', () => {

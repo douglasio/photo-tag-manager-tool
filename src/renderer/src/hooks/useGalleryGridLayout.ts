@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
 
 const DEFAULT_CELL_WIDTH = 168
 // The filename label below each thumbnail takes roughly this much extra

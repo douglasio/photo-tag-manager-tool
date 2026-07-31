@@ -1,5 +1,6 @@
+import type { GallerySort } from '@shared/types'
+
 import { getDb } from './database'
-import type { GallerySort } from '../../shared/types'
 
 function getSetting(key: string): string | null {
   const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as
@@ -114,4 +115,32 @@ export function getExcludePatterns(): string[] {
 
 export function setExcludePatterns(patterns: string[]): void {
   setSetting('excludePatterns', JSON.stringify(patterns))
+}
+
+const DEFAULT_MAGAZINE_TITLE = 'TAG ME'
+const DEFAULT_NEWSPAPER_TITLE = 'The Tag Me Times'
+const DEFAULT_DVD_STUDIO_NAME = 'TAG ME PICTURES'
+
+export function getMagazineTitle(): string {
+  return getSetting('magazineTitle') ?? DEFAULT_MAGAZINE_TITLE
+}
+
+export function setMagazineTitle(value: string): void {
+  setSetting('magazineTitle', value)
+}
+
+export function getNewspaperTitle(): string {
+  return getSetting('newspaperTitle') ?? DEFAULT_NEWSPAPER_TITLE
+}
+
+export function setNewspaperTitle(value: string): void {
+  setSetting('newspaperTitle', value)
+}
+
+export function getDvdStudioName(): string {
+  return getSetting('dvdStudioName') ?? DEFAULT_DVD_STUDIO_NAME
+}
+
+export function setDvdStudioName(value: string): void {
+  setSetting('dvdStudioName', value)
 }

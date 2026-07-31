@@ -1,12 +1,8 @@
 import { ExifTool, type Tags } from 'exiftool-vendored'
 import { stat } from 'fs/promises'
 import { basename, extname } from 'path'
-import type {
-  PhotoMetadata,
-  PhotoRecord,
-  RotateDirection,
-  SupportedFormat
-} from '../../shared/types'
+
+import type { PhotoMetadata, PhotoRecord, RotateDirection, SupportedFormat } from '@shared/types'
 
 let exifTool: ExifTool | null = null
 

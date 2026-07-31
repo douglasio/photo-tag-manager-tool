@@ -1,7 +1,8 @@
 import { Menu } from '@mantine/core'
 import { IconEdit, IconFolderOpen } from '@tabler/icons-react'
 import type { ReactElement, ReactNode } from 'react'
-import { isMac } from '../../utils/platform'
+
+import { isMac } from '@utils'
 
 interface FolderContextMenuProps {
   folderPath: string

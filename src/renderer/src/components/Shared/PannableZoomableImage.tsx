@@ -1,8 +1,10 @@
+import type { UsePannableZoomResult } from '@hooks'
 import { Box, Flex, Image } from '@mantine/core'
 import type { ReactElement, ReactNode } from 'react'
-import type { PhotoRecord } from '../../../../shared/types'
-import { toFileProtocolUrl } from '../../../../shared/protocolUrls'
-import type { UsePannableZoomResult } from '../../hooks/usePannableZoom'
+
+import { toFileProtocolUrl } from '@shared/protocolUrls'
+import type { PhotoRecord } from '@shared/types'
+
 import { ZoomToolbar } from './ZoomToolbar'
 
 interface PannableZoomableImageProps {

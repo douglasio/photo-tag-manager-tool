@@ -1,3 +1,4 @@
+import { useDraggable } from '@dnd-kit/core'
 import {
   AspectRatio,
   Box,
@@ -9,16 +10,17 @@ import {
   useMantineTheme
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
-import { useDraggable } from '@dnd-kit/core'
 import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
 import type { ComponentPropsWithoutRef, MouseEvent, ReactElement } from 'react'
-import type { PhotoRecord } from '../../../../shared/types'
-import { toThumbProtocolUrl } from '../../../../shared/protocolUrls'
-import { GalleryFileName } from './GalleryFileName'
+
+import { FileNameField } from '@components'
+import { useHoverPreview } from '@hooks'
+import { toThumbProtocolUrl } from '@shared/protocolUrls'
+import type { PhotoRecord } from '@shared/types'
+import { usePhotoLibrary } from '@state'
+import { PREVIEW_TRIGGER_KEY_LABEL } from '@utils'
+
 import { GalleryHoverPreview } from './GalleryHoverPreview'
-import { PREVIEW_TRIGGER_KEY_LABEL } from '../../utils/previewTrigger'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { useHoverPreview } from '../../hooks/useHoverPreview'
 
 interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onSelect'> {
   photo: PhotoRecord
@@ -41,7 +43,7 @@ interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onS
   showFilename: boolean
 }
 
-// Not a single root button — GalleryFileName's own edit button can't nest
+// Not a single root button — FileNameField's own edit button can't nest
 // inside another button, so the image gets its own inner button while the
 // filename stays a sibling. `...rest` carries PhotoContextMenu's injected
 // handlers onto the outer container so right-click works anywhere on the cell.
@@ -139,12 +141,13 @@ export function PhotoThumbnail({
         />
         {(showFilename || renaming) && (
           <Box w="100%">
-            <GalleryFileName
+            <FileNameField
               fileName={photo.fileName}
               editing={renaming}
               onStartEdit={onStartRename}
               onStopEdit={onStopRename}
               onRename={onRename}
+              variant="grid"
             />
           </Box>
         )}

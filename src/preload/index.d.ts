@@ -1,4 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
+
 import type { PhotagApi } from './index'
 
 declare global {

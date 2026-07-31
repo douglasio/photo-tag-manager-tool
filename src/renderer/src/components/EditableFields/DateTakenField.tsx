@@ -1,11 +1,13 @@
-import { DateTimePicker } from '@mantine/dates'
-import { Text } from '@mantine/core'
-import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { InlineEditField } from '../Shared/InlineEditField'
-import { DATE_TAKEN_FORMAT } from '../../utils/metadataDisplay'
-import { useCommitEdit } from '../../hooks/useCommitEdit'
+import { type ReactElement, useEffect, useRef, useState } from 'react'
 
-interface DateTakenEditorProps {
+import { DateTimePicker } from '@mantine/dates'
+
+import { useCommitEdit } from '@hooks'
+import { DATE_TAKEN_FORMAT } from '@utils'
+
+import { InlineEditField } from './InlineEditField'
+
+interface DateTakenFieldProps {
   value: string | null
   displayValue: string
   onSave: (isoDate: string) => Promise<void>
@@ -23,11 +25,13 @@ function parsePickerValue(dateTimeStr: string): Date {
   return new Date(y, m - 1, d, h, mi, s)
 }
 
-export function DateTakenEditor({
-  value,
-  displayValue,
-  onSave
-}: DateTakenEditorProps): ReactElement {
+// Same single-persistent-element approach as EditableText (toggle
+// interactivity instead of swapping a display component for a differently
+// styled input) — DateTimePicker just isn't textarea-based, so it can't use
+// EditableText itself, but it does support `readOnly`, which is enough to
+// get the same effect: this always renders the same picker, showing plain
+// formatted text when not editing and becoming interactive when it is.
+export function DateTakenField({ value, displayValue, onSave }: DateTakenFieldProps): ReactElement {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Date | null>(value ? new Date(value) : null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -35,8 +39,9 @@ export function DateTakenEditor({
 
   // DateTimePicker has no prop to start with its popover open (dropdownOpened
   // is purely internal useDisclosure state) — its trigger's onClick just
-  // calls dropdownHandlers.toggle(), so simulating a click on mount opens it
-  // the same way a real click would, saving an extra click to enter edit mode.
+  // calls dropdownHandlers.toggle(), so simulating a click once it's no
+  // longer readOnly opens it the same way a real click would, saving an
+  // extra click to enter edit mode.
   useEffect(() => {
     if (editing) triggerRef.current?.click()
   }, [editing])
@@ -64,34 +69,32 @@ export function DateTakenEditor({
 
   return (
     <InlineEditField editing={editing} onStartEdit={startEdit}>
-      {editing ? (
-        <DateTimePicker
-          ref={triggerRef}
-          autoFocus
-          variant="unstyled"
-          valueFormat={DATE_TAKEN_FORMAT}
-          value={draft}
-          onChange={(dateTimeStr) => setDraft(dateTimeStr ? parsePickerValue(dateTimeStr) : null)}
-          onDropdownClose={commitDraft}
-          // Escape/outside-click are handled by our own onKeyDown below
-          // instead (which cancels without saving) — only the submit button
-          // or Enter should actually commit the pick and close this.
-          popoverProps={{ closeOnClickOutside: false, closeOnEscape: false }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') setEditing(false)
-          }}
-          styles={{
-            input: {
-              fontSize: 'var(--mantine-font-size-sm)',
-              padding: 0,
-              height: 'auto',
-              minHeight: 'auto'
-            }
-          }}
-        />
-      ) : (
-        <Text>{displayValue}</Text>
-      )}
+      <DateTimePicker
+        ref={triggerRef}
+        readOnly={!editing}
+        variant="unstyled"
+        valueFormat={DATE_TAKEN_FORMAT}
+        value={editing ? draft : value ? new Date(value) : null}
+        placeholder={displayValue}
+        onChange={(dateTimeStr) => setDraft(dateTimeStr ? parsePickerValue(dateTimeStr) : null)}
+        onDropdownClose={commitDraft}
+        // Escape/outside-click are handled by our own onKeyDown below
+        // instead (which cancels without saving) — only the submit button
+        // or Enter should actually commit the pick and close this.
+        popoverProps={{ closeOnClickOutside: false, closeOnEscape: false }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setEditing(false)
+        }}
+        styles={{
+          input: {
+            fontSize: 'var(--mantine-font-size-sm)',
+            padding: 0,
+            height: 'auto',
+            minHeight: 'auto',
+            cursor: editing ? 'pointer' : 'default'
+          }
+        }}
+      />
     </InlineEditField>
   )
 }

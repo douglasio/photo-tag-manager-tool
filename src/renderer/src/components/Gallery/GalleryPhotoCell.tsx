@@ -1,7 +1,9 @@
 import { Box } from '@mantine/core'
 import type { MouseEvent as ReactMouseEvent, ReactElement } from 'react'
 import type { CellComponentProps } from 'react-window'
-import type { PhotoRecord } from '../../../../shared/types'
+
+import type { PhotoRecord } from '@shared/types'
+
 import { PhotoContextMenu } from './PhotoContextMenu'
 import { PhotoThumbnail } from './PhotoThumbnail'
 

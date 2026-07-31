@@ -1,7 +1,8 @@
+import { MantineProvider } from '@mantine/core'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MantineProvider } from '@mantine/core'
 import { describe, expect, it, vi } from 'vitest'
+
 import { ConfirmDialog } from './ConfirmDialog'
 
 describe('ConfirmDialog', () => {

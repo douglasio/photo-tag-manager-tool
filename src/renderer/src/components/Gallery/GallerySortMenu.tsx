@@ -1,7 +1,8 @@
 import { ActionIcon, Box, Menu, Tooltip } from '@mantine/core'
 import { IconArrowsSort, IconCheck } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+
+import { usePhotoLibrary } from '@state'
 
 export function GallerySortMenu(): ReactElement {
   const { state, setSort } = usePhotoLibrary()

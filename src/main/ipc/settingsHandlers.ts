@@ -1,28 +1,35 @@
 import { ipcMain } from 'electron'
 import { rename, stat } from 'fs/promises'
 import { dirname, join } from 'path'
+
+import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
-  getFolders,
-  setFolders,
-  getGalleryCellWidth,
-  setGalleryCellWidth,
-  getGallerySort,
-  setGallerySort,
-  getShowEmptyFolders,
-  setShowEmptyFolders,
   getDetailsPanelCollapsed,
-  setDetailsPanelCollapsed,
-  getGalleryAnimationsEnabled,
-  setGalleryAnimationsEnabled,
-  getShowFilenames,
-  setShowFilenames,
+  getDvdStudioName,
   getExcludePatterns,
-  setExcludePatterns
-} from '../db/settingsRepository'
-import type { GallerySort } from '../../shared/types'
-import { pruneMissing, renamePhotoPathPrefix } from '../db/photoRepository'
-import { deleteThumbnail } from '../services/thumbnailService'
-import { watchFolder, unwatchFolder, restartAllWatchers } from '../services/watchManager'
+  getFolders,
+  getGalleryAnimationsEnabled,
+  getGalleryCellWidth,
+  getGallerySort,
+  getMagazineTitle,
+  getNewspaperTitle,
+  getShowEmptyFolders,
+  getShowFilenames,
+  setDetailsPanelCollapsed,
+  setDvdStudioName,
+  setExcludePatterns,
+  setFolders,
+  setGalleryAnimationsEnabled,
+  setGalleryCellWidth,
+  setGallerySort,
+  setMagazineTitle,
+  setNewspaperTitle,
+  setShowEmptyFolders,
+  setShowFilenames
+} from '@main/db/settingsRepository'
+import { deleteThumbnail } from '@main/services/thumbnailService'
+import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
+import type { GallerySort } from '@shared/types'
 
 // Conservative cross-platform block list — matches photoHandlers.ts's file
 // rename validation, since folder names share the same filesystem constraints.
@@ -73,6 +80,24 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setShowFilenames', (_event, value: boolean): void => {
     setShowFilenames(value)
+  })
+
+  ipcMain.handle('settings:getMagazineTitle', (): string => getMagazineTitle())
+
+  ipcMain.handle('settings:setMagazineTitle', (_event, value: string): void => {
+    setMagazineTitle(value)
+  })
+
+  ipcMain.handle('settings:getNewspaperTitle', (): string => getNewspaperTitle())
+
+  ipcMain.handle('settings:setNewspaperTitle', (_event, value: string): void => {
+    setNewspaperTitle(value)
+  })
+
+  ipcMain.handle('settings:getDvdStudioName', (): string => getDvdStudioName())
+
+  ipcMain.handle('settings:setDvdStudioName', (_event, value: string): void => {
+    setDvdStudioName(value)
   })
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())
