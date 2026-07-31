@@ -130,7 +130,7 @@ export function EditableText({
           color: c,
           textAlign: ta,
           lineHeight: 'var(--mantine-line-height)',
-          cursor: editing ? 'text' : 'default',
+          cursor: editing ? 'text' : 'pointer',
           ...(shrinkToFit && { fieldSizing: 'content', maxWidth: '100%' }),
           ...(truncate && {
             whiteSpace: 'nowrap',

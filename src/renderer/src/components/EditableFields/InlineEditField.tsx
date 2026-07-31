@@ -1,4 +1,4 @@
-import { ActionIcon, Box, Group } from '@mantine/core'
+import { ActionIcon, Box, Group, Tooltip } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import { IconPencil } from '@tabler/icons-react'
 import type { ReactElement, ReactNode } from 'react'
@@ -29,13 +29,16 @@ export function InlineEditField({
         flex={fill ? 1 : '0 1 auto'}
         miw={0}
         maw="100%"
+        style={{ cursor: editing ? undefined : 'pointer' }}
       >
         {children}
       </Box>
       {!editing && (
-        <ActionIcon opacity={hovered ? 0.7 : 0} onClick={onStartEdit} style={{ flexShrink: 0 }}>
-          <IconPencil />
-        </ActionIcon>
+        <Tooltip label="Edit">
+          <ActionIcon opacity={hovered ? 0.7 : 0} onClick={onStartEdit} style={{ flexShrink: 0 }}>
+            <IconPencil />
+          </ActionIcon>
+        </Tooltip>
       )}
     </Group>
   )

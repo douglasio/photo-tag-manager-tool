@@ -34,7 +34,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Metadata
 
-1. I want to see how often a photo has been viewed. This field should be available in the Details panel for each photo, represented by an eye icon with a number next to it saying "Viewed X times." The view should increment anytime the photo is opened in a tab or previewed with space bar in the gallery. Since this only tracks views within the app, I'm thinking it only makes sense to store this info inthe db, but I'd also be open to saving the info to exif data (ex. views|XX). Before you begin implementation, give me pros and cons for each option and your recommendation.
+1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
 ## Write features
 

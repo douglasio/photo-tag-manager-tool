@@ -25,12 +25,7 @@ function parsePickerValue(dateTimeStr: string): Date {
   return new Date(y, m - 1, d, h, mi, s)
 }
 
-// Same single-persistent-element approach as EditableText (toggle
-// interactivity instead of swapping a display component for a differently
-// styled input) — DateTimePicker just isn't textarea-based, so it can't use
-// EditableText itself, but it does support `readOnly`, which is enough to
-// get the same effect: this always renders the same picker, showing plain
-// formatted text when not editing and becoming interactive when it is.
+// Same single-persistent-element approach as EditableText
 export function DateTakenField({ value, displayValue, onSave }: DateTakenFieldProps): ReactElement {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Date | null>(value ? new Date(value) : null)
@@ -51,14 +46,8 @@ export function DateTakenField({ value, displayValue, onSave }: DateTakenFieldPr
     setEditing(true)
   }
 
-  // DateTimePicker's onChange fires on every intermediate field change
-  // (picking the day, then adjusting the hour, then the minute, ...), not
-  // just once when the user is done — committing straight from onChange
-  // used to save (and close the editor) after the very first partial pick.
-  // Instead onChange only updates the local draft below; the actual commit
-  // happens once the dropdown closes, via the submit button or Enter —
-  // popoverProps disables the other ways a Mantine popover normally closes,
-  // so those are the only two paths that reach here.
+  // onChange only updates the local draft below; the actual commit
+  // happens once the dropdown closes, via the submit button or Enter
   const commitDraft = (): void => {
     if (!draft) {
       setEditing(false)
@@ -79,8 +68,6 @@ export function DateTakenField({ value, displayValue, onSave }: DateTakenFieldPr
         onChange={(dateTimeStr) => setDraft(dateTimeStr ? parsePickerValue(dateTimeStr) : null)}
         onDropdownClose={commitDraft}
         // Escape/outside-click are handled by our own onKeyDown below
-        // instead (which cancels without saving) — only the submit button
-        // or Enter should actually commit the pick and close this.
         popoverProps={{ closeOnClickOutside: false, closeOnEscape: false }}
         onKeyDown={(event) => {
           if (event.key === 'Escape') setEditing(false)
@@ -91,7 +78,7 @@ export function DateTakenField({ value, displayValue, onSave }: DateTakenFieldPr
             padding: 0,
             height: 'auto',
             minHeight: 'auto',
-            cursor: editing ? 'pointer' : 'default'
+            cursor: 'pointer'
           }
         }}
       />
