@@ -1,34 +1,35 @@
 import { ipcMain } from 'electron'
 import { rename, stat } from 'fs/promises'
 import { dirname, join } from 'path'
+
+import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
-  getFolders,
-  setFolders,
-  getGalleryCellWidth,
-  setGalleryCellWidth,
-  getGallerySort,
-  setGallerySort,
-  getShowEmptyFolders,
-  setShowEmptyFolders,
   getDetailsPanelCollapsed,
-  setDetailsPanelCollapsed,
-  getGalleryAnimationsEnabled,
-  setGalleryAnimationsEnabled,
-  getShowFilenames,
-  setShowFilenames,
-  getExcludePatterns,
-  setExcludePatterns,
-  getMagazineTitle,
-  setMagazineTitle,
-  getNewspaperTitle,
-  setNewspaperTitle,
   getDvdStudioName,
-  setDvdStudioName
-} from '../db/settingsRepository'
-import type { GallerySort } from '../../shared/types'
-import { pruneMissing, renamePhotoPathPrefix } from '../db/photoRepository'
-import { deleteThumbnail } from '../services/thumbnailService'
-import { watchFolder, unwatchFolder, restartAllWatchers } from '../services/watchManager'
+  getExcludePatterns,
+  getFolders,
+  getGalleryAnimationsEnabled,
+  getGalleryCellWidth,
+  getGallerySort,
+  getMagazineTitle,
+  getNewspaperTitle,
+  getShowEmptyFolders,
+  getShowFilenames,
+  setDetailsPanelCollapsed,
+  setDvdStudioName,
+  setExcludePatterns,
+  setFolders,
+  setGalleryAnimationsEnabled,
+  setGalleryCellWidth,
+  setGallerySort,
+  setMagazineTitle,
+  setNewspaperTitle,
+  setShowEmptyFolders,
+  setShowFilenames
+} from '@main/db/settingsRepository'
+import { deleteThumbnail } from '@main/services/thumbnailService'
+import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
+import type { GallerySort } from '@shared/types'
 
 // Conservative cross-platform block list — matches photoHandlers.ts's file
 // rename validation, since folder names share the same filesystem constraints.

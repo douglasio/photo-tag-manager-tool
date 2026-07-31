@@ -1,11 +1,11 @@
+import type { PhotoRecord, ScanCompleteEvent } from '@shared/types'
 import {
   addPhotoToFolderTree,
   findRootFolder,
   isPathUnderOrEqual,
   removePhotoFromFolderTree,
   rewritePathPrefix
-} from '../utils/folderTree'
-import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
+} from '@utils'
 
 type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 

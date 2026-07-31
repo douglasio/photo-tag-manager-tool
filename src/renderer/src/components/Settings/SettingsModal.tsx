@@ -1,3 +1,5 @@
+import { type ReactElement, useState } from 'react'
+
 import {
   Burger,
   Button,
@@ -14,10 +16,9 @@ import {
   Tooltip
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { useState, type ReactElement } from 'react'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { FolderRemoveButton } from '../Folders/FolderRemoveButton'
-import { SectionTitle } from '../Shared/SectionTitle'
+
+import { FolderRemoveButton, SectionTitle } from '@components'
+import { usePhotoLibrary } from '@state'
 
 function FoldersSection(): ReactElement {
   const { state, addFolder } = usePhotoLibrary()

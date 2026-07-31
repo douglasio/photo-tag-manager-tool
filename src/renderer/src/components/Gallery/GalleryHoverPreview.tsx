@@ -1,8 +1,9 @@
 import { Box, Image, Portal } from '@mantine/core'
 import { AnimatePresence, motion } from 'motion/react'
 import type { ReactElement } from 'react'
-import type { PhotoRecord } from '../../../../shared/types'
-import { toFileProtocolUrl } from '../../../../shared/protocolUrls'
+
+import { toFileProtocolUrl } from '@shared/protocolUrls'
+import type { PhotoRecord } from '@shared/types'
 
 // Size at scale === 1, in viewport-relative units so it scales with the window.
 const BASE_WIDTH_VW = 50

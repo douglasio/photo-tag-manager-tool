@@ -1,5 +1,6 @@
+import type { GallerySort } from '@shared/types'
+
 import { getDb } from './database'
-import type { GallerySort } from '../../shared/types'
 
 function getSetting(key: string): string | null {
   const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PhotoRecord } from '../../shared/types'
+
+import type { PhotoRecord } from '@shared/types'
 
 const {
   mockStartWatching,

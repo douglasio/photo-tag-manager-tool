@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+
+import type { NavigationDirection } from '@state'
 import type { TargetAndTransition } from 'motion/react'
-import type { NavigationDirection } from '../state/PhotoLibraryContext'
 
 // A simple fade + slide crossfade — no scale/blur, just opacity and a small
 // horizontal offset in the direction navigated from/to.

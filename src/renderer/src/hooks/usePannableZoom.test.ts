@@ -1,7 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
 import type { PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react'
-import type { PhotoRecord } from '../../../shared/types'
+import { describe, expect, it } from 'vitest'
+
+import type { PhotoRecord } from '@shared/types'
+
 import { usePannableZoom } from './usePannableZoom'
 
 function makePhoto(filePath: string): PhotoRecord {

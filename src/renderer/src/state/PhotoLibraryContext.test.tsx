@@ -1,8 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import type { PhotoRecord } from '@shared/types'
+
 import { PhotoLibraryProvider, usePhotoLibrary } from './PhotoLibraryContext'
-import type { PhotoRecord } from '../../../shared/types'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {

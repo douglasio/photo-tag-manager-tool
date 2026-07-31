@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { PhotoRecord } from '../../../../shared/types'
+
+import type { PhotoRecord } from '@shared/types'
+
 import { GalleryHoverPreview } from './GalleryHoverPreview'
 
 const photo: PhotoRecord = {

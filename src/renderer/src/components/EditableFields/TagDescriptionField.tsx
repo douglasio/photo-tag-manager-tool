@@ -1,6 +1,7 @@
-import { useState, type ReactElement } from 'react'
-import { InlineEditField } from './InlineEditField'
+import { type ReactElement, useState } from 'react'
+
 import { EditableText } from './EditableText'
+import { InlineEditField } from './InlineEditField'
 
 interface TagDescriptionFieldProps {
   description: string

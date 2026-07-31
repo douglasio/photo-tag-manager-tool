@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
+
+import { PREVIEW_TRIGGER_KEY } from '@utils'
+
 import { useKeyHeld } from './useKeyHeld'
-import { PREVIEW_TRIGGER_KEY } from '../utils/previewTrigger'
 
 const MIN_PREVIEW_SCALE = 0.5
 const MAX_PREVIEW_SCALE = 3

@@ -1,5 +1,6 @@
-import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import { contextBridge, ipcRenderer } from 'electron'
+
 import type {
   GallerySort,
   MetadataBatchEvent,
@@ -13,7 +14,7 @@ import type {
   WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
   WatchPhotoUpsertedEvent
-} from '../shared/types'
+} from '@shared/types'
 
 function subscribe<T>(channel: string, callback: (payload: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, payload: T): void => callback(payload)

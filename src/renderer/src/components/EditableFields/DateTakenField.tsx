@@ -1,8 +1,11 @@
+import { type ReactElement, useEffect, useRef, useState } from 'react'
+
 import { DateTimePicker } from '@mantine/dates'
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+
+import { useCommitEdit } from '@hooks'
+import { DATE_TAKEN_FORMAT } from '@utils'
+
 import { InlineEditField } from './InlineEditField'
-import { DATE_TAKEN_FORMAT } from '../../utils/metadataDisplay'
-import { useCommitEdit } from '../../hooks/useCommitEdit'
 
 interface DateTakenFieldProps {
   value: string | null

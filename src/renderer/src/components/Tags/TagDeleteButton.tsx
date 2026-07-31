@@ -1,8 +1,10 @@
+import { type ReactElement, useState } from 'react'
+
 import { ActionIcon, Tooltip } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconTrash } from '@tabler/icons-react'
-import { useState, type ReactElement } from 'react'
+
 import { TagDeleteDialog } from './TagDeleteDialog'
 
 interface TagDeleteButtonProps {

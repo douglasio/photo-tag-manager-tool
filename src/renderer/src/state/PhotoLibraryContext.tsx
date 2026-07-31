@@ -1,27 +1,30 @@
 import {
   createContext,
+  type ReactElement,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useReducer,
-  useRef,
-  type ReactElement,
-  type ReactNode
+  useRef
 } from 'react'
+
 import { notifications } from '@mantine/notifications'
-import { MoveProgressToast } from '../components/Settings/MoveProgressToast'
+
+import { MoveProgressToast } from '@components'
+import type { PhotoRecord, RotateDirection } from '@shared/types'
+import { basename, isPhotoInFolder } from '@utils'
+import { type DisplayMetadata, toDisplayMetadata } from '@utils'
+
 import {
+  type GallerySortBy,
+  type GallerySortOrder,
   initialState,
   MIN_COMPARE_PHOTOS,
   photoLibraryReducer,
-  type GallerySortBy,
-  type GallerySortOrder,
   type PhotoLibraryState
 } from './photoLibraryReducer'
-import { basename, isPhotoInFolder } from '../utils/folderTree'
-import { toDisplayMetadata, type DisplayMetadata } from '../utils/metadataDisplay'
-import type { PhotoRecord, RotateDirection } from '../../../shared/types'
 
 // selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
 // only it gets the labeled/display-formatted shape — transforming the whole

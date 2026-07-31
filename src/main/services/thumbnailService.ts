@@ -1,5 +1,5 @@
-import { app } from 'electron'
 import { createHash } from 'crypto'
+import { app } from 'electron'
 import { mkdir, unlink } from 'fs/promises'
 import { join } from 'path'
 import sharp from 'sharp'

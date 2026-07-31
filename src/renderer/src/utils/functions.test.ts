@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { isNullOrEmpty } from './functions'
 
 describe('isNullOrEmpty', () => {

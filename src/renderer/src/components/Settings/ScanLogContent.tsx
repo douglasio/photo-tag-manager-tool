@@ -10,8 +10,9 @@ import {
 } from '@mantine/core'
 import { IconCheck, IconRefresh, IconX } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import type { ThumbnailStatus } from '../../../../shared/types'
+
+import type { ThumbnailStatus } from '@shared/types'
+import { usePhotoLibrary } from '@state'
 
 // Approximate row height (text/badge row + Stack gap), used so the list only
 // scrolls once it grows past ~5 visible rows instead of a guessed pixel cap.

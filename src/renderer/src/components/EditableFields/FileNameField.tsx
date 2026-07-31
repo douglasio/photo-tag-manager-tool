@@ -1,8 +1,11 @@
+import { type ReactElement, useState } from 'react'
+
 import { Group, Text, Tooltip } from '@mantine/core'
-import { useState, type ReactElement } from 'react'
-import { InlineEditField } from './InlineEditField'
+
+import { splitFileName, validateFileNameBase } from '@utils'
+
 import { EditableText } from './EditableText'
-import { splitFileName, validateFileNameBase } from '../../utils/fileNameValidation'
+import { InlineEditField } from './InlineEditField'
 
 interface FileNameFieldProps {
   fileName: string

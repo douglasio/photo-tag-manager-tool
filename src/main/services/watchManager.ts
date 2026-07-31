@@ -1,16 +1,18 @@
 import type { WebContents } from 'electron'
 import pLimitImport from 'p-limit'
-import { startWatching, stopWatching, stopAllWatchers } from './folderWatcher'
-import { ingestFile } from './photoIngest'
-import { deleteThumbnail } from './thumbnailService'
-import { removePhoto } from '../db/photoRepository'
-import { getExcludePatterns } from '../db/settingsRepository'
+
+import { removePhoto } from '@main/db/photoRepository'
+import { getExcludePatterns } from '@main/db/settingsRepository'
 import type {
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
   WatchPhotoUpsertedEvent
-} from '../../shared/types'
+} from '@shared/types'
+
+import { startWatching, stopAllWatchers, stopWatching } from './folderWatcher'
+import { ingestFile } from './photoIngest'
+import { deleteThumbnail } from './thumbnailService'
 
 // p-limit is ESM-only; when externalized in the main-process CJS bundle,
 // `require('p-limit')` yields the module namespace object rather than the

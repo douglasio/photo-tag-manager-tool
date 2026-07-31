@@ -1,5 +1,6 @@
-import { Group, Text, Tooltip } from '@mantine/core'
 import { Fragment, type ReactElement } from 'react'
+
+import { Group, Text, Tooltip } from '@mantine/core'
 
 const MAX_LABEL_WIDTH = 160
 const TOOLTIP_OPEN_DELAY = 400

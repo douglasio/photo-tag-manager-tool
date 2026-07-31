@@ -1,3 +1,5 @@
+import { type ReactElement, useState } from 'react'
+
 import {
   ActionIcon,
   ActionIconGroup,
@@ -10,17 +12,13 @@ import {
   Text,
   Tooltip
 } from '@mantine/core'
-import { notifications } from '@mantine/notifications'
-import { useState, type ReactElement } from 'react'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { CommentField } from '../EditableFields/CommentField'
-import { DateTakenField } from '../EditableFields/DateTakenField'
-import { FileNameField } from '../EditableFields/FileNameField'
-import { TagList } from '../Tags/TagList'
-import { isNullOrEmpty } from '@renderer/utils/functions'
-import { IconCopy, IconExternalLink, IconPhoto } from '@tabler/icons-react'
 import { useHover } from '@mantine/hooks'
-import { SectionTitle } from '../Shared/SectionTitle'
+import { notifications } from '@mantine/notifications'
+import { IconCopy, IconExternalLink, IconPhoto } from '@tabler/icons-react'
+
+import { CommentField, DateTakenField, FileNameField, SectionTitle, TagList } from '@components'
+import { isNullOrEmpty } from '@renderer/utils/functions'
+import { usePhotoLibrary } from '@state'
 
 const metadataDisplayFilters = ['comment', 'dateTaken']
 

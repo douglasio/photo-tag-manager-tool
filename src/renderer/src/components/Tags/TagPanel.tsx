@@ -1,3 +1,6 @@
+import { type ReactElement, useState } from 'react'
+
+import { useDroppable } from '@dnd-kit/core'
 import {
   ActionIcon,
   AspectRatio,
@@ -10,14 +13,14 @@ import {
   Tooltip
 } from '@mantine/core'
 import { useHover, useMergedRef } from '@mantine/hooks'
-import { useDroppable } from '@dnd-kit/core'
 import { notifications } from '@mantine/notifications'
 import { IconPencil } from '@tabler/icons-react'
-import { useState, type ReactElement } from 'react'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { activeHoverBackground } from '../../utils/listItemStyles'
-import { toThumbProtocolUrl } from '../../../../shared/protocolUrls'
-import type { PhotoRecord } from '../../../../shared/types'
+
+import { toThumbProtocolUrl } from '@shared/protocolUrls'
+import type { PhotoRecord } from '@shared/types'
+import { usePhotoLibrary } from '@state'
+import { activeHoverBackground } from '@utils'
+
 import { TagContextMenu } from './TagContextMenu'
 import { TagRenameDialog } from './TagRenameDialog'
 

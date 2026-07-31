@@ -1,3 +1,5 @@
+import { type ReactElement, type ReactNode, useState } from 'react'
+
 import { Box, Menu, MultiSelect } from '@mantine/core'
 import {
   IconEdit,
@@ -7,10 +9,10 @@ import {
   IconRotateClockwise,
   IconTag
 } from '@tabler/icons-react'
-import { useState, type ReactElement, type ReactNode } from 'react'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { isMac } from '../../utils/platform'
-import { ROTATABLE_FORMATS, type PhotoRecord } from '../../../../shared/types'
+
+import { type PhotoRecord, ROTATABLE_FORMATS } from '@shared/types'
+import { usePhotoLibrary } from '@state'
+import { isMac } from '@utils'
 
 interface PhotoContextMenuProps {
   photo: PhotoRecord

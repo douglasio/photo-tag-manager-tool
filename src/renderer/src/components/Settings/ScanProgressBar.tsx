@@ -1,8 +1,11 @@
+import { type ReactElement, useEffect, useState } from 'react'
+
 import { Button, Group, Popover, RingProgress, Text, Tooltip } from '@mantine/core'
 import { useDisclosure, useHover } from '@mantine/hooks'
 import { IconCheck, IconX } from '@tabler/icons-react'
-import { useEffect, useState, type ReactElement } from 'react'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
+
+import { usePhotoLibrary } from '@state'
+
 import { ScanLogContent } from './ScanLogContent'
 
 // How long the "just synced" checkmark stays green before fading to a

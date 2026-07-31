@@ -1,5 +1,6 @@
+import { type MouseEvent, type ReactElement, type ReactNode, useEffect, useRef } from 'react'
+
 import { Textarea } from '@mantine/core'
-import { useEffect, useRef, type MouseEvent, type ReactElement, type ReactNode } from 'react'
 
 interface EditableTextProps {
   // Committed value, shown while not editing.

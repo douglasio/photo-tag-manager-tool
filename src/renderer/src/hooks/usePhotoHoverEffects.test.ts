@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
 import type { MouseEvent as ReactMouseEvent } from 'react'
+import { describe, expect, it } from 'vitest'
+
 import { usePhotoHoverEffects } from './usePhotoHoverEffects'
 
 function fakeMouseEvent(x: number, y: number): ReactMouseEvent<HTMLElement> {

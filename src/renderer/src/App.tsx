@@ -1,3 +1,19 @@
+import { useEffect, useState } from 'react'
+
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  type Modifier,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core'
+import { arrayMove, horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable'
+import { getEventCoordinates } from '@dnd-kit/utilities'
 import {
   ActionIcon,
   AppShell,
@@ -17,20 +33,6 @@ import {
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  closestCenter,
-  pointerWithin,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-  type Modifier
-} from '@dnd-kit/core'
-import { SortableContext, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
-import { getEventCoordinates } from '@dnd-kit/utilities'
-import {
   IconColumns2,
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
@@ -38,25 +40,26 @@ import {
   IconPhoto,
   IconX
 } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
-import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
-import { AllPhotosRow } from './components/Folders/AllPhotosRow'
-import { AppLogo } from './components/Shared/AppLogo'
-import { SettingsModal } from './components/Settings/SettingsModal'
-import { ScanProgressBar } from './components/Settings/ScanProgressBar'
-import { GalleryGrid } from './components/Gallery/GalleryGrid'
+
+import { radiusSize } from '@renderer/theme'
+import { toThumbProtocolUrl } from '@shared/protocolUrls'
+import type { PhotoRecord } from '@shared/types'
+
 import { CompareView } from './components/Compare/CompareView'
 import { DetailPanel } from './components/DetailPanel/DetailPanel'
+import { AllPhotosRow } from './components/Folders/AllPhotosRow'
 import { FolderSettingsMenu } from './components/Folders/FolderSettingsMenu'
 import { FolderTree } from './components/Folders/FolderTree'
-import { PanelSection } from './components/Shared/PanelSection'
+import { GalleryGrid } from './components/Gallery/GalleryGrid'
 import { PhotoView } from './components/PhotoView/PhotoView'
+import { ScanProgressBar } from './components/Settings/ScanProgressBar'
+import { SettingsModal } from './components/Settings/SettingsModal'
+import { AppLogo } from './components/Shared/AppLogo'
+import { PanelSection } from './components/Shared/PanelSection'
 import { SortableTab } from './components/Shared/SortableTab'
 import { CompareTabLabel, TabLabel } from './components/Shared/TabLabel'
 import { TagPanel } from './components/Tags/TagPanel'
-import { toThumbProtocolUrl } from '../../shared/protocolUrls'
-import type { PhotoRecord } from '../../shared/types'
-import { radiusSize } from '@renderer/theme'
+import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
 
 // True while focus is inside anything the "g" shortcut below shouldn't
 // hijack a keystroke from (text/date inputs, contenteditable, etc.).

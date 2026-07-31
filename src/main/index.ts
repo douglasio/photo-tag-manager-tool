@@ -1,21 +1,23 @@
-import { app, shell, BrowserWindow, screen } from 'electron'
+import { electronApp, is, optimizer } from '@electron-toolkit/utils'
+import { app, BrowserWindow, screen, shell } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+
+// eslint-disable-next-line no-restricted-imports -- resources/ lives outside src/, so no alias covers it
 import icon from '../../resources/icon.png?asset'
+import { getFolders } from './db/settingsRepository'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
 import { registerPhotoHandlers } from './ipc/photoHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
-import { registerShellHandlers } from './ipc/shellHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
+import { registerShellHandlers } from './ipc/shellHandlers'
 import { registerTagHandlers } from './ipc/tagHandlers'
+import { registerFileProtocolHandler, registerFileProtocolScheme } from './protocols/fileProtocol'
 import {
   registerThumbProtocolHandler,
   registerThumbProtocolScheme
 } from './protocols/thumbProtocol'
-import { registerFileProtocolHandler, registerFileProtocolScheme } from './protocols/fileProtocol'
 import { shutdownExifTool } from './services/metadataService'
-import { getFolders } from './db/settingsRepository'
-import { setWatchTarget, watchFolder, unwatchAllFolders } from './services/watchManager'
+import { setWatchTarget, unwatchAllFolders, watchFolder } from './services/watchManager'
 
 app.setName('Tag Me')
 

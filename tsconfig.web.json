@@ -21,6 +21,25 @@
     "paths": {
       "@renderer/*": [
         "./src/renderer/src/*"
+      ],
+      "@shared/*": [
+        "./src/shared/*"
+      ],
+      // Bare specifier only (no "/*" wildcard) — these four are meant to be
+      // imported only from their barrel (index.ts), never a specific file
+      // inside them, so a deep import like "@state/PhotoLibraryContext"
+      // fails to resolve here rather than silently working.
+      "@components": [
+        "./src/renderer/src/components/index.ts"
+      ],
+      "@state": [
+        "./src/renderer/src/state/index.ts"
+      ],
+      "@hooks": [
+        "./src/renderer/src/hooks/index.ts"
+      ],
+      "@utils": [
+        "./src/renderer/src/utils/index.ts"
       ]
     }
   }

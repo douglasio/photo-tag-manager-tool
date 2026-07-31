@@ -1,10 +1,10 @@
+import type { UsePannableZoomResult } from '@hooks'
 import { Box, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
-import type { PhotoRecord } from '../../../../shared/types'
-import { toDisplayMetadata } from '../../utils/metadataDisplay'
-import type { UsePannableZoomResult } from '../../hooks/usePannableZoom'
-import { PannableZoomableImage } from '../Shared/PannableZoomableImage'
-import { CoverBarcode } from '../Shared/CoverBarcode'
+
+import { CoverBarcode, PannableZoomableImage } from '@components'
+import type { PhotoRecord } from '@shared/types'
+import { toDisplayMetadata } from '@utils'
 
 interface DvdCoverViewProps {
   photo: PhotoRecord

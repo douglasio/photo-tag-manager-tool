@@ -1,24 +1,27 @@
+import { type ReactElement, useMemo, useState } from 'react'
+
+import { useDroppable } from '@dnd-kit/core'
 import {
   ActionIcon,
   Button,
+  type RenderTreeNodePayload,
   Stack,
   Text,
   TextInput,
   Tooltip,
   Tree,
+  type TreeNodeData,
   useMantineTheme,
-  useTree,
-  type RenderTreeNodePayload,
-  type TreeNodeData
+  useTree
 } from '@mantine/core'
 import { useHover, useMergedRef } from '@mantine/hooks'
-import { useDroppable } from '@dnd-kit/core'
 import { IconChevronDown, IconChevronRight, IconPencil } from '@tabler/icons-react'
-import { useState, useMemo, type ReactElement } from 'react'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { foldersToTreeData, foldersToTreeDataWithEmpty } from '../../utils/folderTree'
-import { splitFolderPath, validateFolderNameBase } from '../../utils/folderNameValidation'
-import { activeHoverBackground } from '../../utils/listItemStyles'
+
+import { usePhotoLibrary } from '@state'
+import { foldersToTreeData, foldersToTreeDataWithEmpty } from '@utils'
+import { splitFolderPath, validateFolderNameBase } from '@utils'
+import { activeHoverBackground } from '@utils'
+
 import { FolderBadge } from './FolderBadge'
 import { FolderContextMenu } from './FolderContextMenu'
 

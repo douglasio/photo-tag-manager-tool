@@ -1,11 +1,12 @@
 import { ipcMain } from 'electron'
 import { copyFile, rename, stat, unlink } from 'fs/promises'
 import { basename, dirname, extname, join } from 'path'
-import { findByPath, renamePhotoPath } from '../db/photoRepository'
-import { rotatePhoto, writeComment, writeDateTaken } from '../services/metadataService'
-import { ingestFile } from '../services/photoIngest'
-import { suppressNextEvent } from '../services/watchManager'
-import type { MoveProgressEvent, PhotoRecord, RotateDirection } from '../../shared/types'
+
+import { findByPath, renamePhotoPath } from '@main/db/photoRepository'
+import { rotatePhoto, writeComment, writeDateTaken } from '@main/services/metadataService'
+import { ingestFile } from '@main/services/photoIngest'
+import { suppressNextEvent } from '@main/services/watchManager'
+import type { MoveProgressEvent, PhotoRecord, RotateDirection } from '@shared/types'
 
 // Conservative cross-platform block list — covers reserved path/filesystem
 // characters on both Windows and Unix rather than just the current OS, since

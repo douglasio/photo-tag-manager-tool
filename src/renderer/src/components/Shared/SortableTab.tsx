@@ -1,6 +1,6 @@
-import { Tabs, type TabsTabProps } from '@mantine/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Tabs, type TabsTabProps } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 interface SortableTabProps extends TabsTabProps {

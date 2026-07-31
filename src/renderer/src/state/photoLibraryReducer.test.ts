@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
+
+import type { PhotoRecord, ScanCompleteEvent } from '@shared/types'
+
 import {
   initialState,
   photoLibraryReducer,
-  RECENT_TAGS_LIMIT,
-  type PhotoLibraryState
+  type PhotoLibraryState,
+  RECENT_TAGS_LIMIT
 } from './photoLibraryReducer'
-import type { PhotoRecord, ScanCompleteEvent } from '../../../shared/types'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {

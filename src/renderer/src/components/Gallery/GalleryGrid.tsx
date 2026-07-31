@@ -1,4 +1,12 @@
 import {
+  type MouseEvent as ReactMouseEvent,
+  type ReactElement,
+  useCallback,
+  useMemo,
+  useState
+} from 'react'
+
+import {
   ActionIcon,
   Box,
   Center,
@@ -12,22 +20,16 @@ import {
   Tooltip
 } from '@mantine/core'
 import { IconColumns2, IconPhoto, IconX } from '@tabler/icons-react'
-import {
-  useCallback,
-  useMemo,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type ReactElement
-} from 'react'
 import { Grid } from 'react-window'
-import { usePhotoLibrary } from '../../state/PhotoLibraryContext'
-import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '../../state/photoLibraryReducer'
-import { useGalleryGridLayout } from '../../hooks/useGalleryGridLayout'
-import { useGalleryPreviewZoom } from '../../hooks/useGalleryPreviewZoom'
-import { GalleryPhotoCell, type GalleryCellProps } from './GalleryPhotoCell'
-import { TagDeleteButton } from '../Tags/TagDeleteButton'
-import { TagDescriptionField } from '../EditableFields/TagDescriptionField'
-import { basename } from '../../utils/folderTree'
+
+import { TagDeleteButton, TagDescriptionField } from '@components'
+import { useGalleryGridLayout } from '@hooks'
+import { useGalleryPreviewZoom } from '@hooks'
+import { usePhotoLibrary } from '@state'
+import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '@state'
+import { basename } from '@utils'
+
+import { type GalleryCellProps, GalleryPhotoCell } from './GalleryPhotoCell'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
 

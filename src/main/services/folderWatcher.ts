@@ -1,7 +1,8 @@
-import { watch, type FSWatcher } from 'chokidar'
+import { type FSWatcher, watch } from 'chokidar'
 import { extname } from 'path'
-import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
+
 import { matchesExcludePattern } from './excludeMatcher'
+import { SUPPORTED_EXTENSIONS } from './supportedExtensions'
 
 type WatchEventType = 'add' | 'change' | 'unlink'
 type WatchDirEventType = 'addDir' | 'unlinkDir'

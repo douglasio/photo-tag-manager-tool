@@ -1,9 +1,12 @@
+import { type ReactElement, useState } from 'react'
+
 import { Blockquote } from '@mantine/core'
-import { useState, type ReactElement } from 'react'
-import { InlineEditField } from './InlineEditField'
-import { EditableText } from './EditableText'
-import { useCommitEdit } from '../../hooks/useCommitEdit'
 import { IconMessage } from '@tabler/icons-react'
+
+import { useCommitEdit } from '@hooks'
+
+import { EditableText } from './EditableText'
+import { InlineEditField } from './InlineEditField'
 
 interface CommentFieldProps {
   value: string | null

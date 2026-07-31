@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+
+import type { PhotoMetadata } from '@shared/types'
+
 import { DATE_TAKEN_FORMAT, formatDateTaken, toDisplayMetadata } from './metadataDisplay'
-import type { PhotoMetadata } from '../../../shared/types'
 
 describe('formatDateTaken', () => {
   it('formats a valid ISO date using DATE_TAKEN_FORMAT', () => {

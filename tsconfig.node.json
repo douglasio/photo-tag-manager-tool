@@ -14,6 +14,17 @@
     // to emit a declaration for src/preload/index.ts right next to the
     // hand-written src/preload/index.d.ts and collide with it.
     "outDir": "dist/node-types",
-    "types": ["electron-vite/node"]
+    "types": ["electron-vite/node"],
+    "paths": {
+      "@shared/*": [
+        "./src/shared/*"
+      ],
+      "@main/*": [
+        "./src/main/*"
+      ],
+      "@preload/*": [
+        "./src/preload/*"
+      ]
+    }
   }
 }

@@ -1,9 +1,10 @@
+import type { UsePannableZoomResult } from '@hooks'
 import { Box, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
-import type { PhotoRecord } from '../../../../shared/types'
-import { formatDateTaken } from '../../utils/metadataDisplay'
-import type { UsePannableZoomResult } from '../../hooks/usePannableZoom'
-import { PannableZoomableImage } from '../Shared/PannableZoomableImage'
+
+import { PannableZoomableImage } from '@components'
+import type { PhotoRecord } from '@shared/types'
+import { formatDateTaken } from '@utils'
 
 interface NewspaperCoverViewProps {
   photo: PhotoRecord

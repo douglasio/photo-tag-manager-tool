@@ -1,5 +1,6 @@
+import type { PhotoRecord } from '@shared/types'
+
 import { getDb } from './database'
-import type { PhotoRecord } from '../../shared/types'
 
 interface PhotoRow {
   path: string

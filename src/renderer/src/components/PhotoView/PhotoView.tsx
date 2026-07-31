@@ -1,6 +1,7 @@
+import { type ReactElement, useEffect, useRef, useState } from 'react'
+
 import { ActionIcon, Box, Container, Flex, Group, Image, Portal, Tooltip } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
-import { motion } from 'motion/react'
 import {
   IconArticle,
   IconMovie,
@@ -9,17 +10,19 @@ import {
   IconRotateClockwise,
   IconX
 } from '@tabler/icons-react'
-import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { ROTATABLE_FORMATS, type PhotoRecord } from '../../../../shared/types'
-import { toFileProtocolUrl } from '../../../../shared/protocolUrls'
-import { usePhotoLibrary, type PhotoVisualization } from '../../state/PhotoLibraryContext'
-import { usePhotoEntranceExit } from '../../hooks/usePhotoEntranceExit'
-import { usePhotoHoverEffects } from '../../hooks/usePhotoHoverEffects'
-import { usePannableZoom } from '../../hooks/usePannableZoom'
-import { ZoomToolbar } from '../Shared/ZoomToolbar'
+import { motion } from 'motion/react'
+
+import { ZoomToolbar } from '@components'
+import { usePhotoEntranceExit } from '@hooks'
+import { usePhotoHoverEffects } from '@hooks'
+import { usePannableZoom } from '@hooks'
+import { toFileProtocolUrl } from '@shared/protocolUrls'
+import { type PhotoRecord, ROTATABLE_FORMATS } from '@shared/types'
+import { type PhotoVisualization, usePhotoLibrary } from '@state'
+
+import { DvdCoverView } from './DvdCoverView'
 import { MagazineCoverView } from './MagazineCoverView'
 import { NewspaperCoverView } from './NewspaperCoverView'
-import { DvdCoverView } from './DvdCoverView'
 
 // 0.5 (not 1) so zooming out can go beyond the fitted size, matching
 // usePannableZoom's range — 1 used to double as both "fitted" and "as far

@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+
 import { useKeyHeld } from './useKeyHeld'
 
 function dispatchKey(type: 'keydown' | 'keyup', key: string): void {
