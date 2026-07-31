@@ -53,7 +53,8 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     visiblePhotos,
     navigateToPhoto,
     consumeNavDirection,
-    consumeVisualization
+    consumeVisualization,
+    incrementViewCount
   } = usePhotoLibrary()
   const [scale, setScale] = useState(1)
   // Read once at mount via lazy initializer, same pattern as enterDirection
@@ -150,6 +151,23 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     if (!nativeSize || !baseSize) return
     setScale(clampScale(nativeSize.width / baseSize.width))
   }
+
+  // This instance mounts exactly once per "opened in a tab" — every opened
+  // photo's panel stays mounted for the tab's whole lifetime (see the
+  // isActiveRef comment below), so counting on mount (rather than on every
+  // activeTab switch) is what makes this "opened," not "switched back to."
+  // hasCountedRef (not reset in a cleanup) guards against StrictMode's dev-
+  // only mount→cleanup→remount double-invoke: the ref survives that
+  // simulated remount, so the second pass sees it already set and skips —
+  // an effect cleanup can't fix this itself, since "undoing" the increment
+  // there would just let the following remount redo it.
+  const hasCountedRef = useRef(false)
+  useEffect(() => {
+    if (hasCountedRef.current) return
+    hasCountedRef.current = true
+    void incrementViewCount(photo.filePath)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally once per mount, not on every photo.filePath/incrementViewCount identity change
+  }, [])
 
   // Every opened photo's panel stays mounted, so gate keydown on whether
   // this tab is the one actually showing.

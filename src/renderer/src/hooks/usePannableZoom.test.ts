@@ -25,7 +25,8 @@ function makePhoto(filePath: string): PhotoRecord {
     thumbnailStatus: 'pending',
     thumbnailKey: null,
     scanError: null,
-    fromCache: false
+    fromCache: false,
+    viewCount: 0
   }
 }
 

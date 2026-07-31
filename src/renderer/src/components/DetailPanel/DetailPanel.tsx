@@ -8,13 +8,15 @@ import {
   Center,
   DataList,
   Flex,
+  Group,
+  RollingNumber,
   Stack,
   Text,
   Tooltip
 } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
-import { IconCopy, IconExternalLink, IconPhoto } from '@tabler/icons-react'
+import { IconCopy, IconExternalLink, IconEye, IconPhoto } from '@tabler/icons-react'
 
 import { CommentField, DateTakenField, FileNameField, SectionTitle, TagList } from '@components'
 import { isNullOrEmpty } from '@renderer/utils/functions'
@@ -92,6 +94,15 @@ export function DetailPanel(): ReactElement {
             variant="panel"
           />
         </Box>
+        <Group gap={4} c="dimmed">
+          <IconEye size={16} />
+          <RollingNumber
+            value={selectedPhoto.viewCount}
+            prefix="Viewed "
+            suffix={selectedPhoto.viewCount === 1 ? ' time' : ' times'}
+            fz="sm"
+          />
+        </Group>
         <Stack>
           <SectionTitle>Comment</SectionTitle>
           <CommentField

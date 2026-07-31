@@ -51,6 +51,9 @@ export function getDb(): Database.Database {
   if (!photoColumns.some((column) => column.name === 'comment')) {
     db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')
   }
+  if (!photoColumns.some((column) => column.name === 'viewCount')) {
+    db.exec('ALTER TABLE photos ADD COLUMN viewCount INTEGER NOT NULL DEFAULT 0')
+  }
 
   // Bumping THUMBNAIL_GENERATION (e.g. after changing thumbnailService's target
   // size) marks every cached thumbnail stale so the next scan regenerates them

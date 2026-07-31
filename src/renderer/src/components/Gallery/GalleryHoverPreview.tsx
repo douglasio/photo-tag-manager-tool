@@ -1,9 +1,11 @@
+import { type ReactElement, useEffect } from 'react'
+
 import { Box, Image, Portal } from '@mantine/core'
 import { AnimatePresence, motion } from 'motion/react'
-import type { ReactElement } from 'react'
 
 import { toFileProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
+import { usePhotoLibrary } from '@state'
 
 // Size at scale === 1, in viewport-relative units so it scales with the window.
 const BASE_WIDTH_VW = 50
@@ -30,6 +32,17 @@ export function GalleryHoverPreview({
   scale,
   motionEnabled
 }: GalleryHoverPreviewProps): ReactElement {
+  const { incrementViewCount } = usePhotoLibrary()
+  const isVisible = position !== null
+
+  // Fires once per rising edge (hidden → visible), not on every cursor move
+  // while already visible — `isVisible` (not `position` itself) is the
+  // effect's dependency specifically to collapse that down to one count per
+  // "preview shown," matching "previewed with space bar" in the spec.
+  useEffect(() => {
+    if (isVisible) void incrementViewCount(photo.filePath)
+  }, [isVisible, photo.filePath, incrementViewCount])
+
   return (
     <AnimatePresence>
       {position && (

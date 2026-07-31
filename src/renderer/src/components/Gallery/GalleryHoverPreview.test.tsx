@@ -1,8 +1,13 @@
 import { MantineProvider } from '@mantine/core'
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { PhotoRecord } from '@shared/types'
+
+const mockIncrementViewCount = vi.fn()
+vi.mock('@state', () => ({
+  usePhotoLibrary: () => ({ incrementViewCount: mockIncrementViewCount })
+}))
 
 import { GalleryHoverPreview } from './GalleryHoverPreview'
 
@@ -24,7 +29,8 @@ const photo: PhotoRecord = {
   thumbnailStatus: 'ready',
   thumbnailKey: 'key123',
   scanError: null,
-  fromCache: false
+  fromCache: false,
+  viewCount: 0
 }
 
 describe('GalleryHoverPreview', () => {
@@ -35,9 +41,10 @@ describe('GalleryHoverPreview', () => {
       </MantineProvider>
     )
     expect(screen.queryByAltText('a.jpg')).not.toBeInTheDocument()
+    expect(mockIncrementViewCount).not.toHaveBeenCalled()
   })
 
-  it('renders the preview image once a position is given', () => {
+  it('renders the preview image once a position is given, and counts it as a view', () => {
     render(
       <MantineProvider>
         <GalleryHoverPreview
@@ -49,5 +56,6 @@ describe('GalleryHoverPreview', () => {
       </MantineProvider>
     )
     expect(screen.getByAltText('a.jpg')).toBeInTheDocument()
+    expect(mockIncrementViewCount).toHaveBeenCalledExactlyOnceWith('/a.jpg')
   })
 })
