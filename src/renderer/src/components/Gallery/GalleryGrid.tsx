@@ -27,7 +27,6 @@ import { useGalleryPreviewZoom } from '../../hooks/useGalleryPreviewZoom'
 import { GalleryPhotoCell, type GalleryCellProps } from './GalleryPhotoCell'
 import { TagDeleteButton } from '../Tags/TagDeleteButton'
 import { TagDescriptionField } from '../EditableFields/TagDescriptionField'
-import { TagNameField } from '../EditableFields/TagNameField'
 import { basename } from '../../utils/folderTree'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
@@ -41,7 +40,6 @@ export function GalleryGrid(): ReactElement {
     selectPhotoRange,
     clearSelection,
     setTagDescription,
-    renameTag,
     deleteTag,
     tagCounts,
     folderTags,
@@ -143,22 +141,7 @@ export function GalleryGrid(): ReactElement {
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
           <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
-            {isPureTagView ? (
-              <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
-                <Box flex={1} miw={0}>
-                  <TagNameField
-                    tag={state.selectedTag!}
-                    count={tagCounts.get(state.selectedTag!) ?? 0}
-                    onRename={(newTag) => renameTag(state.selectedTag!, newTag)}
-                  />
-                </Box>
-                <TagDeleteButton
-                  tag={state.selectedTag!}
-                  count={tagCounts.get(state.selectedTag!) ?? 0}
-                  onDelete={() => deleteTag(state.selectedTag!)}
-                />
-              </Group>
-            ) : (
+            <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
               <Title
                 order={2}
                 flex={1}
@@ -171,7 +154,14 @@ export function GalleryGrid(): ReactElement {
               >
                 {galleryTitle}
               </Title>
-            )}
+              {isPureTagView && (
+                <TagDeleteButton
+                  tag={state.selectedTag!}
+                  count={tagCounts.get(state.selectedTag!) ?? 0}
+                  onDelete={() => deleteTag(state.selectedTag!)}
+                />
+              )}
+            </Group>
             <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
               {state.selectedPaths.size > 0 && (
                 <>
