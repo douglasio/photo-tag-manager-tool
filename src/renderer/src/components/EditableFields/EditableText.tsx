@@ -79,12 +79,25 @@ export function EditableText({
     el.select()
   }, [editing])
 
+  // Single-line, non-truncated fields (e.g. a panel filename) size to fit
+  // their actual text instead of stretching to fill the row — a full-width
+  // field left the pencil icon (rendered as a flex sibling) stranded far
+  // from short text. `field-sizing: content` (native, Chromium-only —
+  // fine here since this only ever runs inside Electron) hands width AND
+  // height sizing to the browser based on live content, so Mantine's own
+  // `autosize` (a JS/ResizeObserver-driven height calculation) is turned
+  // off for this case to avoid the two fighting over the element's height.
+  // Truncated fields (fixed-width grid cells) and multiline fields
+  // (comment/description, meant to use the full available width) keep the
+  // original full-width, Mantine-autosize behavior.
+  const shrinkToFit = !truncate && !multiline
+
   return (
     <Textarea
       ref={inputRef}
       variant="unstyled"
       readOnly={!editing}
-      autosize={!truncate}
+      autosize={!!multiline}
       minRows={1}
       maxRows={maxRows}
       maxLength={maxLength}
@@ -105,8 +118,8 @@ export function EditableText({
           onCancel()
         }
       }}
-      flex={1}
-      miw={0}
+      flex={shrinkToFit ? undefined : 1}
+      miw={shrinkToFit ? undefined : 0}
       styles={{
         input: {
           padding: 0,
@@ -116,20 +129,13 @@ export function EditableText({
           fontWeight: fw,
           color: c,
           textAlign: ta,
-          // Mantine's input line-height token is sized for a full-height
-          // input control (much taller than plain text) — using the same
-          // line-height Mantine's own Text component defaults to instead
-          // keeps this vertically aligned with any fixed Text sibling a
-          // field renders next to it (e.g. a "#" prefix), since that's the
-          // value that sibling is already using implicitly.
           lineHeight: 'var(--mantine-line-height)',
           cursor: editing ? 'text' : 'default',
+          ...(shrinkToFit && { fieldSizing: 'content', maxWidth: '100%' }),
           ...(truncate && {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
-            // No ellipsis while actively editing — let it scroll to the
-            // caret like a normal single-line input instead of clipping
-            // the text you're mid-way through typing.
+            // No ellipsis while actively editing
             textOverflow: editing ? 'clip' : 'ellipsis'
           })
         }
