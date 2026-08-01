@@ -18,7 +18,7 @@ import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { PREVIEW_TRIGGER_KEY_LABEL } from '@utils'
+import { PREVIEW_TRIGGER_KEY, PREVIEW_TRIGGER_KEY_LABEL } from '@utils'
 
 import { GalleryHoverPreview } from './GalleryHoverPreview'
 
@@ -104,6 +104,13 @@ export function PhotoThumbnail({
           className="photo-thumbnail__select-button"
           onClick={(event) => onSelect(photo.filePath, event)}
           onDoubleClick={() => openPhotoTab(photo.filePath)}
+          // Space is the preview trigger (handled globally via useKeyHeld), not
+          // a selection toggle — without this, a focused button's native
+          // space-triggers-click behavior would also fire onSelect and
+          // deselect an already-selected photo.
+          onKeyDown={(event) => {
+            if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+          }}
           onMouseMove={onMouseMove}
           onMouseLeave={onMouseLeave}
           w="100%"
