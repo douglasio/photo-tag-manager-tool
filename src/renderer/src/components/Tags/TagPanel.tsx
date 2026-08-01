@@ -19,7 +19,7 @@ import { IconPencil } from '@tabler/icons-react'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { activeHoverBackground } from '@utils'
+import { activeHoverBackground, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { TagContextMenu } from './TagContextMenu'
 import { TagRenameDialog } from './TagRenameDialog'
@@ -122,6 +122,13 @@ function TagListItem({
           onClick={() => {
             if (editing) return
             onSelect()
+          }}
+          // Space is the gallery's preview-trigger key, not a click here —
+          // without this, a native space-triggers-click on this button (still
+          // focused from the click that selected it) would re-fire onSelect
+          // while previewing a thumbnail and toggle this tag's filter off.
+          onKeyDown={(event) => {
+            if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
           }}
           fullWidth
           justify="space-between"

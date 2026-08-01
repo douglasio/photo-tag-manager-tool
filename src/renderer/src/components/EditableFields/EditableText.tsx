@@ -13,27 +13,20 @@ interface EditableTextProps {
   onCancel: () => void
   placeholder?: string
   error?: ReactNode
-  // Typography, applied identically in both states — the point of this
-  // component. Pass the same tokens the field previously used for its
-  // separate display component (Title/Text) here instead.
+  // Typography, applied identically in both states
   fz?: string
   fw?: number
   c?: string
   ta?: 'left' | 'center' | 'right'
-  // Single-line, ellipsis-truncated while not editing (for fixed-width
-  // contexts like a gallery grid cell) instead of the default autosize/wrap
-  // behavior — pair with a Tooltip showing the untruncated value, since the
-  // truncated text itself no longer reveals the full value on its own.
+  // Single-line, ellipsis-truncated while not editing
   truncate?: boolean
-  // When set, Shift+Enter inserts a literal newline and only plain Enter
-  // commits (browser default handles the newline insertion — only the
-  // commit path is intercepted). Off by default: Enter always commits,
-  // for single-line-ish fields (filenames, tag names) where a newline never
-  // makes sense.
+  // When set, Shift+Enter inserts a literal newline
   multiline?: boolean
   maxRows?: number
   maxLength?: number
   onClick?: (event: MouseEvent<HTMLTextAreaElement>) => void
+  // Overrides the default shrink-to-fit-width behavior
+  shrinkToFit?: boolean
 }
 
 // A single persistent Textarea that toggles `readOnly` instead of swapping
@@ -64,7 +57,8 @@ export function EditableText({
   multiline,
   maxRows,
   maxLength,
-  onClick
+  onClick,
+  shrinkToFit: shrinkToFitProp
 }: EditableTextProps): ReactElement {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -79,25 +73,25 @@ export function EditableText({
     el.select()
   }, [editing])
 
-  // Single-line, non-truncated fields (e.g. a panel filename) size to fit
-  // their actual text instead of stretching to fill the row — a full-width
-  // field left the pencil icon (rendered as a flex sibling) stranded far
-  // from short text. `field-sizing: content` (native, Chromium-only —
-  // fine here since this only ever runs inside Electron) hands width AND
-  // height sizing to the browser based on live content, so Mantine's own
+  // Non-truncated fields default to sizing themselves to fit their actual
+  // text instead of stretching to fill the row — a full-width field left
+  // the pencil icon (rendered as a flex sibling) stranded far from short
+  // text — unless `shrinkToFit` is explicitly overridden (e.g. a comment
+  // box, which wants to fill its row regardless of text length) or the
+  // field is truncated (fixed-width grid cell, always full-width).
+  // `field-sizing: content` (native, Chromium-only — fine here since this
+  // only ever runs inside Electron) hands sizing to the browser based on
+  // live content, wrapping once it hits `maxWidth`, so Mantine's own
   // `autosize` (a JS/ResizeObserver-driven height calculation) is turned
-  // off for this case to avoid the two fighting over the element's height.
-  // Truncated fields (fixed-width grid cells) and multiline fields
-  // (comment/description, meant to use the full available width) keep the
-  // original full-width, Mantine-autosize behavior.
-  const shrinkToFit = !truncate && !multiline
+  // off in this case to avoid the two fighting over the element's height.
+  const shrinkToFit = !truncate && (shrinkToFitProp ?? !multiline)
 
   return (
     <Textarea
       ref={inputRef}
       variant="unstyled"
       readOnly={!editing}
-      autosize={!!multiline}
+      autosize={!!multiline && !shrinkToFit}
       minRows={1}
       maxRows={maxRows}
       maxLength={maxLength}
@@ -131,7 +125,18 @@ export function EditableText({
           textAlign: ta,
           lineHeight: 'var(--mantine-line-height)',
           cursor: editing ? 'text' : 'pointer',
-          ...(shrinkToFit && { fieldSizing: 'content', maxWidth: '100%' }),
+          ...(shrinkToFit && {
+            fieldSizing: 'content',
+            maxWidth: '100%',
+            // Autosize (and its maxRows clamp) is off in this branch, so
+            // replicate the row cap ourselves — field-sizing: content would
+            // otherwise grow the box to fit unbounded text.
+            ...(multiline &&
+              maxRows && {
+                maxHeight: `calc(${maxRows} * var(--mantine-line-height) * 1em)`,
+                overflowY: 'auto'
+              })
+          }),
           ...(truncate && {
             whiteSpace: 'nowrap',
             overflow: 'hidden',
