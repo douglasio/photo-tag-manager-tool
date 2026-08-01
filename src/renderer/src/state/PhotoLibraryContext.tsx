@@ -29,7 +29,7 @@ import {
 // selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
 // only it gets the labeled/display-formatted shape — transforming the whole
 // photos array on every render would be wasted work for fields nothing reads.
-interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
+export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
   metadata: DisplayMetadata
 }
 
