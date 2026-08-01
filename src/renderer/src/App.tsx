@@ -25,7 +25,6 @@ import {
   Image,
   Loader,
   Scroller,
-  Stack,
   Tabs,
   Text,
   Title,
@@ -410,13 +409,10 @@ function AppLayout(): React.JSX.Element {
 function StartupLoadingScreen(): React.JSX.Element {
   return (
     <Center h="100vh">
-      <Stack align="center" gap="md">
-        <AppLogo />
-        <Group gap="xs">
-          <Loader size="sm" />
-          <Text c="dimmed">Loading your library…</Text>
-        </Group>
-      </Stack>
+      <Group gap="xs">
+        <Loader size="sm" />
+        <Text c="dimmed">Loading your library…</Text>
+      </Group>
     </Center>
   )
 }

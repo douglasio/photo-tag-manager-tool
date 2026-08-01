@@ -14,6 +14,7 @@ import {
   Group,
   Loader,
   Pill,
+  Scroller,
   Slider,
   Text,
   Title,
@@ -135,10 +136,6 @@ export function GalleryGrid(): ReactElement {
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
   return (
-    // mih=0 (with miw=0) — this mounts in both row-flex and column-flex
-    // parents depending on context; without it, a column parent lets this
-    // overflow past its fixed height instead of shrinking, hiding the
-    // footer and breaking the grid's own scroll container.
     <Flex direction="column" flex={1} miw={0} mih={0}>
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
@@ -215,26 +212,28 @@ export function GalleryGrid(): ReactElement {
             />
           )}
           {state.selectedFolder && folderTags.length > 0 && (
-            <Pill.Group mt="xs">
-              {folderTags.map((tag) => {
-                const isActive = state.selectedTag === tag
-                return (
-                  <Pill
-                    key={tag}
-                    onClick={() => setFolderTagFilter(isActive ? null : tag)}
-                    bg={
-                      isActive
-                        ? 'var(--mantine-primary-color-filled)'
-                        : 'var(--mantine-primary-color-light)'
-                    }
-                    c={isActive ? 'var(--mantine-color-white)' : undefined}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {tag}
-                  </Pill>
-                )
-              })}
-            </Pill.Group>
+            <Scroller mt="xs">
+              <Pill.Group style={{ flexWrap: 'nowrap' }}>
+                {folderTags.map((tag) => {
+                  const isActive = state.selectedTag === tag
+                  return (
+                    <Pill
+                      key={tag}
+                      onClick={() => setFolderTagFilter(isActive ? null : tag)}
+                      bg={
+                        isActive
+                          ? 'var(--mantine-primary-color-filled)'
+                          : 'var(--mantine-primary-color-light)'
+                      }
+                      c={isActive ? 'var(--mantine-color-white)' : undefined}
+                      style={{ cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      {tag}
+                    </Pill>
+                  )
+                })}
+              </Pill.Group>
+            </Scroller>
           )}
         </Box>
       )}
