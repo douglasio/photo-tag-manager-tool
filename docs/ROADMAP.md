@@ -10,6 +10,10 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 To-dos, tasks, and features loosely grouped by feature segment.
 
+## Optimization
+
+1. During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
+
 ## Shell
 
 1. [] Both the details pane and the left folder / tag panel should be resizable using Mantine Splitter with the no handle setting. Tags and Folders panels within the left sidebar should also be vertically resizable using the same component but vertically oriented. All of these positioning settings should be persisted.
@@ -69,6 +73,8 @@ Note: For all field "edit" features, interactivity should follow the same resuab
 ## Details Panel
 
 1. Make sure the details panel is not horizontally scrollable--it appears fields like folder path can stretch the panel beyond its width.
+
+2. When multiple photos are selected, we should replace the simple photo count view with options for multi-photo select. I want to see two sections - one that's a button to Compare (same functionality and icon as the one that appears at the top of the gallery). The second should display a list of all the tags in all the photos selected. It should utilize the same TagList format as other areas. From here, you should be able to batch add or batch delete any of the tags from the selected photos.
 
 ## Photo view
 

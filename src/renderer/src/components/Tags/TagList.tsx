@@ -9,16 +9,9 @@ interface TagListProps {
 }
 
 export function TagList({ tags, allTags, recentTags, onChange }: TagListProps): ReactElement {
-  // Only excludes tags that no longer exist at all (deleted) — deliberately
-  // NOT filtered against this photo's own tags, so the "Recent" section is
-  // identical no matter which photo is selected.
+  // Only excludes tags that no longer exist at all (deleted)
   const availableRecent = recentTags.filter((tag) => allTags.includes(tag))
-  // TagsInput unconditionally strips any tag already in `value` out of its
-  // dropdown data (filterPickedTags), matched by label text — with no prop
-  // to opt out. Rather than let an already-applied recent tag silently
-  // vanish (confusing — "where did it go?"), give it a label that doesn't
-  // match the plain tag text so it survives that filter, and mark it
-  // disabled so it still reads as "already added" instead of selectable.
+  // shows already-applied tags as disabled in the "Recent" group, so users can see them but not re-add them
   const recentItems = availableRecent.map((tag) => {
     const alreadyApplied = tags.includes(tag)
     return {
@@ -27,10 +20,7 @@ export function TagList({ tags, allTags, recentTags, onChange }: TagListProps): 
       disabled: alreadyApplied
     }
   })
-  // Every value in a Combobox's data must be unique — Mantine looks options
-  // up by value in a flat map keyed off it (getOptionsLockup), so a tag
-  // appearing in both "Recent" and the full list overwrites its own lockup
-  // entry and produces inconsistent/broken selection behavior.
+  // Every value in a Combobox's data must be unique
   const rest = allTags.filter((tag) => !availableRecent.includes(tag))
   const data: ComboboxData =
     availableRecent.length > 0

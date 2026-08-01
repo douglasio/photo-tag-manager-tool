@@ -243,7 +243,7 @@ export function TagPanel(): ReactElement {
   }
 
   return (
-    <Stack gap="xs">
+    <Stack gap={0}>
       {allTags.map((tag) => {
         const isActive = state.selectedTag === tag
         return (

@@ -20,7 +20,9 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { useReducedMotion } from '@mantine/hooks'
 import { IconColumns2, IconPhoto, IconX } from '@tabler/icons-react'
+import { motion } from 'motion/react'
 import { Grid } from 'react-window'
 
 import { TagDeleteButton, TagDescriptionField } from '@components'
@@ -64,9 +66,12 @@ export function GalleryGrid(): ReactElement {
     rowCount,
     setCellWidth,
     setCellWidthPersisted,
-    stepToMark
+    stepToMark,
+    isSettling
   } = useGalleryGridLayout({ photoCount: photos.length, showFilenames: state.showFilenames })
   const { previewTriggerHeld, previewScale } = useGalleryPreviewZoom(containerRef)
+  const prefersReducedMotion = useReducedMotion()
+  const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
   // Lifted here (not into GalleryPhotoCell) — react-window recycles cell
   // instances, so per-cell state would leak "is renaming" onto the wrong photo.
@@ -260,17 +265,32 @@ export function GalleryGrid(): ReactElement {
             )}
           </Center>
         ) : (
-          <Grid<GalleryCellProps>
-            cellComponent={GalleryPhotoCell}
-            cellProps={cellProps}
-            columnCount={columnCount}
-            columnWidth={actualCellWidth}
-            rowCount={rowCount}
-            rowHeight={cellHeight}
-            defaultWidth={size.width}
-            defaultHeight={size.height}
-            style={{ overflowX: 'hidden' }}
-          />
+          // Hidden while a resize is settling — the grid below is still
+          // rendering at its stale column count/size at that point, so this
+          // avoids showing that reflow live, fading the corrected layout in
+          // instead once useGalleryGridLayout's debounce catches up.
+          <motion.div
+            style={{
+              width: '100%',
+              height: '100%',
+              pointerEvents: isSettling ? 'none' : undefined
+            }}
+            initial={false}
+            animate={{ opacity: isSettling ? 0 : 1 }}
+            transition={{ duration: motionEnabled ? 0.25 : 0 }}
+          >
+            <Grid<GalleryCellProps>
+              cellComponent={GalleryPhotoCell}
+              cellProps={cellProps}
+              columnCount={columnCount}
+              columnWidth={actualCellWidth}
+              rowCount={rowCount}
+              rowHeight={cellHeight}
+              defaultWidth={size.width}
+              defaultHeight={size.height}
+              style={{ overflowX: 'hidden' }}
+            />
+          </motion.div>
         )}
       </Box>
       {photos.length > 0 && (
