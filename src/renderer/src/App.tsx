@@ -44,7 +44,7 @@ import {
 
 import {
   AllPhotosRow,
-  AppLogo,
+  // AppLogo,
   CompareTabLabel,
   CompareView,
   DashboardView,
@@ -75,9 +75,9 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
-const TITLE_BAR_HEIGHT = 52
-const TAB_BAR_HEIGHT = 44
-const HEADER_HEIGHT = TITLE_BAR_HEIGHT + TAB_BAR_HEIGHT
+// const TITLE_BAR_HEIGHT = 52
+// const TAB_BAR_HEIGHT = 44
+const HEADER_HEIGHT = 50
 const DRAG_PREVIEW_SIZE = 64
 const DRAG_PREVIEW_OFFSET_X = 0
 const DRAG_PREVIEW_OFFSET_Y = 0
@@ -293,7 +293,11 @@ function AppLayout(): React.JSX.Element {
           bar in the header — a Tabs.List sibling of Tabs.Panel deep inside
           Main — can share this context; Mantine's Tabs is context-driven, so
           List/Panel don't need to be DOM-adjacent to it. */}
-      <Tabs value={state.activeTab} onChange={(value) => value && setActiveTab(value)}>
+      <Tabs
+        // h={HEADER_HEIGHT}
+        value={state.activeTab}
+        onChange={(value) => value && setActiveTab(value)}
+      >
         <AppShell
           header={{ height: HEADER_HEIGHT }}
           navbar={{
@@ -311,114 +315,115 @@ function AppLayout(): React.JSX.Element {
           }}
           padding={0}
         >
-          <AppShell.Header>
-            <Group h={TITLE_BAR_HEIGHT} px="md" justify="space-between" wrap="nowrap">
-              <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                <AppLogo />
+          <AppShell.Header h="auto">
+            <Group px="md" justify="space-between">
+              <Group gap="xs" wrap="nowrap">
+                {/* <AppLogo /> */}
                 <Title order={1} size="h5">
                   Tag Me
                 </Title>
               </Group>
+              <Tabs.List className="tabs-list-no-divider" style={{ flexGrow: 1 }}>
+                <Scroller>
+                  <Tooltip
+                    openDelay={1000}
+                    label={
+                      <>
+                        shortcut: <Kbd>d</Kbd>
+                      </>
+                    }
+                  >
+                    <Tabs.Tab
+                      value="dashboard"
+                      leftSection={<IconLayoutDashboard size={TAB_ICON_SIZE} />}
+                    >
+                      Dashboard
+                    </Tabs.Tab>
+                  </Tooltip>
+                  <Tooltip
+                    openDelay={1000}
+                    label={
+                      <>
+                        shortcut: <Kbd>g</Kbd>
+                      </>
+                    }
+                  >
+                    <Tabs.Tab
+                      value="gallery"
+                      leftSection={<IconLibraryPhoto size={TAB_ICON_SIZE} />}
+                    >
+                      Gallery
+                    </Tabs.Tab>
+                  </Tooltip>
+                  <DndContext
+                    sensors={tabSensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleTabDragEnd}
+                  >
+                    <SortableContext
+                      items={state.openTabs}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {openTabEntries.map((entry) => (
+                        <SortableTab
+                          key={entry.id}
+                          id={entry.id}
+                          value={entry.id}
+                          leftSection={
+                            entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
+                          }
+                          rightSection={
+                            <ActionIcon
+                              component="span"
+                              size="xs"
+                              variant="subtle"
+                              color="gray"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                closePhotoTab(entry.id)
+                              }}
+                            >
+                              <IconX size={12} />
+                            </ActionIcon>
+                          }
+                        >
+                          {entry.kind === 'compare' ? (
+                            <CompareTabLabel
+                              fileNames={entry.photos.map((photo) => photo.fileName)}
+                            />
+                          ) : (
+                            <TabLabel fileName={entry.photo.fileName} />
+                          )}
+                        </SortableTab>
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                </Scroller>
+              </Tabs.List>
               <Group gap="md" wrap="nowrap">
                 <ScanProgressBar />
-                <Tooltip
-                  label={
-                    isCompareTabActive
-                      ? 'Not available in Compare View'
-                      : isDashboardTabActive
-                        ? 'Not available on Dashboard'
-                        : state.detailsPanelCollapsed
-                          ? 'Show details panel'
-                          : 'Hide details panel'
-                  }
-                >
-                  <ActionIcon
-                    variant="subtle"
-                    aria-label="Toggle details panel"
-                    disabled={isCompareTabActive || isDashboardTabActive}
-                    onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
+                {!(isCompareTabActive || isDashboardTabActive) && (
+                  <Tooltip
+                    label={
+                      state.detailsPanelCollapsed ? 'Show details panel' : 'Hide details panel'
+                    }
                   >
-                    {state.detailsPanelCollapsed || isCompareTabActive || isDashboardTabActive ? (
-                      <IconLayoutSidebarRightExpand size={18} />
-                    ) : (
-                      <IconLayoutSidebarRightCollapse size={18} />
-                    )}
-                  </ActionIcon>
-                </Tooltip>
+                    <ActionIcon
+                      variant="subtle"
+                      aria-label="Toggle details panel"
+                      onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
+                    >
+                      {state.detailsPanelCollapsed ? (
+                        <IconLayoutSidebarRightExpand size={18} />
+                      ) : (
+                        <IconLayoutSidebarRightCollapse size={18} />
+                      )}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
                 <SettingsModal />
               </Group>
             </Group>
-            <Tabs.List h={TAB_BAR_HEIGHT} style={{ flexWrap: 'nowrap' }}>
-              <Scroller>
-                <Tooltip
-                  openDelay={1000}
-                  label={
-                    <>
-                      shortcut: <Kbd>d</Kbd>
-                    </>
-                  }
-                >
-                  <Tabs.Tab
-                    value="dashboard"
-                    leftSection={<IconLayoutDashboard size={TAB_ICON_SIZE} />}
-                  >
-                    Dashboard
-                  </Tabs.Tab>
-                </Tooltip>
-                <Tooltip
-                  openDelay={1000}
-                  label={
-                    <>
-                      shortcut: <Kbd>g</Kbd>
-                    </>
-                  }
-                >
-                  <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto size={TAB_ICON_SIZE} />}>
-                    Gallery
-                  </Tabs.Tab>
-                </Tooltip>
-                <DndContext
-                  sensors={tabSensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleTabDragEnd}
-                >
-                  <SortableContext items={state.openTabs} strategy={horizontalListSortingStrategy}>
-                    {openTabEntries.map((entry) => (
-                      <SortableTab
-                        key={entry.id}
-                        id={entry.id}
-                        value={entry.id}
-                        leftSection={
-                          entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
-                        }
-                        rightSection={
-                          <ActionIcon
-                            component="span"
-                            size="xs"
-                            variant="subtle"
-                            color="gray"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              closePhotoTab(entry.id)
-                            }}
-                          >
-                            <IconX size={12} />
-                          </ActionIcon>
-                        }
-                      >
-                        {entry.kind === 'compare' ? (
-                          <CompareTabLabel
-                            fileNames={entry.photos.map((photo) => photo.fileName)}
-                          />
-                        ) : (
-                          <TabLabel fileName={entry.photo.fileName} />
-                        )}
-                      </SortableTab>
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              </Scroller>
-            </Tabs.List>
           </AppShell.Header>
           <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
             <Box p="md" style={{ flexShrink: 0 }}>

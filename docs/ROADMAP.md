@@ -66,4 +66,4 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Codebase
 
-(none)
+1. Storybook or env config? Need a way to preview things without affecting data.
