@@ -97,6 +97,10 @@ interface PhotoLibraryContextValue {
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
   deleteTag: (tag: string) => Promise<void>
+  createTagGroup: (name: string) => Promise<void>
+  renameTagGroup: (id: string, name: string) => Promise<void>
+  deleteTagGroup: (id: string) => Promise<void>
+  assignTagToGroup: (tag: string, groupId: string | null) => Promise<void>
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
   updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
   updateComment: (filePath: string, comment: string) => Promise<void>
@@ -248,6 +252,16 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     })
   }, [])
 
+  const loadTagGroupsData = useCallback(() => {
+    return window.api.getTagGroupsData().then(({ groups, assignments }) => {
+      dispatch({ type: 'TAG_GROUPS_DATA_LOADED', groups, assignments })
+    })
+  }, [])
+
+  useEffect(() => {
+    void loadTagGroupsData()
+  }, [loadTagGroupsData])
+
   useEffect(() => {
     window.api.getGallerySort().then((sort) => {
       if (sort) dispatch({ type: 'SET_SORT', sortBy: sort.sortBy, sortOrder: sort.sortOrder })
@@ -395,18 +409,22 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // (tags applied to state.selectedPaths) and drag-and-drop onto a tag row
   // (tags applied to whatever was actually dragged, which isn't necessarily
   // the current selection — e.g. dragging a single unselected photo).
-  const addTagsToPhotos = useCallback(async (tags: string[], filePaths: string[]) => {
-    if (filePaths.length === 0 || tags.length === 0) return
-    try {
-      const photos = await window.api.addTagsToPhotos(tags, filePaths)
-      dispatch({ type: 'PHOTOS_UPSERTED', photos })
-      dispatch({ type: 'TAGS_ASSIGNED', tags })
-    } catch (err) {
-      console.error('failed to add tags to photos', err)
-      notifications.show({ color: 'red', message: 'Failed to save tags' })
-      throw err
-    }
-  }, [])
+  const addTagsToPhotos = useCallback(
+    async (tags: string[], filePaths: string[]) => {
+      if (filePaths.length === 0 || tags.length === 0) return
+      try {
+        const photos = await window.api.addTagsToPhotos(tags, filePaths)
+        dispatch({ type: 'PHOTOS_UPSERTED', photos })
+        dispatch({ type: 'TAGS_ASSIGNED', tags })
+        void loadTagGroupsData()
+      } catch (err) {
+        console.error('failed to add tags to photos', err)
+        notifications.show({ color: 'red', message: 'Failed to save tags' })
+        throw err
+      }
+    },
+    [loadTagGroupsData]
+  )
 
   const addTagsToSelection = useCallback(
     (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
@@ -504,6 +522,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
           try {
             const photo = await window.api.updateTags(filePath, tags)
             dispatch({ type: 'PHOTO_UPSERTED', photo })
+            // Removing a tag here can drop it to zero photos elsewhere
+            // (main already pruned its group assignment server-side) —
+            // refetch so this session's state doesn't drift from that.
+            void loadTagGroupsData()
           } catch (err) {
             console.error(`failed to update tags for ${filePath}`, err)
             notifications.show({ color: 'red', message: 'Failed to save tags' })
@@ -513,7 +535,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       tagWriteQueueRef.current.set(filePath, next)
       await next
     },
-    [state.photosByPath]
+    [state.photosByPath, loadTagGroupsData]
   )
 
   const setFolderFilter = useCallback((folder: string | null) => {
@@ -552,13 +574,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       try {
         const photos = await window.api.renameTag(oldTag, newTag, filePaths)
         dispatch({ type: 'TAG_RENAMED', oldTag, newTag, photos })
+        void loadTagGroupsData()
       } catch (err) {
         console.error(`failed to rename tag ${oldTag} to ${newTag}`, err)
         notifications.show({ color: 'red', message: 'Failed to rename tag' })
         throw err
       }
     },
-    [state.photosByPath]
+    [state.photosByPath, loadTagGroupsData]
   )
 
   const deleteTag = useCallback(
@@ -570,14 +593,48 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       try {
         const photos = await window.api.deleteTag(tag, filePaths)
         dispatch({ type: 'TAG_DELETED', tag, photos })
+        void loadTagGroupsData()
       } catch (err) {
         console.error(`failed to delete tag ${tag}`, err)
         notifications.show({ color: 'red', message: 'Failed to delete tag' })
         throw err
       }
     },
-    [state.photosByPath]
+    [state.photosByPath, loadTagGroupsData]
   )
+
+  // Group id/position are assigned server-side (createTagGroup), so this
+  // waits for the response rather than dispatching optimistically like the
+  // other three below — there's nothing sensible to render before that.
+  const createTagGroup = useCallback(async (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    try {
+      const group = await window.api.createTagGroup(trimmed)
+      dispatch({ type: 'TAG_GROUP_CREATED', group })
+    } catch (err) {
+      console.error(`failed to create tag group ${trimmed}`, err)
+      notifications.show({ color: 'red', message: 'Failed to create tag group' })
+      throw err
+    }
+  }, [])
+
+  const renameTagGroup = useCallback(async (id: string, name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    dispatch({ type: 'TAG_GROUP_RENAMED', id, name: trimmed })
+    void window.api.renameTagGroup(id, trimmed)
+  }, [])
+
+  const deleteTagGroup = useCallback(async (id: string) => {
+    dispatch({ type: 'TAG_GROUP_DELETED', id })
+    void window.api.deleteTagGroup(id)
+  }, [])
+
+  const assignTagToGroup = useCallback(async (tag: string, groupId: string | null) => {
+    dispatch({ type: 'TAG_GROUP_ASSIGNMENT_CHANGED', tag, groupId })
+    void window.api.setTagGroupAssignment(tag, groupId)
+  }, [])
 
   const renameFile = useCallback(
     async (filePath: string, newBaseName: string) => {
@@ -940,6 +997,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setTagDescription,
     renameTag,
     deleteTag,
+    createTagGroup,
+    renameTagGroup,
+    deleteTagGroup,
+    assignTagToGroup,
     renameFile,
     updateDateTaken,
     updateComment,

@@ -1,4 +1,4 @@
-import type { PhotoRecord, ScanCompleteEvent } from '@shared/types'
+import type { PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
 import {
   addPhotoToFolderTree,
   findRootFolder,
@@ -58,6 +58,12 @@ export interface PhotoLibraryState {
   dvdStudioName: string
   excludePatterns: string[]
   tagDescriptions: Map<string, string>
+  // User-defined tag groups (TagPanel's accordion view) and each grouped
+  // tag's membership (tag -> group id) — a tag not present here is ungrouped
+  // ("Other Tags"). A group with no tags still stays in tagGroups; only an
+  // explicit delete removes one.
+  tagGroups: TagGroup[]
+  tagGroupAssignments: Map<string, string>
   // Newest-first shortcut list for the tag-input dropdown. Session-only.
   recentTags: string[]
   // Open tab ids — photo paths or compare-tab ids (see compareTabs).
@@ -97,6 +103,8 @@ export const initialState: PhotoLibraryState = {
   dvdStudioName: 'TAG ME PICTURES',
   excludePatterns: [],
   tagDescriptions: new Map(),
+  tagGroups: [],
+  tagGroupAssignments: new Map(),
   recentTags: [],
   openTabs: [],
   activeTab: 'gallery',
@@ -138,6 +146,15 @@ export type PhotoLibraryAction =
   | { type: 'TAG_DESCRIPTION_UPDATED'; tag: string; description: string }
   | { type: 'TAG_RENAMED'; oldTag: string; newTag: string; photos: PhotoRecord[] }
   | { type: 'TAG_DELETED'; tag: string; photos: PhotoRecord[] }
+  | {
+      type: 'TAG_GROUPS_DATA_LOADED'
+      groups: TagGroup[]
+      assignments: Record<string, string>
+    }
+  | { type: 'TAG_GROUP_CREATED'; group: TagGroup }
+  | { type: 'TAG_GROUP_RENAMED'; id: string; name: string }
+  | { type: 'TAG_GROUP_DELETED'; id: string }
+  | { type: 'TAG_GROUP_ASSIGNMENT_CHANGED'; tag: string; groupId: string | null }
   | { type: 'OPEN_PHOTO_TAB'; filePath: string }
   | { type: 'OPEN_COMPARE_TAB'; paths: string[] }
   | { type: 'REMOVE_FROM_COMPARE_TAB'; tabId: string; filePath: string }
@@ -495,9 +512,19 @@ export function photoLibraryReducer(
       tagDescriptions.delete(action.oldTag)
       if (movedDescription) tagDescriptions.set(action.newTag, movedDescription)
 
+      // Carries group membership across the rename too — from allTags'
+      // perspective a rename looks identical to "old tag gone, new tag
+      // appeared," so this can't be inferred generically the way a tag
+      // actually disappearing can (see the reconciliation this mirrors on
+      // the main-process side, renameTagMetadata).
+      const tagGroupAssignments = new Map(state.tagGroupAssignments)
+      const movedGroupId = tagGroupAssignments.get(action.oldTag)
+      tagGroupAssignments.delete(action.oldTag)
+      if (movedGroupId) tagGroupAssignments.set(action.newTag, movedGroupId)
+
       const selectedTag = state.selectedTag === action.oldTag ? action.newTag : state.selectedTag
 
-      return { ...state, photosByPath, tagDescriptions, selectedTag }
+      return { ...state, photosByPath, tagDescriptions, tagGroupAssignments, selectedTag }
     }
     case 'TAG_DELETED': {
       const photosByPath = new Map(state.photosByPath)
@@ -508,9 +535,43 @@ export function photoLibraryReducer(
       const tagDescriptions = new Map(state.tagDescriptions)
       tagDescriptions.delete(action.tag)
 
+      const tagGroupAssignments = new Map(state.tagGroupAssignments)
+      tagGroupAssignments.delete(action.tag)
+
       const selectedTag = state.selectedTag === action.tag ? null : state.selectedTag
 
-      return { ...state, photosByPath, tagDescriptions, selectedTag }
+      return { ...state, photosByPath, tagDescriptions, tagGroupAssignments, selectedTag }
+    }
+    case 'TAG_GROUPS_DATA_LOADED':
+      return {
+        ...state,
+        tagGroups: action.groups,
+        tagGroupAssignments: new Map(Object.entries(action.assignments))
+      }
+    case 'TAG_GROUP_CREATED':
+      return { ...state, tagGroups: [...state.tagGroups, action.group] }
+    case 'TAG_GROUP_RENAMED':
+      return {
+        ...state,
+        tagGroups: state.tagGroups.map((group) =>
+          group.id === action.id ? { ...group, name: action.name } : group
+        )
+      }
+    case 'TAG_GROUP_DELETED': {
+      const tagGroups = state.tagGroups.filter((group) => group.id !== action.id)
+      const tagGroupAssignments = new Map(
+        Array.from(state.tagGroupAssignments).filter(([, groupId]) => groupId !== action.id)
+      )
+      return { ...state, tagGroups, tagGroupAssignments }
+    }
+    case 'TAG_GROUP_ASSIGNMENT_CHANGED': {
+      const tagGroupAssignments = new Map(state.tagGroupAssignments)
+      if (action.groupId === null) {
+        tagGroupAssignments.delete(action.tag)
+      } else {
+        tagGroupAssignments.set(action.tag, action.groupId)
+      }
+      return { ...state, tagGroupAssignments }
     }
     case 'OPEN_PHOTO_TAB': {
       const openTabs = state.openTabs.includes(action.filePath)

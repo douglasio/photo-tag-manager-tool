@@ -404,6 +404,108 @@ describe('photoLibraryReducer', () => {
     })
   })
 
+  describe('tag groups', () => {
+    it('loads groups and their tag assignments together', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUPS_DATA_LOADED',
+        groups: [{ id: 'g1', name: 'People', position: 0 }],
+        assignments: { vacation: 'g1' }
+      })
+      expect(state.tagGroups).toEqual([{ id: 'g1', name: 'People', position: 0 }])
+      expect(state.tagGroupAssignments.get('vacation')).toBe('g1')
+    })
+
+    it('appends a created group', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUP_CREATED',
+        group: { id: 'g1', name: 'People', position: 0 }
+      })
+      expect(state.tagGroups).toEqual([{ id: 'g1', name: 'People', position: 0 }])
+    })
+
+    it('renames a group by id', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUP_CREATED',
+        group: { id: 'g1', name: 'People', position: 0 }
+      })
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_RENAMED',
+        id: 'g1',
+        name: 'Friends & Family'
+      })
+      expect(state.tagGroups[0].name).toBe('Friends & Family')
+    })
+
+    it('deletes a group and un-assigns its tags, leaving other groups alone', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUPS_DATA_LOADED',
+        groups: [
+          { id: 'g1', name: 'People', position: 0 },
+          { id: 'g2', name: 'Places', position: 1 }
+        ],
+        assignments: { vacation: 'g1', beach: 'g2' }
+      })
+
+      state = photoLibraryReducer(state, { type: 'TAG_GROUP_DELETED', id: 'g1' })
+
+      expect(state.tagGroups).toEqual([{ id: 'g2', name: 'Places', position: 1 }])
+      expect(state.tagGroupAssignments.has('vacation')).toBe(false)
+      expect(state.tagGroupAssignments.get('beach')).toBe('g2')
+    })
+
+    it('sets and clears a tag-to-group assignment', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUP_ASSIGNMENT_CHANGED',
+        tag: 'vacation',
+        groupId: 'g1'
+      })
+      expect(state.tagGroupAssignments.get('vacation')).toBe('g1')
+
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_ASSIGNMENT_CHANGED',
+        tag: 'vacation',
+        groupId: null
+      })
+      expect(state.tagGroupAssignments.has('vacation')).toBe(false)
+    })
+
+    it('carries a tag group assignment across a rename', () => {
+      let state = withPhotos('/root/a.jpg')
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_ASSIGNMENT_CHANGED',
+        tag: 'old',
+        groupId: 'g1'
+      })
+
+      const next = photoLibraryReducer(state, {
+        type: 'TAG_RENAMED',
+        oldTag: 'old',
+        newTag: 'new',
+        photos: [makePhoto('/root/a.jpg', { tags: ['new'] })]
+      })
+
+      expect(next.tagGroupAssignments.has('old')).toBe(false)
+      expect(next.tagGroupAssignments.get('new')).toBe('g1')
+    })
+
+    it('clears a tag group assignment when the tag is deleted', () => {
+      let state = withPhotos('/root/a.jpg')
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_ASSIGNMENT_CHANGED',
+        tag: 'old',
+        groupId: 'g1'
+      })
+
+      const next = photoLibraryReducer(state, {
+        type: 'TAG_DELETED',
+        tag: 'old',
+        photos: [makePhoto('/root/a.jpg', { tags: [] })]
+      })
+
+      expect(next.tagGroupAssignments.has('old')).toBe(false)
+    })
+  })
+
   describe('photo view tabs', () => {
     it('opens a new tab and makes it active', () => {
       const state = photoLibraryReducer(initialState, {

@@ -10,6 +10,7 @@ import type {
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
+  TagGroup,
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
@@ -96,6 +97,14 @@ const api = {
     ipcRenderer.invoke('tags:delete', tag, filePaths),
   addTagsToPhotos: (tags: string[], filePaths: string[]): Promise<PhotoRecord[]> =>
     ipcRenderer.invoke('tags:addBatch', tags, filePaths),
+  getTagGroupsData: (): Promise<{ groups: TagGroup[]; assignments: Record<string, string> }> =>
+    ipcRenderer.invoke('tags:getGroupsData'),
+  createTagGroup: (name: string): Promise<TagGroup> => ipcRenderer.invoke('tags:createGroup', name),
+  renameTagGroup: (id: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('tags:renameGroup', id, name),
+  deleteTagGroup: (id: string): Promise<void> => ipcRenderer.invoke('tags:deleteGroup', id),
+  setTagGroupAssignment: (tag: string, groupId: string | null): Promise<void> =>
+    ipcRenderer.invoke('tags:setGroupAssignment', tag, groupId),
   onScanProgress: (callback: (payload: ScanProgressEvent) => void): (() => void) =>
     subscribe('scan:progress', callback),
   onMetadataBatch: (callback: (payload: MetadataBatchEvent) => void): (() => void) =>

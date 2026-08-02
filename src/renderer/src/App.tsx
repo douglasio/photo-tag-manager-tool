@@ -24,6 +24,7 @@ import {
   Group,
   Image,
   Loader,
+  Paper,
   Scroller,
   Stack,
   Tabs,
@@ -56,6 +57,7 @@ import {
   SettingsModal,
   SortableTab,
   TabLabel,
+  TagGroupCreateButton,
   TagPanel
 } from '@components'
 import { radiusSize } from '@renderer/theme'
@@ -137,6 +139,18 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
   )
 }
 
+// The DragOverlay ghost for a tag being dragged into a group — deliberately
+// much lighter than DragPreview above, no thumbnail to show.
+function TagDragPreview({ tag }: { tag: string }): React.JSX.Element {
+  return (
+    <Paper withBorder shadow="md" px="sm" py={4} radius={radiusSize} style={{ cursor: 'grabbing' }}>
+      <Text size="sm" fw={500}>
+        #{tag}
+      </Text>
+    </Paper>
+  )
+}
+
 // Split out from App so it can call usePhotoLibrary — a component can't read
 // a context it also renders the Provider for in the same function.
 function AppLayout(): React.JSX.Element {
@@ -148,7 +162,8 @@ function AppLayout(): React.JSX.Element {
     addTagsToPhotos,
     movePhotosToFolder,
     setDetailsPanelCollapsed,
-    reorderPhotoTabs
+    reorderPhotoTabs,
+    assignTagToGroup
   } = usePhotoLibrary()
   const hasTabs = state.openTabs.length > 0
   // The navbar (Tags/Folders) only hides while an actual photo tab is active — switching back to the Gallery tab (with other photo tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
@@ -184,7 +199,14 @@ function AppLayout(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.openTabs, state.activeTab, setActiveTab])
 
-  const [activeDragPaths, setActiveDragPaths] = useState<string[] | null>(null)
+  // Two independent drag domains share this one DndContext (tags can't move
+  // to a second, nested context scoped to the tag panel without shadowing
+  // their existing useDroppable — see the tag-drag branch below) — 'photo'
+  // is the original dragged-thumbnail-onto-tag/folder flow, 'tag' is a tag
+  // being dragged into a group.
+  const [activeDrag, setActiveDrag] = useState<
+    { kind: 'photo'; paths: string[] } | { kind: 'tag'; tag: string } | null
+  >(null)
   const sensors = useSensors(
     // Requires a small pointer move before a drag "starts," so an ordinary
     // click (select, rename, etc.) is never mistaken for a drag.
@@ -192,16 +214,34 @@ function AppLayout(): React.JSX.Element {
   )
 
   const handleDragStart = (event: DragStartEvent): void => {
-    const paths = (event.active.data.current as { paths?: string[] } | undefined)?.paths
-    setActiveDragPaths(paths && paths.length > 0 ? paths : [String(event.active.id)])
+    const data = event.active.data.current as { paths?: string[]; tag?: string } | undefined
+    if (data?.tag) {
+      setActiveDrag({ kind: 'tag', tag: data.tag })
+      return
+    }
+    const paths = data?.paths
+    setActiveDrag({
+      kind: 'photo',
+      paths: paths && paths.length > 0 ? paths : [String(event.active.id)]
+    })
   }
 
   const handleDragEnd = (event: DragEndEvent): void => {
-    setActiveDragPaths(null)
+    setActiveDrag(null)
     const { active, over } = event
     if (!over) return
+
+    const activeData = active.data.current as { paths?: string[]; tag?: string } | undefined
+    if (activeData?.tag) {
+      const overData = over.data.current as { groupId?: string | null } | undefined
+      if (overData && 'groupId' in overData) {
+        void assignTagToGroup(activeData.tag, overData.groupId ?? null)
+      }
+      return
+    }
+
     const overData = over.data.current as { tag?: string; folderPath?: string } | undefined
-    const paths = (active.data.current as { paths?: string[] } | undefined)?.paths
+    const paths = activeData?.paths
     if (!paths || paths.length === 0) return
 
     if (overData?.folderPath) {
@@ -219,7 +259,8 @@ function AppLayout(): React.JSX.Element {
     })
   }
 
-  const activeDragPhoto = activeDragPaths ? state.photosByPath.get(activeDragPaths[0]) : undefined
+  const activeDragPhoto =
+    activeDrag?.kind === 'photo' ? state.photosByPath.get(activeDrag.paths[0]) : undefined
 
   // DndContext scoped to just the photo-tab row
   const tabSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -238,7 +279,7 @@ function AppLayout(): React.JSX.Element {
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setActiveDragPaths(null)}
+      onDragCancel={() => setActiveDrag(null)}
     >
       <AppShell
         header={{ height: HEADER_HEIGHT }}
@@ -298,7 +339,7 @@ function AppLayout(): React.JSX.Element {
             <AllPhotosRow />
           </Box>
           <Divider />
-          <PanelSection title="Tags">
+          <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
             <TagPanel />
           </PanelSection>
           <Divider />
@@ -399,10 +440,21 @@ function AppLayout(): React.JSX.Element {
       </AppShell>
       <DragOverlay
         modifiers={[snapCenterToCursor]}
-        style={{ width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }}
+        style={
+          activeDrag?.kind === 'tag'
+            ? undefined
+            : { width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }
+        }
       >
-        {activeDragPhoto && (
-          <DragPreview photo={activeDragPhoto} count={activeDragPaths?.length ?? 1} />
+        {activeDrag?.kind === 'tag' ? (
+          <TagDragPreview tag={activeDrag.tag} />
+        ) : (
+          activeDragPhoto && (
+            <DragPreview
+              photo={activeDragPhoto}
+              count={activeDrag?.kind === 'photo' ? activeDrag.paths.length : 1}
+            />
+          )
         )}
       </DragOverlay>
     </DndContext>

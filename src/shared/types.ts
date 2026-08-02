@@ -95,3 +95,9 @@ export interface MoveProgressEvent {
   completed: number
   total: number
 }
+
+export interface TagGroup {
+  id: string
+  name: string
+  position: number
+}

@@ -53,6 +53,32 @@ describe('ConfirmDialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
+  it('disables the confirm button when confirmDisabled is set', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+
+    render(
+      <MantineProvider>
+        <ConfirmDialog
+          title="New group"
+          opened
+          saving={false}
+          confirmLabel="Create"
+          confirmDisabled
+          onConfirm={onConfirm}
+          onCancel={vi.fn()}
+        >
+          content
+        </ConfirmDialog>
+      </MantineProvider>
+    )
+
+    const confirmButton = screen.getByRole('button', { name: 'Create' })
+    expect(confirmButton).toBeDisabled()
+    await user.click(confirmButton)
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
   it('renders nothing interactive when closed', () => {
     render(
       <MantineProvider>

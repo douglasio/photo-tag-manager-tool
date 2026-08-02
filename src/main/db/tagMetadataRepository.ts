@@ -1,5 +1,16 @@
 import { getDb } from './database'
 
+interface TagMetadataRow {
+  tag: string
+  description: string | null
+  group_id: string | null
+  position: number | null
+  hidden: number
+  cover_photo_path: string | null
+}
+
+const TAG_METADATA_COLUMNS = 'tag, description, group_id, position, hidden, cover_photo_path'
+
 export function getAllTagDescriptions(): Record<string, string> {
   const rows = getDb().prepare('SELECT tag, description FROM tag_metadata').all() as {
     tag: string
@@ -13,31 +24,97 @@ export function getAllTagDescriptions(): Record<string, string> {
   return result
 }
 
+// Upserts rather than deleting the row on an empty description — the row may
+// carry other properties (group membership, etc.) that must survive a
+// description being cleared. A row left with every column empty/default is
+// harmless: every getter here already filters on its own column.
 export function setTagDescription(tag: string, description: string): void {
-  if (description.trim() === '') {
-    getDb().prepare('DELETE FROM tag_metadata WHERE tag = ?').run(tag)
-    return
-  }
-
+  const value = description.trim() === '' ? null : description
   getDb()
     .prepare(
       `INSERT INTO tag_metadata (tag, description) VALUES (@tag, @description)
        ON CONFLICT(tag) DO UPDATE SET description = excluded.description`
     )
-    .run({ tag, description })
+    .run({ tag, description: value })
 }
 
-/** Moves a tag's description (if any) to a new tag name, used when a tag is renamed. */
-export function renameTagDescription(oldTag: string, newTag: string): void {
+/** Moves a tag's whole metadata row (description, group membership, and any
+ * future per-tag property) to a new tag name, used when a tag is renamed.
+ * If newTag already has a row (renaming into an existing tag name), the
+ * old row's values win — same precedence this already had for description
+ * alone before other columns existed on this table. */
+export function renameTagMetadata(oldTag: string, newTag: string): void {
   const db = getDb()
-  const row = db.prepare('SELECT description FROM tag_metadata WHERE tag = ?').get(oldTag) as
-    { description: string | null } | undefined
+  const row = db
+    .prepare(`SELECT ${TAG_METADATA_COLUMNS} FROM tag_metadata WHERE tag = ?`)
+    .get(oldTag) as TagMetadataRow | undefined
+  if (!row) return
 
   db.prepare('DELETE FROM tag_metadata WHERE tag = ?').run(oldTag)
-  if (!row?.description) return
-
   db.prepare(
-    `INSERT INTO tag_metadata (tag, description) VALUES (@tag, @description)
-     ON CONFLICT(tag) DO UPDATE SET description = excluded.description`
-  ).run({ tag: newTag, description: row.description })
+    `INSERT INTO tag_metadata (tag, description, group_id, position, hidden, cover_photo_path)
+     VALUES (@tag, @description, @group_id, @position, @hidden, @cover_photo_path)
+     ON CONFLICT(tag) DO UPDATE SET
+       description = excluded.description,
+       group_id = excluded.group_id,
+       position = excluded.position,
+       hidden = excluded.hidden,
+       cover_photo_path = excluded.cover_photo_path`
+  ).run({ ...row, tag: newTag })
+}
+
+/** Fully removes a tag's metadata row — used when the tag itself is deleted
+ * (stripped from every photo), unlike setTagDescription's empty-value case
+ * above which only clears one column. */
+export function deleteTagMetadata(tag: string): void {
+  getDb().prepare('DELETE FROM tag_metadata WHERE tag = ?').run(tag)
+}
+
+export function getAllTagGroupAssignments(): Record<string, string> {
+  const rows = getDb()
+    .prepare('SELECT tag, group_id FROM tag_metadata WHERE group_id IS NOT NULL')
+    .all() as { tag: string; group_id: string }[]
+
+  const result: Record<string, string> = {}
+  for (const row of rows) result[row.tag] = row.group_id
+  return result
+}
+
+export function setTagGroupAssignment(tag: string, groupId: string | null): void {
+  getDb()
+    .prepare(
+      `INSERT INTO tag_metadata (tag, group_id) VALUES (@tag, @groupId)
+       ON CONFLICT(tag) DO UPDATE SET group_id = excluded.group_id`
+    )
+    .run({ tag, groupId })
+}
+
+/** The set of tags currently applied to at least one photo, computed
+ * directly from photos.tags (a JSON array column) via SQLite's json_each —
+ * the authoritative source `allTags` is derived from in the renderer, used
+ * here so group-assignment cleanup doesn't need its own tracking of tag
+ * usage. */
+export function getUsedTags(): Set<string> {
+  const rows = getDb()
+    .prepare('SELECT DISTINCT je.value AS tag FROM photos, json_each(photos.tags) je')
+    .all() as { tag: string }[]
+  return new Set(rows.map((row) => row.tag))
+}
+
+/** Clears group_id for any tag no longer applied to any photo — never
+ * touches tag_groups itself, so a group stays around (even empty) until a
+ * user explicitly deletes it. Call after anything that can shrink the set
+ * of tags in use (see call sites in photoRepository/watchManager/tagHandlers). */
+export function pruneStaleTagGroupAssignments(): void {
+  const usedTags = getUsedTags()
+  const grouped = getAllTagGroupAssignments()
+  const stale = Object.keys(grouped).filter((tag) => !usedTags.has(tag))
+  if (stale.length === 0) return
+
+  const db = getDb()
+  const clear = db.prepare('UPDATE tag_metadata SET group_id = NULL WHERE tag = ?')
+  const clearMany = db.transaction((tags: string[]) => {
+    for (const tag of tags) clear.run(tag)
+  })
+  clearMany(stale)
 }

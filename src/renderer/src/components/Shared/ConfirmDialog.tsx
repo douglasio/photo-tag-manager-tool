@@ -7,6 +7,9 @@ interface ConfirmDialogProps {
   saving: boolean
   confirmLabel: string
   confirmColor?: string
+  // For a form-shaped dialog (e.g. a name input as children) rather than a
+  // pure confirmation — keeps the confirm button inert while its content is invalid.
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
   children: ReactNode
@@ -19,6 +22,7 @@ export function ConfirmDialog({
   saving,
   confirmLabel,
   confirmColor,
+  confirmDisabled,
   onConfirm,
   onCancel,
   children
@@ -30,7 +34,12 @@ export function ConfirmDialog({
         <Button variant="default" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
-        <Button color={confirmColor} onClick={onConfirm} loading={saving}>
+        <Button
+          color={confirmColor}
+          onClick={onConfirm}
+          loading={saving}
+          disabled={confirmDisabled}
+        >
           {confirmLabel}
         </Button>
       </Group>

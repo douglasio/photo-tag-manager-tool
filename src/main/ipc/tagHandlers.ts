@@ -3,14 +3,24 @@ import pLimitImport from 'p-limit'
 
 import { findByPath } from '@main/db/photoRepository'
 import {
+  createTagGroup,
+  deleteTagGroup,
+  getTagGroups,
+  renameTagGroup
+} from '@main/db/tagGroupRepository'
+import {
+  deleteTagMetadata,
   getAllTagDescriptions,
-  renameTagDescription,
-  setTagDescription
+  getAllTagGroupAssignments,
+  pruneStaleTagGroupAssignments,
+  renameTagMetadata,
+  setTagDescription,
+  setTagGroupAssignment
 } from '@main/db/tagMetadataRepository'
 import { writeTags } from '@main/services/metadataService'
 import { ingestFile } from '@main/services/photoIngest'
 import { suppressNextEvent } from '@main/services/watchManager'
-import type { PhotoRecord } from '@shared/types'
+import type { PhotoRecord, TagGroup } from '@shared/types'
 
 // p-limit is ESM-only; when externalized in the main-process CJS bundle,
 // `require('p-limit')` yields the module namespace object rather than the
@@ -36,6 +46,9 @@ export function registerTagHandlers(): void {
       await writeTags(filePath, tags)
       // Single-file, user-triggered edit — no concurrency to limit, so just run it inline.
       const { photo } = await ingestFile(filePath, (fn) => fn())
+      // This edit alone (not just a photo/row removal) can drop some other
+      // tag's usage to zero, e.g. removing the last instance of a tag here.
+      pruneStaleTagGroupAssignments()
       return photo
     }
   )
@@ -65,7 +78,11 @@ export function registerTagHandlers(): void {
         )
       )
 
-      renameTagDescription(oldTag, newTag)
+      // Carries the whole metadata row (description, group membership, ...)
+      // forward under the new name — a rename looks identical to
+      // "old tag deleted, new tag created" from allTags' perspective, so
+      // generic pruning alone can't preserve group membership across it.
+      renameTagMetadata(oldTag, newTag)
       return photos
     }
   )
@@ -74,7 +91,7 @@ export function registerTagHandlers(): void {
     'tags:addBatch',
     async (_event, tagsToAdd: string[], filePaths: string[]): Promise<PhotoRecord[]> => {
       const limit = pLimit(TAG_BATCH_CONCURRENCY)
-      return Promise.all(
+      const photos = await Promise.all(
         filePaths.map((filePath) =>
           limit(async () => {
             const currentTags = findByPath(filePath)?.record.tags ?? []
@@ -86,6 +103,12 @@ export function registerTagHandlers(): void {
           })
         )
       )
+
+      // Adding tags never removes usage, but a rename-like collision
+      // (renaming into a tag processed by another concurrent batch) is
+      // cheap enough to just cover unconditionally rather than reason about.
+      pruneStaleTagGroupAssignments()
+      return photos
     }
   )
 
@@ -106,8 +129,30 @@ export function registerTagHandlers(): void {
         )
       )
 
-      setTagDescription(tag, '')
+      deleteTagMetadata(tag)
       return photos
     }
   )
+
+  ipcMain.handle(
+    'tags:getGroupsData',
+    (): { groups: TagGroup[]; assignments: Record<string, string> } => ({
+      groups: getTagGroups(),
+      assignments: getAllTagGroupAssignments()
+    })
+  )
+
+  ipcMain.handle('tags:createGroup', (_event, name: string): TagGroup => createTagGroup(name))
+
+  ipcMain.handle('tags:renameGroup', (_event, id: string, name: string): void => {
+    renameTagGroup(id, name)
+  })
+
+  ipcMain.handle('tags:deleteGroup', (_event, id: string): void => {
+    deleteTagGroup(id)
+  })
+
+  ipcMain.handle('tags:setGroupAssignment', (_event, tag: string, groupId: string | null): void => {
+    setTagGroupAssignment(tag, groupId)
+  })
 }

@@ -1,11 +1,13 @@
 import { type ReactElement, useState } from 'react'
 
-import { useDroppable } from '@dnd-kit/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
+  Accordion,
   ActionIcon,
   AspectRatio,
   Badge,
   Button,
+  Group,
   Image,
   Stack,
   Text,
@@ -17,11 +19,14 @@ import { notifications } from '@mantine/notifications'
 import { IconPencil } from '@tabler/icons-react'
 
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
-import type { PhotoRecord } from '@shared/types'
+import type { PhotoRecord, TagGroup } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { activeHoverBackground, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { TagContextMenu } from './TagContextMenu'
+import { TagGroupContextMenu } from './TagGroupContextMenu'
+import { TagGroupDeleteDialog } from './TagGroupDeleteDialog'
+import { TagGroupNameDialog } from './TagGroupNameDialog'
 import { TagRenameDialog } from './TagRenameDialog'
 
 const COVER_SIZE = 28
@@ -33,6 +38,9 @@ interface TagListItemProps {
   coverPhoto: PhotoRecord | undefined
   isActive: boolean
   editing: boolean
+  // Only draggable once there's at least one group to drag it into — no
+  // point offering the affordance with nowhere for a drop to land.
+  draggable: boolean
   onSelect: () => void
   onStartEdit: () => void
   onStopEdit: () => void
@@ -46,14 +54,25 @@ function TagListItem({
   coverPhoto,
   isActive,
   editing,
+  draggable,
   onSelect,
   onStartEdit,
   onStopEdit,
   onRename
 }: TagListItemProps): ReactElement {
   const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
-  const { isOver, setNodeRef } = useDroppable({ id: `tag:${tag}`, data: { tag } })
-  const ref = useMergedRef(hoverRef, setNodeRef)
+  const { isOver, setNodeRef: setDropRef } = useDroppable({ id: `tag:${tag}`, data: { tag } })
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging
+  } = useDraggable({
+    id: `tag-drag:${tag}`,
+    data: { tag },
+    disabled: !draggable || editing
+  })
+  const ref = useMergedRef(hoverRef, setDropRef, setDragRef)
 
   const [draft, setDraft] = useState(tag)
   // Adjust-during-render reset (not a useEffect) for when editing is
@@ -119,6 +138,8 @@ function TagListItem({
             as FolderTree's rename row). */}
         <Button
           ref={ref}
+          {...attributes}
+          {...listeners}
           onClick={() => {
             if (editing) return
             onSelect()
@@ -130,6 +151,7 @@ function TagListItem({
           onKeyDown={(event) => {
             if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
           }}
+          opacity={isDragging ? 0.4 : undefined}
           fullWidth
           justify="space-between"
           variant="transparent"
@@ -234,6 +256,110 @@ function TagListItem({
   )
 }
 
+interface TagGroupSectionProps {
+  // null renders the synthetic "Other Tags" section — no rename/delete,
+  // never removed itself, just whatever isn't in a real group.
+  group: TagGroup | null
+  tags: string[]
+  existingGroupNames: string[]
+  renderTagRow: (tag: string) => ReactElement
+}
+
+function TagGroupSection({
+  group,
+  tags,
+  existingGroupNames,
+  renderTagRow
+}: TagGroupSectionProps): ReactElement {
+  const { renameTagGroup, deleteTagGroup } = usePhotoLibrary()
+  const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
+  const { isOver, setNodeRef } = useDroppable({
+    id: `group:${group?.id ?? 'other'}`,
+    data: { groupId: group?.id ?? null }
+  })
+  const ref = useMergedRef(hoverRef, setNodeRef)
+
+  const [renaming, setRenaming] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const handleRename = async (name: string): Promise<void> => {
+    if (!group) return
+    setSaving(true)
+    try {
+      await renameTagGroup(group.id, name)
+      setRenaming(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (): Promise<void> => {
+    if (!group) return
+    setSaving(true)
+    try {
+      await deleteTagGroup(group.id)
+      setConfirmingDelete(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const control = (
+    <Accordion.Control
+      ref={ref}
+      bg={isOver ? 'var(--mantine-primary-color-light)' : activeHoverBackground(false, hovered)}
+      bd={isOver ? '2px dashed var(--mantine-primary-color-filled)' : undefined}
+    >
+      <Group justify="space-between" wrap="nowrap" pr="xs">
+        <Text truncate="end">{group?.name ?? 'Other Tags'}</Text>
+        <Badge variant="light" style={{ flexShrink: 0 }}>
+          {tags.length}
+        </Badge>
+      </Group>
+    </Accordion.Control>
+  )
+
+  return (
+    <Accordion.Item value={group?.id ?? '__other__'}>
+      {group ? (
+        <TagGroupContextMenu
+          onRename={() => setRenaming(true)}
+          onDelete={() => setConfirmingDelete(true)}
+        >
+          {control}
+        </TagGroupContextMenu>
+      ) : (
+        control
+      )}
+      <Accordion.Panel>
+        <Stack gap={0}>{tags.map(renderTagRow)}</Stack>
+      </Accordion.Panel>
+      {group && (
+        <>
+          <TagGroupNameDialog
+            title="Rename tag group"
+            confirmLabel="Rename"
+            opened={renaming}
+            saving={saving}
+            initialName={group.name}
+            existingNames={existingGroupNames}
+            onConfirm={(name) => void handleRename(name)}
+            onCancel={() => setRenaming(false)}
+          />
+          <TagGroupDeleteDialog
+            name={group.name}
+            opened={confirmingDelete}
+            saving={saving}
+            onConfirm={() => void handleDelete()}
+            onCancel={() => setConfirmingDelete(false)}
+          />
+        </>
+      )}
+    </Accordion.Item>
+  )
+}
+
 export function TagPanel(): ReactElement {
   const { allTags, tagCounts, tagCoverPhotos, state, setTagFilter, renameTag } = usePhotoLibrary()
   const [editingTag, setEditingTag] = useState<string | null>(null)
@@ -242,26 +368,54 @@ export function TagPanel(): ReactElement {
     return <Text c="dimmed">No tags yet.</Text>
   }
 
+  const renderTagRow = (tag: string): ReactElement => {
+    const isActive = state.selectedTag === tag
+    return (
+      <TagListItem
+        key={tag}
+        tag={tag}
+        count={tagCounts.get(tag) ?? 0}
+        description={state.tagDescriptions.get(tag) ?? ''}
+        coverPhoto={tagCoverPhotos.get(tag)}
+        isActive={isActive}
+        editing={editingTag === tag}
+        draggable={state.tagGroups.length > 0}
+        onSelect={() => setTagFilter(isActive ? null : tag)}
+        onStartEdit={() => setEditingTag(tag)}
+        onStopEdit={() => setEditingTag(null)}
+        onRename={(newTag) => renameTag(tag, newTag)}
+      />
+    )
+  }
+
+  if (state.tagGroups.length === 0) {
+    return <Stack gap={0}>{allTags.map(renderTagRow)}</Stack>
+  }
+
+  const otherTags = allTags.filter((tag) => !state.tagGroupAssignments.has(tag))
+  const existingGroupNames = state.tagGroups.map((group) => group.name)
+
   return (
-    <Stack gap={0}>
-      {allTags.map((tag) => {
-        const isActive = state.selectedTag === tag
-        return (
-          <TagListItem
-            key={tag}
-            tag={tag}
-            count={tagCounts.get(tag) ?? 0}
-            description={state.tagDescriptions.get(tag) ?? ''}
-            coverPhoto={tagCoverPhotos.get(tag)}
-            isActive={isActive}
-            editing={editingTag === tag}
-            onSelect={() => setTagFilter(isActive ? null : tag)}
-            onStartEdit={() => setEditingTag(tag)}
-            onStopEdit={() => setEditingTag(null)}
-            onRename={(newTag) => renameTag(tag, newTag)}
-          />
-        )
-      })}
-    </Stack>
+    <Accordion
+      multiple
+      variant="separated"
+      defaultValue={[...state.tagGroups.map((group) => group.id), '__other__']}
+    >
+      {state.tagGroups.map((group) => (
+        <TagGroupSection
+          key={group.id}
+          group={group}
+          tags={allTags.filter((tag) => state.tagGroupAssignments.get(tag) === group.id)}
+          existingGroupNames={existingGroupNames.filter((name) => name !== group.name)}
+          renderTagRow={renderTagRow}
+        />
+      ))}
+      <TagGroupSection
+        group={null}
+        tags={otherTags}
+        existingGroupNames={existingGroupNames}
+        renderTagRow={renderTagRow}
+      />
+    </Accordion>
   )
 }

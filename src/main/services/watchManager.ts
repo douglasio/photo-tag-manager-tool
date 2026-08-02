@@ -3,6 +3,7 @@ import pLimitImport from 'p-limit'
 
 import { removePhoto } from '@main/db/photoRepository'
 import { getExcludePatterns } from '@main/db/settingsRepository'
+import { pruneStaleTagGroupAssignments } from '@main/db/tagMetadataRepository'
 import type {
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
@@ -45,6 +46,11 @@ export function suppressNextEvent(filePath: string): void {
 async function handleUpsert(filePath: string, changeType: 'add' | 'change'): Promise<void> {
   try {
     const { photo } = await ingestFile(filePath, thumbnailLimit)
+    // Only an edit to an already-known file can shrink tag usage (a brand
+    // new 'add' can only introduce tags) — skipped for 'add' so this isn't
+    // also running once per file during a large initial folder scan, which
+    // goes through a separate path from this live-watcher one anyway.
+    if (changeType === 'change') pruneStaleTagGroupAssignments()
     const payload: WatchPhotoUpsertedEvent = { photo, changeType }
     watchTarget?.send('watch:photo-upserted', payload)
   } catch (err) {
