@@ -13,7 +13,7 @@ import {
 import { notifications } from '@mantine/notifications'
 
 import { MoveProgressToast } from '@components'
-import type { PhotoRecord, RotateDirection } from '@shared/types'
+import type { DefaultView, PhotoRecord, RotateDirection } from '@shared/types'
 import { basename, isPhotoInFolder } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
@@ -85,10 +85,12 @@ interface PhotoLibraryContextValue {
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
+  setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
   setShowFilenames: (value: boolean) => void
+  setShowViewCounts: (value: boolean) => void
   setMagazineTitle: (value: string) => void
   setNewspaperTitle: (value: string) => void
   setDvdStudioName: (value: string) => void
@@ -97,6 +99,11 @@ interface PhotoLibraryContextValue {
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
   deleteTag: (tag: string) => Promise<void>
+  createTagGroup: (name: string, matchPattern?: string | null) => Promise<void>
+  renameTagGroup: (id: string, name: string) => Promise<void>
+  updateTagGroupPattern: (id: string, matchPattern: string | null) => Promise<void>
+  deleteTagGroup: (id: string) => Promise<void>
+  assignTagToGroup: (tag: string, groupId: string | null) => Promise<void>
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
   updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
   updateComment: (filePath: string, comment: string) => Promise<void>
@@ -215,13 +222,33 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   }, [scheduleWatchNotification])
 
   // Starts a scan for one folder and resolves once that scan's scan:complete
-  // event arrives, so callers can await folders sequentially rather than
-  // firing them all at once.
+  // event arrives.
   const startScanFor = useCallback((rootPath: string): Promise<void> => {
     return new Promise((resolve) => {
       void window.api.startScan(rootPath).then(({ scanId }) => {
         scanIdRef.current = scanId
-        dispatch({ type: 'SCAN_STARTED', rootPath, scanId })
+        dispatch({ type: 'SCAN_STARTED', scanId })
+
+        const unsubscribe = window.api.onScanComplete((payload) => {
+          if (payload.scanId !== scanId) return
+          unsubscribe()
+          resolve()
+        })
+      })
+    })
+  }, [])
+
+  // Same as startScanFor, but combines every given root into one scan (one
+  // scanId, one shared metadata/thumbnail concurrency pool) instead of
+  // awaiting each folder's scan sequentially — used for the startup sweep
+  // and "rescan all," where sequential awaiting made total load time the
+  // sum of every folder's scan time.
+  const startScanForAll = useCallback((rootPaths: string[]): Promise<void> => {
+    if (rootPaths.length === 0) return Promise.resolve()
+    return new Promise((resolve) => {
+      void window.api.startScanAll(rootPaths).then(({ scanId }) => {
+        scanIdRef.current = scanId
+        dispatch({ type: 'SCAN_STARTED', scanId })
 
         const unsubscribe = window.api.onScanComplete((payload) => {
           if (payload.scanId !== scanId) return
@@ -235,12 +262,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getFolders().then(async (folders) => {
       dispatch({ type: 'FOLDERS_LOADED', folders })
-      for (const folder of folders) {
-        await startScanFor(folder)
-      }
+      await startScanForAll(folders)
       dispatch({ type: 'INITIAL_LOAD_COMPLETE' })
     })
-  }, [startScanFor])
+  }, [startScanForAll])
 
   useEffect(() => {
     window.api.getTagDescriptions().then((descriptions) => {
@@ -248,9 +273,26 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     })
   }, [])
 
+  const loadTagGroupsData = useCallback(() => {
+    return window.api.getTagGroupsData().then(({ groups, assignments }) => {
+      dispatch({ type: 'TAG_GROUPS_DATA_LOADED', groups, assignments })
+    })
+  }, [])
+
+  useEffect(() => {
+    void loadTagGroupsData()
+  }, [loadTagGroupsData])
+
   useEffect(() => {
     window.api.getGallerySort().then((sort) => {
       if (sort) dispatch({ type: 'SET_SORT', sortBy: sort.sortBy, sortOrder: sort.sortOrder })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getDefaultView().then((value) => {
+      dispatch({ type: 'SET_DEFAULT_VIEW', value })
+      dispatch({ type: 'SET_ACTIVE_TAB', tab: value })
     })
   }, [])
 
@@ -281,6 +323,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getShowFilenames().then((value) => {
       dispatch({ type: 'SET_SHOW_FILENAMES', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getShowViewCounts().then((value) => {
+      dispatch({ type: 'SET_SHOW_VIEW_COUNTS', value })
     })
   }, [])
 
@@ -363,10 +411,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   }, [])
 
   const rescanAll = useCallback(async () => {
-    for (const folder of state.folders) {
-      await startScanFor(folder)
-    }
-  }, [state.folders, startScanFor])
+    await startScanForAll(state.folders)
+  }, [state.folders, startScanForAll])
 
   // A plain click always replaces the whole selection with just this photo —
   // both the DetailPanel-primary pointer and the multi-select batch.
@@ -395,18 +441,22 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // (tags applied to state.selectedPaths) and drag-and-drop onto a tag row
   // (tags applied to whatever was actually dragged, which isn't necessarily
   // the current selection — e.g. dragging a single unselected photo).
-  const addTagsToPhotos = useCallback(async (tags: string[], filePaths: string[]) => {
-    if (filePaths.length === 0 || tags.length === 0) return
-    try {
-      const photos = await window.api.addTagsToPhotos(tags, filePaths)
-      dispatch({ type: 'PHOTOS_UPSERTED', photos })
-      dispatch({ type: 'TAGS_ASSIGNED', tags })
-    } catch (err) {
-      console.error('failed to add tags to photos', err)
-      notifications.show({ color: 'red', message: 'Failed to save tags' })
-      throw err
-    }
-  }, [])
+  const addTagsToPhotos = useCallback(
+    async (tags: string[], filePaths: string[]) => {
+      if (filePaths.length === 0 || tags.length === 0) return
+      try {
+        const photos = await window.api.addTagsToPhotos(tags, filePaths)
+        dispatch({ type: 'PHOTOS_UPSERTED', photos })
+        dispatch({ type: 'TAGS_ASSIGNED', tags })
+        void loadTagGroupsData()
+      } catch (err) {
+        console.error('failed to add tags to photos', err)
+        notifications.show({ color: 'red', message: 'Failed to save tags' })
+        throw err
+      }
+    },
+    [loadTagGroupsData]
+  )
 
   const addTagsToSelection = useCallback(
     (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
@@ -504,6 +554,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
           try {
             const photo = await window.api.updateTags(filePath, tags)
             dispatch({ type: 'PHOTO_UPSERTED', photo })
+            // Removing a tag here can drop it to zero photos elsewhere
+            // (main already pruned its group assignment server-side) —
+            // refetch so this session's state doesn't drift from that.
+            void loadTagGroupsData()
           } catch (err) {
             console.error(`failed to update tags for ${filePath}`, err)
             notifications.show({ color: 'red', message: 'Failed to save tags' })
@@ -513,7 +567,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       tagWriteQueueRef.current.set(filePath, next)
       await next
     },
-    [state.photosByPath]
+    [state.photosByPath, loadTagGroupsData]
   )
 
   const setFolderFilter = useCallback((folder: string | null) => {
@@ -552,13 +606,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       try {
         const photos = await window.api.renameTag(oldTag, newTag, filePaths)
         dispatch({ type: 'TAG_RENAMED', oldTag, newTag, photos })
+        void loadTagGroupsData()
       } catch (err) {
         console.error(`failed to rename tag ${oldTag} to ${newTag}`, err)
         notifications.show({ color: 'red', message: 'Failed to rename tag' })
         throw err
       }
     },
-    [state.photosByPath]
+    [state.photosByPath, loadTagGroupsData]
   )
 
   const deleteTag = useCallback(
@@ -570,14 +625,66 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       try {
         const photos = await window.api.deleteTag(tag, filePaths)
         dispatch({ type: 'TAG_DELETED', tag, photos })
+        void loadTagGroupsData()
       } catch (err) {
         console.error(`failed to delete tag ${tag}`, err)
         notifications.show({ color: 'red', message: 'Failed to delete tag' })
         throw err
       }
     },
-    [state.photosByPath]
+    [state.photosByPath, loadTagGroupsData]
   )
+
+  // Group id/position are assigned server-side (createTagGroup), so this
+  // waits for the response rather than dispatching optimistically like the
+  // other three below — there's nothing sensible to render before that.
+  const createTagGroup = useCallback(
+    async (name: string, matchPattern: string | null = null) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      try {
+        const group = await window.api.createTagGroup(trimmed, matchPattern)
+        dispatch({ type: 'TAG_GROUP_CREATED', group })
+        // A rule set at creation time sweeps in matching tags server-side —
+        // refetch to pick up whatever it just assigned.
+        if (group.matchPattern) void loadTagGroupsData()
+      } catch (err) {
+        console.error(`failed to create tag group ${trimmed}`, err)
+        notifications.show({ color: 'red', message: 'Failed to create tag group' })
+        throw err
+      }
+    },
+    [loadTagGroupsData]
+  )
+
+  const renameTagGroup = useCallback(async (id: string, name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    dispatch({ type: 'TAG_GROUP_RENAMED', id, name: trimmed })
+    void window.api.renameTagGroup(id, trimmed)
+  }, [])
+
+  const updateTagGroupPattern = useCallback(
+    async (id: string, matchPattern: string | null) => {
+      const trimmed = matchPattern?.trim() || null
+      dispatch({ type: 'TAG_GROUP_MATCH_PATTERN_UPDATED', id, matchPattern: trimmed })
+      await window.api.setTagGroupMatchPattern(id, trimmed)
+      // The pattern change sweeps tag assignments server-side — refetch to
+      // reflect whatever it just added/removed from this (or any) group.
+      void loadTagGroupsData()
+    },
+    [loadTagGroupsData]
+  )
+
+  const deleteTagGroup = useCallback(async (id: string) => {
+    dispatch({ type: 'TAG_GROUP_DELETED', id })
+    void window.api.deleteTagGroup(id)
+  }, [])
+
+  const assignTagToGroup = useCallback(async (tag: string, groupId: string | null) => {
+    dispatch({ type: 'TAG_GROUP_ASSIGNMENT_CHANGED', tag, groupId })
+    void window.api.setTagGroupAssignment(tag, groupId)
+  }, [])
 
   const renameFile = useCallback(
     async (filePath: string, newBaseName: string) => {
@@ -726,6 +833,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         if (bTime === null) return -1
         return direction * (aTime - bTime)
       })
+    } else if (state.sortBy === 'viewCount') {
+      // Ties (most commonly 0 views, before anything's been opened) fall
+      // back to filename so the order stays stable rather than shuffling.
+      result.sort((a, b) => {
+        if (a.viewCount === b.viewCount) return a.fileName.localeCompare(b.fileName)
+        return direction * (a.viewCount - b.viewCount)
+      })
     } else {
       result.sort((a, b) => direction * a.fileName.localeCompare(b.fileName))
     }
@@ -735,6 +849,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const setSort = useCallback((sortBy: GallerySortBy, sortOrder: GallerySortOrder) => {
     dispatch({ type: 'SET_SORT', sortBy, sortOrder })
     void window.api.setGallerySort({ sortBy, sortOrder })
+  }, [])
+
+  const setDefaultView = useCallback((value: DefaultView) => {
+    dispatch({ type: 'SET_DEFAULT_VIEW', value })
+    void window.api.setDefaultView(value)
   }, [])
 
   const setShowEmptyFolders = useCallback((value: boolean) => {
@@ -755,6 +874,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const setShowFilenames = useCallback((value: boolean) => {
     dispatch({ type: 'SET_SHOW_FILENAMES', value })
     void window.api.setShowFilenames(value)
+  }, [])
+
+  const setShowViewCounts = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_SHOW_VIEW_COUNTS', value })
+    void window.api.setShowViewCounts(value)
   }, [])
 
   const setMagazineTitle = useCallback((value: string) => {
@@ -928,10 +1052,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setTagFilter,
     setFolderTagFilter,
     setSort,
+    setDefaultView,
     setShowEmptyFolders,
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,
     setShowFilenames,
+    setShowViewCounts,
     setMagazineTitle,
     setNewspaperTitle,
     setDvdStudioName,
@@ -940,6 +1066,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setTagDescription,
     renameTag,
     deleteTag,
+    createTagGroup,
+    renameTagGroup,
+    updateTagGroupPattern,
+    deleteTagGroup,
+    assignTagToGroup,
     renameFile,
     updateDateTaken,
     updateComment,

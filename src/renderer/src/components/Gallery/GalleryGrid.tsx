@@ -68,7 +68,11 @@ export function GalleryGrid(): ReactElement {
     setCellWidthPersisted,
     stepToMark,
     isSettling
-  } = useGalleryGridLayout({ photoCount: photos.length, showFilenames: state.showFilenames })
+  } = useGalleryGridLayout({
+    photoCount: photos.length,
+    showFilenames: state.showFilenames,
+    showViewCounts: state.showViewCounts
+  })
   const { previewTriggerHeld, previewScale } = useGalleryPreviewZoom(containerRef)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -109,7 +113,8 @@ export function GalleryGrid(): ReactElement {
       onRename: renameFile,
       previewTriggerHeld,
       previewScale,
-      showFilenames: state.showFilenames
+      showFilenames: state.showFilenames,
+      showViewCounts: state.showViewCounts
     }),
     [
       photos,
@@ -121,7 +126,8 @@ export function GalleryGrid(): ReactElement {
       renameFile,
       previewTriggerHeld,
       previewScale,
-      state.showFilenames
+      state.showFilenames,
+      state.showViewCounts
     ]
   )
 

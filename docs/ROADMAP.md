@@ -2,9 +2,9 @@
 
 This document serves as a roadmap of feature to implement, generally in no particular order.
 
-# Bug Fixes*
+# Bug Fixes
 
-- the tag in the gallery header looks crazy when in edit mode. Maybe move this edit toggle to the tag panel to be consistent with the folder list
+- Gallery preview zoom is not very smooth and doesn't zoom in enough
 
 # Features
 
@@ -12,21 +12,11 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Optimization
 
-1. During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
+1. [possibly already resolved] During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
 
 ## Shell
 
-1. [] Both the details pane and the left folder / tag panel should be resizable using Mantine Splitter with the no handle setting. Tags and Folders panels within the left sidebar should also be vertically resizable using the same component but vertically oriented. All of these positioning settings should be persisted.
-
-## Dashboard
-
-1. Create a welcome Dashboard view. Requirements:
-
-- Create all components for this under src/components/Dashboard
-- Add a persistent setting in the settings modal to allow the user to toggle between Dashboard and Gallery as the default view when opening the app, and check for that flag when the app runs to know which view to load into.
-- Dashboard should be pinned as the first tab (before Gallery) when tabs are visible.
-- Dashboard view is full-screen -- no side panels.
-- Leave the dashboard view itself blank for now, except for a barebones grid layout that scales from 1 / 2 / 3 columns based on screen size. In one of the grid cells, include a button to go to the Gallery view.
+1. Both the details pane and the left folder / tag panel should be resizable using Mantine Splitter with the no handle setting. Tags and Folders panels within the left sidebar should also be vertically resizable using the same component but vertically oriented. All of these positioning settings should be persisted.
 
 ## Navigation
 
@@ -40,23 +30,11 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
-## Write features
-
-Note: For all field "edit" features, interactivity should follow the same resuable pattern as tag editing - subtle edit ActionIcon appears on hover, clicking the icon or double-clicking the content should enable edit mode, enter saves the change, esc cancels it. Don't use a ConfirmDialog gate unless the action is risky or affects a number of files.
-
 ## Gallery View
 
-1. Sort by view count
+1. Select tag thumbnail photo
 
-2. Select tag thumbnail photo
-
-3. Create an alternate display option for the tags panel. This one is a 2-column grid of the tag thumbnails with the tag name and image count overlayed on top of the thumbnail, using Mantine's BackgroundImage component. Use the settings cog pattern used in the Folder section to put the toggle for this.
-
-4. Sort tags by count, alpha, most recent
-
-5. Rename tag and update all
-
-6. Update the keyboard tooltip hint about pressing ctrl to use the Mantine Kbd component
+2. Create an alternate display option for the tags panel. This one is a 2-column grid of the tag thumbnails with the tag name and image count overlayed on top of the thumbnail, using Mantine's BackgroundImage component. Use the settings cog pattern used in the Folder section to put the toggle for this.
 
 ## Tools
 
@@ -70,6 +48,8 @@ Note: For all field "edit" features, interactivity should follow the same resuab
 
 5. Export database
 
+6. Removing folders should not delete photo data
+
 ## Details Panel
 
 1. Make sure the details panel is not horizontally scrollable--it appears fields like folder path can stretch the panel beyond its width.
@@ -78,8 +58,14 @@ Note: For all field "edit" features, interactivity should follow the same resuab
 
 ## Photo view
 
-5. The image rotation issue persists
+1. Filters
+
+2. The image rotation issue persists
+
+## Settings
+
+1. Refactor the settings menu into a multi-tab list (Mantine Tabs, configured vertically), the first tab being "Settings" and the second being "Keyboard Shortcuts" with a list of all keyboard shortcuts built into the app, making use of Mantine Kbd to show keys when appropriate
 
 ## Codebase
 
-(none)
+1. Storybook or env config? Need a way to preview things without affecting data.

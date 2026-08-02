@@ -3,14 +3,16 @@ import {
   AspectRatio,
   Box,
   Center,
+  Flex,
   Image,
   Kbd,
+  RollingNumber,
   Tooltip,
   UnstyledButton,
   useMantineTheme
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
-import { IconAlertTriangle, IconPhoto } from '@tabler/icons-react'
+import { IconAlertTriangle, IconEye, IconPhoto } from '@tabler/icons-react'
 import type { ComponentPropsWithoutRef, MouseEvent, ReactElement } from 'react'
 
 import { FileNameField } from '@components'
@@ -25,8 +27,6 @@ import { GalleryHoverPreview } from './GalleryHoverPreview'
 interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onSelect'> {
   photo: PhotoRecord
   selected: boolean
-  // Distinct (lighter) highlight from `selected` for the rest of a
-  // multi-selection.
   multiSelected: boolean
   onSelect: (path: string, event: MouseEvent) => void
   renaming: boolean
@@ -41,12 +41,10 @@ interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onS
   previewScale: number
   // Renaming always shows the filename field regardless of this setting.
   showFilename: boolean
+  // Shares the filename's row rather than adding its own.
+  showViewCount: boolean
 }
 
-// Not a single root button — FileNameField's own edit button can't nest
-// inside another button, so the image gets its own inner button while the
-// filename stays a sibling. `...rest` carries PhotoContextMenu's injected
-// handlers onto the outer container so right-click works anywhere on the cell.
 export function PhotoThumbnail({
   photo,
   selected,
@@ -59,6 +57,7 @@ export function PhotoThumbnail({
   previewTriggerHeld,
   previewScale,
   showFilename,
+  showViewCount,
   className,
   ...rest
 }: PhotoThumbnailProps): ReactElement {
@@ -104,10 +103,7 @@ export function PhotoThumbnail({
           className="photo-thumbnail__select-button"
           onClick={(event) => onSelect(photo.filePath, event)}
           onDoubleClick={() => openPhotoTab(photo.filePath)}
-          // Space is the preview trigger (handled globally via useKeyHeld), not
-          // a selection toggle — without this, a focused button's native
-          // space-triggers-click behavior would also fire onSelect and
-          // deselect an already-selected photo.
+          // Space is the preview trigger (handled globally via useKeyHeld)
           onKeyDown={(event) => {
             if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
           }}
@@ -146,18 +142,31 @@ export function PhotoThumbnail({
           scale={previewScale}
           motionEnabled={motionEnabled}
         />
-        {(showFilename || renaming) && (
-          <Box w="100%">
-            <FileNameField
-              fileName={photo.fileName}
-              editing={renaming}
-              onStartEdit={onStartRename}
-              onStopEdit={onStopRename}
-              onRename={onRename}
-              variant="grid"
-            />
-          </Box>
-        )}
+        {(() => {
+          const filenameVisible = showFilename || renaming
+          const viewCountVisible = showViewCount && !renaming
+          if (!filenameVisible && !viewCountVisible) return null
+          return (
+            <Flex>
+              {filenameVisible && (
+                <FileNameField
+                  fileName={photo.fileName}
+                  editing={renaming}
+                  onStartEdit={onStartRename}
+                  onStopEdit={onStopRename}
+                  onRename={onRename}
+                  variant="grid"
+                />
+              )}
+              {viewCountVisible && (
+                <Flex c="dimmed" gap={2} style={{ transform: 'translateY(5px)' }}>
+                  <IconEye size={15} />
+                  <RollingNumber value={photo.viewCount} fz="sm" />
+                </Flex>
+              )}
+            </Flex>
+          )
+        })()}
       </Box>
     </Tooltip>
   )

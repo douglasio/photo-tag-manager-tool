@@ -8,6 +8,10 @@ body {
   height: 100vh;
 }
 
+button {
+  cursor: pointer;
+}
+
 .photo-thumbnail {
   display: flex;
   flex-direction: column;
@@ -63,4 +67,12 @@ body {
   aspect-ratio: 1;
   border-radius: var(--mantine-radius-sm);
   background-color: var(--mantine-color-default);
+}
+
+/* Mantine's default-variant Tabs.List draws its full-width bottom divider via
+   a ::before pseudo-element, which a className/style prop on Tabs.List can't
+   otherwise reach. !important guarantees this wins regardless of load order
+   against Mantine's own stylesheet (same selector specificity otherwise). */
+.tabs-list-no-divider::before {
+  display: none !important;
 }

@@ -2,6 +2,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 
 import type {
+  DefaultView,
   GallerySort,
   MetadataBatchEvent,
   MoveProgressEvent,
@@ -10,6 +11,7 @@ import type {
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
+  TagGroup,
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
@@ -50,6 +52,9 @@ const api = {
   getGallerySort: (): Promise<GallerySort | null> => ipcRenderer.invoke('settings:getGallerySort'),
   setGallerySort: (sort: GallerySort): Promise<void> =>
     ipcRenderer.invoke('settings:setGallerySort', sort),
+  getDefaultView: (): Promise<DefaultView> => ipcRenderer.invoke('settings:getDefaultView'),
+  setDefaultView: (value: DefaultView): Promise<void> =>
+    ipcRenderer.invoke('settings:setDefaultView', value),
   getShowEmptyFolders: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowEmptyFolders'),
   setShowEmptyFolders: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowEmptyFolders', value),
@@ -64,6 +69,9 @@ const api = {
   getShowFilenames: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowFilenames'),
   setShowFilenames: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowFilenames', value),
+  getShowViewCounts: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowViewCounts'),
+  setShowViewCounts: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setShowViewCounts', value),
   getMagazineTitle: (): Promise<string> => ipcRenderer.invoke('settings:getMagazineTitle'),
   setMagazineTitle: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setMagazineTitle', value),
@@ -83,6 +91,8 @@ const api = {
     ipcRenderer.invoke('settings:renameFolder', folder, newBaseName),
   startScan: (rootPath: string): Promise<ScanStartResult> =>
     ipcRenderer.invoke('scan:start', rootPath),
+  startScanAll: (rootPaths: string[]): Promise<ScanStartResult> =>
+    ipcRenderer.invoke('scan:startAll', rootPaths),
   cancelScan: (scanId: string): Promise<void> => ipcRenderer.invoke('scan:cancel', scanId),
   updateTags: (filePath: string, tags: string[]): Promise<PhotoRecord> =>
     ipcRenderer.invoke('tags:update', filePath, tags),
@@ -96,6 +106,17 @@ const api = {
     ipcRenderer.invoke('tags:delete', tag, filePaths),
   addTagsToPhotos: (tags: string[], filePaths: string[]): Promise<PhotoRecord[]> =>
     ipcRenderer.invoke('tags:addBatch', tags, filePaths),
+  getTagGroupsData: (): Promise<{ groups: TagGroup[]; assignments: Record<string, string> }> =>
+    ipcRenderer.invoke('tags:getGroupsData'),
+  createTagGroup: (name: string, matchPattern: string | null): Promise<TagGroup> =>
+    ipcRenderer.invoke('tags:createGroup', name, matchPattern),
+  renameTagGroup: (id: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('tags:renameGroup', id, name),
+  setTagGroupMatchPattern: (id: string, matchPattern: string | null): Promise<void> =>
+    ipcRenderer.invoke('tags:setGroupMatchPattern', id, matchPattern),
+  deleteTagGroup: (id: string): Promise<void> => ipcRenderer.invoke('tags:deleteGroup', id),
+  setTagGroupAssignment: (tag: string, groupId: string | null): Promise<void> =>
+    ipcRenderer.invoke('tags:setGroupAssignment', tag, groupId),
   onScanProgress: (callback: (payload: ScanProgressEvent) => void): (() => void) =>
     subscribe('scan:progress', callback),
   onMetadataBatch: (callback: (payload: MetadataBatchEvent) => void): (() => void) =>

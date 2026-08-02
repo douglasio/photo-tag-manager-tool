@@ -37,13 +37,25 @@ export function getDb(): Database.Database {
     )
   `)
 
-  // App-local tag metadata (description, etc). Deliberately never written back to
-  // the photo files themselves — it's a local annotation layer on top of the tags
-  // that live in EXIF/IPTC.
+  // App-local tag metadata (description, group membership, etc). Deliberately
+  // never written back to the photo files themselves — it's a local annotation
+  // layer on top of the tags that live in EXIF/IPTC.
   db.exec(`
     CREATE TABLE IF NOT EXISTS tag_metadata (
       tag TEXT PRIMARY KEY,
       description TEXT
+    )
+  `)
+
+  // User-defined tag groups (see TagPanel's accordion view). A tag belongs to
+  // at most one group, recorded as tag_metadata.group_id — groups themselves
+  // are never deleted as a side effect of anything (e.g. going empty); only
+  // an explicit user action removes one.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tag_groups (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL
     )
   `)
 
@@ -53,6 +65,41 @@ export function getDb(): Database.Database {
   }
   if (!photoColumns.some((column) => column.name === 'viewCount')) {
     db.exec('ALTER TABLE photos ADD COLUMN viewCount INTEGER NOT NULL DEFAULT 0')
+  }
+
+  // group_id is used now (tag groups); position/hidden/coverPhotoPath are
+  // reserved for later tag features (custom ordering, hiding from the UI, a
+  // tag cover photo) — added now so those don't need their own migration
+  // later, left unused by any code path until built.
+  const tagColumns = db.prepare('PRAGMA table_info(tag_metadata)').all() as { name: string }[]
+  if (!tagColumns.some((column) => column.name === 'group_id')) {
+    db.exec('ALTER TABLE tag_metadata ADD COLUMN group_id TEXT')
+  }
+  if (!tagColumns.some((column) => column.name === 'position')) {
+    db.exec('ALTER TABLE tag_metadata ADD COLUMN position INTEGER')
+  }
+  if (!tagColumns.some((column) => column.name === 'hidden')) {
+    db.exec('ALTER TABLE tag_metadata ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!tagColumns.some((column) => column.name === 'cover_photo_path')) {
+    db.exec('ALTER TABLE tag_metadata ADD COLUMN cover_photo_path TEXT')
+  }
+  // True once a tag's group_id was set by an explicit user action (drag-and-
+  // drop) rather than a group's auto-add rule — reconciliation leaves a
+  // pinned tag's group alone even if it also matches some rule, so manually
+  // moving a tag always wins over a rule, permanently.
+  if (!tagColumns.some((column) => column.name === 'group_pinned')) {
+    db.exec('ALTER TABLE tag_metadata ADD COLUMN group_pinned INTEGER NOT NULL DEFAULT 0')
+  }
+
+  // Case-insensitive substring a tag must contain to be auto-added to this
+  // group (e.g. "vintage" matches any tag containing it) — null/empty means
+  // no rule. Reconciliation (see tagMetadataRepository.reconcileTagGroups)
+  // evaluates rules in position order, first match wins, and never
+  // overrides a pinned tag.
+  const groupColumns = db.prepare('PRAGMA table_info(tag_groups)').all() as { name: string }[]
+  if (!groupColumns.some((column) => column.name === 'match_pattern')) {
+    db.exec('ALTER TABLE tag_groups ADD COLUMN match_pattern TEXT')
   }
 
   // Bumping THUMBNAIL_GENERATION (e.g. after changing thumbnailService's target

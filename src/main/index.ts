@@ -45,6 +45,8 @@ if (!app.requestSingleInstanceLock()) {
       }
     })
 
+    mainWindow.setMinimumSize(700, 400)
+
     mainWindow.on('ready-to-show', () => {
       mainWindow?.show()
     })

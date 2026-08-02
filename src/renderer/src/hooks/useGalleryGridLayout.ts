@@ -41,6 +41,9 @@ const SIZE_MARKS = SIZE_MARK_VALUES.map((value) => ({ value }))
 interface UseGalleryGridLayoutOptions {
   photoCount: number
   showFilenames: boolean
+  // Shares the filename's label row rather than adding its own, so the
+  // height budget below only needs reserving once either is on.
+  showViewCounts: boolean
 }
 
 interface UseGalleryGridLayoutResult {
@@ -69,7 +72,8 @@ interface UseGalleryGridLayoutResult {
 // slider both landing exactly on SIZE_MARK_VALUES).
 export function useGalleryGridLayout({
   photoCount,
-  showFilenames
+  showFilenames,
+  showViewCounts
 }: UseGalleryGridLayoutOptions): UseGalleryGridLayoutResult {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
@@ -117,7 +121,7 @@ export function useGalleryGridLayout({
   const availableWidth = Math.max(size.width - SCROLLBAR_RESERVE_PX, 0)
   const columnCount = Math.max(1, Math.round(availableWidth / cellWidth))
   const actualCellWidth = availableWidth > 0 ? availableWidth / columnCount : cellWidth
-  const cellHeight = actualCellWidth + (showFilenames ? CELL_LABEL_HEIGHT : 0)
+  const cellHeight = actualCellWidth + (showFilenames || showViewCounts ? CELL_LABEL_HEIGHT : 0)
   const rowCount = Math.ceil(photoCount / columnCount)
 
   // The +/- buttons jump between the slider's own SIZE_MARK_VALUES rather

@@ -3,6 +3,7 @@ import pLimitImport from 'p-limit'
 
 import { removePhoto } from '@main/db/photoRepository'
 import { getExcludePatterns } from '@main/db/settingsRepository'
+import { reconcileTagGroups } from '@main/db/tagMetadataRepository'
 import type {
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
@@ -45,6 +46,12 @@ export function suppressNextEvent(filePath: string): void {
 async function handleUpsert(filePath: string, changeType: 'add' | 'change'): Promise<void> {
   try {
     const { photo } = await ingestFile(filePath, thumbnailLimit)
+    // Both 'add' and 'change' can affect group membership now that this also
+    // auto-matches tags against group rules, not just pruning stale ones — a
+    // brand new file can introduce a tag that a rule should immediately pick
+    // up. Fine to run per live-watcher event (unlike the bulk initial-scan
+    // path, which deliberately calls this once at the end instead).
+    reconcileTagGroups()
     const payload: WatchPhotoUpsertedEvent = { photo, changeType }
     watchTarget?.send('watch:photo-upserted', payload)
   } catch (err) {

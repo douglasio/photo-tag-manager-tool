@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { PhotoRecord, ScanCompleteEvent } from '@shared/types'
+import type { PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
 
 import {
   initialState,
@@ -32,6 +32,10 @@ function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): Phot
     viewCount: 0,
     ...overrides
   }
+}
+
+function makeGroup(overrides: Partial<TagGroup> & { id: string }): TagGroup {
+  return { name: 'Group', position: 0, matchPattern: null, ...overrides }
 }
 
 function withPhotos(...paths: string[]): PhotoLibraryState {
@@ -95,7 +99,6 @@ describe('photoLibraryReducer', () => {
     it('tracks scan lifecycle', () => {
       let state = photoLibraryReducer(initialState, {
         type: 'SCAN_STARTED',
-        rootPath: '/root',
         scanId: 'scan-1'
       })
       expect(state.status).toBe('scanning')
@@ -129,7 +132,7 @@ describe('photoLibraryReducer', () => {
 
       const result: ScanCompleteEvent = {
         scanId: 'scan-1',
-        rootPath: '/root',
+        rootPaths: ['/root'],
         totalScanned: 1,
         cacheHits: 0,
         errors: [],
@@ -152,7 +155,7 @@ describe('photoLibraryReducer', () => {
       })
       const result: ScanCompleteEvent = {
         scanId: 'scan-1',
-        rootPath: '/root',
+        rootPaths: ['/root'],
         totalScanned: 0,
         cacheHits: 0,
         errors: [],
@@ -162,6 +165,40 @@ describe('photoLibraryReducer', () => {
       const next = photoLibraryReducer(state, { type: 'SCAN_COMPLETE', result })
       expect(next.photosByPath.has('/root/a.jpg')).toBe(true)
       expect(next.allFolderPaths.has('/root/new-empty')).toBe(true)
+    })
+
+    it('attributes a batch photo to whichever watched root actually owns it', () => {
+      const state = { ...initialState, folders: ['/root-a', '/root-b'] }
+      const next = photoLibraryReducer(state, {
+        type: 'METADATA_BATCH',
+        photos: [makePhoto('/root-a/x.jpg'), makePhoto('/root-b/y.jpg')]
+      })
+
+      expect(next.folderCounts.get('/root-a')).toBe(1)
+      expect(next.folderCounts.get('/root-b')).toBe(1)
+    })
+
+    it('prunes stale photos under the correct root when a combined scan covers multiple roots', () => {
+      let state = { ...initialState, folders: ['/root-a', '/root-b'] }
+      state = photoLibraryReducer(state, {
+        type: 'METADATA_BATCH',
+        photos: [makePhoto('/root-a/x.jpg'), makePhoto('/root-b/y.jpg')]
+      })
+
+      const result: ScanCompleteEvent = {
+        scanId: 'scan-1',
+        rootPaths: ['/root-a', '/root-b'],
+        totalScanned: 1,
+        cacheHits: 0,
+        errors: [],
+        allFolders: ['/root-a', '/root-b'],
+        filePaths: ['/root-a/x.jpg']
+      }
+      const next = photoLibraryReducer(state, { type: 'SCAN_COMPLETE', result })
+
+      expect(next.photosByPath.has('/root-a/x.jpg')).toBe(true)
+      expect(next.photosByPath.has('/root-b/y.jpg')).toBe(false)
+      expect(next.folderCounts.get('/root-b')).toBeFalsy()
     })
   })
 
@@ -203,12 +240,21 @@ describe('photoLibraryReducer', () => {
       ['SET_SHOW_EMPTY_FOLDERS', 'showEmptyFolders'],
       ['SET_DETAILS_PANEL_COLLAPSED', 'detailsPanelCollapsed'],
       ['SET_GALLERY_ANIMATIONS_ENABLED', 'galleryAnimationsEnabled'],
-      ['SET_SHOW_FILENAMES', 'showFilenames']
+      ['SET_SHOW_FILENAMES', 'showFilenames'],
+      ['SET_SHOW_VIEW_COUNTS', 'showViewCounts']
     ] as const)('%s flips %s', (type, key) => {
       const state = photoLibraryReducer(initialState, { type, value: true } as never)
       expect(state[key]).toBe(true)
       const flipped = photoLibraryReducer(state, { type, value: false } as never)
       expect(flipped[key]).toBe(false)
+    })
+
+    it('sets the default view', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_DEFAULT_VIEW',
+        value: 'dashboard'
+      })
+      expect(state.defaultView).toBe('dashboard')
     })
 
     it('sets the sort order', () => {
@@ -401,6 +447,121 @@ describe('photoLibraryReducer', () => {
       })
       expect(next.tagDescriptions.has('old')).toBe(false)
       expect(next.selectedTag).toBeNull()
+    })
+  })
+
+  describe('tag groups', () => {
+    it('loads groups and their tag assignments together', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUPS_DATA_LOADED',
+        groups: [makeGroup({ id: 'g1', name: 'People' })],
+        assignments: { vacation: 'g1' }
+      })
+      expect(state.tagGroups).toEqual([makeGroup({ id: 'g1', name: 'People' })])
+      expect(state.tagGroupAssignments.get('vacation')).toBe('g1')
+    })
+
+    it('appends a created group', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUP_CREATED',
+        group: makeGroup({ id: 'g1', name: 'People' })
+      })
+      expect(state.tagGroups).toEqual([makeGroup({ id: 'g1', name: 'People' })])
+    })
+
+    it('renames a group by id', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUP_CREATED',
+        group: makeGroup({ id: 'g1', name: 'People' })
+      })
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_RENAMED',
+        id: 'g1',
+        name: 'Friends & Family'
+      })
+      expect(state.tagGroups[0].name).toBe('Friends & Family')
+    })
+
+    it('updates a group match pattern by id', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUP_CREATED',
+        group: makeGroup({ id: 'g1', name: 'People' })
+      })
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_MATCH_PATTERN_UPDATED',
+        id: 'g1',
+        matchPattern: 'age'
+      })
+      expect(state.tagGroups[0].matchPattern).toBe('age')
+    })
+
+    it('deletes a group and un-assigns its tags, leaving other groups alone', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUPS_DATA_LOADED',
+        groups: [
+          makeGroup({ id: 'g1', name: 'People' }),
+          makeGroup({ id: 'g2', name: 'Places', position: 1 })
+        ],
+        assignments: { vacation: 'g1', beach: 'g2' }
+      })
+
+      state = photoLibraryReducer(state, { type: 'TAG_GROUP_DELETED', id: 'g1' })
+
+      expect(state.tagGroups).toEqual([makeGroup({ id: 'g2', name: 'Places', position: 1 })])
+      expect(state.tagGroupAssignments.has('vacation')).toBe(false)
+      expect(state.tagGroupAssignments.get('beach')).toBe('g2')
+    })
+
+    it('sets and clears a tag-to-group assignment', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUP_ASSIGNMENT_CHANGED',
+        tag: 'vacation',
+        groupId: 'g1'
+      })
+      expect(state.tagGroupAssignments.get('vacation')).toBe('g1')
+
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_ASSIGNMENT_CHANGED',
+        tag: 'vacation',
+        groupId: null
+      })
+      expect(state.tagGroupAssignments.has('vacation')).toBe(false)
+    })
+
+    it('carries a tag group assignment across a rename', () => {
+      let state = withPhotos('/root/a.jpg')
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_ASSIGNMENT_CHANGED',
+        tag: 'old',
+        groupId: 'g1'
+      })
+
+      const next = photoLibraryReducer(state, {
+        type: 'TAG_RENAMED',
+        oldTag: 'old',
+        newTag: 'new',
+        photos: [makePhoto('/root/a.jpg', { tags: ['new'] })]
+      })
+
+      expect(next.tagGroupAssignments.has('old')).toBe(false)
+      expect(next.tagGroupAssignments.get('new')).toBe('g1')
+    })
+
+    it('clears a tag group assignment when the tag is deleted', () => {
+      let state = withPhotos('/root/a.jpg')
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_ASSIGNMENT_CHANGED',
+        tag: 'old',
+        groupId: 'g1'
+      })
+
+      const next = photoLibraryReducer(state, {
+        type: 'TAG_DELETED',
+        tag: 'old',
+        photos: [makePhoto('/root/a.jpg', { tags: [] })]
+      })
+
+      expect(next.tagGroupAssignments.has('old')).toBe(false)
     })
   })
 

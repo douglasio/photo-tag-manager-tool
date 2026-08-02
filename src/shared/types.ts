@@ -1,3 +1,5 @@
+export type DefaultView = 'dashboard' | 'gallery'
+
 export type SupportedFormat = 'JPEG' | 'PNG' | 'TIFF'
 
 // Lossless EXIF-orientation-flip rotation — only meaningful for formats
@@ -52,19 +54,22 @@ export interface MetadataBatchEvent {
 
 export interface ScanCompleteEvent {
   scanId: string
-  rootPath: string
+  // Every watched folder this scan covered — a single-folder scan (e.g.
+  // adding one new folder) sends a one-element array, same shape as a
+  // combined startup/rescan-all sweep across every watched folder.
+  rootPaths: string[]
   totalScanned: number
   cacheHits: number
   errors: { filePath: string; message: string }[]
-  // Every folder under the scanned root, including empty ones — separate
+  // Every folder under the scanned roots, including empty ones — separate
   // from photo-derived folder structure, which never includes folders with
   // no photos in them.
   allFolders: string[]
-  // The complete, authoritative set of files that exist under rootPath as of
+  // The complete, authoritative set of files that exist under rootPaths as of
   // this scan (post exclude-pattern filtering) — lets the renderer prune
   // anything it previously knew about that's no longer present (deleted, or
   // newly excluded). Null when the scan aborted before enumerating anything
-  // (root became inaccessible, or the scan was cancelled), so the renderer
+  // (a root became inaccessible, or the scan was cancelled), so the renderer
   // knows not to prune from incomplete data.
   filePaths: string[] | null
 }
@@ -87,11 +92,20 @@ export interface WatchFolderRemovedEvent {
 }
 
 export interface GallerySort {
-  sortBy: 'name' | 'dateTaken'
+  sortBy: 'name' | 'dateTaken' | 'viewCount'
   sortOrder: 'asc' | 'desc'
 }
 
 export interface MoveProgressEvent {
   completed: number
   total: number
+}
+
+export interface TagGroup {
+  id: string
+  name: string
+  position: number
+  // Case-insensitive substring a tag must contain to be auto-added to this
+  // group; null means no rule.
+  matchPattern: string | null
 }

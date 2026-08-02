@@ -1,4 +1,4 @@
-import type { GallerySort } from '@shared/types'
+import type { DefaultView, GallerySort } from '@shared/types'
 
 import { getDb } from './database'
 
@@ -73,6 +73,15 @@ export function setShowEmptyFolders(value: boolean): void {
   setSetting('showEmptyFolders', String(value))
 }
 
+// Defaults to Dashboard, same reasoning as getGalleryAnimationsEnabled above.
+export function getDefaultView(): DefaultView {
+  return getSetting('defaultView') === 'gallery' ? 'gallery' : 'dashboard'
+}
+
+export function setDefaultView(value: DefaultView): void {
+  setSetting('defaultView', value)
+}
+
 export function getDetailsPanelCollapsed(): boolean {
   return getSetting('detailsPanelCollapsed') === 'true'
 }
@@ -100,6 +109,16 @@ export function getShowFilenames(): boolean {
 
 export function setShowFilenames(value: boolean): void {
   setSetting('showFilenames', String(value))
+}
+
+// Defaults to off — an opt-in badge, not something that should suddenly
+// appear for existing users on upgrade.
+export function getShowViewCounts(): boolean {
+  return getSetting('showViewCounts') === 'true'
+}
+
+export function setShowViewCounts(value: boolean): void {
+  setSetting('showViewCounts', String(value))
 }
 
 export function getExcludePatterns(): string[] {

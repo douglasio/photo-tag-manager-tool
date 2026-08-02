@@ -20,6 +20,22 @@ import { useDisclosure } from '@mantine/hooks'
 import { FolderRemoveButton, SectionTitle } from '@components'
 import { usePhotoLibrary } from '@state'
 
+function GeneralSection(): ReactElement {
+  const { state, setDefaultView } = usePhotoLibrary()
+
+  return (
+    <Stack gap="xs">
+      <SectionTitle>General</SectionTitle>
+      <Switch
+        label="Open to Dashboard on launch"
+        description="When off, the app opens to Gallery instead."
+        checked={state.defaultView === 'dashboard'}
+        onChange={(event) => setDefaultView(event.currentTarget.checked ? 'dashboard' : 'gallery')}
+      />
+    </Stack>
+  )
+}
+
 function FoldersSection(): ReactElement {
   const { state, addFolder } = usePhotoLibrary()
 
@@ -181,6 +197,8 @@ export function SettingsModal(): ReactElement {
 
       <Modal opened={opened} onClose={close} title={<Title order={2}>Settings</Title>} size="lg">
         <Stack gap="lg">
+          <GeneralSection />
+          <Divider />
           <FoldersSection />
           <Divider />
           <GallerySection />

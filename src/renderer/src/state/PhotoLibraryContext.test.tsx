@@ -60,6 +60,8 @@ function createMockApi(): {
     setGalleryCellWidth: vi.fn().mockResolvedValue(undefined),
     getGallerySort: vi.fn().mockResolvedValue(null),
     setGallerySort: vi.fn().mockResolvedValue(undefined),
+    getDefaultView: vi.fn().mockResolvedValue('gallery'),
+    setDefaultView: vi.fn().mockResolvedValue(undefined),
     getShowEmptyFolders: vi.fn().mockResolvedValue(false),
     setShowEmptyFolders: vi.fn().mockResolvedValue(undefined),
     getDetailsPanelCollapsed: vi.fn().mockResolvedValue(false),
@@ -68,6 +70,8 @@ function createMockApi(): {
     setGalleryAnimationsEnabled: vi.fn().mockResolvedValue(undefined),
     getShowFilenames: vi.fn().mockResolvedValue(true),
     setShowFilenames: vi.fn().mockResolvedValue(undefined),
+    getShowViewCounts: vi.fn().mockResolvedValue(false),
+    setShowViewCounts: vi.fn().mockResolvedValue(undefined),
     getMagazineTitle: vi.fn().mockResolvedValue('TAG ME'),
     setMagazineTitle: vi.fn().mockResolvedValue(undefined),
     getNewspaperTitle: vi.fn().mockResolvedValue('The Tag Me Times'),
@@ -80,6 +84,7 @@ function createMockApi(): {
     removeFolder: vi.fn().mockResolvedValue(undefined),
     renameFolder: vi.fn(),
     startScan: vi.fn().mockResolvedValue({ scanId: 'scan-1' }),
+    startScanAll: vi.fn().mockResolvedValue({ scanId: 'scan-1' }),
     cancelScan: vi.fn().mockResolvedValue(undefined),
     updateTags: vi.fn(),
     getTagDescriptions: vi.fn().mockResolvedValue({}),
@@ -87,6 +92,12 @@ function createMockApi(): {
     renameTag: vi.fn(),
     deleteTag: vi.fn(),
     addTagsToPhotos: vi.fn(),
+    getTagGroupsData: vi.fn().mockResolvedValue({ groups: [], assignments: {} }),
+    createTagGroup: vi.fn(),
+    renameTagGroup: vi.fn(),
+    setTagGroupMatchPattern: vi.fn(),
+    deleteTagGroup: vi.fn(),
+    setTagGroupAssignment: vi.fn(),
     onScanProgress: onMethod('onScanProgress'),
     onMetadataBatch: onMethod('onMetadataBatch'),
     onScanComplete: onMethod('onScanComplete'),
@@ -146,7 +157,7 @@ describe('PhotoLibraryContext', () => {
     mockApi.getFolders.mockResolvedValue(['/root'])
     const { result } = setup()
 
-    await waitFor(() => expect(mockApi.startScan).toHaveBeenCalledWith('/root'))
+    await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalledWith(['/root']))
     expect(result.current.state.folders).toEqual(['/root'])
   })
 
@@ -154,13 +165,13 @@ describe('PhotoLibraryContext', () => {
     mockApi.getFolders.mockResolvedValue(['/root'])
     const { result } = setup()
 
-    await waitFor(() => expect(mockApi.startScan).toHaveBeenCalledWith('/root'))
+    await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalledWith(['/root']))
     expect(result.current.state.initialLoadComplete).toBe(false)
 
     act(() => {
       subscriptions.onScanComplete({
         scanId: 'scan-1',
-        rootPath: '/root',
+        rootPaths: ['/root'],
         totalScanned: 0,
         cacheHits: 0,
         errors: [],
@@ -206,7 +217,7 @@ describe('PhotoLibraryContext', () => {
     it('selectPhotoRange selects everything between the anchor and target in visible order', async () => {
       mockApi.getFolders.mockResolvedValue(['/root'])
       const { result } = setup()
-      await waitFor(() => expect(mockApi.startScan).toHaveBeenCalled())
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
 
       act(() => {
         subscriptions.onMetadataBatch({
@@ -261,6 +272,13 @@ describe('PhotoLibraryContext', () => {
       act(() => result.current.setShowFilenames(false))
       expect(result.current.state.showFilenames).toBe(false)
       expect(mockApi.setShowFilenames).toHaveBeenCalledWith(false)
+    })
+
+    it('setShowViewCounts dispatches and persists', () => {
+      const { result } = setup()
+      act(() => result.current.setShowViewCounts(true))
+      expect(result.current.state.showViewCounts).toBe(true)
+      expect(mockApi.setShowViewCounts).toHaveBeenCalledWith(true)
     })
 
     it('setMagazineTitle dispatches and persists', () => {
@@ -367,7 +385,7 @@ describe('PhotoLibraryContext', () => {
     async function seedPhotos(): Promise<ReturnType<typeof setup>> {
       mockApi.getFolders.mockResolvedValue(['/root'])
       const hook = setup()
-      await waitFor(() => expect(mockApi.startScan).toHaveBeenCalled())
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
       act(() => {
         subscriptions.onMetadataBatch({
           scanId: 'scan-1',
@@ -396,6 +414,28 @@ describe('PhotoLibraryContext', () => {
       const { result } = await seedPhotos()
       act(() => result.current.setTagFilter('sunset'))
       expect(result.current.visiblePhotos.map((p) => p.fileName)).toEqual(['a.jpg'])
+    })
+
+    it('sorts photos by view count, falling back to filename on ties', async () => {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const { result } = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [
+            makePhoto('/root/b.jpg', { viewCount: 5 }),
+            makePhoto('/root/a.jpg', { viewCount: 5 }),
+            makePhoto('/root/c.jpg', { viewCount: 1 })
+          ]
+        })
+      })
+
+      act(() => result.current.setSort('viewCount', 'desc'))
+      expect(result.current.photos.map((p) => p.fileName)).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
+
+      act(() => result.current.setSort('viewCount', 'asc'))
+      expect(result.current.photos.map((p) => p.fileName)).toEqual(['c.jpg', 'a.jpg', 'b.jpg'])
     })
   })
 

@@ -1,4 +1,4 @@
-import type { PhotoRecord, ScanCompleteEvent } from '@shared/types'
+import type { DefaultView, PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
 import {
   addPhotoToFolderTree,
   findRootFolder,
@@ -9,7 +9,7 @@ import {
 
 type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 
-export type GallerySortBy = 'name' | 'dateTaken'
+export type GallerySortBy = 'name' | 'dateTaken' | 'viewCount'
 export type GallerySortOrder = 'asc' | 'desc'
 
 export const RECENT_TAGS_LIMIT = 3
@@ -24,7 +24,6 @@ export function compareTabId(paths: string[]): string {
 
 export interface PhotoLibraryState {
   folders: string[]
-  rootPath: string | null
   scanId: string | null
   status: ScanStatus
   // False until every folder's initial startup scan has resolved
@@ -47,10 +46,13 @@ export interface PhotoLibraryState {
   // folderChildren above never include those). From SCAN_COMPLETE's
   // allFolders, so it's as of the last scan, not live filesystem changes.
   allFolderPaths: Set<string>
+  // Which pinned tab ('dashboard' or 'gallery') the app loads into on launch.
+  defaultView: DefaultView
   showEmptyFolders: boolean
   detailsPanelCollapsed: boolean
   galleryAnimationsEnabled: boolean
   showFilenames: boolean
+  showViewCounts: boolean
   // Global masthead/studio text for PhotoView's magazine/newspaper/DVD
   // visualizations, editable from Settings.
   magazineTitle: string
@@ -58,6 +60,12 @@ export interface PhotoLibraryState {
   dvdStudioName: string
   excludePatterns: string[]
   tagDescriptions: Map<string, string>
+  // User-defined tag groups (TagPanel's accordion view) and each grouped
+  // tag's membership (tag -> group id) — a tag not present here is ungrouped
+  // ("Other Tags"). A group with no tags still stays in tagGroups; only an
+  // explicit delete removes one.
+  tagGroups: TagGroup[]
+  tagGroupAssignments: Map<string, string>
   // Newest-first shortcut list for the tag-input dropdown. Session-only.
   recentTags: string[]
   // Open tab ids — photo paths or compare-tab ids (see compareTabs).
@@ -71,7 +79,6 @@ export interface PhotoLibraryState {
 
 export const initialState: PhotoLibraryState = {
   folders: [],
-  rootPath: null,
   scanId: null,
   status: 'idle',
   initialLoadComplete: false,
@@ -88,18 +95,22 @@ export const initialState: PhotoLibraryState = {
   folderCounts: new Map(),
   folderChildren: new Map(),
   allFolderPaths: new Set(),
+  defaultView: 'dashboard',
   showEmptyFolders: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
   showFilenames: true,
+  showViewCounts: false,
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
   dvdStudioName: 'TAG ME PICTURES',
   excludePatterns: [],
   tagDescriptions: new Map(),
+  tagGroups: [],
+  tagGroupAssignments: new Map(),
   recentTags: [],
   openTabs: [],
-  activeTab: 'gallery',
+  activeTab: 'dashboard',
   compareTabs: new Map()
 }
 
@@ -108,7 +119,7 @@ export type PhotoLibraryAction =
   | { type: 'FOLDER_ADDED'; folder: string }
   | { type: 'FOLDER_REMOVED'; folder: string }
   | { type: 'FOLDER_RENAMED'; oldFolder: string; newFolder: string }
-  | { type: 'SCAN_STARTED'; rootPath: string; scanId: string }
+  | { type: 'SCAN_STARTED'; scanId: string }
   | { type: 'SCAN_PROGRESS'; filesFound: number }
   | { type: 'METADATA_BATCH'; photos: PhotoRecord[] }
   | { type: 'SCAN_COMPLETE'; result: ScanCompleteEvent }
@@ -121,10 +132,12 @@ export type PhotoLibraryAction =
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
+  | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
   | { type: 'SET_SHOW_FILENAMES'; value: boolean }
+  | { type: 'SET_SHOW_VIEW_COUNTS'; value: boolean }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
   | { type: 'SET_DVD_STUDIO_NAME'; value: string }
@@ -138,6 +151,16 @@ export type PhotoLibraryAction =
   | { type: 'TAG_DESCRIPTION_UPDATED'; tag: string; description: string }
   | { type: 'TAG_RENAMED'; oldTag: string; newTag: string; photos: PhotoRecord[] }
   | { type: 'TAG_DELETED'; tag: string; photos: PhotoRecord[] }
+  | {
+      type: 'TAG_GROUPS_DATA_LOADED'
+      groups: TagGroup[]
+      assignments: Record<string, string>
+    }
+  | { type: 'TAG_GROUP_CREATED'; group: TagGroup }
+  | { type: 'TAG_GROUP_RENAMED'; id: string; name: string }
+  | { type: 'TAG_GROUP_MATCH_PATTERN_UPDATED'; id: string; matchPattern: string | null }
+  | { type: 'TAG_GROUP_DELETED'; id: string }
+  | { type: 'TAG_GROUP_ASSIGNMENT_CHANGED'; tag: string; groupId: string | null }
   | { type: 'OPEN_PHOTO_TAB'; filePath: string }
   | { type: 'OPEN_COMPARE_TAB'; paths: string[] }
   | { type: 'REMOVE_FROM_COMPARE_TAB'; tabId: string; filePath: string }
@@ -283,7 +306,6 @@ export function photoLibraryReducer(
     case 'SCAN_STARTED':
       return {
         ...state,
-        rootPath: action.rootPath,
         scanId: action.scanId,
         status: 'scanning',
         filesFound: 0
@@ -296,19 +318,28 @@ export function photoLibraryReducer(
       const folderCounts = new Map(state.folderCounts)
       const folderChildren = new Map(state.folderChildren)
       for (const photo of action.photos) {
-        if (state.rootPath && !photosByPath.has(photo.filePath)) {
-          addPhotoToFolderTree(photo.filePath, state.rootPath, folderCounts, folderChildren)
+        if (!photosByPath.has(photo.filePath)) {
+          // Looked up per photo (not a single "currently scanning" root) —
+          // a combined scan across every watched folder interleaves photos
+          // from all of them in the same batch.
+          const owningRoot = state.folders.find((folder) =>
+            isPathUnderOrEqual(photo.filePath, folder)
+          )
+          if (owningRoot)
+            addPhotoToFolderTree(photo.filePath, owningRoot, folderCounts, folderChildren)
         }
         photosByPath.set(photo.filePath, photo)
       }
       return { ...state, photosByPath, folderCounts, folderChildren }
     }
     // filePaths (null if the scan aborted before finishing) is authoritative
-    // for what exists under rootPath. METADATA_BATCH already added new
+    // for what exists under rootPaths. METADATA_BATCH already added new
     // finds; this prunes anything previously known that's now missing,
     // mirroring the main process's own pruneMissing.
     case 'SCAN_COMPLETE': {
-      const { rootPath, filePaths, allFolders } = action.result
+      const { rootPaths, filePaths, allFolders } = action.result
+      const isUnderAnyRoot = (path: string): boolean =>
+        rootPaths.some((root) => isPathUnderOrEqual(path, root))
 
       let photosByPath = state.photosByPath
       let folderCounts = state.folderCounts
@@ -322,7 +353,7 @@ export function photoLibraryReducer(
       if (filePaths) {
         const keep = new Set(filePaths)
         const stale = Array.from(photosByPath.keys()).filter(
-          (path) => isPathUnderOrEqual(path, rootPath) && !keep.has(path)
+          (path) => isUnderAnyRoot(path) && !keep.has(path)
         )
         if (stale.length > 0) {
           photosByPath = new Map(photosByPath)
@@ -330,7 +361,9 @@ export function photoLibraryReducer(
           folderChildren = new Map(folderChildren)
           for (const filePath of stale) {
             photosByPath.delete(filePath)
-            removePhotoFromFolderTree(filePath, rootPath, folderCounts, folderChildren)
+            const owningRoot = rootPaths.find((root) => isPathUnderOrEqual(filePath, root))
+            if (owningRoot)
+              removePhotoFromFolderTree(filePath, owningRoot, folderCounts, folderChildren)
           }
 
           const staleSet = new Set(stale)
@@ -340,10 +373,8 @@ export function photoLibraryReducer(
           activeTab = staleSet.has(activeTab) ? 'gallery' : activeTab
         }
 
-        // Replaces this root's folder listing rather than only adding to it.
-        const keptFolders = Array.from(allFolderPaths).filter(
-          (folder) => !isPathUnderOrEqual(folder, rootPath)
-        )
+        // Replaces these roots' folder listings rather than only adding to them.
+        const keptFolders = Array.from(allFolderPaths).filter((folder) => !isUnderAnyRoot(folder))
         allFolderPaths = new Set([...keptFolders, ...allFolders])
       } else {
         allFolderPaths = new Set(allFolderPaths)
@@ -390,6 +421,8 @@ export function photoLibraryReducer(
       return { ...state, selectedTag: action.tag }
     case 'SET_SORT':
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
+    case 'SET_DEFAULT_VIEW':
+      return { ...state, defaultView: action.value }
     case 'SET_SHOW_EMPTY_FOLDERS':
       return { ...state, showEmptyFolders: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':
@@ -398,6 +431,8 @@ export function photoLibraryReducer(
       return { ...state, galleryAnimationsEnabled: action.value }
     case 'SET_SHOW_FILENAMES':
       return { ...state, showFilenames: action.value }
+    case 'SET_SHOW_VIEW_COUNTS':
+      return { ...state, showViewCounts: action.value }
     case 'SET_MAGAZINE_TITLE':
       return { ...state, magazineTitle: action.value }
     case 'SET_NEWSPAPER_TITLE':
@@ -495,9 +530,19 @@ export function photoLibraryReducer(
       tagDescriptions.delete(action.oldTag)
       if (movedDescription) tagDescriptions.set(action.newTag, movedDescription)
 
+      // Carries group membership across the rename too — from allTags'
+      // perspective a rename looks identical to "old tag gone, new tag
+      // appeared," so this can't be inferred generically the way a tag
+      // actually disappearing can (see the reconciliation this mirrors on
+      // the main-process side, renameTagMetadata).
+      const tagGroupAssignments = new Map(state.tagGroupAssignments)
+      const movedGroupId = tagGroupAssignments.get(action.oldTag)
+      tagGroupAssignments.delete(action.oldTag)
+      if (movedGroupId) tagGroupAssignments.set(action.newTag, movedGroupId)
+
       const selectedTag = state.selectedTag === action.oldTag ? action.newTag : state.selectedTag
 
-      return { ...state, photosByPath, tagDescriptions, selectedTag }
+      return { ...state, photosByPath, tagDescriptions, tagGroupAssignments, selectedTag }
     }
     case 'TAG_DELETED': {
       const photosByPath = new Map(state.photosByPath)
@@ -508,9 +553,50 @@ export function photoLibraryReducer(
       const tagDescriptions = new Map(state.tagDescriptions)
       tagDescriptions.delete(action.tag)
 
+      const tagGroupAssignments = new Map(state.tagGroupAssignments)
+      tagGroupAssignments.delete(action.tag)
+
       const selectedTag = state.selectedTag === action.tag ? null : state.selectedTag
 
-      return { ...state, photosByPath, tagDescriptions, selectedTag }
+      return { ...state, photosByPath, tagDescriptions, tagGroupAssignments, selectedTag }
+    }
+    case 'TAG_GROUPS_DATA_LOADED':
+      return {
+        ...state,
+        tagGroups: action.groups,
+        tagGroupAssignments: new Map(Object.entries(action.assignments))
+      }
+    case 'TAG_GROUP_CREATED':
+      return { ...state, tagGroups: [...state.tagGroups, action.group] }
+    case 'TAG_GROUP_RENAMED':
+      return {
+        ...state,
+        tagGroups: state.tagGroups.map((group) =>
+          group.id === action.id ? { ...group, name: action.name } : group
+        )
+      }
+    case 'TAG_GROUP_MATCH_PATTERN_UPDATED':
+      return {
+        ...state,
+        tagGroups: state.tagGroups.map((group) =>
+          group.id === action.id ? { ...group, matchPattern: action.matchPattern } : group
+        )
+      }
+    case 'TAG_GROUP_DELETED': {
+      const tagGroups = state.tagGroups.filter((group) => group.id !== action.id)
+      const tagGroupAssignments = new Map(
+        Array.from(state.tagGroupAssignments).filter(([, groupId]) => groupId !== action.id)
+      )
+      return { ...state, tagGroups, tagGroupAssignments }
+    }
+    case 'TAG_GROUP_ASSIGNMENT_CHANGED': {
+      const tagGroupAssignments = new Map(state.tagGroupAssignments)
+      if (action.groupId === null) {
+        tagGroupAssignments.delete(action.tag)
+      } else {
+        tagGroupAssignments.set(action.tag, action.groupId)
+      }
+      return { ...state, tagGroupAssignments }
     }
     case 'OPEN_PHOTO_TAB': {
       const openTabs = state.openTabs.includes(action.filePath)

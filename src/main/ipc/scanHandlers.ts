@@ -5,13 +5,14 @@ import pLimitImport from 'p-limit'
 import { pruneMissing } from '@main/db/photoRepository'
 import { getExcludePatterns } from '@main/db/settingsRepository'
 import { scanAllFolders, scanDirectory } from '@main/services/directoryScanner'
-import { ingestFile } from '@main/services/photoIngest'
+import { ingestMetadata, ingestThumbnail } from '@main/services/photoIngest'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import type {
   MetadataBatchEvent,
   PhotoRecord,
   ScanCompleteEvent,
-  ScanProgressEvent
+  ScanProgressEvent,
+  ScanStartResult
 } from '@shared/types'
 
 // p-limit is ESM-only; when externalized in the main-process CJS bundle,
@@ -31,18 +32,28 @@ interface ScanState {
 
 const activeScans = new Map<string, ScanState>()
 
+function startScan(sender: WebContents, rootPaths: string[]): ScanStartResult {
+  const scanId = randomUUID()
+  const state: ScanState = { cancelled: false }
+  activeScans.set(scanId, state)
+
+  runScan(scanId, rootPaths, sender, state)
+    .catch((err) => console.error(`scan ${scanId} failed`, err))
+    .finally(() => activeScans.delete(scanId))
+
+  return { scanId }
+}
+
 export function registerScanHandlers(): void {
-  ipcMain.handle('scan:start', (event, rootPath: string) => {
-    const scanId = randomUUID()
-    const state: ScanState = { cancelled: false }
-    activeScans.set(scanId, state)
+  ipcMain.handle('scan:start', (event, rootPath: string) => startScan(event.sender, [rootPath]))
 
-    runScan(scanId, rootPath, event.sender, state)
-      .catch((err) => console.error(`scan ${scanId} failed`, err))
-      .finally(() => activeScans.delete(scanId))
-
-    return { scanId }
-  })
+  // Combines every given root into one scan (one scanId, one shared
+  // metadata/thumbnail concurrency pool) instead of the renderer awaiting
+  // each folder's own separate scan one at a time — see PhotoLibraryContext's
+  // startScanForAll, used for the startup sweep and "rescan all."
+  ipcMain.handle('scan:startAll', (event, rootPaths: string[]) =>
+    startScan(event.sender, rootPaths)
+  )
 
   ipcMain.handle('scan:cancel', (_event, scanId: string) => {
     const state = activeScans.get(scanId)
@@ -52,7 +63,7 @@ export function registerScanHandlers(): void {
 
 async function runScan(
   scanId: string,
-  rootPath: string,
+  rootPaths: string[],
   sender: WebContents,
   state: ScanState
 ): Promise<void> {
@@ -60,17 +71,28 @@ async function runScan(
   let allFolders: string[]
   try {
     const excludePatterns = getExcludePatterns()
-    ;[filePaths, allFolders] = await Promise.all([
-      scanDirectory(rootPath, excludePatterns),
-      scanAllFolders(rootPath, excludePatterns)
-    ])
+    const perRoot = await Promise.all(
+      rootPaths.map((rootPath) =>
+        Promise.all([
+          scanDirectory(rootPath, excludePatterns),
+          scanAllFolders(rootPath, excludePatterns)
+        ])
+      )
+    )
+    filePaths = perRoot.flatMap(([files]) => files)
+    allFolders = perRoot.flatMap(([, folders]) => folders)
   } catch (err) {
     const completeEvent: ScanCompleteEvent = {
       scanId,
-      rootPath,
+      rootPaths,
       totalScanned: 0,
       cacheHits: 0,
-      errors: [{ filePath: rootPath, message: err instanceof Error ? err.message : String(err) }],
+      errors: [
+        {
+          filePath: rootPaths.join(', '),
+          message: err instanceof Error ? err.message : String(err)
+        }
+      ],
       allFolders: [],
       // Enumeration itself failed — this isn't an authoritative "nothing
       // exists here" result, so the renderer must not prune based on it.
@@ -105,15 +127,35 @@ async function runScan(
 
   const flushInterval = setInterval(() => flush(), BATCH_INTERVAL_MS)
 
+  // Thumbnail generation is intentionally *not* awaited inline here — doing
+  // so would hold a metadata slot open for the full duration of that file's
+  // thumbnail work too, throttling metadata-read throughput down to
+  // thumbnail-generation throughput even though the two have their own,
+  // independent p-limits. Instead each file's thumbnail work (once queued
+  // under thumbnailLimit) is collected here and awaited together, after
+  // every file's metadata step has had a chance to run at full speed.
+  const thumbnailTasks: Promise<void>[] = []
+
   await Promise.all(
     filePaths.map((filePath) =>
       metadataLimit(async () => {
         if (state.cancelled) return
         try {
-          const result = await ingestFile(filePath, thumbnailLimit)
-          if (result.fromCache) cacheHits++
-          pendingBatch.push(result.photo)
+          const { photo, fromCache, fileStat } = await ingestMetadata(filePath)
+          if (fromCache) cacheHits++
+          pendingBatch.push(photo)
           flush()
+
+          if (photo.thumbnailStatus !== 'ready') {
+            thumbnailTasks.push(
+              thumbnailLimit(async () => {
+                if (state.cancelled) return
+                const updated = await ingestThumbnail(filePath, photo, fileStat)
+                pendingBatch.push(updated)
+                flush()
+              })
+            )
+          }
         } catch (err) {
           errors.push({ filePath, message: err instanceof Error ? err.message : String(err) })
         }
@@ -121,15 +163,22 @@ async function runScan(
     )
   )
 
+  // Every metadata step (and therefore every thumbnail task it might have
+  // queued) has resolved by now, but thumbnails run on their own pace and
+  // may still be finishing — wait for those too before declaring this scan done.
+  await Promise.all(thumbnailTasks)
+
   clearInterval(flushInterval)
   flush(true)
 
-  const removedThumbnailKeys = state.cancelled ? [] : pruneMissing(rootPath, seenPaths)
+  const removedThumbnailKeys = state.cancelled
+    ? []
+    : rootPaths.flatMap((rootPath) => pruneMissing(rootPath, seenPaths))
   await Promise.all(removedThumbnailKeys.map((key) => deleteThumbnail(key)))
 
   const completeEvent: ScanCompleteEvent = {
     scanId,
-    rootPath,
+    rootPaths,
     totalScanned: filePaths.length,
     cacheHits,
     errors,
