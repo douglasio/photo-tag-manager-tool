@@ -126,6 +126,7 @@ function TreeRow({
         }}
         style={{
           ...style,
+          paddingInlineStart: 'var(--label-offset)',
           outline: isOver ? '2px dashed var(--mantine-primary-color-filled)' : undefined,
           outlineOffset: -2
         }}

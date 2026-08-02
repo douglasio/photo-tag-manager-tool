@@ -4,11 +4,9 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
-1. The tags themselves appear as drop zones when dragging tags around in the tag panel -- only the tag group should appear as a drop zone. Tags themselves should only appear as drop zones when dragging images.
-
 2. Adding or removing a tag while in photo view causes the photo to blink briefly. There should be no blink.
 
-3. Nested subfolders in the folder tree should indent accordingly.
+3. Nested subfolders in the folder tree should indent accordingly as they're opened.
 
 # Features
 
