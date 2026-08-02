@@ -293,11 +293,7 @@ function AppLayout(): React.JSX.Element {
           bar in the header — a Tabs.List sibling of Tabs.Panel deep inside
           Main — can share this context; Mantine's Tabs is context-driven, so
           List/Panel don't need to be DOM-adjacent to it. */}
-      <Tabs
-        // h={HEADER_HEIGHT}
-        value={state.activeTab}
-        onChange={(value) => value && setActiveTab(value)}
-      >
+      <Tabs value={state.activeTab} onChange={(value) => value && setActiveTab(value)}>
         <AppShell
           header={{ height: HEADER_HEIGHT }}
           navbar={{

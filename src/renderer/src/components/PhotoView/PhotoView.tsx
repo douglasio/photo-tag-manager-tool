@@ -17,7 +17,7 @@ import { usePhotoEntranceExit } from '@hooks'
 import { usePhotoHoverEffects } from '@hooks'
 import { usePannableZoom } from '@hooks'
 import { toFileProtocolUrl } from '@shared/protocolUrls'
-import { type PhotoRecord, ROTATABLE_FORMATS } from '@shared/types'
+import { type PhotoRecord, ROTATABLE_FORMATS, type RotateDirection } from '@shared/types'
 import { type PhotoVisualization, usePhotoLibrary } from '@state'
 
 import { DvdCoverView } from './DvdCoverView'
@@ -116,14 +116,59 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   // used to open at whatever size the percentages happened to produce
   // instead of the frame-fit size zoomToFit is supposed to return to.
   const [baseSize, setBaseSize] = useState<{ width: number; height: number } | null>(null)
+  // A rotate's spin (see rotationDeg below) needs to *not* animate the one
+  // instant it snaps back to 0 once the freshly re-oriented file has actually
+  // loaded — otherwise that snap itself would visibly animate backwards. Set
+  // alongside rotationDeg in the probe's onLoad below (the browser has
+  // already painted the transition-less snap by the time that render
+  // commits), then cleared again by this effect right after.
+  const [suppressRotationTransition, setSuppressRotationTransition] = useState(false)
+  useEffect(() => {
+    // Deliberately not "adjusted during render" like measuredForKey below —
+    // this needs the browser to actually paint the transition-less snap
+    // (true post-commit) before flipping back, which only an effect can do.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (suppressRotationTransition) setSuppressRotationTransition(false)
+  }, [suppressRotationTransition])
+  // Degrees of *optimistic* rotation applied on top of the image while its
+  // rotate round-trip is in flight — see handleRotate. Nonzero doubles as
+  // "a rotate is in flight" for the reset below. Settled back to 0 by the
+  // probe's onLoad (below) once the real re-oriented file has actually
+  // loaded — NOT here on the thumbnailKey data update alone, since that
+  // arrives before the browser has fetched/decoded the new file, which was
+  // the actual source of the blink: the optimistic rotation used to get
+  // cleared while the old, unrotated frame was still the one on screen.
+  const [rotationDeg, setRotationDeg] = useState(0)
   // Reset (during render, not an effect, per this codebase's convention for
   // resetting state when an external value changes) whenever the file is
-  // rewritten — e.g. after a rotate — so the probe re-measures.
+  // rewritten — e.g. after a rotate — so the probe re-measures. Skipped
+  // while a rotate is in flight: nativeSize was already optimistically
+  // swapped in handleRotate, so clearing it here would hide the image again
+  // until the probe's onLoad settles things below.
   const [measuredForKey, setMeasuredForKey] = useState(photo.thumbnailKey)
   if (measuredForKey !== photo.thumbnailKey) {
     setMeasuredForKey(photo.thumbnailKey)
-    setNativeSize(null)
-    setBaseSize(null)
+    if (rotationDeg === 0) {
+      setNativeSize(null)
+      setBaseSize(null)
+    }
+  }
+
+  const handleRotate = (direction: RotateDirection): void => {
+    const delta = direction === 'right' ? 90 : -90
+    setRotationDeg((prev) => prev + delta)
+    // A rotate is always exactly ±90° — the new native size is deterministically
+    // the old one with width/height swapped, so this stays visible (correctly
+    // reoriented, via rotationDeg above) instead of blanking out while waiting
+    // for the round trip and a fresh async remeasure.
+    setNativeSize((prev) => (prev ? { width: prev.height, height: prev.width } : prev))
+    void rotatePhoto(photo.filePath, direction).catch(() => {
+      // Failed server-side (already notified by context) — undo the
+      // optimistic spin/size swap so the view doesn't stay stuck showing a
+      // rotation that never actually happened.
+      setRotationDeg((prev) => prev - delta)
+      setNativeSize((prev) => (prev ? { width: prev.height, height: prev.width } : prev))
+    })
   }
 
   useEffect(() => {
@@ -151,6 +196,11 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     if (!nativeSize || !baseSize) return
     setScale(clampScale(nativeSize.width / baseSize.width))
   }
+
+  // Shared by both the visible image and its saturation-overlay twin so a
+  // rotate's spin stays in sync across both — see rotationDeg/handleRotate.
+  const imageTransform = `scale(${scale}) rotate(${rotationDeg}deg)`
+  const imageTransition = motionEnabled && !suppressRotationTransition ? ZOOM_TRANSITION : undefined
 
   // This instance mounts exactly once per "opened in a tab" — every opened
   // photo's panel stays mounted for the tab's whole lifetime (see the
@@ -313,6 +363,14 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
             style={{ visibility: 'hidden' }}
             onLoad={(event) => {
               const rect = event.currentTarget.getBoundingClientRect()
+              if (rotationDeg !== 0) {
+                // The freshly re-oriented file has now actually finished
+                // loading and painting — only now is it safe to snap the
+                // optimistic CSS rotation back to 0 without flashing the old,
+                // unrotated frame (see rotationDeg's comment above).
+                setSuppressRotationTransition(true)
+                setRotationDeg(0)
+              }
               setNativeSize({ width: rect.width, height: rect.height })
             }}
           />
@@ -337,9 +395,9 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                   display="block"
                   style={{
                     visibility: baseSize ? 'visible' : 'hidden',
-                    transform: `scale(${scale})`,
+                    transform: imageTransform,
                     transformOrigin: 'center',
-                    transition: motionEnabled ? ZOOM_TRANSITION : undefined,
+                    transition: imageTransition,
                     userSelect: 'none',
                     WebkitUserDrag: 'none'
                   }}
@@ -364,9 +422,9 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
                     display="block"
                     style={{
                       visibility: baseSize ? 'visible' : 'hidden',
-                      transform: `scale(${scale})`,
+                      transform: imageTransform,
                       transformOrigin: 'center',
-                      transition: motionEnabled ? ZOOM_TRANSITION : undefined,
+                      transition: imageTransition,
                       filter: `saturate(${saturationAmount})`,
                       userSelect: 'none',
                       WebkitUserDrag: 'none'
@@ -381,18 +439,12 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
       <Flex pos="absolute" bottom={0} left={0} right={0} justify="space-between" p="md" gap="sm">
         {canRotate ? (
           <Group bg="gray" p="sm" gap="sm" wrap="nowrap">
-            <ActionIcon
-              onClick={() => void rotatePhoto(photo.filePath, 'left')}
-              aria-label="Rotate left"
-            >
+            <ActionIcon onClick={() => handleRotate('left')} aria-label="Rotate left">
               <Tooltip label="Rotate left">
                 <IconRotate size={18} />
               </Tooltip>
             </ActionIcon>
-            <ActionIcon
-              onClick={() => void rotatePhoto(photo.filePath, 'right')}
-              aria-label="Rotate right"
-            >
+            <ActionIcon onClick={() => handleRotate('right')} aria-label="Rotate right">
               <Tooltip label="Rotate right">
                 <IconRotateClockwise size={18} />
               </Tooltip>

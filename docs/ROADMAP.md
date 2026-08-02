@@ -58,7 +58,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Photo view
 
-5. The image rotation issue persists
+1. Filters
+
+2. The image rotation issue persists
 
 ## Settings
 
