@@ -215,6 +215,14 @@ describe('photoLibraryReducer', () => {
       expect(flipped[key]).toBe(false)
     })
 
+    it('sets the default view', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_DEFAULT_VIEW',
+        value: 'dashboard'
+      })
+      expect(state.defaultView).toBe('dashboard')
+    })
+
     it('sets the sort order', () => {
       const state = photoLibraryReducer(initialState, {
         type: 'SET_SORT',

@@ -35,6 +35,7 @@ import {
 import { notifications } from '@mantine/notifications'
 import {
   IconColumns2,
+  IconLayoutDashboard,
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
   IconLibraryPhoto,
@@ -47,6 +48,7 @@ import {
   AppLogo,
   CompareTabLabel,
   CompareView,
+  DashboardView,
   DetailPanel,
   FolderSettingsMenu,
   FolderTree,
@@ -73,7 +75,9 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
-const HEADER_HEIGHT = 52
+const TITLE_BAR_HEIGHT = 52
+const TAB_BAR_HEIGHT = 44
+const HEADER_HEIGHT = TITLE_BAR_HEIGHT + TAB_BAR_HEIGHT
 const DRAG_PREVIEW_SIZE = 64
 const DRAG_PREVIEW_OFFSET_X = 0
 const DRAG_PREVIEW_OFFSET_Y = 0
@@ -165,11 +169,12 @@ function AppLayout(): React.JSX.Element {
     reorderPhotoTabs,
     assignTagToGroup
   } = usePhotoLibrary()
-  const hasTabs = state.openTabs.length > 0
-  // The navbar (Tags/Folders) only hides while an actual photo tab is active — switching back to the Gallery tab (with other photo tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
+  // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
   const isPhotoTabActive = state.activeTab !== 'gallery'
   // Compare View always hides the details panel outright
   const isCompareTabActive = state.compareTabs.has(state.activeTab)
+  // Dashboard is full-screen — no details panel either.
+  const isDashboardTabActive = state.activeTab === 'dashboard'
 
   // Universal "back to gallery" shortcut
   useEffect(() => {
@@ -187,7 +192,7 @@ function AppLayout(): React.JSX.Element {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return
       if (isEditableTarget(event.target)) return
-      const order = ['gallery', ...state.openTabs]
+      const order = ['dashboard', 'gallery', ...state.openTabs]
       const currentIndex = order.indexOf(state.activeTab)
       if (currentIndex === -1) return
       const nextIndex = event.key === 'ArrowRight' ? currentIndex + 1 : currentIndex - 1
@@ -262,6 +267,8 @@ function AppLayout(): React.JSX.Element {
   const activeDragPhoto =
     activeDrag?.kind === 'photo' ? state.photosByPath.get(activeDrag.paths[0]) : undefined
 
+  const TAB_ICON_SIZE = 20
+
   // DndContext scoped to just the photo-tab row
   const tabSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const handleTabDragEnd = (event: DragEndEvent): void => {
@@ -281,163 +288,164 @@ function AppLayout(): React.JSX.Element {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDrag(null)}
     >
-      <AppShell
-        header={{ height: HEADER_HEIGHT }}
-        navbar={{
-          width: 260,
-          breakpoint: 0,
-          collapsed: { desktop: isPhotoTabActive, mobile: isPhotoTabActive }
-        }}
-        aside={{
-          width: 320,
-          breakpoint: 0,
-          collapsed: {
-            desktop: state.detailsPanelCollapsed || isCompareTabActive,
-            mobile: state.detailsPanelCollapsed || isCompareTabActive
-          }
-        }}
-        padding={0}
-      >
-        <AppShell.Header>
-          <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-              <AppLogo />
-              <Title order={1} size="h5">
-                Tag Me
-              </Title>
-            </Group>
-            <Group gap="md" wrap="nowrap">
-              <ScanProgressBar />
-              <Tooltip
-                label={
-                  isCompareTabActive
-                    ? 'Not available in Compare View'
-                    : state.detailsPanelCollapsed
-                      ? 'Show details panel'
-                      : 'Hide details panel'
-                }
-              >
-                <ActionIcon
-                  variant="subtle"
-                  aria-label="Toggle details panel"
-                  disabled={isCompareTabActive}
-                  onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
+      {/* Wraps the whole AppShell (rather than just AppShell.Main) so the tab
+          bar in the header — a Tabs.List sibling of Tabs.Panel deep inside
+          Main — can share this context; Mantine's Tabs is context-driven, so
+          List/Panel don't need to be DOM-adjacent to it. */}
+      <Tabs value={state.activeTab} onChange={(value) => value && setActiveTab(value)}>
+        <AppShell
+          header={{ height: HEADER_HEIGHT }}
+          navbar={{
+            width: 260,
+            breakpoint: 0,
+            collapsed: { desktop: isPhotoTabActive, mobile: isPhotoTabActive }
+          }}
+          aside={{
+            width: 320,
+            breakpoint: 0,
+            collapsed: {
+              desktop: state.detailsPanelCollapsed || isCompareTabActive || isDashboardTabActive,
+              mobile: state.detailsPanelCollapsed || isCompareTabActive || isDashboardTabActive
+            }
+          }}
+          padding={0}
+        >
+          <AppShell.Header>
+            <Group h={TITLE_BAR_HEIGHT} px="md" justify="space-between" wrap="nowrap">
+              <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                <AppLogo />
+                <Title order={1} size="h5">
+                  Tag Me
+                </Title>
+              </Group>
+              <Group gap="md" wrap="nowrap">
+                <ScanProgressBar />
+                <Tooltip
+                  label={
+                    isCompareTabActive
+                      ? 'Not available in Compare View'
+                      : isDashboardTabActive
+                        ? 'Not available on Dashboard'
+                        : state.detailsPanelCollapsed
+                          ? 'Show details panel'
+                          : 'Hide details panel'
+                  }
                 >
-                  {state.detailsPanelCollapsed || isCompareTabActive ? (
-                    <IconLayoutSidebarRightExpand size={18} />
-                  ) : (
-                    <IconLayoutSidebarRightCollapse size={18} />
-                  )}
-                </ActionIcon>
-              </Tooltip>
-              <SettingsModal />
-            </Group>
-          </Group>
-        </AppShell.Header>
-        <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
-          <Box p="md" style={{ flexShrink: 0 }}>
-            <AllPhotosRow />
-          </Box>
-          <Divider />
-          <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
-            <TagPanel />
-          </PanelSection>
-          <Divider />
-          <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
-            <FolderTree />
-          </PanelSection>
-        </AppShell.Navbar>
-        <AppShell.Main>
-          <Box
-            h={`calc(100dvh - ${HEADER_HEIGHT}px)`}
-            display="flex"
-            style={{ flexDirection: 'column' }}
-          >
-            {hasTabs ? (
-              <Tabs
-                value={state.activeTab}
-                onChange={(value) => value && setActiveTab(value)}
-                display="flex"
-                flex={1}
-                mih={0}
-                style={{ flexDirection: 'column' }}
-              >
-                <Tabs.List style={{ flexShrink: 0, flexWrap: 'nowrap' }}>
-                  <Scroller>
-                    <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto />}>
-                      Gallery
-                    </Tabs.Tab>
-                    <DndContext
-                      sensors={tabSensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleTabDragEnd}
-                    >
-                      <SortableContext
-                        items={state.openTabs}
-                        strategy={horizontalListSortingStrategy}
-                      >
-                        {openTabEntries.map((entry) => (
-                          <SortableTab
-                            key={entry.id}
-                            id={entry.id}
-                            value={entry.id}
-                            leftSection={
-                              entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
-                            }
-                            rightSection={
-                              <ActionIcon
-                                component="span"
-                                size="xs"
-                                variant="subtle"
-                                color="gray"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  closePhotoTab(entry.id)
-                                }}
-                              >
-                                <IconX size={12} />
-                              </ActionIcon>
-                            }
-                          >
-                            {entry.kind === 'compare' ? (
-                              <CompareTabLabel
-                                fileNames={entry.photos.map((photo) => photo.fileName)}
-                              />
-                            ) : (
-                              <TabLabel fileName={entry.photo.fileName} />
-                            )}
-                          </SortableTab>
-                        ))}
-                      </SortableContext>
-                    </DndContext>
-                  </Scroller>
-                </Tabs.List>
-                <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-                  <GalleryGrid />
-                </Tabs.Panel>
-                {openTabEntries.map((entry) => (
-                  <Tabs.Panel
-                    key={entry.id}
-                    value={entry.id}
-                    style={{ flex: 1, minHeight: 0, display: 'flex' }}
+                  <ActionIcon
+                    variant="subtle"
+                    aria-label="Toggle details panel"
+                    disabled={isCompareTabActive || isDashboardTabActive}
+                    onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
                   >
-                    {entry.kind === 'compare' ? (
-                      <CompareView id={entry.id} photos={entry.photos} />
+                    {state.detailsPanelCollapsed || isCompareTabActive || isDashboardTabActive ? (
+                      <IconLayoutSidebarRightExpand size={18} />
                     ) : (
-                      <PhotoView photo={entry.photo} />
+                      <IconLayoutSidebarRightCollapse size={18} />
                     )}
-                  </Tabs.Panel>
-                ))}
-              </Tabs>
-            ) : (
-              <GalleryGrid />
-            )}
-          </Box>
-        </AppShell.Main>
-        <AppShell.Aside p="md" style={{ overflowY: 'auto' }}>
-          <DetailPanel />
-        </AppShell.Aside>
-      </AppShell>
+                  </ActionIcon>
+                </Tooltip>
+                <SettingsModal />
+              </Group>
+            </Group>
+            <Tabs.List h={TAB_BAR_HEIGHT} style={{ flexWrap: 'nowrap' }}>
+              <Scroller>
+                <Tabs.Tab
+                  value="dashboard"
+                  leftSection={<IconLayoutDashboard size={TAB_ICON_SIZE} />}
+                >
+                  Dashboard
+                </Tabs.Tab>
+                <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto size={TAB_ICON_SIZE} />}>
+                  Gallery
+                </Tabs.Tab>
+                <DndContext
+                  sensors={tabSensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleTabDragEnd}
+                >
+                  <SortableContext items={state.openTabs} strategy={horizontalListSortingStrategy}>
+                    {openTabEntries.map((entry) => (
+                      <SortableTab
+                        key={entry.id}
+                        id={entry.id}
+                        value={entry.id}
+                        leftSection={
+                          entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
+                        }
+                        rightSection={
+                          <ActionIcon
+                            component="span"
+                            size="xs"
+                            variant="subtle"
+                            color="gray"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              closePhotoTab(entry.id)
+                            }}
+                          >
+                            <IconX size={12} />
+                          </ActionIcon>
+                        }
+                      >
+                        {entry.kind === 'compare' ? (
+                          <CompareTabLabel
+                            fileNames={entry.photos.map((photo) => photo.fileName)}
+                          />
+                        ) : (
+                          <TabLabel fileName={entry.photo.fileName} />
+                        )}
+                      </SortableTab>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              </Scroller>
+            </Tabs.List>
+          </AppShell.Header>
+          <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
+            <Box p="md" style={{ flexShrink: 0 }}>
+              <AllPhotosRow />
+            </Box>
+            <Divider />
+            <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
+              <TagPanel />
+            </PanelSection>
+            <Divider />
+            <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
+              <FolderTree />
+            </PanelSection>
+          </AppShell.Navbar>
+          <AppShell.Main>
+            <Box
+              h={`calc(100dvh - ${HEADER_HEIGHT}px)`}
+              display="flex"
+              style={{ flexDirection: 'column' }}
+            >
+              <Tabs.Panel value="dashboard" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+                <DashboardView />
+              </Tabs.Panel>
+              <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+                <GalleryGrid />
+              </Tabs.Panel>
+              {openTabEntries.map((entry) => (
+                <Tabs.Panel
+                  key={entry.id}
+                  value={entry.id}
+                  style={{ flex: 1, minHeight: 0, display: 'flex' }}
+                >
+                  {entry.kind === 'compare' ? (
+                    <CompareView id={entry.id} photos={entry.photos} />
+                  ) : (
+                    <PhotoView photo={entry.photo} />
+                  )}
+                </Tabs.Panel>
+              ))}
+            </Box>
+          </AppShell.Main>
+          <AppShell.Aside p="md" style={{ overflowY: 'auto' }}>
+            <DetailPanel />
+          </AppShell.Aside>
+        </AppShell>
+      </Tabs>
       <DragOverlay
         modifiers={[snapCenterToCursor]}
         style={

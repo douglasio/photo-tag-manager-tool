@@ -1,4 +1,4 @@
-import type { PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
+import type { DefaultView, PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
 import {
   addPhotoToFolderTree,
   findRootFolder,
@@ -47,6 +47,8 @@ export interface PhotoLibraryState {
   // folderChildren above never include those). From SCAN_COMPLETE's
   // allFolders, so it's as of the last scan, not live filesystem changes.
   allFolderPaths: Set<string>
+  // Which pinned tab ('dashboard' or 'gallery') the app loads into on launch.
+  defaultView: DefaultView
   showEmptyFolders: boolean
   detailsPanelCollapsed: boolean
   galleryAnimationsEnabled: boolean
@@ -94,6 +96,7 @@ export const initialState: PhotoLibraryState = {
   folderCounts: new Map(),
   folderChildren: new Map(),
   allFolderPaths: new Set(),
+  defaultView: 'dashboard',
   showEmptyFolders: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
@@ -107,7 +110,7 @@ export const initialState: PhotoLibraryState = {
   tagGroupAssignments: new Map(),
   recentTags: [],
   openTabs: [],
-  activeTab: 'gallery',
+  activeTab: 'dashboard',
   compareTabs: new Map()
 }
 
@@ -129,6 +132,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
+  | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
@@ -408,6 +412,8 @@ export function photoLibraryReducer(
       return { ...state, selectedTag: action.tag }
     case 'SET_SORT':
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
+    case 'SET_DEFAULT_VIEW':
+      return { ...state, defaultView: action.value }
     case 'SET_SHOW_EMPTY_FOLDERS':
       return { ...state, showEmptyFolders: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':

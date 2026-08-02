@@ -60,6 +60,8 @@ function createMockApi(): {
     setGalleryCellWidth: vi.fn().mockResolvedValue(undefined),
     getGallerySort: vi.fn().mockResolvedValue(null),
     setGallerySort: vi.fn().mockResolvedValue(undefined),
+    getDefaultView: vi.fn().mockResolvedValue('gallery'),
+    setDefaultView: vi.fn().mockResolvedValue(undefined),
     getShowEmptyFolders: vi.fn().mockResolvedValue(false),
     setShowEmptyFolders: vi.fn().mockResolvedValue(undefined),
     getDetailsPanelCollapsed: vi.fn().mockResolvedValue(false),

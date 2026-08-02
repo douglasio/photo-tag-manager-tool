@@ -4,6 +4,7 @@ import { dirname, join } from 'path'
 
 import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
+  getDefaultView,
   getDetailsPanelCollapsed,
   getDvdStudioName,
   getExcludePatterns,
@@ -15,6 +16,7 @@ import {
   getNewspaperTitle,
   getShowEmptyFolders,
   getShowFilenames,
+  setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
   setExcludePatterns,
@@ -29,7 +31,7 @@ import {
 } from '@main/db/settingsRepository'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
-import type { GallerySort } from '@shared/types'
+import type { DefaultView, GallerySort } from '@shared/types'
 
 // Conservative cross-platform block list — matches photoHandlers.ts's file
 // rename validation, since folder names share the same filesystem constraints.
@@ -54,6 +56,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setGallerySort', (_event, sort: GallerySort): void => {
     setGallerySort(sort)
+  })
+
+  ipcMain.handle('settings:getDefaultView', (): DefaultView => getDefaultView())
+
+  ipcMain.handle('settings:setDefaultView', (_event, value: DefaultView): void => {
+    setDefaultView(value)
   })
 
   ipcMain.handle('settings:getShowEmptyFolders', (): boolean => getShowEmptyFolders())

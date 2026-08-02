@@ -13,7 +13,7 @@ import {
 import { notifications } from '@mantine/notifications'
 
 import { MoveProgressToast } from '@components'
-import type { PhotoRecord, RotateDirection } from '@shared/types'
+import type { DefaultView, PhotoRecord, RotateDirection } from '@shared/types'
 import { basename, isPhotoInFolder } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
@@ -85,6 +85,7 @@ interface PhotoLibraryContextValue {
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
+  setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
@@ -266,6 +267,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getGallerySort().then((sort) => {
       if (sort) dispatch({ type: 'SET_SORT', sortBy: sort.sortBy, sortOrder: sort.sortOrder })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getDefaultView().then((value) => {
+      dispatch({ type: 'SET_DEFAULT_VIEW', value })
+      dispatch({ type: 'SET_ACTIVE_TAB', tab: value })
     })
   }, [])
 
@@ -813,6 +821,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setGallerySort({ sortBy, sortOrder })
   }, [])
 
+  const setDefaultView = useCallback((value: DefaultView) => {
+    dispatch({ type: 'SET_DEFAULT_VIEW', value })
+    void window.api.setDefaultView(value)
+  }, [])
+
   const setShowEmptyFolders = useCallback((value: boolean) => {
     dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
     void window.api.setShowEmptyFolders(value)
@@ -1004,6 +1017,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setTagFilter,
     setFolderTagFilter,
     setSort,
+    setDefaultView,
     setShowEmptyFolders,
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,

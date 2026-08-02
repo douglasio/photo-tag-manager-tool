@@ -1,4 +1,4 @@
-import type { GallerySort } from '@shared/types'
+import type { DefaultView, GallerySort } from '@shared/types'
 
 import { getDb } from './database'
 
@@ -71,6 +71,15 @@ export function getShowEmptyFolders(): boolean {
 
 export function setShowEmptyFolders(value: boolean): void {
   setSetting('showEmptyFolders', String(value))
+}
+
+// Defaults to Dashboard, same reasoning as getGalleryAnimationsEnabled above.
+export function getDefaultView(): DefaultView {
+  return getSetting('defaultView') === 'gallery' ? 'gallery' : 'dashboard'
+}
+
+export function setDefaultView(value: DefaultView): void {
+  setSetting('defaultView', value)
 }
 
 export function getDetailsPanelCollapsed(): boolean {

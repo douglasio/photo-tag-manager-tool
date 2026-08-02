@@ -2,6 +2,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 
 import type {
+  DefaultView,
   GallerySort,
   MetadataBatchEvent,
   MoveProgressEvent,
@@ -51,6 +52,9 @@ const api = {
   getGallerySort: (): Promise<GallerySort | null> => ipcRenderer.invoke('settings:getGallerySort'),
   setGallerySort: (sort: GallerySort): Promise<void> =>
     ipcRenderer.invoke('settings:setGallerySort', sort),
+  getDefaultView: (): Promise<DefaultView> => ipcRenderer.invoke('settings:getDefaultView'),
+  setDefaultView: (value: DefaultView): Promise<void> =>
+    ipcRenderer.invoke('settings:setDefaultView', value),
   getShowEmptyFolders: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowEmptyFolders'),
   setShowEmptyFolders: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowEmptyFolders', value),
