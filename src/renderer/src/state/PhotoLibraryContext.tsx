@@ -221,13 +221,33 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   }, [scheduleWatchNotification])
 
   // Starts a scan for one folder and resolves once that scan's scan:complete
-  // event arrives, so callers can await folders sequentially rather than
-  // firing them all at once.
+  // event arrives.
   const startScanFor = useCallback((rootPath: string): Promise<void> => {
     return new Promise((resolve) => {
       void window.api.startScan(rootPath).then(({ scanId }) => {
         scanIdRef.current = scanId
-        dispatch({ type: 'SCAN_STARTED', rootPath, scanId })
+        dispatch({ type: 'SCAN_STARTED', scanId })
+
+        const unsubscribe = window.api.onScanComplete((payload) => {
+          if (payload.scanId !== scanId) return
+          unsubscribe()
+          resolve()
+        })
+      })
+    })
+  }, [])
+
+  // Same as startScanFor, but combines every given root into one scan (one
+  // scanId, one shared metadata/thumbnail concurrency pool) instead of
+  // awaiting each folder's scan sequentially — used for the startup sweep
+  // and "rescan all," where sequential awaiting made total load time the
+  // sum of every folder's scan time.
+  const startScanForAll = useCallback((rootPaths: string[]): Promise<void> => {
+    if (rootPaths.length === 0) return Promise.resolve()
+    return new Promise((resolve) => {
+      void window.api.startScanAll(rootPaths).then(({ scanId }) => {
+        scanIdRef.current = scanId
+        dispatch({ type: 'SCAN_STARTED', scanId })
 
         const unsubscribe = window.api.onScanComplete((payload) => {
           if (payload.scanId !== scanId) return
@@ -241,12 +261,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getFolders().then(async (folders) => {
       dispatch({ type: 'FOLDERS_LOADED', folders })
-      for (const folder of folders) {
-        await startScanFor(folder)
-      }
+      await startScanForAll(folders)
       dispatch({ type: 'INITIAL_LOAD_COMPLETE' })
     })
-  }, [startScanFor])
+  }, [startScanForAll])
 
   useEffect(() => {
     window.api.getTagDescriptions().then((descriptions) => {
@@ -386,10 +404,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   }, [])
 
   const rescanAll = useCallback(async () => {
-    for (const folder of state.folders) {
-      await startScanFor(folder)
-    }
-  }, [state.folders, startScanFor])
+    await startScanForAll(state.folders)
+  }, [state.folders, startScanForAll])
 
   // A plain click always replaces the whole selection with just this photo —
   // both the DetailPanel-primary pointer and the multi-select batch.

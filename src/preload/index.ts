@@ -88,6 +88,8 @@ const api = {
     ipcRenderer.invoke('settings:renameFolder', folder, newBaseName),
   startScan: (rootPath: string): Promise<ScanStartResult> =>
     ipcRenderer.invoke('scan:start', rootPath),
+  startScanAll: (rootPaths: string[]): Promise<ScanStartResult> =>
+    ipcRenderer.invoke('scan:startAll', rootPaths),
   cancelScan: (scanId: string): Promise<void> => ipcRenderer.invoke('scan:cancel', scanId),
   updateTags: (filePath: string, tags: string[]): Promise<PhotoRecord> =>
     ipcRenderer.invoke('tags:update', filePath, tags),

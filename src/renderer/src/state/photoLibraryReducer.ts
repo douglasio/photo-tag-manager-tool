@@ -24,7 +24,6 @@ export function compareTabId(paths: string[]): string {
 
 export interface PhotoLibraryState {
   folders: string[]
-  rootPath: string | null
   scanId: string | null
   status: ScanStatus
   // False until every folder's initial startup scan has resolved
@@ -79,7 +78,6 @@ export interface PhotoLibraryState {
 
 export const initialState: PhotoLibraryState = {
   folders: [],
-  rootPath: null,
   scanId: null,
   status: 'idle',
   initialLoadComplete: false,
@@ -119,7 +117,7 @@ export type PhotoLibraryAction =
   | { type: 'FOLDER_ADDED'; folder: string }
   | { type: 'FOLDER_REMOVED'; folder: string }
   | { type: 'FOLDER_RENAMED'; oldFolder: string; newFolder: string }
-  | { type: 'SCAN_STARTED'; rootPath: string; scanId: string }
+  | { type: 'SCAN_STARTED'; scanId: string }
   | { type: 'SCAN_PROGRESS'; filesFound: number }
   | { type: 'METADATA_BATCH'; photos: PhotoRecord[] }
   | { type: 'SCAN_COMPLETE'; result: ScanCompleteEvent }
@@ -305,7 +303,6 @@ export function photoLibraryReducer(
     case 'SCAN_STARTED':
       return {
         ...state,
-        rootPath: action.rootPath,
         scanId: action.scanId,
         status: 'scanning',
         filesFound: 0
@@ -318,19 +315,28 @@ export function photoLibraryReducer(
       const folderCounts = new Map(state.folderCounts)
       const folderChildren = new Map(state.folderChildren)
       for (const photo of action.photos) {
-        if (state.rootPath && !photosByPath.has(photo.filePath)) {
-          addPhotoToFolderTree(photo.filePath, state.rootPath, folderCounts, folderChildren)
+        if (!photosByPath.has(photo.filePath)) {
+          // Looked up per photo (not a single "currently scanning" root) —
+          // a combined scan across every watched folder interleaves photos
+          // from all of them in the same batch.
+          const owningRoot = state.folders.find((folder) =>
+            isPathUnderOrEqual(photo.filePath, folder)
+          )
+          if (owningRoot)
+            addPhotoToFolderTree(photo.filePath, owningRoot, folderCounts, folderChildren)
         }
         photosByPath.set(photo.filePath, photo)
       }
       return { ...state, photosByPath, folderCounts, folderChildren }
     }
     // filePaths (null if the scan aborted before finishing) is authoritative
-    // for what exists under rootPath. METADATA_BATCH already added new
+    // for what exists under rootPaths. METADATA_BATCH already added new
     // finds; this prunes anything previously known that's now missing,
     // mirroring the main process's own pruneMissing.
     case 'SCAN_COMPLETE': {
-      const { rootPath, filePaths, allFolders } = action.result
+      const { rootPaths, filePaths, allFolders } = action.result
+      const isUnderAnyRoot = (path: string): boolean =>
+        rootPaths.some((root) => isPathUnderOrEqual(path, root))
 
       let photosByPath = state.photosByPath
       let folderCounts = state.folderCounts
@@ -344,7 +350,7 @@ export function photoLibraryReducer(
       if (filePaths) {
         const keep = new Set(filePaths)
         const stale = Array.from(photosByPath.keys()).filter(
-          (path) => isPathUnderOrEqual(path, rootPath) && !keep.has(path)
+          (path) => isUnderAnyRoot(path) && !keep.has(path)
         )
         if (stale.length > 0) {
           photosByPath = new Map(photosByPath)
@@ -352,7 +358,9 @@ export function photoLibraryReducer(
           folderChildren = new Map(folderChildren)
           for (const filePath of stale) {
             photosByPath.delete(filePath)
-            removePhotoFromFolderTree(filePath, rootPath, folderCounts, folderChildren)
+            const owningRoot = rootPaths.find((root) => isPathUnderOrEqual(filePath, root))
+            if (owningRoot)
+              removePhotoFromFolderTree(filePath, owningRoot, folderCounts, folderChildren)
           }
 
           const staleSet = new Set(stale)
@@ -362,10 +370,8 @@ export function photoLibraryReducer(
           activeTab = staleSet.has(activeTab) ? 'gallery' : activeTab
         }
 
-        // Replaces this root's folder listing rather than only adding to it.
-        const keptFolders = Array.from(allFolderPaths).filter(
-          (folder) => !isPathUnderOrEqual(folder, rootPath)
-        )
+        // Replaces these roots' folder listings rather than only adding to them.
+        const keptFolders = Array.from(allFolderPaths).filter((folder) => !isUnderAnyRoot(folder))
         allFolderPaths = new Set([...keptFolders, ...allFolders])
       } else {
         allFolderPaths = new Set(allFolderPaths)

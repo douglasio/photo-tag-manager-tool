@@ -23,10 +23,8 @@ import {
   Divider,
   Group,
   Image,
-  Loader,
   Paper,
   Scroller,
-  Stack,
   Tabs,
   Text,
   Title,
@@ -58,6 +56,7 @@ import {
   ScanProgressBar,
   SettingsModal,
   SortableTab,
+  StartupLoadingScreen,
   TabLabel,
   TagGroupCreateButton,
   TagPanel
@@ -466,20 +465,6 @@ function AppLayout(): React.JSX.Element {
         )}
       </DragOverlay>
     </DndContext>
-  )
-}
-
-// Shown until every watched folder's initial scan resolves, instead of the gallery appearing empty and filling in photo-by-photo as the sync job runs.
-function StartupLoadingScreen(): React.JSX.Element {
-  return (
-    <Center h="100vh">
-      <Stack align="center" gap="xl">
-        <Group gap="xs">
-          <Loader size="sm" />
-          <Text c="dimmed">Loading your library…</Text>
-        </Group>
-      </Stack>
-    </Center>
   )
 }
 

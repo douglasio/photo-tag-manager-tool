@@ -99,7 +99,6 @@ describe('photoLibraryReducer', () => {
     it('tracks scan lifecycle', () => {
       let state = photoLibraryReducer(initialState, {
         type: 'SCAN_STARTED',
-        rootPath: '/root',
         scanId: 'scan-1'
       })
       expect(state.status).toBe('scanning')
@@ -133,7 +132,7 @@ describe('photoLibraryReducer', () => {
 
       const result: ScanCompleteEvent = {
         scanId: 'scan-1',
-        rootPath: '/root',
+        rootPaths: ['/root'],
         totalScanned: 1,
         cacheHits: 0,
         errors: [],
@@ -156,7 +155,7 @@ describe('photoLibraryReducer', () => {
       })
       const result: ScanCompleteEvent = {
         scanId: 'scan-1',
-        rootPath: '/root',
+        rootPaths: ['/root'],
         totalScanned: 0,
         cacheHits: 0,
         errors: [],
@@ -166,6 +165,40 @@ describe('photoLibraryReducer', () => {
       const next = photoLibraryReducer(state, { type: 'SCAN_COMPLETE', result })
       expect(next.photosByPath.has('/root/a.jpg')).toBe(true)
       expect(next.allFolderPaths.has('/root/new-empty')).toBe(true)
+    })
+
+    it('attributes a batch photo to whichever watched root actually owns it', () => {
+      const state = { ...initialState, folders: ['/root-a', '/root-b'] }
+      const next = photoLibraryReducer(state, {
+        type: 'METADATA_BATCH',
+        photos: [makePhoto('/root-a/x.jpg'), makePhoto('/root-b/y.jpg')]
+      })
+
+      expect(next.folderCounts.get('/root-a')).toBe(1)
+      expect(next.folderCounts.get('/root-b')).toBe(1)
+    })
+
+    it('prunes stale photos under the correct root when a combined scan covers multiple roots', () => {
+      let state = { ...initialState, folders: ['/root-a', '/root-b'] }
+      state = photoLibraryReducer(state, {
+        type: 'METADATA_BATCH',
+        photos: [makePhoto('/root-a/x.jpg'), makePhoto('/root-b/y.jpg')]
+      })
+
+      const result: ScanCompleteEvent = {
+        scanId: 'scan-1',
+        rootPaths: ['/root-a', '/root-b'],
+        totalScanned: 1,
+        cacheHits: 0,
+        errors: [],
+        allFolders: ['/root-a', '/root-b'],
+        filePaths: ['/root-a/x.jpg']
+      }
+      const next = photoLibraryReducer(state, { type: 'SCAN_COMPLETE', result })
+
+      expect(next.photosByPath.has('/root-a/x.jpg')).toBe(true)
+      expect(next.photosByPath.has('/root-b/y.jpg')).toBe(false)
+      expect(next.folderCounts.get('/root-b')).toBeFalsy()
     })
   })
 

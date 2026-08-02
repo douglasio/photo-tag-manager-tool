@@ -82,6 +82,7 @@ function createMockApi(): {
     removeFolder: vi.fn().mockResolvedValue(undefined),
     renameFolder: vi.fn(),
     startScan: vi.fn().mockResolvedValue({ scanId: 'scan-1' }),
+    startScanAll: vi.fn().mockResolvedValue({ scanId: 'scan-1' }),
     cancelScan: vi.fn().mockResolvedValue(undefined),
     updateTags: vi.fn(),
     getTagDescriptions: vi.fn().mockResolvedValue({}),
@@ -154,7 +155,7 @@ describe('PhotoLibraryContext', () => {
     mockApi.getFolders.mockResolvedValue(['/root'])
     const { result } = setup()
 
-    await waitFor(() => expect(mockApi.startScan).toHaveBeenCalledWith('/root'))
+    await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalledWith(['/root']))
     expect(result.current.state.folders).toEqual(['/root'])
   })
 
@@ -162,13 +163,13 @@ describe('PhotoLibraryContext', () => {
     mockApi.getFolders.mockResolvedValue(['/root'])
     const { result } = setup()
 
-    await waitFor(() => expect(mockApi.startScan).toHaveBeenCalledWith('/root'))
+    await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalledWith(['/root']))
     expect(result.current.state.initialLoadComplete).toBe(false)
 
     act(() => {
       subscriptions.onScanComplete({
         scanId: 'scan-1',
-        rootPath: '/root',
+        rootPaths: ['/root'],
         totalScanned: 0,
         cacheHits: 0,
         errors: [],
@@ -214,7 +215,7 @@ describe('PhotoLibraryContext', () => {
     it('selectPhotoRange selects everything between the anchor and target in visible order', async () => {
       mockApi.getFolders.mockResolvedValue(['/root'])
       const { result } = setup()
-      await waitFor(() => expect(mockApi.startScan).toHaveBeenCalled())
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
 
       act(() => {
         subscriptions.onMetadataBatch({
@@ -375,7 +376,7 @@ describe('PhotoLibraryContext', () => {
     async function seedPhotos(): Promise<ReturnType<typeof setup>> {
       mockApi.getFolders.mockResolvedValue(['/root'])
       const hook = setup()
-      await waitFor(() => expect(mockApi.startScan).toHaveBeenCalled())
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
       act(() => {
         subscriptions.onMetadataBatch({
           scanId: 'scan-1',
