@@ -1,4 +1,4 @@
-import { Center, Group, Loader, Progress, Stack, Text, Title } from '@mantine/core'
+import { Center, Group, Loader, Progress, Stack, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 import { usePhotoLibrary } from '@state'
@@ -15,16 +15,14 @@ export function StartupLoadingScreen(): ReactElement {
       <Stack align="center" gap="xl" w={320}>
         {total > 0 ? (
           <Stack align="center" gap="xs" w="100%">
-            <Title>Welcome</Title>
             <Progress value={percent} size="sm" w="100%" animated />
             <Text c="dimmed" size="sm">
-              {processed} / {total} photos
+              Loading {processed} / {total} photos
             </Text>
           </Stack>
         ) : (
           <Group gap="xs">
             <Loader size="sm" />
-            <Text c="dimmed">Loading your library…</Text>
           </Group>
         )}
       </Stack>

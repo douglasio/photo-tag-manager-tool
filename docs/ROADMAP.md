@@ -4,6 +4,8 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
+- Gallery preview zoom is not very smooth and doesn't zoom in enough
+
 # Features
 
 To-dos, tasks, and features loosely grouped by feature segment.
@@ -44,13 +46,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Gallery View
 
-1. Sort by view count
+1. Select tag thumbnail photo
 
-2. Select tag thumbnail photo
-
-3. Create an alternate display option for the tags panel. This one is a 2-column grid of the tag thumbnails with the tag name and image count overlayed on top of the thumbnail, using Mantine's BackgroundImage component. Use the settings cog pattern used in the Folder section to put the toggle for this.
-
-4. Sort tags by count, alpha, most recent
+2. Create an alternate display option for the tags panel. This one is a 2-column grid of the tag thumbnails with the tag name and image count overlayed on top of the thumbnail, using Mantine's BackgroundImage component. Use the settings cog pattern used in the Folder section to put the toggle for this.
 
 ## Tools
 

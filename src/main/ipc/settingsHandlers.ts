@@ -16,6 +16,7 @@ import {
   getNewspaperTitle,
   getShowEmptyFolders,
   getShowFilenames,
+  getShowViewCounts,
   setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
@@ -27,7 +28,8 @@ import {
   setMagazineTitle,
   setNewspaperTitle,
   setShowEmptyFolders,
-  setShowFilenames
+  setShowFilenames,
+  setShowViewCounts
 } from '@main/db/settingsRepository'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
@@ -88,6 +90,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setShowFilenames', (_event, value: boolean): void => {
     setShowFilenames(value)
+  })
+
+  ipcMain.handle('settings:getShowViewCounts', (): boolean => getShowViewCounts())
+
+  ipcMain.handle('settings:setShowViewCounts', (_event, value: boolean): void => {
+    setShowViewCounts(value)
   })
 
   ipcMain.handle('settings:getMagazineTitle', (): string => getMagazineTitle())

@@ -240,7 +240,8 @@ describe('photoLibraryReducer', () => {
       ['SET_SHOW_EMPTY_FOLDERS', 'showEmptyFolders'],
       ['SET_DETAILS_PANEL_COLLAPSED', 'detailsPanelCollapsed'],
       ['SET_GALLERY_ANIMATIONS_ENABLED', 'galleryAnimationsEnabled'],
-      ['SET_SHOW_FILENAMES', 'showFilenames']
+      ['SET_SHOW_FILENAMES', 'showFilenames'],
+      ['SET_SHOW_VIEW_COUNTS', 'showViewCounts']
     ] as const)('%s flips %s', (type, key) => {
       const state = photoLibraryReducer(initialState, { type, value: true } as never)
       expect(state[key]).toBe(true)

@@ -111,6 +111,16 @@ export function setShowFilenames(value: boolean): void {
   setSetting('showFilenames', String(value))
 }
 
+// Defaults to off — an opt-in badge, not something that should suddenly
+// appear for existing users on upgrade.
+export function getShowViewCounts(): boolean {
+  return getSetting('showViewCounts') === 'true'
+}
+
+export function setShowViewCounts(value: boolean): void {
+  setSetting('showViewCounts', String(value))
+}
+
 export function getExcludePatterns(): string[] {
   const raw = getSetting('excludePatterns')
   if (!raw) return []

@@ -67,6 +67,31 @@ export function GallerySortMenu(): ReactElement {
         >
           Date taken (Oldest)
         </Menu.Item>
+        <Menu.Divider />
+        <Menu.Item
+          leftSection={
+            state.sortBy === 'viewCount' && state.sortOrder === 'desc' ? (
+              <IconCheck size={14} />
+            ) : (
+              <Box w={14} />
+            )
+          }
+          onClick={() => setSort('viewCount', 'desc')}
+        >
+          View count (Most)
+        </Menu.Item>
+        <Menu.Item
+          leftSection={
+            state.sortBy === 'viewCount' && state.sortOrder === 'asc' ? (
+              <IconCheck size={14} />
+            ) : (
+              <Box w={14} />
+            )
+          }
+          onClick={() => setSort('viewCount', 'asc')}
+        >
+          View count (Least)
+        </Menu.Item>
       </Menu.Dropdown>
     </Menu>
   )

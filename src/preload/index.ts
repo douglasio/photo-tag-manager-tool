@@ -69,6 +69,9 @@ const api = {
   getShowFilenames: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowFilenames'),
   setShowFilenames: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowFilenames', value),
+  getShowViewCounts: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowViewCounts'),
+  setShowViewCounts: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setShowViewCounts', value),
   getMagazineTitle: (): Promise<string> => ipcRenderer.invoke('settings:getMagazineTitle'),
   setMagazineTitle: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setMagazineTitle', value),

@@ -1,6 +1,6 @@
 import { MantineProvider } from '@mantine/core'
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { PhotoRecord } from '@shared/types'
 
@@ -34,6 +34,15 @@ const photo: PhotoRecord = {
 }
 
 describe('GalleryHoverPreview', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockIncrementViewCount.mockClear()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('renders nothing when position is null', () => {
     render(
       <MantineProvider>
@@ -44,7 +53,7 @@ describe('GalleryHoverPreview', () => {
     expect(mockIncrementViewCount).not.toHaveBeenCalled()
   })
 
-  it('renders the preview image once a position is given, and counts it as a view', () => {
+  it('renders the preview image once a position is given, without counting a view yet', () => {
     render(
       <MantineProvider>
         <GalleryHoverPreview
@@ -56,6 +65,61 @@ describe('GalleryHoverPreview', () => {
       </MantineProvider>
     )
     expect(screen.getByAltText('a.jpg')).toBeInTheDocument()
+    expect(mockIncrementViewCount).not.toHaveBeenCalled()
+  })
+
+  it('counts a view only after the preview closes and the delay elapses', () => {
+    const { rerender } = render(
+      <MantineProvider>
+        <GalleryHoverPreview
+          photo={photo}
+          position={{ x: 10, y: 20 }}
+          scale={1}
+          motionEnabled={false}
+        />
+      </MantineProvider>
+    )
+
+    rerender(
+      <MantineProvider>
+        <GalleryHoverPreview photo={photo} position={null} scale={1} motionEnabled={false} />
+      </MantineProvider>
+    )
+    expect(mockIncrementViewCount).not.toHaveBeenCalled()
+
+    act(() => vi.runAllTimers())
     expect(mockIncrementViewCount).toHaveBeenCalledExactlyOnceWith('/a.jpg')
+  })
+
+  it('does not count a view if reopened before the delay elapses', () => {
+    const { rerender } = render(
+      <MantineProvider>
+        <GalleryHoverPreview
+          photo={photo}
+          position={{ x: 10, y: 20 }}
+          scale={1}
+          motionEnabled={false}
+        />
+      </MantineProvider>
+    )
+
+    rerender(
+      <MantineProvider>
+        <GalleryHoverPreview photo={photo} position={null} scale={1} motionEnabled={false} />
+      </MantineProvider>
+    )
+    rerender(
+      <MantineProvider>
+        <GalleryHoverPreview
+          photo={photo}
+          position={{ x: 15, y: 25 }}
+          scale={1}
+          motionEnabled={false}
+        />
+      </MantineProvider>
+    )
+
+    act(() => vi.runAllTimers())
+    expect(mockIncrementViewCount).not.toHaveBeenCalled()
   })
 })

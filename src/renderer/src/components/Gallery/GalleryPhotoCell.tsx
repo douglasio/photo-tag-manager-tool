@@ -20,6 +20,7 @@ export interface GalleryCellProps {
   previewTriggerHeld: boolean
   previewScale: number
   showFilenames: boolean
+  showViewCounts: boolean
 }
 
 /** react-window cell renderer for GalleryGrid — one photo thumbnail per cell. */
@@ -38,7 +39,8 @@ export function GalleryPhotoCell({
   onRename,
   previewTriggerHeld,
   previewScale,
-  showFilenames
+  showFilenames,
+  showViewCounts
 }: CellComponentProps<GalleryCellProps>): ReactElement {
   const index = rowIndex * columnCount + columnIndex
   const photo = photos[index]
@@ -58,6 +60,7 @@ export function GalleryPhotoCell({
           previewTriggerHeld={previewTriggerHeld}
           previewScale={previewScale}
           showFilename={showFilenames}
+          showViewCount={showViewCounts}
         />
       </PhotoContextMenu>
     </Box>

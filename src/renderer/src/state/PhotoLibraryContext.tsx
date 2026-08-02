@@ -90,6 +90,7 @@ interface PhotoLibraryContextValue {
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
   setShowFilenames: (value: boolean) => void
+  setShowViewCounts: (value: boolean) => void
   setMagazineTitle: (value: string) => void
   setNewspaperTitle: (value: string) => void
   setDvdStudioName: (value: string) => void
@@ -322,6 +323,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getShowFilenames().then((value) => {
       dispatch({ type: 'SET_SHOW_FILENAMES', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getShowViewCounts().then((value) => {
+      dispatch({ type: 'SET_SHOW_VIEW_COUNTS', value })
     })
   }, [])
 
@@ -826,6 +833,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         if (bTime === null) return -1
         return direction * (aTime - bTime)
       })
+    } else if (state.sortBy === 'viewCount') {
+      // Ties (most commonly 0 views, before anything's been opened) fall
+      // back to filename so the order stays stable rather than shuffling.
+      result.sort((a, b) => {
+        if (a.viewCount === b.viewCount) return a.fileName.localeCompare(b.fileName)
+        return direction * (a.viewCount - b.viewCount)
+      })
     } else {
       result.sort((a, b) => direction * a.fileName.localeCompare(b.fileName))
     }
@@ -860,6 +874,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const setShowFilenames = useCallback((value: boolean) => {
     dispatch({ type: 'SET_SHOW_FILENAMES', value })
     void window.api.setShowFilenames(value)
+  }, [])
+
+  const setShowViewCounts = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_SHOW_VIEW_COUNTS', value })
+    void window.api.setShowViewCounts(value)
   }, [])
 
   const setMagazineTitle = useCallback((value: string) => {
@@ -1038,6 +1057,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,
     setShowFilenames,
+    setShowViewCounts,
     setMagazineTitle,
     setNewspaperTitle,
     setDvdStudioName,

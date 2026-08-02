@@ -70,6 +70,8 @@ function createMockApi(): {
     setGalleryAnimationsEnabled: vi.fn().mockResolvedValue(undefined),
     getShowFilenames: vi.fn().mockResolvedValue(true),
     setShowFilenames: vi.fn().mockResolvedValue(undefined),
+    getShowViewCounts: vi.fn().mockResolvedValue(false),
+    setShowViewCounts: vi.fn().mockResolvedValue(undefined),
     getMagazineTitle: vi.fn().mockResolvedValue('TAG ME'),
     setMagazineTitle: vi.fn().mockResolvedValue(undefined),
     getNewspaperTitle: vi.fn().mockResolvedValue('The Tag Me Times'),
@@ -272,6 +274,13 @@ describe('PhotoLibraryContext', () => {
       expect(mockApi.setShowFilenames).toHaveBeenCalledWith(false)
     })
 
+    it('setShowViewCounts dispatches and persists', () => {
+      const { result } = setup()
+      act(() => result.current.setShowViewCounts(true))
+      expect(result.current.state.showViewCounts).toBe(true)
+      expect(mockApi.setShowViewCounts).toHaveBeenCalledWith(true)
+    })
+
     it('setMagazineTitle dispatches and persists', () => {
       const { result } = setup()
       act(() => result.current.setMagazineTitle('Custom Mag'))
@@ -405,6 +414,28 @@ describe('PhotoLibraryContext', () => {
       const { result } = await seedPhotos()
       act(() => result.current.setTagFilter('sunset'))
       expect(result.current.visiblePhotos.map((p) => p.fileName)).toEqual(['a.jpg'])
+    })
+
+    it('sorts photos by view count, falling back to filename on ties', async () => {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const { result } = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [
+            makePhoto('/root/b.jpg', { viewCount: 5 }),
+            makePhoto('/root/a.jpg', { viewCount: 5 }),
+            makePhoto('/root/c.jpg', { viewCount: 1 })
+          ]
+        })
+      })
+
+      act(() => result.current.setSort('viewCount', 'desc'))
+      expect(result.current.photos.map((p) => p.fileName)).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
+
+      act(() => result.current.setSort('viewCount', 'asc'))
+      expect(result.current.photos.map((p) => p.fileName)).toEqual(['c.jpg', 'a.jpg', 'b.jpg'])
     })
   })
 

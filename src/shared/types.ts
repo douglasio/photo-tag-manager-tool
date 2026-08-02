@@ -92,7 +92,7 @@ export interface WatchFolderRemovedEvent {
 }
 
 export interface GallerySort {
-  sortBy: 'name' | 'dateTaken'
+  sortBy: 'name' | 'dateTaken' | 'viewCount'
   sortOrder: 'asc' | 'desc'
 }
 

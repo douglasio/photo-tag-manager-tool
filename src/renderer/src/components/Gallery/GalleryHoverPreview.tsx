@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect } from 'react'
+import { type ReactElement, useEffect, useRef } from 'react'
 
 import { Box, Image, Portal } from '@mantine/core'
 import { AnimatePresence, motion } from 'motion/react'
@@ -11,6 +11,11 @@ import { usePhotoLibrary } from '@state'
 const BASE_WIDTH_VW = 50
 const BASE_HEIGHT_VH = 70
 const TRANSITION = { duration: 0.12, ease: 'easeOut' } as const
+// Grace period after the preview closes before its view actually counts —
+// incrementing the instant the preview opens caused the gallery (when
+// sorted by view count) to reshuffle out from under the photo the user was
+// still looking at.
+const VIEW_COUNT_DELAY_MS = 600
 
 interface GalleryHoverPreviewProps {
   photo: PhotoRecord
@@ -34,13 +39,26 @@ export function GalleryHoverPreview({
 }: GalleryHoverPreviewProps): ReactElement {
   const { incrementViewCount } = usePhotoLibrary()
   const isVisible = position !== null
+  // Only the falling edge (visible → hidden) should ever schedule a count —
+  // this guards against counting on mount or on the rising edge itself.
+  const wasVisibleRef = useRef(false)
 
-  // Fires once per rising edge (hidden → visible), not on every cursor move
-  // while already visible — `isVisible` (not `position` itself) is the
-  // effect's dependency specifically to collapse that down to one count per
-  // "preview shown," matching "previewed with space bar" in the spec.
+  // Counts once per full preview session (open → close), matching "previewed
+  // with space bar" in the spec, but deferred until VIEW_COUNT_DELAY_MS after
+  // it closes rather than the moment it opens. Reopening before that timer
+  // fires re-triggers this effect, which cancels the pending count via the
+  // cleanup below — a quick re-hover during the same look doesn't double-count.
   useEffect(() => {
-    if (isVisible) void incrementViewCount(photo.filePath)
+    if (isVisible) {
+      wasVisibleRef.current = true
+      return
+    }
+    if (!wasVisibleRef.current) return
+    wasVisibleRef.current = false
+    const timer = setTimeout(() => {
+      void incrementViewCount(photo.filePath)
+    }, VIEW_COUNT_DELAY_MS)
+    return () => clearTimeout(timer)
   }, [isVisible, photo.filePath, incrementViewCount])
 
   return (
