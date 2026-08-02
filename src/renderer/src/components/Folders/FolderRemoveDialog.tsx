@@ -43,7 +43,7 @@ export function FolderRemoveDialog({
         <Text span fw={700}>
           {count} photo{count === 1 ? '' : 's'}
         </Text>{' '}
-        from the library.
+        and their associated details (like view count) from the library.
       </Text>
       <Text c="dimmed" mt="xs">
         The original files on disk are not affected.

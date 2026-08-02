@@ -23,6 +23,7 @@ import {
   Divider,
   Group,
   Image,
+  Kbd,
   Paper,
   Scroller,
   Tabs,
@@ -349,15 +350,33 @@ function AppLayout(): React.JSX.Element {
             </Group>
             <Tabs.List h={TAB_BAR_HEIGHT} style={{ flexWrap: 'nowrap' }}>
               <Scroller>
-                <Tabs.Tab
-                  value="dashboard"
-                  leftSection={<IconLayoutDashboard size={TAB_ICON_SIZE} />}
+                <Tooltip
+                  openDelay={1000}
+                  label={
+                    <>
+                      shortcut: <Kbd>d</Kbd>
+                    </>
+                  }
                 >
-                  Dashboard
-                </Tabs.Tab>
-                <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto size={TAB_ICON_SIZE} />}>
-                  Gallery
-                </Tabs.Tab>
+                  <Tabs.Tab
+                    value="dashboard"
+                    leftSection={<IconLayoutDashboard size={TAB_ICON_SIZE} />}
+                  >
+                    Dashboard
+                  </Tabs.Tab>
+                </Tooltip>
+                <Tooltip
+                  openDelay={1000}
+                  label={
+                    <>
+                      shortcut: <Kbd>g</Kbd>
+                    </>
+                  }
+                >
+                  <Tabs.Tab value="gallery" leftSection={<IconLibraryPhoto size={TAB_ICON_SIZE} />}>
+                    Gallery
+                  </Tabs.Tab>
+                </Tooltip>
                 <DndContext
                   sensors={tabSensors}
                   collisionDetection={closestCenter}

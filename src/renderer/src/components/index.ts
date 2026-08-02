@@ -1,5 +1,6 @@
 export * from './Compare/CompareView'
 export * from './Dashboard/DashboardView'
+export * from './Dashboard/FeaturedTagWidget'
 export * from './DetailPanel/DetailPanel'
 export * from './DetailPanel/DetailPanelComment'
 export * from './DetailPanel/DetailPanelHeader'

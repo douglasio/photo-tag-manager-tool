@@ -8,6 +8,10 @@ body {
   height: 100vh;
 }
 
+button {
+  cursor: pointer;
+}
+
 .photo-thumbnail {
   display: flex;
   flex-direction: column;

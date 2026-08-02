@@ -18,20 +18,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. Both the details pane and the left folder / tag panel should be resizable using Mantine Splitter with the no handle setting. Tags and Folders panels within the left sidebar should also be vertically resizable using the same component but vertically oriented. All of these positioning settings should be persisted.
 
-## Dashboard
-
-1. Create a welcome Dashboard view. Requirements:
-
-- Create new components for this under src/components/Dashboard
-- Add a persistent setting in the settings modal to allow the user to toggle between Dashboard and Gallery as the default view when opening the app, and check for that flag when the app runs to know which view to load into.
-- Dashboard should be pinned as the first tab (before Gallery) when tabs are visible.
-- Dashboard view is full-screen -- no side panels.
-- Leave the dashboard view itself blank for now, except for a barebones grid layout that scales from 1 / 2 / 3 columns based on screen size. In one of the grid cells, include a button to go to the Gallery view.
-
-2. Make 'd' a global keyboard shortcut to get to the dashboard.
-
-3. The first dashboard "widget" should be a Featured tag, which shows a small grid/collage of the most recent photos from that tag. Only select a tag for the Featured section if it has more than 3 photos. The section should persist while the app is open and change on restart.
-
 ## Navigation
 
 1. Truncate photo filenames in the tabs so more can fit. Hovering over the tab should reveal the full filename as a tooltip.
@@ -61,6 +47,8 @@ To-dos, tasks, and features loosely grouped by feature segment.
 4. Reset view counts
 
 5. Export database
+
+6. Removing folders should not delete photo data
 
 ## Details Panel
 
