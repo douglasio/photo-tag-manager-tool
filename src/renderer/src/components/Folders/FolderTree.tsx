@@ -11,7 +11,6 @@ import {
   Tooltip,
   Tree,
   type TreeNodeData,
-  useMantineTheme,
   useTree
 } from '@mantine/core'
 import { useHover, useMergedRef } from '@mantine/hooks'
@@ -20,7 +19,7 @@ import { IconChevronDown, IconChevronRight, IconPencil } from '@tabler/icons-rea
 import { usePhotoLibrary } from '@state'
 import { foldersToTreeData, foldersToTreeDataWithEmpty } from '@utils'
 import { splitFolderPath, validateFolderNameBase } from '@utils'
-import { activeHoverBackground } from '@utils'
+import { activeHoverBackground, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { FolderBadge } from './FolderBadge'
 import { FolderContextMenu } from './FolderContextMenu'
@@ -32,7 +31,6 @@ interface ExpandToggleProps {
 }
 
 function ExpandToggle({ hasChildren, expanded, onToggle }: ExpandToggleProps): ReactElement {
-  const theme = useMantineTheme()
   const { ref } = useHover<HTMLButtonElement>()
 
   return (
@@ -46,12 +44,7 @@ function ExpandToggle({ hasChildren, expanded, onToggle }: ExpandToggleProps): R
         onToggle()
       }}
     >
-      {hasChildren &&
-        (expanded ? (
-          <IconChevronDown size={theme.spacing.sm} />
-        ) : (
-          <IconChevronRight size={theme.spacing.sm} />
-        ))}
+      {hasChildren && (expanded ? <IconChevronDown /> : <IconChevronRight />)}
     </ActionIcon>
   )
 }
@@ -256,6 +249,18 @@ function FolderTreeInner({
       data={treeData}
       tree={tree}
       expandOnClick={false}
+      // Otherwise Mantine's Tree swallows Space (stopPropagation, to
+      // expand/collapse the focused node) before it ever reaches the
+      // window-level listener the gallery's preview-trigger key relies on —
+      // expand/collapse already has the chevron button and double-click.
+      expandOnSpace={false}
+      // expandOnSpace above also drops Tree's own preventDefault for Space,
+      // so redo just that part ourselves — otherwise a focused tree row
+      // scrolls the sidebar (the browser's native Space behavior) while the
+      // user is just holding it to preview a gallery thumbnail.
+      onKeyDown={(event) => {
+        if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+      }}
       renderNode={(payload) => (
         <TreeRow
           payload={payload}

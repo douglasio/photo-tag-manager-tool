@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { copyFile, rename, stat, unlink } from 'fs/promises'
 import { basename, dirname, extname, join } from 'path'
 
-import { findByPath, renamePhotoPath } from '@main/db/photoRepository'
+import { findByPath, incrementViewCount, renamePhotoPath } from '@main/db/photoRepository'
 import { rotatePhoto, writeComment, writeDateTaken } from '@main/services/metadataService'
 import { ingestFile } from '@main/services/photoIngest'
 import { suppressNextEvent } from '@main/services/watchManager'
@@ -109,6 +109,16 @@ export function registerPhotoHandlers(): void {
       return photo
     }
   )
+
+  // No suppressNextEvent/exiftool write here — this is DB-only app state, not
+  // a file change, so it deliberately doesn't touch the file (or its watcher)
+  // at all. Returns null (rather than throwing) for an unknown photo, since
+  // callers fire this passively (mount, hover-preview) and shouldn't surface
+  // an error toast just for that.
+  ipcMain.handle('photo:incrementView', (_event, filePath: string): PhotoRecord | null => {
+    incrementViewCount(filePath)
+    return findByPath(filePath)?.record ?? null
+  })
 
   ipcMain.handle(
     'photo:moveToFolder',

@@ -32,6 +32,8 @@ const api = {
     ipcRenderer.invoke('photo:updateDateTaken', filePath, isoDate),
   updateComment: (filePath: string, comment: string): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:updateComment', filePath, comment),
+  incrementPhotoView: (filePath: string): Promise<PhotoRecord | null> =>
+    ipcRenderer.invoke('photo:incrementView', filePath),
   rotatePhoto: (filePath: string, direction: RotateDirection): Promise<PhotoRecord> =>
     ipcRenderer.invoke('photo:rotate', filePath, direction),
   movePhotosToFolder: (

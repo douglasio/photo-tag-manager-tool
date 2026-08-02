@@ -29,7 +29,7 @@ import {
 // selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
 // only it gets the labeled/display-formatted shape — transforming the whole
 // photos array on every render would be wasted work for fields nothing reads.
-interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
+export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
   metadata: DisplayMetadata
 }
 
@@ -101,6 +101,7 @@ interface PhotoLibraryContextValue {
   updateDateTaken: (filePath: string, isoDate: string) => Promise<void>
   updateComment: (filePath: string, comment: string) => Promise<void>
   rotatePhoto: (filePath: string, direction: RotateDirection) => Promise<void>
+  incrementViewCount: (filePath: string) => Promise<void>
   openTabEntries: OpenTabEntry[]
   openPhotoTab: (filePath: string) => void
   openCompareTab: (paths: string[]) => void
@@ -624,6 +625,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [])
 
+  // Passive/background tracking (mount, hover-preview) — errors are logged,
+  // not surfaced as a notification toast, since a failed view-count bump
+  // shouldn't interrupt the user for something they didn't explicitly do.
+  const incrementViewCount = useCallback(async (filePath: string) => {
+    try {
+      const photo = await window.api.incrementPhotoView(filePath)
+      if (photo) dispatch({ type: 'PHOTO_UPSERTED', photo })
+    } catch (err) {
+      console.error(`failed to increment view count for ${filePath}`, err)
+    }
+  }, [])
+
   const rotatePhoto = useCallback(async (filePath: string, direction: RotateDirection) => {
     try {
       const photo = await window.api.rotatePhoto(filePath, direction)
@@ -931,6 +944,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     updateDateTaken,
     updateComment,
     rotatePhoto,
+    incrementViewCount,
     openTabEntries,
     openPhotoTab,
     openCompareTab,

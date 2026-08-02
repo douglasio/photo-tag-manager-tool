@@ -57,6 +57,11 @@ interface UseGalleryGridLayoutResult {
   setCellWidth: (width: number) => void
   setCellWidthPersisted: (width: number) => void
   stepToMark: (delta: number) => void
+  // True from the moment a resize starts until it settles — the grid still
+  // renders at its old (stale) column count/size while this is true, so the
+  // caller can hide it instead of showing that live reflow, then fade it
+  // back in once this flips false and the grid has already caught up.
+  isSettling: boolean
 }
 
 // Owns GalleryGrid's container measurement (debounced against AppShell
@@ -69,6 +74,9 @@ export function useGalleryGridLayout({
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
   const [cellWidth, setCellWidth] = useState(DEFAULT_CELL_WIDTH)
+  // Starts true so the not-yet-measured default size above never flashes on
+  // mount either — both cases resolve the same way, via the first settle.
+  const [isSettling, setIsSettling] = useState(true)
 
   useEffect(() => {
     const el = containerRef.current
@@ -77,8 +85,12 @@ export function useGalleryGridLayout({
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return
       const { width, height } = entry.contentRect
+      setIsSettling(true)
       if (settleTimer) clearTimeout(settleTimer)
-      settleTimer = setTimeout(() => setSize({ width, height }), RESIZE_SETTLE_MS)
+      settleTimer = setTimeout(() => {
+        setSize({ width, height })
+        setIsSettling(false)
+      }, RESIZE_SETTLE_MS)
     })
     observer.observe(el)
     return () => {
@@ -136,6 +148,7 @@ export function useGalleryGridLayout({
     rowCount,
     setCellWidth,
     setCellWidthPersisted,
-    stepToMark
+    stepToMark,
+    isSettling
   }
 }

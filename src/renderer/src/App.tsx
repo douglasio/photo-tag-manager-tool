@@ -41,24 +41,27 @@ import {
   IconX
 } from '@tabler/icons-react'
 
+import {
+  AllPhotosRow,
+  AppLogo,
+  CompareTabLabel,
+  CompareView,
+  DetailPanel,
+  FolderSettingsMenu,
+  FolderTree,
+  GalleryGrid,
+  PanelSection,
+  PhotoView,
+  ScanProgressBar,
+  SettingsModal,
+  SortableTab,
+  TabLabel,
+  TagPanel
+} from '@components'
 import { radiusSize } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 
-import { CompareView } from './components/Compare/CompareView'
-import { DetailPanel } from './components/DetailPanel/DetailPanel'
-import { AllPhotosRow } from './components/Folders/AllPhotosRow'
-import { FolderSettingsMenu } from './components/Folders/FolderSettingsMenu'
-import { FolderTree } from './components/Folders/FolderTree'
-import { GalleryGrid } from './components/Gallery/GalleryGrid'
-import { PhotoView } from './components/PhotoView/PhotoView'
-import { ScanProgressBar } from './components/Settings/ScanProgressBar'
-import { SettingsModal } from './components/Settings/SettingsModal'
-import { AppLogo } from './components/Shared/AppLogo'
-import { PanelSection } from './components/Shared/PanelSection'
-import { SortableTab } from './components/Shared/SortableTab'
-import { CompareTabLabel, TabLabel } from './components/Shared/TabLabel'
-import { TagPanel } from './components/Tags/TagPanel'
 import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
 
 // True while focus is inside anything the "g" shortcut below shouldn't
@@ -410,8 +413,7 @@ function AppLayout(): React.JSX.Element {
 function StartupLoadingScreen(): React.JSX.Element {
   return (
     <Center h="100vh">
-      <Stack align="center" gap="md">
-        <AppLogo />
+      <Stack align="center" gap="xl">
         <Group gap="xs">
           <Loader size="sm" />
           <Text c="dimmed">Loading your library…</Text>

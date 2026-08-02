@@ -17,6 +17,7 @@ interface PhotoRow {
   comment: string | null
   thumbnailKey: string | null
   thumbnailStatus: string
+  viewCount: number
 }
 
 function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
@@ -40,7 +41,8 @@ function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
     scanError: null,
     // Callers that actually hit the cache (see scanHandlers.ts's processFile)
     // override this to true; a DB row read on its own isn't "from cache."
-    fromCache: false
+    fromCache: false,
+    viewCount: row.viewCount
   }
 }
 
@@ -96,6 +98,13 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
       thumbnailStatus: record.thumbnailStatus,
       lastScannedAt: Date.now()
     })
+}
+
+/** Bumps a photo's view count by one. Deliberately not part of upsertPhoto's
+ * column set — a rescan (which re-upserts every touched photo) must never
+ * reset or overwrite this. */
+export function incrementViewCount(filePath: string): void {
+  getDb().prepare('UPDATE photos SET viewCount = viewCount + 1 WHERE path = ?').run(filePath)
 }
 
 export function updateThumbnail(

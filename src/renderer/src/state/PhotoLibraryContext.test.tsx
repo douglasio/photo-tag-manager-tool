@@ -26,6 +26,7 @@ function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): Phot
     thumbnailKey: null,
     scanError: null,
     fromCache: false,
+    viewCount: 0,
     ...overrides
   }
 }
@@ -52,6 +53,7 @@ function createMockApi(): {
     updateDateTaken: vi.fn(),
     updateComment: vi.fn(),
     rotatePhoto: vi.fn(),
+    incrementPhotoView: vi.fn(),
     movePhotosToFolder: vi.fn(),
     onMoveProgress: onMethod('onMoveProgress'),
     getGalleryCellWidth: vi.fn().mockResolvedValue(null),

@@ -55,6 +55,7 @@ function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): Phot
     thumbnailKey: null,
     scanError: null,
     fromCache: false,
+    viewCount: 0,
     ...overrides
   }
 }

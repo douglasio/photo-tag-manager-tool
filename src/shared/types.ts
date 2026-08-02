@@ -29,6 +29,11 @@ export interface PhotoRecord {
   thumbnailKey: string | null
   scanError: string | null
   fromCache: boolean
+  // App-local view count — how many times this photo has been opened in a
+  // tab or previewed with the gallery's hover/spacebar preview. Lives only
+  // in the local DB, never written back to the file (same reasoning as
+  // thumbnailKey/thumbnailStatus above).
+  viewCount: number
 }
 
 export interface ScanStartResult {

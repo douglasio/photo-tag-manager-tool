@@ -59,7 +59,8 @@ function makePhoto(filePath: string): PhotoRecord {
     thumbnailStatus: 'ready',
     thumbnailKey: 'key',
     scanError: null,
-    fromCache: false
+    fromCache: false,
+    viewCount: 0
   }
 }
 

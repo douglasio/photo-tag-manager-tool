@@ -1,4 +1,4 @@
-import { ActionIcon, Box, Group } from '@mantine/core'
+import { ActionIcon, Box, Group, Tooltip } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import { IconPencil } from '@tabler/icons-react'
 import type { ReactElement, ReactNode } from 'react'
@@ -7,22 +7,16 @@ interface InlineEditFieldProps {
   editing: boolean
   onStartEdit: () => void
   children: ReactNode
+  // True for fields that need to occupy the full row width
+  fill?: boolean
 }
 
-/**
- * Shared hover/toggle chrome for an inline-editable field: content on the
- * left (double-click to edit), a pencil icon beside it that only appears on
- * hover (click to edit). `align="flex-start"` pins the icon to the top of
- * the content — not vertically centered — so it lands in the same place
- * relative to the first line of text whether that text is a single short
- * line or wraps across several, which is what made it look inconsistently
- * placed from field to field before. Callers own the editing/draft state
- * and pass their EditableText (or equivalent) as children.
- */
+// Shared hover/toggle chrome for an inline-editable field
 export function InlineEditField({
   editing,
   onStartEdit,
-  children
+  children,
+  fill = false
 }: InlineEditFieldProps): ReactElement {
   const { hovered, ref } = useHover<HTMLDivElement>()
 
@@ -32,15 +26,19 @@ export function InlineEditField({
         onDoubleClick={() => {
           if (!editing) onStartEdit()
         }}
-        flex={1}
+        flex={fill ? 1 : '0 1 auto'}
         miw={0}
+        maw="100%"
+        style={{ cursor: editing ? undefined : 'pointer' }}
       >
         {children}
       </Box>
       {!editing && (
-        <ActionIcon opacity={hovered ? 0.7 : 0} onClick={onStartEdit} style={{ flexShrink: 0 }}>
-          <IconPencil />
-        </ActionIcon>
+        <Tooltip label="Edit">
+          <ActionIcon opacity={hovered ? 0.7 : 0} onClick={onStartEdit} style={{ flexShrink: 0 }}>
+            <IconPencil />
+          </ActionIcon>
+        </Tooltip>
       )}
     </Group>
   )

@@ -22,6 +22,10 @@ export async function ingestFile(
   } else {
     photo = await readPhotoRecord(filePath)
     upsertPhoto(photo, fileStat.mtimeMs, fileStat.size)
+    // upsertPhoto never touches the viewCount column (a rescan must not
+    // reset it) — reflect its true, preserved DB value here too, rather
+    // than the fresh-read placeholder of 0.
+    photo = { ...photo, viewCount: cached?.record.viewCount ?? 0 }
   }
 
   if (photo.thumbnailStatus !== 'ready') {

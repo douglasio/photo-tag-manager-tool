@@ -44,6 +44,7 @@ export function TagDescriptionField({
         c="dimmed"
         multiline
         maxRows={8}
+        shrinkToFit
       />
     </InlineEditField>
   )
