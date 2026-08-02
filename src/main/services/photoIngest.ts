@@ -8,7 +8,12 @@ import { generateThumbnail, thumbnailKeyFor } from './thumbnailService'
 
 export async function ingestFile(
   filePath: string,
-  thumbnailLimit: <T>(fn: () => Promise<T>) => Promise<T>
+  thumbnailLimit: <T>(fn: () => Promise<T>) => Promise<T>,
+  options?: {
+    // Metadata-only writes (tags/comment/date-taken) bump mtime without
+    // touching pixels — set this to skip the pointless thumbnail regen. Omit for rotate.
+    pixelsUnchanged?: boolean
+  }
 ): Promise<{ photo: PhotoRecord; fromCache: boolean }> {
   const fileStat = await stat(filePath)
   const cached = findByPath(filePath)
@@ -21,6 +26,13 @@ export async function ingestFile(
     fromCache = true
   } else {
     photo = await readPhotoRecord(filePath)
+    if (options?.pixelsUnchanged && cached) {
+      photo = {
+        ...photo,
+        thumbnailKey: cached.record.thumbnailKey,
+        thumbnailStatus: cached.record.thumbnailStatus
+      }
+    }
     upsertPhoto(photo, fileStat.mtimeMs, fileStat.size)
     // upsertPhoto never touches the viewCount column (a rescan must not
     // reset it) — reflect its true, preserved DB value here too, rather

@@ -8,18 +8,12 @@ import { ingestFile } from '@main/services/photoIngest'
 import { suppressNextEvent } from '@main/services/watchManager'
 import type { MoveProgressEvent, PhotoRecord, RotateDirection } from '@shared/types'
 
-// Conservative cross-platform block list — covers reserved path/filesystem
-// characters on both Windows and Unix rather than just the current OS, since
-// a synced folder could later be opened on either.
+// Covers reserved path characters on both Windows and Unix, since a synced folder could later be opened on either.
 const INVALID_FILENAME_CHARS = /[/\\:*?"<>|]/
 
 const MAX_COLLISION_ATTEMPTS = 1000
 
-// Picks a destination path for filePath inside destFolder, appending " (n)"
-// before the extension if a same-named file is already there. This check is
-// inherently racy (stat-then-use, not atomic) — acceptable here since moves
-// run sequentially against the same destFolder within one call, matching the
-// same non-atomic collision check photo:rename already relies on.
+// Appends " (n)" before the extension if a same-named file already exists at the destination.
 async function resolveDestPath(filePath: string, destFolder: string): Promise<string> {
   const ext = extname(filePath)
   const base = basename(filePath, ext)
@@ -31,10 +25,7 @@ async function resolveDestPath(filePath: string, destFolder: string): Promise<st
   throw new Error(`Could not find a free filename for ${base}${ext} in ${destFolder}`)
 }
 
-// Moves filePath into destFolder, returning its new path. fs.rename is
-// atomic and the common case, but fails with EXDEV when source and
-// destination are on different filesystems/volumes — falls back to
-// copy-then-delete-original in that case.
+// fs.rename fails with EXDEV across filesystems/volumes — falls back to copy-then-delete-original in that case.
 async function moveIntoFolder(filePath: string, destFolder: string): Promise<string> {
   const destPath = await resolveDestPath(filePath, destFolder)
   suppressNextEvent(filePath)
@@ -85,7 +76,7 @@ export function registerPhotoHandlers(): void {
     async (_event, filePath: string, isoDate: string): Promise<PhotoRecord> => {
       suppressNextEvent(filePath)
       await writeDateTaken(filePath, isoDate)
-      const { photo } = await ingestFile(filePath, (fn) => fn())
+      const { photo } = await ingestFile(filePath, (fn) => fn(), { pixelsUnchanged: true })
       return photo
     }
   )
@@ -95,7 +86,7 @@ export function registerPhotoHandlers(): void {
     async (_event, filePath: string, comment: string): Promise<PhotoRecord> => {
       suppressNextEvent(filePath)
       await writeComment(filePath, comment)
-      const { photo } = await ingestFile(filePath, (fn) => fn())
+      const { photo } = await ingestFile(filePath, (fn) => fn(), { pixelsUnchanged: true })
       return photo
     }
   )
@@ -110,11 +101,7 @@ export function registerPhotoHandlers(): void {
     }
   )
 
-  // No suppressNextEvent/exiftool write here — this is DB-only app state, not
-  // a file change, so it deliberately doesn't touch the file (or its watcher)
-  // at all. Returns null (rather than throwing) for an unknown photo, since
-  // callers fire this passively (mount, hover-preview) and shouldn't surface
-  // an error toast just for that.
+  // DB-only app state — no file write/watcher involved. Returns null (not throwing) since callers fire this passively.
   ipcMain.handle('photo:incrementView', (_event, filePath: string): PhotoRecord | null => {
     incrementViewCount(filePath)
     return findByPath(filePath)?.record ?? null
@@ -129,13 +116,9 @@ export function registerPhotoHandlers(): void {
     ): Promise<{ moved: { oldPath: string; photo: PhotoRecord }[]; skipped: number }> => {
       const moved: { oldPath: string; photo: PhotoRecord }[] = []
       let skipped = 0
-      // Sequential rather than Promise.all — these are ordinary user-visible
-      // file moves (not a batch-import hot path), and running them one at a
-      // time keeps collision-suffix numbering (" (1)", " (2)", ...) stable
-      // and easy to reason about rather than racing on the same destFolder.
+      // Sequential rather than Promise.all — keeps collision-suffix numbering (" (1)", " (2)", ...) stable across the same destFolder.
       for (const filePath of filePaths) {
-        // Dropping a photo onto the folder it's already in is a no-op — skip
-        // it rather than "moving" it to the same place.
+        // Dropping a photo onto its current folder is a no-op.
         if (dirname(filePath) === destFolder) {
           skipped++
         } else {

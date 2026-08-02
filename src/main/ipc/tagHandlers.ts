@@ -23,9 +23,7 @@ import { ingestFile } from '@main/services/photoIngest'
 import { suppressNextEvent } from '@main/services/watchManager'
 import type { PhotoRecord, TagGroup } from '@shared/types'
 
-// p-limit is ESM-only; when externalized in the main-process CJS bundle,
-// `require('p-limit')` yields the module namespace object rather than the
-// callable default export, so it must be unwrapped explicitly.
+// p-limit is ESM-only; externalized in the main-process CJS bundle, require() yields the module namespace, not the default export.
 const pLimit =
   (pLimitImport as unknown as { default?: typeof pLimitImport }).default ?? pLimitImport
 
@@ -35,18 +33,11 @@ export function registerTagHandlers(): void {
   ipcMain.handle(
     'tags:update',
     async (_event, filePath: string, tags: string[]): Promise<PhotoRecord> => {
-      // Without this, the watcher's own independent re-ingest of the file
-      // (triggered by the write's mtime change) races this handler's
-      // explicit ingestFile below — and, worse, races the *next* tag write
-      // if the user saves several tags in quick succession. exiftool's
-      // -overwrite_original write is a temp-file-then-rename-over-original;
-      // POSIX tolerates renaming over a file another process has open, but
-      // Windows/NTFS generally doesn't, so that race only actually fails
-      // there.
+      // Prevents the watcher's own re-ingest (triggered by the write's mtime change) from racing this handler's ingestFile below.
       suppressNextEvent(filePath)
       await writeTags(filePath, tags)
       // Single-file, user-triggered edit — no concurrency to limit, so just run it inline.
-      const { photo } = await ingestFile(filePath, (fn) => fn())
+      const { photo } = await ingestFile(filePath, (fn) => fn(), { pixelsUnchanged: true })
       // This edit alone (not just a photo/row removal) can drop some other
       // tag's usage to zero, or introduce a tag a group's rule should match.
       reconcileTagGroups()
@@ -73,16 +64,13 @@ export function registerTagHandlers(): void {
             )
             suppressNextEvent(filePath)
             await writeTags(filePath, nextTags)
-            const { photo } = await ingestFile(filePath, (fn) => fn())
+            const { photo } = await ingestFile(filePath, (fn) => fn(), { pixelsUnchanged: true })
             return photo
           })
         )
       )
 
-      // Carries the whole metadata row (description, group membership, ...)
-      // forward under the new name — a rename looks identical to
-      // "old tag deleted, new tag created" from allTags' perspective, so
-      // generic pruning alone can't preserve group membership across it.
+      // Carries the metadata row (description, group membership) forward under the new name, since a rename looks like delete+create otherwise.
       renameTagMetadata(oldTag, newTag)
       return photos
     }
@@ -99,7 +87,7 @@ export function registerTagHandlers(): void {
             const nextTags = Array.from(new Set([...currentTags, ...tagsToAdd]))
             suppressNextEvent(filePath)
             await writeTags(filePath, nextTags)
-            const { photo } = await ingestFile(filePath, (fn) => fn())
+            const { photo } = await ingestFile(filePath, (fn) => fn(), { pixelsUnchanged: true })
             return photo
           })
         )
@@ -122,7 +110,7 @@ export function registerTagHandlers(): void {
             const nextTags = currentTags.filter((t) => t !== tag)
             suppressNextEvent(filePath)
             await writeTags(filePath, nextTags)
-            const { photo } = await ingestFile(filePath, (fn) => fn())
+            const { photo } = await ingestFile(filePath, (fn) => fn(), { pixelsUnchanged: true })
             return photo
           })
         )
