@@ -12,10 +12,10 @@ export function TagGroupCreateButton(): ReactElement {
   const [opened, setOpened] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const handleConfirm = async (name: string): Promise<void> => {
+  const handleConfirm = async (name: string, matchPattern: string | null): Promise<void> => {
     setSaving(true)
     try {
-      await createTagGroup(name)
+      await createTagGroup(name, matchPattern)
       setOpened(false)
     } catch {
       // createTagGroup already surfaces an error toast — leave the dialog
@@ -38,8 +38,9 @@ export function TagGroupCreateButton(): ReactElement {
         opened={opened}
         saving={saving}
         initialName=""
+        initialMatchPattern={null}
         existingNames={state.tagGroups.map((group) => group.name)}
-        onConfirm={(name) => void handleConfirm(name)}
+        onConfirm={(name, matchPattern) => void handleConfirm(name, matchPattern)}
         onCancel={() => setOpened(false)}
       />
     </>

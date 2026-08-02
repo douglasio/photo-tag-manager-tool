@@ -84,6 +84,23 @@ export function getDb(): Database.Database {
   if (!tagColumns.some((column) => column.name === 'cover_photo_path')) {
     db.exec('ALTER TABLE tag_metadata ADD COLUMN cover_photo_path TEXT')
   }
+  // True once a tag's group_id was set by an explicit user action (drag-and-
+  // drop) rather than a group's auto-add rule — reconciliation leaves a
+  // pinned tag's group alone even if it also matches some rule, so manually
+  // moving a tag always wins over a rule, permanently.
+  if (!tagColumns.some((column) => column.name === 'group_pinned')) {
+    db.exec('ALTER TABLE tag_metadata ADD COLUMN group_pinned INTEGER NOT NULL DEFAULT 0')
+  }
+
+  // Case-insensitive substring a tag must contain to be auto-added to this
+  // group (e.g. "vintage" matches any tag containing it) — null/empty means
+  // no rule. Reconciliation (see tagMetadataRepository.reconcileTagGroups)
+  // evaluates rules in position order, first match wins, and never
+  // overrides a pinned tag.
+  const groupColumns = db.prepare('PRAGMA table_info(tag_groups)').all() as { name: string }[]
+  if (!groupColumns.some((column) => column.name === 'match_pattern')) {
+    db.exec('ALTER TABLE tag_groups ADD COLUMN match_pattern TEXT')
+  }
 
   // Bumping THUMBNAIL_GENERATION (e.g. after changing thumbnailService's target
   // size) marks every cached thumbnail stale so the next scan regenerates them

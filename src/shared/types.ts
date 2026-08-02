@@ -100,4 +100,7 @@ export interface TagGroup {
   id: string
   name: string
   position: number
+  // Case-insensitive substring a tag must contain to be auto-added to this
+  // group; null means no rule.
+  matchPattern: string | null
 }

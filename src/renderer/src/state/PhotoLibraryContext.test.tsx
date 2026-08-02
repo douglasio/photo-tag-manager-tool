@@ -90,6 +90,7 @@ function createMockApi(): {
     getTagGroupsData: vi.fn().mockResolvedValue({ groups: [], assignments: {} }),
     createTagGroup: vi.fn(),
     renameTagGroup: vi.fn(),
+    setTagGroupMatchPattern: vi.fn(),
     deleteTagGroup: vi.fn(),
     setTagGroupAssignment: vi.fn(),
     onScanProgress: onMethod('onScanProgress'),

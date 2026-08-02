@@ -99,9 +99,12 @@ const api = {
     ipcRenderer.invoke('tags:addBatch', tags, filePaths),
   getTagGroupsData: (): Promise<{ groups: TagGroup[]; assignments: Record<string, string> }> =>
     ipcRenderer.invoke('tags:getGroupsData'),
-  createTagGroup: (name: string): Promise<TagGroup> => ipcRenderer.invoke('tags:createGroup', name),
+  createTagGroup: (name: string, matchPattern: string | null): Promise<TagGroup> =>
+    ipcRenderer.invoke('tags:createGroup', name, matchPattern),
   renameTagGroup: (id: string, name: string): Promise<void> =>
     ipcRenderer.invoke('tags:renameGroup', id, name),
+  setTagGroupMatchPattern: (id: string, matchPattern: string | null): Promise<void> =>
+    ipcRenderer.invoke('tags:setGroupMatchPattern', id, matchPattern),
   deleteTagGroup: (id: string): Promise<void> => ipcRenderer.invoke('tags:deleteGroup', id),
   setTagGroupAssignment: (tag: string, groupId: string | null): Promise<void> =>
     ipcRenderer.invoke('tags:setGroupAssignment', tag, groupId),

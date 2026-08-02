@@ -97,8 +97,9 @@ interface PhotoLibraryContextValue {
   setTagDescription: (tag: string, description: string) => Promise<void>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
   deleteTag: (tag: string) => Promise<void>
-  createTagGroup: (name: string) => Promise<void>
+  createTagGroup: (name: string, matchPattern?: string | null) => Promise<void>
   renameTagGroup: (id: string, name: string) => Promise<void>
+  updateTagGroupPattern: (id: string, matchPattern: string | null) => Promise<void>
   deleteTagGroup: (id: string) => Promise<void>
   assignTagToGroup: (tag: string, groupId: string | null) => Promise<void>
   renameFile: (filePath: string, newBaseName: string) => Promise<void>
@@ -606,18 +607,24 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // Group id/position are assigned server-side (createTagGroup), so this
   // waits for the response rather than dispatching optimistically like the
   // other three below — there's nothing sensible to render before that.
-  const createTagGroup = useCallback(async (name: string) => {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    try {
-      const group = await window.api.createTagGroup(trimmed)
-      dispatch({ type: 'TAG_GROUP_CREATED', group })
-    } catch (err) {
-      console.error(`failed to create tag group ${trimmed}`, err)
-      notifications.show({ color: 'red', message: 'Failed to create tag group' })
-      throw err
-    }
-  }, [])
+  const createTagGroup = useCallback(
+    async (name: string, matchPattern: string | null = null) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      try {
+        const group = await window.api.createTagGroup(trimmed, matchPattern)
+        dispatch({ type: 'TAG_GROUP_CREATED', group })
+        // A rule set at creation time sweeps in matching tags server-side —
+        // refetch to pick up whatever it just assigned.
+        if (group.matchPattern) void loadTagGroupsData()
+      } catch (err) {
+        console.error(`failed to create tag group ${trimmed}`, err)
+        notifications.show({ color: 'red', message: 'Failed to create tag group' })
+        throw err
+      }
+    },
+    [loadTagGroupsData]
+  )
 
   const renameTagGroup = useCallback(async (id: string, name: string) => {
     const trimmed = name.trim()
@@ -625,6 +632,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'TAG_GROUP_RENAMED', id, name: trimmed })
     void window.api.renameTagGroup(id, trimmed)
   }, [])
+
+  const updateTagGroupPattern = useCallback(
+    async (id: string, matchPattern: string | null) => {
+      const trimmed = matchPattern?.trim() || null
+      dispatch({ type: 'TAG_GROUP_MATCH_PATTERN_UPDATED', id, matchPattern: trimmed })
+      await window.api.setTagGroupMatchPattern(id, trimmed)
+      // The pattern change sweeps tag assignments server-side — refetch to
+      // reflect whatever it just added/removed from this (or any) group.
+      void loadTagGroupsData()
+    },
+    [loadTagGroupsData]
+  )
 
   const deleteTagGroup = useCallback(async (id: string) => {
     dispatch({ type: 'TAG_GROUP_DELETED', id })
@@ -999,6 +1018,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     deleteTag,
     createTagGroup,
     renameTagGroup,
+    updateTagGroupPattern,
     deleteTagGroup,
     assignTagToGroup,
     renameFile,

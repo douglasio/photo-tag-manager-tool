@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { PhotoRecord, ScanCompleteEvent } from '@shared/types'
+import type { PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
 
 import {
   initialState,
@@ -32,6 +32,10 @@ function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): Phot
     viewCount: 0,
     ...overrides
   }
+}
+
+function makeGroup(overrides: Partial<TagGroup> & { id: string }): TagGroup {
+  return { name: 'Group', position: 0, matchPattern: null, ...overrides }
 }
 
 function withPhotos(...paths: string[]): PhotoLibraryState {
@@ -408,25 +412,25 @@ describe('photoLibraryReducer', () => {
     it('loads groups and their tag assignments together', () => {
       const state = photoLibraryReducer(initialState, {
         type: 'TAG_GROUPS_DATA_LOADED',
-        groups: [{ id: 'g1', name: 'People', position: 0 }],
+        groups: [makeGroup({ id: 'g1', name: 'People' })],
         assignments: { vacation: 'g1' }
       })
-      expect(state.tagGroups).toEqual([{ id: 'g1', name: 'People', position: 0 }])
+      expect(state.tagGroups).toEqual([makeGroup({ id: 'g1', name: 'People' })])
       expect(state.tagGroupAssignments.get('vacation')).toBe('g1')
     })
 
     it('appends a created group', () => {
       const state = photoLibraryReducer(initialState, {
         type: 'TAG_GROUP_CREATED',
-        group: { id: 'g1', name: 'People', position: 0 }
+        group: makeGroup({ id: 'g1', name: 'People' })
       })
-      expect(state.tagGroups).toEqual([{ id: 'g1', name: 'People', position: 0 }])
+      expect(state.tagGroups).toEqual([makeGroup({ id: 'g1', name: 'People' })])
     })
 
     it('renames a group by id', () => {
       let state = photoLibraryReducer(initialState, {
         type: 'TAG_GROUP_CREATED',
-        group: { id: 'g1', name: 'People', position: 0 }
+        group: makeGroup({ id: 'g1', name: 'People' })
       })
       state = photoLibraryReducer(state, {
         type: 'TAG_GROUP_RENAMED',
@@ -436,19 +440,32 @@ describe('photoLibraryReducer', () => {
       expect(state.tagGroups[0].name).toBe('Friends & Family')
     })
 
+    it('updates a group match pattern by id', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'TAG_GROUP_CREATED',
+        group: makeGroup({ id: 'g1', name: 'People' })
+      })
+      state = photoLibraryReducer(state, {
+        type: 'TAG_GROUP_MATCH_PATTERN_UPDATED',
+        id: 'g1',
+        matchPattern: 'age'
+      })
+      expect(state.tagGroups[0].matchPattern).toBe('age')
+    })
+
     it('deletes a group and un-assigns its tags, leaving other groups alone', () => {
       let state = photoLibraryReducer(initialState, {
         type: 'TAG_GROUPS_DATA_LOADED',
         groups: [
-          { id: 'g1', name: 'People', position: 0 },
-          { id: 'g2', name: 'Places', position: 1 }
+          makeGroup({ id: 'g1', name: 'People' }),
+          makeGroup({ id: 'g2', name: 'Places', position: 1 })
         ],
         assignments: { vacation: 'g1', beach: 'g2' }
       })
 
       state = photoLibraryReducer(state, { type: 'TAG_GROUP_DELETED', id: 'g1' })
 
-      expect(state.tagGroups).toEqual([{ id: 'g2', name: 'Places', position: 1 }])
+      expect(state.tagGroups).toEqual([makeGroup({ id: 'g2', name: 'Places', position: 1 })])
       expect(state.tagGroupAssignments.has('vacation')).toBe(false)
       expect(state.tagGroupAssignments.get('beach')).toBe('g2')
     })

@@ -153,6 +153,7 @@ export type PhotoLibraryAction =
     }
   | { type: 'TAG_GROUP_CREATED'; group: TagGroup }
   | { type: 'TAG_GROUP_RENAMED'; id: string; name: string }
+  | { type: 'TAG_GROUP_MATCH_PATTERN_UPDATED'; id: string; matchPattern: string | null }
   | { type: 'TAG_GROUP_DELETED'; id: string }
   | { type: 'TAG_GROUP_ASSIGNMENT_CHANGED'; tag: string; groupId: string | null }
   | { type: 'OPEN_PHOTO_TAB'; filePath: string }
@@ -555,6 +556,13 @@ export function photoLibraryReducer(
         ...state,
         tagGroups: state.tagGroups.map((group) =>
           group.id === action.id ? { ...group, name: action.name } : group
+        )
+      }
+    case 'TAG_GROUP_MATCH_PATTERN_UPDATED':
+      return {
+        ...state,
+        tagGroups: state.tagGroups.map((group) =>
+          group.id === action.id ? { ...group, matchPattern: action.matchPattern } : group
         )
       }
     case 'TAG_GROUP_DELETED': {

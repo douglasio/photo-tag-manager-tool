@@ -10,7 +10,8 @@ const {
   mockIngestFile,
   mockDeleteThumbnail,
   mockRemovePhoto,
-  mockGetExcludePatterns
+  mockGetExcludePatterns,
+  mockReconcileTagGroups
 } = vi.hoisted(() => ({
   mockStartWatching: vi.fn(),
   mockStopWatching: vi.fn().mockResolvedValue(undefined),
@@ -18,7 +19,8 @@ const {
   mockIngestFile: vi.fn(),
   mockDeleteThumbnail: vi.fn().mockResolvedValue(undefined),
   mockRemovePhoto: vi.fn(),
-  mockGetExcludePatterns: vi.fn().mockReturnValue([])
+  mockGetExcludePatterns: vi.fn().mockReturnValue([]),
+  mockReconcileTagGroups: vi.fn()
 }))
 
 vi.mock('./folderWatcher', () => ({
@@ -30,6 +32,7 @@ vi.mock('./photoIngest', () => ({ ingestFile: mockIngestFile }))
 vi.mock('./thumbnailService', () => ({ deleteThumbnail: mockDeleteThumbnail }))
 vi.mock('../db/photoRepository', () => ({ removePhoto: mockRemovePhoto }))
 vi.mock('../db/settingsRepository', () => ({ getExcludePatterns: mockGetExcludePatterns }))
+vi.mock('../db/tagMetadataRepository', () => ({ reconcileTagGroups: mockReconcileTagGroups }))
 
 import {
   restartAllWatchers,

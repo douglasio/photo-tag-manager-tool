@@ -2,9 +2,13 @@
 
 This document serves as a roadmap of feature to implement, generally in no particular order.
 
-# Bug Fixes*
+# Bug Fixes
 
-- the tag in the gallery header looks crazy when in edit mode. Maybe move this edit toggle to the tag panel to be consistent with the folder list
+1. The tags themselves appear as drop zones when dragging tags around in the tag panel -- only the tag group should appear as a drop zone. Tags themselves should only appear as drop zones when dragging images.
+
+2. Adding or removing a tag while in photo view causes the photo to blink briefly. There should be no blink.
+
+3. Nested subfolders in the folder tree should indent accordingly.
 
 # Features
 
@@ -13,6 +17,8 @@ To-dos, tasks, and features loosely grouped by feature segment.
 ## Optimization
 
 1. During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
+
+2. Opening the app can sometimes take a pretty long time (on the "loading your library" screen). Are there performance improvement opportunities, and/or a way to show a Progress bar to make visible what's taking so long / how much time is left?
 
 ## Shell
 
@@ -40,10 +46,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
-## Write features
-
-Note: For all field "edit" features, interactivity should follow the same resuable pattern as tag editing - subtle edit ActionIcon appears on hover, clicking the icon or double-clicking the content should enable edit mode, enter saves the change, esc cancels it. Don't use a ConfirmDialog gate unless the action is risky or affects a number of files.
-
 ## Gallery View
 
 1. Sort by view count
@@ -53,10 +55,6 @@ Note: For all field "edit" features, interactivity should follow the same resuab
 3. Create an alternate display option for the tags panel. This one is a 2-column grid of the tag thumbnails with the tag name and image count overlayed on top of the thumbnail, using Mantine's BackgroundImage component. Use the settings cog pattern used in the Folder section to put the toggle for this.
 
 4. Sort tags by count, alpha, most recent
-
-5. Rename tag and update all
-
-6. Update the keyboard tooltip hint about pressing ctrl to use the Mantine Kbd component
 
 ## Tools
 

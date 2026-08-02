@@ -56,6 +56,7 @@ export function CommentField({ value, onSave }: CommentFieldProps): ReactElement
           multiline
           maxRows={8}
           maxLength={COMMENT_MAX_LENGTH}
+          shrinkToFit
         />
       </Blockquote>
     </InlineEditField>

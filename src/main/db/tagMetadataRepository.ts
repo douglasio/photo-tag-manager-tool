@@ -1,4 +1,5 @@
 import { getDb } from './database'
+import { getTagGroups } from './tagGroupRepository'
 
 interface TagMetadataRow {
   tag: string
@@ -80,11 +81,13 @@ export function getAllTagGroupAssignments(): Record<string, string> {
   return result
 }
 
+/** Explicit (drag-and-drop) group assignment — pins the tag, so a group's
+ * auto-add rule can never override this again (see reconcileTagGroups). */
 export function setTagGroupAssignment(tag: string, groupId: string | null): void {
   getDb()
     .prepare(
-      `INSERT INTO tag_metadata (tag, group_id) VALUES (@tag, @groupId)
-       ON CONFLICT(tag) DO UPDATE SET group_id = excluded.group_id`
+      `INSERT INTO tag_metadata (tag, group_id, group_pinned) VALUES (@tag, @groupId, 1)
+       ON CONFLICT(tag) DO UPDATE SET group_id = excluded.group_id, group_pinned = 1`
     )
     .run({ tag, groupId })
 }
@@ -101,20 +104,55 @@ export function getUsedTags(): Set<string> {
   return new Set(rows.map((row) => row.tag))
 }
 
-/** Clears group_id for any tag no longer applied to any photo — never
- * touches tag_groups itself, so a group stays around (even empty) until a
- * user explicitly deletes it. Call after anything that can shrink the set
- * of tags in use (see call sites in photoRepository/watchManager/tagHandlers). */
-export function pruneStaleTagGroupAssignments(): void {
-  const usedTags = getUsedTags()
-  const grouped = getAllTagGroupAssignments()
-  const stale = Object.keys(grouped).filter((tag) => !usedTags.has(tag))
-  if (stale.length === 0) return
-
+/** Keeps tag_metadata.group_id in sync with reality — two independent jobs
+ * in one pass, both scoped to currently-used tags:
+ *  - clears group_id for any tag no longer applied to any photo (never
+ *    touches tag_groups itself, so a group stays around, even empty, until
+ *    a user explicitly deletes it)
+ *  - auto-assigns every unpinned tag to the first group (by position) whose
+ *    match_pattern is a case-insensitive substring of it, or clears it back
+ *    to ungrouped if nothing matches — pinned tags (set via
+ *    setTagGroupAssignment, i.e. a manual drag) are left untouched
+ * Call after anything that can change which tags are in use, or after a
+ * group's own match_pattern changes (see call sites in
+ * photoRepository/watchManager/tagHandlers/tagGroupRepository). */
+export function reconcileTagGroups(): void {
   const db = getDb()
-  const clear = db.prepare('UPDATE tag_metadata SET group_id = NULL WHERE tag = ?')
-  const clearMany = db.transaction((tags: string[]) => {
-    for (const tag of tags) clear.run(tag)
+  const usedTags = getUsedTags()
+  const ruledGroups = getTagGroups().filter((group) => group.matchPattern)
+  const rows = db.prepare('SELECT tag, group_id, group_pinned FROM tag_metadata').all() as {
+    tag: string
+    group_id: string | null
+    group_pinned: number
+  }[]
+  const rowByTag = new Map(rows.map((row) => [row.tag, row]))
+
+  const setGroup = db.prepare('UPDATE tag_metadata SET group_id = ? WHERE tag = ?')
+  const insertGroup = db.prepare(
+    `INSERT INTO tag_metadata (tag, group_id) VALUES (@tag, @groupId)
+     ON CONFLICT(tag) DO UPDATE SET group_id = excluded.group_id`
+  )
+  const clearGroup = db.prepare('UPDATE tag_metadata SET group_id = NULL WHERE tag = ?')
+
+  const applyAll = db.transaction(() => {
+    for (const tag of usedTags) {
+      const row = rowByTag.get(tag)
+      if (row?.group_pinned) continue
+
+      const matched = ruledGroups.find((group) =>
+        tag.toLowerCase().includes(group.matchPattern!.toLowerCase())
+      )
+      const nextGroupId = matched?.id ?? null
+      const currentGroupId = row?.group_id ?? null
+      if (nextGroupId === currentGroupId) continue
+
+      if (row) setGroup.run(nextGroupId, tag)
+      else if (nextGroupId) insertGroup.run({ tag, groupId: nextGroupId })
+    }
+
+    for (const row of rows) {
+      if (row.group_id && !usedTags.has(row.tag)) clearGroup.run(row.tag)
+    }
   })
-  clearMany(stale)
+  applyAll()
 }

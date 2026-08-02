@@ -1,7 +1,7 @@
 import type { PhotoRecord } from '@shared/types'
 
 import { getDb } from './database'
-import { pruneStaleTagGroupAssignments } from './tagMetadataRepository'
+import { reconcileTagGroups } from './tagMetadataRepository'
 
 interface PhotoRow {
   path: string
@@ -126,7 +126,7 @@ export function removePhoto(filePath: string): string | null {
   if (!row) return null
 
   db.prepare('DELETE FROM photos WHERE path = ?').run(filePath)
-  pruneStaleTagGroupAssignments()
+  reconcileTagGroups()
   return row.thumbnailKey
 }
 
@@ -184,7 +184,7 @@ export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[]
     for (const p of paths) del.run(p)
   })
   deleteMany(stale.map((row) => row.path))
-  pruneStaleTagGroupAssignments()
+  reconcileTagGroups()
 
   return stale.map((row) => row.thumbnailKey).filter((key): key is string => Boolean(key))
 }

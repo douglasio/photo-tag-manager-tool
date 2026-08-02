@@ -6,13 +6,14 @@ import {
   createTagGroup,
   deleteTagGroup,
   getTagGroups,
-  renameTagGroup
+  renameTagGroup,
+  setTagGroupMatchPattern
 } from '@main/db/tagGroupRepository'
 import {
   deleteTagMetadata,
   getAllTagDescriptions,
   getAllTagGroupAssignments,
-  pruneStaleTagGroupAssignments,
+  reconcileTagGroups,
   renameTagMetadata,
   setTagDescription,
   setTagGroupAssignment
@@ -47,8 +48,8 @@ export function registerTagHandlers(): void {
       // Single-file, user-triggered edit — no concurrency to limit, so just run it inline.
       const { photo } = await ingestFile(filePath, (fn) => fn())
       // This edit alone (not just a photo/row removal) can drop some other
-      // tag's usage to zero, e.g. removing the last instance of a tag here.
-      pruneStaleTagGroupAssignments()
+      // tag's usage to zero, or introduce a tag a group's rule should match.
+      reconcileTagGroups()
       return photo
     }
   )
@@ -104,10 +105,8 @@ export function registerTagHandlers(): void {
         )
       )
 
-      // Adding tags never removes usage, but a rename-like collision
-      // (renaming into a tag processed by another concurrent batch) is
-      // cheap enough to just cover unconditionally rather than reason about.
-      pruneStaleTagGroupAssignments()
+      // A newly-added tag may match a group's auto-add rule.
+      reconcileTagGroups()
       return photos
     }
   )
@@ -142,11 +141,27 @@ export function registerTagHandlers(): void {
     })
   )
 
-  ipcMain.handle('tags:createGroup', (_event, name: string): TagGroup => createTagGroup(name))
+  ipcMain.handle(
+    'tags:createGroup',
+    (_event, name: string, matchPattern: string | null): TagGroup => {
+      const group = createTagGroup(name, matchPattern)
+      // A rule set at creation time should immediately sweep in matching tags.
+      if (group.matchPattern) reconcileTagGroups()
+      return group
+    }
+  )
 
   ipcMain.handle('tags:renameGroup', (_event, id: string, name: string): void => {
     renameTagGroup(id, name)
   })
+
+  ipcMain.handle(
+    'tags:setGroupMatchPattern',
+    (_event, id: string, matchPattern: string | null): void => {
+      setTagGroupMatchPattern(id, matchPattern)
+      reconcileTagGroups()
+    }
+  )
 
   ipcMain.handle('tags:deleteGroup', (_event, id: string): void => {
     deleteTagGroup(id)
