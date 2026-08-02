@@ -10,9 +10,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Optimization
 
-1. During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
-
-2. Opening the app can sometimes take a pretty long time (on the "loading your library" screen). Are there performance improvement opportunities, and/or a way to show a Progress bar to make visible what's taking so long / how much time is left?
+1. [possibly already resolved] During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
 
 ## Shell
 
@@ -75,6 +73,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 ## Photo view
 
 5. The image rotation issue persists
+
+## Settings
+
+1. Refactor the settings menu into a multi-tab list (Mantine Tabs, configured vertically), the first tab being "Settings" and the second being "Keyboard Shortcuts" with a list of all keyboard shortcuts built into the app, making use of Mantine Kbd to show keys when appropriate
 
 ## Codebase
 

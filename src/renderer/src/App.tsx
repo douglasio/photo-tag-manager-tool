@@ -175,12 +175,13 @@ function AppLayout(): React.JSX.Element {
   // Dashboard is full-screen — no details panel either.
   const isDashboardTabActive = state.activeTab === 'dashboard'
 
-  // Universal "back to gallery" shortcut
+  // Universal "jump to gallery" / "jump to dashboard" shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'g' || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key !== 'g' && event.key !== 'd') return
       if (isEditableTarget(event.target)) return
-      setActiveTab('gallery')
+      setActiveTab(event.key === 'g' ? 'gallery' : 'dashboard')
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
