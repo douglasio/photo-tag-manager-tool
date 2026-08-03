@@ -10,13 +10,11 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 To-dos, tasks, and features loosely grouped by feature segment.
 
-## Optimization
-
-1. [possibly already resolved] During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
-
 ## Shell
 
 1. Both the details pane and the left folder / tag panel should be resizable using Mantine Splitter with the no handle setting. Tags and Folders panels within the left sidebar should also be vertically resizable using the same component but vertically oriented. All of these positioning settings should be persisted.
+
+2. Implement MenuBar?
 
 ## Navigation
 
@@ -26,11 +24,17 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 3. Make the tab row horizontally scroll instead of wrap to multiple lines. I think this can be achieved with Mantine's Scroller component.
 
+## Dashboard
+
+1. Add a new widget to the dashboard showing the top 5 most viewed photos in a Mantine Bar chart (from @mantine/charts). If possible, have the image itself render as the fill for the bar. If it's not possible, have the thumbnail of the image sit on top of the bar. I'm not sure what's possible here so ask me about feasibility and implementation details.
+
 ## Gallery View
 
 1. Select tag thumbnail photo
 
 2. Create an alternate display option for the tags panel. This one is a 2-column grid of the tag thumbnails with the tag name and image count overlayed on top of the thumbnail, using Mantine's BackgroundImage component. Use the settings cog pattern used in the Folder section to put the toggle for this.
+
+3. Cursor multi-select
 
 ## Tools
 
@@ -64,10 +68,14 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Settings
 
-1. Refactor the settings menu into a multi-tab list (Mantine Tabs, configured vertically), the first tab being "Settings" and the second being "Keyboard Shortcuts" with a list of all keyboard shortcuts built into the app, making use of Mantine Kbd to show keys when appropriate
+1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
-2. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
+## Optimization
+
+1. [possibly already resolved] During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
 
 ## Codebase
 
 1. Storybook or env config? Need a way to preview things without affecting data.
+
+2. Enforce component export style
