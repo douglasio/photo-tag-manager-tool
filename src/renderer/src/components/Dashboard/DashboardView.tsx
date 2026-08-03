@@ -1,7 +1,7 @@
 import { Button, Grid, Stack, Title } from '@mantine/core'
 import { IconLibraryPhoto } from '@tabler/icons-react'
 
-import { FeaturedTagWidget } from '@components'
+import { FeaturedTagWidget, TopViewedWidget } from '@components'
 import { usePhotoLibrary } from '@state'
 
 export function DashboardView(): React.JSX.Element {
@@ -22,9 +22,11 @@ export function DashboardView(): React.JSX.Element {
           </Button>
         </Stack>
       </Grid.Col>
-      <Grid.Col {...gridColProps}></Grid.Col>
       <Grid.Col {...gridColProps}>
         <FeaturedTagWidget />
+      </Grid.Col>
+      <Grid.Col {...gridColProps}>
+        <TopViewedWidget />
       </Grid.Col>
       <Grid.Col {...gridColProps}></Grid.Col>
       <Grid.Col {...gridColProps}></Grid.Col>

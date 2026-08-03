@@ -1,6 +1,6 @@
 {
   "name": "photo-tag-manager-tool",
-  "version": "0.5.0-beta",
+  "version": "0.6.0-beta",
   "description": "Tag Me — A file metadata-based photo organizer for reading and browsing photos locally",
   "main": "./out/main/index.js",
   "author": "douglasio",
@@ -49,6 +49,7 @@
     "@fontsource/anton": "^5.3.0",
     "@fontsource/bebas-neue": "^5.3.0",
     "@fontsource/playfair-display": "^5.3.0",
+    "@mantine/charts": "^9.4.2",
     "@mantine/core": "^9.4.2",
     "@mantine/dates": "^9.4.2",
     "@mantine/hooks": "^9.4.2",
@@ -62,6 +63,7 @@
     "motion": "^12.42.2",
     "p-limit": "^7.3.1",
     "react-window": "^2.3.0",
+    "recharts": "^3.10.1",
     "sharp": "^0.35.3"
   },
   "devDependencies": {

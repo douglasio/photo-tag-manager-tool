@@ -62,7 +62,7 @@ import {
   TagGroupCreateButton,
   TagPanel
 } from '@components'
-import { radiusSize } from '@renderer/theme'
+import { RADIUS_SIZE } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 
@@ -106,7 +106,7 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
         w={DRAG_PREVIEW_SIZE}
         h={DRAG_PREVIEW_SIZE}
         opacity={0.75}
-        bdrs={radiusSize}
+        bdrs={RADIUS_SIZE}
         style={{
           overflow: 'hidden',
           boxShadow: 'var(--mantine-shadow-md)',
@@ -147,7 +147,14 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
 // much lighter than DragPreview above, no thumbnail to show.
 function TagDragPreview({ tag }: { tag: string }): React.JSX.Element {
   return (
-    <Paper withBorder shadow="md" px="sm" py={4} radius={radiusSize} style={{ cursor: 'grabbing' }}>
+    <Paper
+      withBorder
+      shadow="md"
+      px="sm"
+      py={4}
+      radius={RADIUS_SIZE}
+      style={{ cursor: 'grabbing' }}
+    >
       <Text size="sm" fw={500}>
         #{tag}
       </Text>
