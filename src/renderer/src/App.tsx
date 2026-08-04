@@ -63,6 +63,7 @@ import {
   TagPanel
 } from '@components'
 import { RADIUS_SIZE } from '@renderer/theme'
+import { ACTION_ICONS } from '@renderer/utils'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 
@@ -122,7 +123,7 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
           />
         ) : (
           <Center w={DRAG_PREVIEW_SIZE} h={DRAG_PREVIEW_SIZE} bg="var(--mantine-color-default)">
-            <IconPhoto />
+            <IconPhoto size={ACTION_ICONS.ICON_SIZE} />
           </Center>
         )}
       </Box>
@@ -373,7 +374,9 @@ function AppLayout(): React.JSX.Element {
                           id={entry.id}
                           value={entry.id}
                           leftSection={
-                            entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
+                            entry.kind === 'compare' ? (
+                              <IconColumns2 size={ACTION_ICONS.ICON_SIZE} />
+                            ) : undefined
                           }
                           rightSection={
                             <ActionIcon
@@ -386,7 +389,7 @@ function AppLayout(): React.JSX.Element {
                                 closePhotoTab(entry.id)
                               }}
                             >
-                              <IconX size={12} />
+                              <IconX size={ACTION_ICONS.ICON_SIZE} />
                             </ActionIcon>
                           }
                         >
@@ -417,9 +420,9 @@ function AppLayout(): React.JSX.Element {
                       onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
                     >
                       {state.detailsPanelCollapsed ? (
-                        <IconLayoutSidebarRightExpand size={18} />
+                        <IconLayoutSidebarRightExpand size={ACTION_ICONS.ICON_SIZE} />
                       ) : (
-                        <IconLayoutSidebarRightCollapse size={18} />
+                        <IconLayoutSidebarRightCollapse size={ACTION_ICONS.ICON_SIZE} />
                       )}
                     </ActionIcon>
                   </Tooltip>

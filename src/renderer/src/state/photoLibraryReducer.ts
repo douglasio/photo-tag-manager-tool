@@ -9,7 +9,7 @@ import {
 
 type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 
-export type GallerySortBy = 'name' | 'dateTaken' | 'viewCount'
+export type GallerySortBy = 'name' | 'dateTaken' | 'viewCount' | 'random'
 export type GallerySortOrder = 'asc' | 'desc'
 
 export const RECENT_TAGS_LIMIT = 3

@@ -32,7 +32,7 @@ export const theme = createTheme({
     ActionIcon: ActionIcon.extend({
       defaultProps: {
         radius: RADIUS_SIZE,
-        size: 'sm',
+        size: 'md',
         variant: 'subtle',
         styles: {
           root: { transition: 'opacity 120ms ease' }

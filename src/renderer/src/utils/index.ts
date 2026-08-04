@@ -1,3 +1,4 @@
+export * from './actionIcons'
 export * from './fileNameValidation'
 export * from './folderNameValidation'
 export * from './folderTree'

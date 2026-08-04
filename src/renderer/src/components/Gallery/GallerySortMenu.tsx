@@ -1,98 +1,81 @@
-import { ActionIcon, Box, Menu, Tooltip } from '@mantine/core'
-import { IconArrowsSort, IconCheck } from '@tabler/icons-react'
+import { ActionIcon, Group, Tooltip } from '@mantine/core'
+import type { GallerySortBy, GallerySortOrder } from '@state'
+import {
+  IconArrowsShuffle,
+  IconCalendarDown,
+  IconCalendarUp,
+  IconSortAscendingNumbers,
+  IconSortAZ,
+  IconSortDescendingNumbers,
+  IconSortZA
+} from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
 import { usePhotoLibrary } from '@state'
+import { ACTION_ICONS } from '@utils'
 
 export function GallerySortMenu(): ReactElement {
   const { state, setSort } = usePhotoLibrary()
 
+  const { ICON_SIZE } = ACTION_ICONS
+
+  // Clicking the already-active sort's icon flips its direction; clicking a
+  // different sort's icon switches to it at its default direction (matching
+  // what used to be the first-listed option for each: Name A-Z, Date
+  // taken newest-first, view count most-first).
+  const toggle = (sortBy: GallerySortBy, defaultOrder: GallerySortOrder): void => {
+    if (state.sortBy === sortBy) {
+      setSort(sortBy, state.sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSort(sortBy, defaultOrder)
+    }
+  }
+
+  const nameDesc = state.sortBy === 'name' && state.sortOrder === 'desc'
+  const dateAsc = state.sortBy === 'dateTaken' && state.sortOrder === 'asc'
+  const viewAsc = state.sortBy === 'viewCount' && state.sortOrder === 'asc'
+  const NameIcon = nameDesc ? IconSortZA : IconSortAZ
+  const DateIcon = dateAsc ? IconCalendarUp : IconCalendarDown
+  const ViewIcon = viewAsc ? IconSortAscendingNumbers : IconSortDescendingNumbers
+
   return (
-    <Menu shadow="md" position="bottom-end">
-      <Menu.Target>
-        <Tooltip label="Sort">
-          <ActionIcon variant="subtle" aria-label="Sort">
-            <IconArrowsSort size={16} />
-          </ActionIcon>
-        </Tooltip>
-      </Menu.Target>
-      <Menu.Dropdown>
-        <Menu.Label>Sort by</Menu.Label>
-        <Menu.Item
-          leftSection={
-            state.sortBy === 'name' && state.sortOrder === 'asc' ? (
-              <IconCheck size={14} />
-            ) : (
-              <Box w={14} />
-            )
-          }
-          onClick={() => setSort('name', 'asc')}
+    <Group gap={4} wrap="nowrap">
+      <Tooltip label={`Name (${nameDesc ? 'Z–A' : 'A–Z'})`}>
+        <ActionIcon
+          variant={state.sortBy === 'name' ? 'filled' : 'default'}
+          aria-label="Sort by name"
+          onClick={() => toggle('name', 'asc')}
         >
-          Name (A–Z)
-        </Menu.Item>
-        <Menu.Item
-          leftSection={
-            state.sortBy === 'name' && state.sortOrder === 'desc' ? (
-              <IconCheck size={14} />
-            ) : (
-              <Box w={14} />
-            )
-          }
-          onClick={() => setSort('name', 'desc')}
+          <NameIcon size={ICON_SIZE} />
+        </ActionIcon>
+      </Tooltip>
+      <Tooltip label={`Date taken (${dateAsc ? 'Oldest' : 'Newest'})`}>
+        <ActionIcon
+          variant={state.sortBy === 'dateTaken' ? 'filled' : 'default'}
+          aria-label="Sort by date taken"
+          onClick={() => toggle('dateTaken', 'desc')}
         >
-          Name (Z–A)
-        </Menu.Item>
-        <Menu.Divider />
-        <Menu.Item
-          leftSection={
-            state.sortBy === 'dateTaken' && state.sortOrder === 'desc' ? (
-              <IconCheck size={14} />
-            ) : (
-              <Box w={14} />
-            )
-          }
-          onClick={() => setSort('dateTaken', 'desc')}
+          <DateIcon size={ICON_SIZE} />
+        </ActionIcon>
+      </Tooltip>
+      <Tooltip label={`View count (${viewAsc ? 'Least' : 'Most'})`}>
+        <ActionIcon
+          variant={state.sortBy === 'viewCount' ? 'filled' : 'default'}
+          aria-label="Sort by view count"
+          onClick={() => toggle('viewCount', 'desc')}
         >
-          Date taken (Newest)
-        </Menu.Item>
-        <Menu.Item
-          leftSection={
-            state.sortBy === 'dateTaken' && state.sortOrder === 'asc' ? (
-              <IconCheck size={14} />
-            ) : (
-              <Box w={14} />
-            )
-          }
-          onClick={() => setSort('dateTaken', 'asc')}
+          <ViewIcon size={ICON_SIZE} />
+        </ActionIcon>
+      </Tooltip>
+      <Tooltip label="Random">
+        <ActionIcon
+          variant={state.sortBy === 'random' ? 'filled' : 'default'}
+          aria-label="Random order"
+          onClick={() => setSort('random', 'asc')}
         >
-          Date taken (Oldest)
-        </Menu.Item>
-        <Menu.Divider />
-        <Menu.Item
-          leftSection={
-            state.sortBy === 'viewCount' && state.sortOrder === 'desc' ? (
-              <IconCheck size={14} />
-            ) : (
-              <Box w={14} />
-            )
-          }
-          onClick={() => setSort('viewCount', 'desc')}
-        >
-          View count (Most)
-        </Menu.Item>
-        <Menu.Item
-          leftSection={
-            state.sortBy === 'viewCount' && state.sortOrder === 'asc' ? (
-              <IconCheck size={14} />
-            ) : (
-              <Box w={14} />
-            )
-          }
-          onClick={() => setSort('viewCount', 'asc')}
-        >
-          View count (Least)
-        </Menu.Item>
-      </Menu.Dropdown>
-    </Menu>
+          <IconArrowsShuffle size={ICON_SIZE} />
+        </ActionIcon>
+      </Tooltip>
+    </Group>
   )
 }

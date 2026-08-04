@@ -3,9 +3,12 @@ import { IconSettings } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
 import { usePhotoLibrary } from '@state'
+import { ACTION_ICONS } from '@utils'
 
 export function GallerySettingsMenu(): ReactElement {
   const { state, setShowFilenames, setShowViewCounts } = usePhotoLibrary()
+
+  const { ICON_SIZE } = ACTION_ICONS
 
   return (
     <Menu
@@ -17,7 +20,7 @@ export function GallerySettingsMenu(): ReactElement {
     >
       <Menu.Target>
         <ActionIcon variant="subtle" aria-label="Gallery settings">
-          <IconSettings size={16} />
+          <IconSettings size={ICON_SIZE} />
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>

@@ -7,14 +7,15 @@ import {
   useEffect,
   useMemo,
   useReducer,
-  useRef
+  useRef,
+  useState
 } from 'react'
 
 import { notifications } from '@mantine/notifications'
 
 import { MoveProgressToast } from '@components'
 import type { DefaultView, PhotoRecord, RotateDirection } from '@shared/types'
-import { basename, isPhotoInFolder } from '@utils'
+import { basename, isPhotoInFolder, shuffle } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
 import {
@@ -818,9 +819,34 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return visualization
   }, [])
 
+  // Locked in when Random is (re)selected or the photo count changes while
+  // already in Random mode — adjusted during render, per this codebase's
+  // convention, rather than an effect. Recomputing the shuffle on every
+  // render (e.g. via state.photosByPath identity, which changes on any
+  // photo update) would reshuffle the whole grid on incidental interactions
+  // like a view-count bump, same as the existing viewCount-sort issue but
+  // worse since it'd affect every field, not just the one being sorted on.
+  // randomOrderSize resets to null on leaving Random so the next time it's
+  // selected always starts from a fresh shuffle, matching a "shuffle" button.
+  const [randomOrder, setRandomOrder] = useState<string[]>([])
+  const [randomOrderSize, setRandomOrderSize] = useState<number | null>(null)
+  if (state.sortBy === 'random') {
+    if (state.photosByPath.size !== randomOrderSize) {
+      setRandomOrderSize(state.photosByPath.size)
+      setRandomOrder(shuffle(Array.from(state.photosByPath.keys())))
+    }
+  } else if (randomOrderSize !== null) {
+    setRandomOrderSize(null)
+  }
+
   const photos = useMemo(() => {
     const direction = state.sortOrder === 'desc' ? -1 : 1
     const result = Array.from(state.photosByPath.values())
+    if (state.sortBy === 'random') {
+      return randomOrder
+        .map((filePath) => state.photosByPath.get(filePath))
+        .filter((photo): photo is PhotoRecord => photo != null)
+    }
     if (state.sortBy === 'dateTaken') {
       // Photos without EXIF date data (screenshots, stripped exports, ...)
       // always sort to the end regardless of direction, rather than
@@ -844,7 +870,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       result.sort((a, b) => direction * a.fileName.localeCompare(b.fileName))
     }
     return result
-  }, [state.photosByPath, state.sortBy, state.sortOrder])
+  }, [state.photosByPath, state.sortBy, state.sortOrder, randomOrder])
 
   const setSort = useCallback((sortBy: GallerySortBy, sortOrder: GallerySortOrder) => {
     dispatch({ type: 'SET_SORT', sortBy, sortOrder })
