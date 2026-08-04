@@ -5,11 +5,12 @@ import { useReducedMotion } from '@mantine/hooks'
 import { IconArrowRight } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'motion/react'
 
-import { TagList } from '@components'
+import { GalleryHoverPreview, TagList } from '@components'
+import { useHoverPreview, useKeyHeld } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { pickRandom } from '@utils'
+import { pickRandom, PREVIEW_TRIGGER_KEY } from '@utils'
 
 const TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
 
@@ -34,6 +35,7 @@ export function QuickTagWidget(): ReactElement {
   const { state, allTags, updateTags } = usePhotoLibrary()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
+  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
 
   // Locked in (lazy init, then again on "Tag another"/"Skip") rather than
   // recomputed on every render — re-resolved against the live photo map
@@ -43,6 +45,8 @@ export function QuickTagWidget(): ReactElement {
     pickUntagged(state.photosByPath, null)
   )
   const currentPhoto = currentPath ? (state.photosByPath.get(currentPath) ?? null) : null
+  const canPreview = previewTriggerHeld && currentPhoto?.thumbnailStatus === 'ready'
+  const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
 
   const handleNext = (): void => {
     setCurrentPath(pickUntagged(state.photosByPath, currentPath))
@@ -63,13 +67,24 @@ export function QuickTagWidget(): ReactElement {
             h="100%"
             style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
           >
-            <Card.Section>
+            <Card.Section
+              onMouseMove={onMouseMove}
+              onMouseLeave={onMouseLeave}
+              style={{ cursor: canPreview ? 'zoom-in' : undefined }}
+            >
               <Image
                 src={toThumbProtocolUrl(currentPhoto.thumbnailKey!)}
+                alt={currentPhoto.fileName}
                 radius="sm"
                 pos="relative"
               />
             </Card.Section>
+            <GalleryHoverPreview
+              photo={currentPhoto}
+              position={canPreview ? position : null}
+              scale={1}
+              motionEnabled={motionEnabled}
+            />
             <Group wrap="nowrap" mt="md">
               <Box style={{ flex: 1, minWidth: 0 }}>
                 <TagList

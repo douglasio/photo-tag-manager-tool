@@ -28,7 +28,11 @@ vi.mock('@state', () => ({
 vi.mock('@components', () => ({
   TagList: ({ onChange }: { onChange: (tags: string[]) => void }) => (
     <button onClick={() => onChange(['vacation'])}>mock-add-tag</button>
-  )
+  ),
+  // The real GalleryHoverPreview isn't relevant to this widget's own
+  // picking/skip logic — a no-op stub keeps these tests from needing to
+  // stand up the Portal/motion machinery it renders.
+  GalleryHoverPreview: () => null
 }))
 
 import { QuickTagWidget } from './QuickTagWidget'

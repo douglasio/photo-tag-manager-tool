@@ -12,12 +12,15 @@ import {
   Timeline,
   UnstyledButton
 } from '@mantine/core'
+import { useReducedMotion } from '@mantine/hooks'
 
+import { GalleryHoverPreview } from '@components'
+import { useHoverPreview, useKeyHeld } from '@hooks'
 import { RADIUS_SIZE } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { pickRandom, shuffle } from '@utils'
+import { pickRandom, PREVIEW_TRIGGER_KEY, shuffle } from '@utils'
 
 // A tag needs at least this many photos before it's eligible to be featured.
 const FEATURED_TAG_MIN_PHOTOS = 3
@@ -69,6 +72,63 @@ function pickSelection(
   return { tag, photoPaths: pickRandomCollagePaths(photosByPath, tag, COLLAGE_PHOTO_COUNT) }
 }
 
+// Each tile gets its own hover-preview session (mirrors gallery thumbnails)
+// rather than sharing one at the widget level, since a SimpleGrid of
+// independent buttons has no shared "currently hovered photo" state to hang
+// a single preview off of.
+function CollageTile({
+  photo,
+  spanTwoColumns,
+  previewTriggerHeld,
+  motionEnabled,
+  onOpen
+}: {
+  photo: PhotoRecord
+  spanTwoColumns: boolean
+  previewTriggerHeld: boolean
+  motionEnabled: boolean
+  onOpen: () => void
+}): ReactElement {
+  const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
+  const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+
+  return (
+    <>
+      <UnstyledButton
+        onClick={onOpen}
+        onKeyDown={(event) => {
+          if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+        }}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+        h="100%"
+        w="100%"
+        display="block"
+        style={{
+          minHeight: 0,
+          cursor: canPreview ? 'zoom-in' : undefined,
+          ...(spanTwoColumns && { gridColumn: 'span 2' })
+        }}
+      >
+        <Image
+          src={toThumbProtocolUrl(photo.thumbnailKey!)}
+          alt={photo.fileName}
+          fit="cover"
+          h="100%"
+          w="100%"
+          bdrs={0}
+        />
+      </UnstyledButton>
+      <GalleryHoverPreview
+        photo={photo}
+        position={canPreview ? position : null}
+        scale={1}
+        motionEnabled={motionEnabled}
+      />
+    </>
+  )
+}
+
 export function FeaturedTagWidget(): ReactElement {
   const {
     state,
@@ -79,6 +139,9 @@ export function FeaturedTagWidget(): ReactElement {
     setActiveTab,
     setSettingsModalOpened
   } = usePhotoLibrary()
+  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const prefersReducedMotion = useReducedMotion()
+  const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
   // Picks a tag (and its collage) on first render that persists through the
   // session — see FeaturedSelection above for why the collage is locked in
@@ -133,23 +196,14 @@ export function FeaturedTagWidget(): ReactElement {
             const isLastOfOddRow =
               collagePhotos.length % 2 === 1 && index === collagePhotos.length - 1
             return (
-              <UnstyledButton
+              <CollageTile
                 key={photo.id}
-                onClick={() => openPhotoTab(photo.filePath)}
-                h="100%"
-                w="100%"
-                display="block"
-                style={{ minHeight: 0, ...(isLastOfOddRow && { gridColumn: 'span 2' }) }}
-              >
-                <Image
-                  src={toThumbProtocolUrl(photo.thumbnailKey!)}
-                  alt={photo.fileName}
-                  fit="cover"
-                  h="100%"
-                  w="100%"
-                  bdrs={0}
-                />
-              </UnstyledButton>
+                photo={photo}
+                spanTwoColumns={isLastOfOddRow}
+                previewTriggerHeld={previewTriggerHeld}
+                motionEnabled={motionEnabled}
+                onOpen={() => openPhotoTab(photo.filePath)}
+              />
             )
           })}
         </SimpleGrid>
