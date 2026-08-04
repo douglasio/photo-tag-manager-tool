@@ -1,3 +1,5 @@
+import type { ReactElement } from 'react'
+
 export type DefaultView = 'dashboard' | 'gallery'
 
 export type SupportedFormat = 'JPEG' | 'PNG' | 'TIFF'
@@ -108,4 +110,10 @@ export interface TagGroup {
   // Case-insensitive substring a tag must contain to be auto-added to this
   // group; null means no rule.
   matchPattern: string | null
+}
+
+export interface Widget {
+  id: string
+  title: string
+  component: ReactElement
 }

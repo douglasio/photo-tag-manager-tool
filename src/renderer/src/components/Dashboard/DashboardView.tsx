@@ -1,36 +1,25 @@
-import { Button, Grid, Stack, Title } from '@mantine/core'
-import { IconLibraryPhoto } from '@tabler/icons-react'
+import { Grid } from '@mantine/core'
 
-import { FeaturedTagWidget, TopViewedWidget } from '@components'
-import { usePhotoLibrary } from '@state'
+import { FeaturedTagWidget, TopViewedWidget, WelcomeWidget } from '@components'
+import DashboardWidget from '@renderer/components/Dashboard/DashboardWidget'
+import { Widget } from '@shared/types'
 
 export function DashboardView(): React.JSX.Element {
-  const { setActiveTab } = usePhotoLibrary()
-
   const gridColProps = { span: 4 }
 
+  const widgets: Widget[] = [
+    { id: 'welcome', title: 'Welcome', component: <WelcomeWidget /> },
+    { id: 'featuredTag', title: 'Featured Tag', component: <FeaturedTagWidget /> },
+    { id: 'topViewed', title: 'Top Viewed Photos', component: <TopViewedWidget /> }
+  ]
+
   return (
-    <Grid gap="lg" p="md">
-      <Grid.Col {...gridColProps}>
-        <Stack gap="md" align="flex-start">
-          <Title>Welcome to Tag Me</Title>
-          <Button
-            leftSection={<IconLibraryPhoto size={18} />}
-            onClick={() => setActiveTab('gallery')}
-          >
-            Go to Gallery
-          </Button>
-        </Stack>
-      </Grid.Col>
-      <Grid.Col {...gridColProps}>
-        <FeaturedTagWidget />
-      </Grid.Col>
-      <Grid.Col {...gridColProps}>
-        <TopViewedWidget />
-      </Grid.Col>
-      <Grid.Col {...gridColProps}></Grid.Col>
-      <Grid.Col {...gridColProps}></Grid.Col>
-      <Grid.Col {...gridColProps}></Grid.Col>
+    <Grid gap="lg" p="md" align="stretch">
+      {widgets.map((widget) => (
+        <Grid.Col key={widget.id} {...gridColProps}>
+          <DashboardWidget {...widget} />
+        </Grid.Col>
+      ))}
     </Grid>
   )
 }

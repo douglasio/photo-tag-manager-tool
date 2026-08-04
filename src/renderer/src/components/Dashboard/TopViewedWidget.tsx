@@ -1,12 +1,13 @@
 import { BarChart } from '@mantine/charts'
-import { Paper, Text, Title } from '@mantine/core'
+import { Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 
+import { RADIUS_SIZE } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import { usePhotoLibrary } from '@state'
 
 const TOP_COUNT = 5
-const BAR_HEIGHT = 56
+const BAR_HEIGHT = 60
 
 interface TopViewedDatum {
   id: string
@@ -42,8 +43,18 @@ function ImageBarShape(props: {
         height={height}
         preserveAspectRatio="xMidYMid slice"
         clipPath={`url(#${clipId})`}
+        opacity={0.6}
       />
-      <text x={x + width + 8} y={y + height / 2} dominantBaseline="middle" fontSize={12}>
+      <text
+        x={x + width / 2 + 10}
+        y={y + 40}
+        textAnchor="end"
+        dominantBaseline="middle"
+        fontSize={35}
+        fontWeight={800}
+        fill="white"
+        style={{ mixBlendMode: 'luminosity', opacity: 0.6 }}
+      >
         {payload.viewCount}
       </text>
     </g>
@@ -67,10 +78,7 @@ export function TopViewedWidget(): ReactElement {
     }))
 
   return (
-    <Paper withBorder p="md">
-      <Title order={4} mb="sm">
-        Top Viewed
-      </Title>
+    <>
       {data.length === 0 ? (
         <Text c="dimmed" size="sm">
           Open some photos from the gallery to see them featured here.
@@ -81,14 +89,17 @@ export function TopViewedWidget(): ReactElement {
           data={data}
           dataKey="fileName"
           orientation="horizontal"
+          bg="dark.8"
+          bdrs={RADIUS_SIZE}
           series={[{ name: 'viewCount', color: 'blue' }]}
-          barProps={{ shape: ImageBarShape, radius: 10 }}
+          barProps={{ shape: ImageBarShape, radius: 30 }}
+          barChartProps={{ barCategoryGap: 0, margin: { top: 0, bottom: 0 } }}
           withXAxis={false}
           withYAxis={false}
           withTooltip={false}
           gridAxis="none"
         />
       )}
-    </Paper>
+    </>
   )
 }

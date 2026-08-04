@@ -91,32 +91,26 @@ export function FeaturedTagWidget(): ReactElement {
       .filter((photo): photo is PhotoRecord => photo != null)
   }, [selection, state.photosByPath])
 
-  const goToTag = (tag): void => {
+  const goToTag = (tag: string): void => {
     setTagFilter(tag)
     setActiveTab('gallery')
   }
 
   if (selectedTag) {
     return (
-      <Paper withBorder p="md">
-        <Group justify="space-between" mb="sm" wrap="nowrap">
-          <Title order={2} flex={1} miw={0} lineClamp={1}>
+      <>
+        <Group justify="space-between" w="100%">
+          <Title order={4} onClick={() => goToTag(selectedTag)} style={{ cursor: 'pointer' }}>
             Featured Tag:{' '}
-            <Text
-              component="button"
-              onClick={() => goToTag(selectedTag)}
-              bd={0}
-              variant="gradient"
-              span
-              inherit
-            >
+            <Text span inherit variant="gradient" fw="bold">
               #{selectedTag}
             </Text>
           </Title>
           <Badge
             component="button"
-            variant="light"
-            style={{ flexShrink: 0, cursor: 'pointer' }}
+            variant="gradient"
+            size="md"
+            style={{ cursor: 'pointer' }}
             onClick={() => {
               goToTag(selectedTag)
             }}
@@ -145,7 +139,6 @@ export function FeaturedTagWidget(): ReactElement {
                       src={toThumbProtocolUrl(photo.thumbnailKey!)}
                       alt={photo.fileName}
                       fit="cover"
-                      radius="sm"
                     />
                   </AspectRatio>
                 </UnstyledButton>
@@ -153,7 +146,7 @@ export function FeaturedTagWidget(): ReactElement {
             )
           })}
         </Grid>
-      </Paper>
+      </>
     )
   }
 
