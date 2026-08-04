@@ -97,6 +97,14 @@ export function TopViewedWidget(): ReactElement {
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
   const [hover, setHover] = useState<HoverState | null>(null)
 
+  // Backstop for an unreliable SVG mouseleave: resets `hover` the instant the
+  // trigger key is released, so a stale bar doesn't reopen on the next press.
+  const [wasTriggerHeld, setWasTriggerHeld] = useState(previewTriggerHeld)
+  if (previewTriggerHeld !== wasTriggerHeld) {
+    setWasTriggerHeld(previewTriggerHeld)
+    if (!previewTriggerHeld) setHover(null)
+  }
+
   const data: TopViewedDatum[] = Array.from(state.photosByPath.values())
     .filter(
       (photo) => photo.viewCount > 0 && photo.thumbnailStatus === 'ready' && photo.thumbnailKey

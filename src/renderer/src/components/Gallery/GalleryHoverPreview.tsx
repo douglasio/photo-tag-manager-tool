@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect, useRef } from 'react'
+import { type ReactElement, useEffect, useRef, useState } from 'react'
 
 import { Box, Image, Portal } from '@mantine/core'
 import { AnimatePresence, motion } from 'motion/react'
@@ -16,6 +16,28 @@ const TRANSITION = { duration: 0.12, ease: 'easeOut' } as const
 // sorted by view count) to reshuffle out from under the photo the user was
 // still looking at.
 const VIEW_COUNT_DELAY_MS = 600
+// Keeps the preview's own edge a bit clear of the window edge rather than
+// flush against it.
+const EDGE_MARGIN_PX = 12
+
+// Shifts the cursor-centered position just enough that the preview's
+// measured box (once known) stays fully inside the window instead of
+// spilling off whichever edge the cursor is near. Falls back to the raw,
+// unclamped position before a size is known (e.g. the very first frame).
+function clampToViewport(
+  position: { x: number; y: number },
+  size: { width: number; height: number } | null
+): { x: number; y: number } {
+  if (!size) return position
+  const halfWidth = size.width / 2 + EDGE_MARGIN_PX
+  const halfHeight = size.height / 2 + EDGE_MARGIN_PX
+  const maxX = Math.max(halfWidth, window.innerWidth - halfWidth)
+  const maxY = Math.max(halfHeight, window.innerHeight - halfHeight)
+  return {
+    x: Math.min(Math.max(position.x, halfWidth), maxX),
+    y: Math.min(Math.max(position.y, halfHeight), maxY)
+  }
+}
 
 interface GalleryHoverPreviewProps {
   photo: PhotoRecord
@@ -43,6 +65,28 @@ export function GalleryHoverPreview({
   // this guards against counting on mount or on the rising edge itself.
   const wasVisibleRef = useRef(false)
 
+  // Measures the actual rendered preview box (its size depends on the
+  // photo's aspect ratio and the current zoom scale, not just the maw/mah
+  // caps) so the position can be clamped to the real edges rather than a
+  // worst-case estimate. Kept across a hide/show cycle for the same
+  // instance rather than reset, so the position is already clamped
+  // correctly on the very next open before the observer fires again.
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height })
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [isVisible])
+
+  const clampedPosition = position ? clampToViewport(position, size) : null
+
   // Counts once per full preview session (open → close), matching "previewed
   // with space bar" in the spec, but deferred until VIEW_COUNT_DELAY_MS after
   // it closes rather than the moment it opens. Reopening before that timer
@@ -63,12 +107,12 @@ export function GalleryHoverPreview({
 
   return (
     <AnimatePresence>
-      {position && (
+      {clampedPosition && (
         <Portal key="preview">
           <Box
             pos="fixed"
-            left={position.x}
-            top={position.y}
+            left={clampedPosition.x}
+            top={clampedPosition.y}
             style={{
               transform: 'translate(-50%, -50%)',
               // Sits directly under the cursor, so it must never intercept
@@ -78,6 +122,7 @@ export function GalleryHoverPreview({
             }}
           >
             <motion.div
+              ref={contentRef}
               initial={motionEnabled ? { opacity: 0, scale: 0.92 } : false}
               animate={{ opacity: 1, scale: 1 }}
               exit={motionEnabled ? { opacity: 0, scale: 0.92 } : undefined}
