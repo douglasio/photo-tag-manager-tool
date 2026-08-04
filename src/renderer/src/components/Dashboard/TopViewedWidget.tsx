@@ -7,7 +7,6 @@ import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import { usePhotoLibrary } from '@state'
 
 const TOP_COUNT = 5
-const BAR_HEIGHT = 60
 
 interface TopViewedDatum {
   id: string
@@ -85,7 +84,7 @@ export function TopViewedWidget(): ReactElement {
         </Text>
       ) : (
         <BarChart
-          h={data.length * BAR_HEIGHT}
+          h="100%"
           data={data}
           dataKey="fileName"
           orientation="horizontal"
@@ -94,6 +93,12 @@ export function TopViewedWidget(): ReactElement {
           series={[{ name: 'viewCount', color: 'blue' }]}
           barProps={{ shape: ImageBarShape, radius: 30 }}
           barChartProps={{ barCategoryGap: 0, margin: { top: 0, bottom: 0 } }}
+          // With orientation="horizontal", Mantine's BarChart puts the value
+          // axis on Y (X carries the category/dataKey) — bars actually grow
+          // upward from a baseline. Without this, Recharts "nicely" rounds
+          // the auto-computed Y max up for tick generation (even with the
+          // axis hidden), leaving every bar short of the chart's top edge.
+          yAxisProps={{ domain: [0, 'dataMax'] }}
           withXAxis={false}
           withYAxis={false}
           withTooltip={false}

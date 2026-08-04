@@ -1,7 +1,6 @@
 import { type ReactElement } from 'react'
 
 import { Burger, Button, Group, Modal, Stack, Tabs, Title, Tooltip } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
 import { IconKeyboard, IconLibraryPhoto, IconTool } from '@tabler/icons-react'
 
 import { usePhotoLibrary } from '@state'
@@ -9,8 +8,10 @@ import { usePhotoLibrary } from '@state'
 import * as SettingsTab from './SettingsTabs'
 
 export function SettingsModal(): ReactElement {
-  const { state } = usePhotoLibrary()
-  const [opened, { open, close }] = useDisclosure(false)
+  const { state, setSettingsModalOpened } = usePhotoLibrary()
+  const opened = state.settingsModalOpened
+  const open = (): void => setSettingsModalOpened(true)
+  const close = (): void => setSettingsModalOpened(false)
 
   const ICON_SIZE = 20
 

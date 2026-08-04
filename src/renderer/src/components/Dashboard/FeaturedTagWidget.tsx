@@ -1,18 +1,19 @@
 import { type ReactElement, useMemo, useState } from 'react'
 
 import {
-  AspectRatio,
+  Anchor,
   Badge,
-  Grid,
+  Button,
   Group,
   Image,
-  Paper,
+  SimpleGrid,
+  Stack,
   Text,
   Timeline,
-  Title,
   UnstyledButton
 } from '@mantine/core'
 
+import { RADIUS_SIZE } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
@@ -22,11 +23,13 @@ import { pickRandom, shuffle } from '@utils'
 const FEATURED_TAG_MIN_PHOTOS = 3
 const COLLAGE_PHOTO_COUNT = 4
 
-const ONBOARDING_STEPS = [
-  'Add photos to your library',
-  'Tag a photo',
-  'Use that tag on a second photo',
-  'Use that tag on a third photo'
+// `action` names which handler (below, in the component) the step's link
+// should call — steps with no action render as plain text.
+const ONBOARDING_STEPS: { text: string; linkLabel?: string; action?: 'settings' | 'gallery' }[] = [
+  { text: 'Add photos to your library', linkLabel: 'Open Settings', action: 'settings' },
+  { text: 'Tag a photo', linkLabel: 'Open Gallery', action: 'gallery' },
+  { text: 'Use that tag on a second photo' },
+  { text: 'Use that tag on a third photo' }
 ]
 
 interface FeaturedSelection {
@@ -67,7 +70,15 @@ function pickSelection(
 }
 
 export function FeaturedTagWidget(): ReactElement {
-  const { state, tagCounts, allTags, openPhotoTab, setTagFilter, setActiveTab } = usePhotoLibrary()
+  const {
+    state,
+    tagCounts,
+    allTags,
+    openPhotoTab,
+    setTagFilter,
+    setActiveTab,
+    setSettingsModalOpened
+  } = usePhotoLibrary()
 
   // Picks a tag (and its collage) on first render that persists through the
   // session — see FeaturedSelection above for why the collage is locked in
@@ -98,14 +109,11 @@ export function FeaturedTagWidget(): ReactElement {
 
   if (selectedTag) {
     return (
-      <>
-        <Group justify="space-between" w="100%">
-          <Title order={4} onClick={() => goToTag(selectedTag)} style={{ cursor: 'pointer' }}>
-            Featured Tag:{' '}
-            <Text span inherit variant="gradient" fw="bold">
-              #{selectedTag}
-            </Text>
-          </Title>
+      <Stack bg="dark" p="md" bdrs={RADIUS_SIZE} h="100%" style={{ minHeight: 0 }}>
+        <Group justify="space-between" w="100%" style={{ flexShrink: 0 }}>
+          <Anchor size="xl" fw="bold" onClick={() => goToTag(selectedTag)} variant="gradient">
+            #{selectedTag}
+          </Anchor>
           <Badge
             component="button"
             variant="gradient"
@@ -118,35 +126,34 @@ export function FeaturedTagWidget(): ReactElement {
             {tagCounts.get(selectedTag) ?? 0} photos
           </Badge>
         </Group>
-        <Grid grow>
+        <SimpleGrid cols={2} spacing="5" autoRows="1fr" style={{ flex: 1, minHeight: 0 }}>
           {collagePhotos.map((photo, index) => {
-            // Two per row (span={6} of 12) — with `grow`, a lone leftover in
-            // the last row stretches to fill the full row width instead of
-            // sitting half-width next to nothing. Doubling its aspect ratio
-            // alongside that doubled width keeps its height matched to the
-            // square photos above it, rather than rendering twice as tall.
+            // A lone leftover tile in an odd-count collage spans both
+            // columns instead of sitting half-width next to an empty cell.
             const isLastOfOddRow =
               collagePhotos.length % 2 === 1 && index === collagePhotos.length - 1
             return (
-              <Grid.Col key={photo.id} span={6}>
-                <UnstyledButton
-                  onClick={() => openPhotoTab(photo.filePath)}
+              <UnstyledButton
+                key={photo.id}
+                onClick={() => openPhotoTab(photo.filePath)}
+                h="100%"
+                w="100%"
+                display="block"
+                style={{ minHeight: 0, ...(isLastOfOddRow && { gridColumn: 'span 2' }) }}
+              >
+                <Image
+                  src={toThumbProtocolUrl(photo.thumbnailKey!)}
+                  alt={photo.fileName}
+                  fit="cover"
+                  h="100%"
                   w="100%"
-                  display="block"
-                >
-                  <AspectRatio ratio={isLastOfOddRow ? 2 : 1}>
-                    <Image
-                      src={toThumbProtocolUrl(photo.thumbnailKey!)}
-                      alt={photo.fileName}
-                      fit="cover"
-                    />
-                  </AspectRatio>
-                </UnstyledButton>
-              </Grid.Col>
+                  bdrs={0}
+                />
+              </UnstyledButton>
             )
           })}
-        </Grid>
-      </>
+        </SimpleGrid>
+      </Stack>
     )
   }
 
@@ -162,19 +169,43 @@ export function FeaturedTagWidget(): ReactElement {
   ]
   const activeIndex = stepsDone.filter(Boolean).length
 
+  const runStepAction = (action?: 'settings' | 'gallery'): void => {
+    if (action === 'settings') setSettingsModalOpened(true)
+    else if (action === 'gallery') setActiveTab('gallery')
+  }
+
   return (
-    <Paper withBorder p="md">
-      <Title order={4} mb="sm">
-        Featured Tag
-      </Title>
-      <Text c="dimmed" size="sm" mb="md">
-        Tag {FEATURED_TAG_MIN_PHOTOS} or more photos the same way to feature them here.
+    <>
+      <Text c="dimmed" mb="md">
+        Tag {FEATURED_TAG_MIN_PHOTOS} or more photos with the same tag to feature them here.
       </Text>
       <Timeline active={activeIndex} bulletSize={20}>
-        {ONBOARDING_STEPS.map((step) => (
-          <Timeline.Item key={step} title={step} />
-        ))}
+        {ONBOARDING_STEPS.map((step, index) => {
+          const isDone = index < activeIndex
+          return (
+            <Timeline.Item
+              key={step.text}
+              title={
+                <Group>
+                  <Text span c={isDone ? 'dimmed' : undefined} fs={isDone ? 'italic' : undefined}>
+                    {step.text}
+                  </Text>
+                  {step.linkLabel && !isDone && (
+                    <Button
+                      variant="outline"
+                      size="compact-sm"
+                      onClick={() => runStepAction(step.action)}
+                      m="0"
+                    >
+                      {step.linkLabel}
+                    </Button>
+                  )}
+                </Group>
+              }
+            />
+          )
+        })}
       </Timeline>
-    </Paper>
+    </>
   )
 }

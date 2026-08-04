@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { Button, Group, Image, Stack, Text } from '@mantine/core'
+import { Box, Button, Card, Group, Image, Text } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { IconArrowRight } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -57,37 +57,43 @@ export function QuickTagWidget(): ReactElement {
           animate={{ opacity: 1, x: 0 }}
           exit={motionEnabled ? { opacity: 0, x: -24 } : undefined}
           transition={TRANSITION}
-          style={{ width: '100%' }}
+          style={{ width: '100%', height: '100%' }}
         >
-          <Stack gap="sm">
-            <Image
-              src={toThumbProtocolUrl(currentPhoto.thumbnailKey!)}
-              alt={currentPhoto.fileName}
-              fit="contain"
-              radius="sm"
-              mah={180}
-            />
-            <Text size="sm" c="dimmed" truncate="end">
-              {currentPhoto.fileName}
-            </Text>
-            <TagList
-              tags={currentPhoto.tags}
-              allTags={allTags}
-              recentTags={state.recentTags}
-              onChange={(tags) => void updateTags(currentPhoto.filePath, tags)}
-            />
-            <Group justify="flex-end">
+          <Card
+            h="100%"
+            style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+          >
+            <Card.Section>
+              <Image
+                src={toThumbProtocolUrl(currentPhoto.thumbnailKey!)}
+                radius="sm"
+                pos="relative"
+              />
+            </Card.Section>
+            <Group wrap="nowrap" mt="md">
+              <Box style={{ flex: 1, minWidth: 0 }}>
+                <TagList
+                  tags={currentPhoto.tags}
+                  allTags={allTags}
+                  recentTags={state.recentTags}
+                  onChange={(tags) => void updateTags(currentPhoto.filePath, tags)}
+                />
+              </Box>
               {currentPhoto.tags.length > 0 ? (
-                <Button rightSection={<IconArrowRight size={14} />} onClick={handleNext}>
+                <Button
+                  rightSection={<IconArrowRight size={14} />}
+                  onClick={handleNext}
+                  style={{ flexShrink: 0 }}
+                >
                   Tag another
                 </Button>
               ) : (
-                <Button variant="subtle" onClick={handleNext}>
+                <Button variant="subtle" onClick={handleNext} style={{ flexShrink: 0 }}>
                   Skip
                 </Button>
               )}
             </Group>
-          </Stack>
+          </Card>
         </motion.div>
       ) : (
         <motion.div key="empty" style={{ width: '100%' }}>

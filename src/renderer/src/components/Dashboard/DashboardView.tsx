@@ -1,12 +1,10 @@
-import { Grid } from '@mantine/core'
+import { SimpleGrid } from '@mantine/core'
 
 import { FeaturedTagWidget, QuickTagWidget, TopViewedWidget, WelcomeWidget } from '@components'
 import DashboardWidget from '@renderer/components/Dashboard/DashboardWidget'
 import { Widget } from '@shared/types'
 
 export function DashboardView(): React.JSX.Element {
-  const gridColProps = { span: 4 }
-
   const widgets: Widget[] = [
     { id: 'welcome', title: 'Welcome', component: <WelcomeWidget /> },
     { id: 'featuredTag', title: 'Featured Tag', component: <FeaturedTagWidget /> },
@@ -15,12 +13,16 @@ export function DashboardView(): React.JSX.Element {
   ]
 
   return (
-    <Grid gap="lg" p="md" align="stretch">
+    <SimpleGrid
+      cols={3}
+      spacing="lg"
+      p="md"
+      autoRows="1fr"
+      style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
+    >
       {widgets.map((widget) => (
-        <Grid.Col key={widget.id} {...gridColProps}>
-          <DashboardWidget {...widget} />
-        </Grid.Col>
+        <DashboardWidget key={widget.id} {...widget} />
       ))}
-    </Grid>
+    </SimpleGrid>
   )
 }

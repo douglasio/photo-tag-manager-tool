@@ -88,6 +88,7 @@ interface PhotoLibraryContextValue {
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
+  setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
   setShowFilenames: (value: boolean) => void
@@ -887,6 +888,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setShowEmptyFolders(value)
   }, [])
 
+  // Session-only UI state — no window.api persistence, unlike the settings
+  // toggles above (a modal should always start closed on launch).
+  const setSettingsModalOpened = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_SETTINGS_MODAL_OPENED', value })
+  }, [])
+
   const setDetailsPanelCollapsed = useCallback((value: boolean) => {
     dispatch({ type: 'SET_DETAILS_PANEL_COLLAPSED', value })
     void window.api.setDetailsPanelCollapsed(value)
@@ -1080,6 +1087,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setSort,
     setDefaultView,
     setShowEmptyFolders,
+    setSettingsModalOpened,
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,
     setShowFilenames,
