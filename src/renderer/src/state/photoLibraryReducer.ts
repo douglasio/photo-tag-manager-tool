@@ -171,6 +171,7 @@ export type PhotoLibraryAction =
   | { type: 'OPEN_COMPARE_TAB'; paths: string[] }
   | { type: 'REMOVE_FROM_COMPARE_TAB'; tabId: string; filePath: string }
   | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
+  | { type: 'CLOSE_ALL_TABS' }
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
@@ -648,6 +649,8 @@ export function photoLibraryReducer(
       }
       return { ...state, openTabs, activeTab, compareTabs }
     }
+    case 'CLOSE_ALL_TABS':
+      return { ...state, openTabs: [], compareTabs: new Map(), activeTab: 'gallery' }
     case 'SET_ACTIVE_TAB':
       return { ...state, activeTab: action.tab }
     // Repoints a renamed photo's tab (and active-tab pointer) at its new

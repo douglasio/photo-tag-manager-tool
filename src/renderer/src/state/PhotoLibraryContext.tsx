@@ -116,6 +116,7 @@ interface PhotoLibraryContextValue {
   openCompareTab: (paths: string[]) => void
   removeFromCompareTab: (tabId: string, filePath: string) => void
   closePhotoTab: (filePath: string) => void
+  closeAllTabs: () => void
   setActiveTab: (tab: string) => void
   reorderPhotoTabs: (openTabs: string[]) => void
   navigateToPhoto: (
@@ -773,6 +774,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'CLOSE_PHOTO_TAB', filePath })
   }, [])
 
+  const closeAllTabs = useCallback(() => {
+    dispatch({ type: 'CLOSE_ALL_TABS' })
+  }, [])
+
   const setActiveTab = useCallback((tab: string) => {
     dispatch({ type: 'SET_ACTIVE_TAB', tab })
   }, [])
@@ -1116,6 +1121,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     openCompareTab,
     removeFromCompareTab,
     closePhotoTab,
+    closeAllTabs,
     setActiveTab,
     reorderPhotoTabs,
     navigateToPhoto,

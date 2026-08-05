@@ -170,6 +170,7 @@ function AppLayout(): React.JSX.Element {
     state,
     openTabEntries,
     closePhotoTab,
+    closeAllTabs,
     setActiveTab,
     addTagsToPhotos,
     movePhotosToFolder,
@@ -407,6 +408,18 @@ function AppLayout(): React.JSX.Element {
                 </Scroller>
               </Tabs.List>
               <Group gap="md" wrap="nowrap">
+                {state.openTabs.length > 0 && (
+                  <Tooltip label="Close all tabs">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      aria-label="Close all tabs"
+                      onClick={closeAllTabs}
+                    >
+                      <IconX size={ACTION_ICONS.ICON_SIZE} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
                 <ScanProgressBar />
                 {!(isCompareTabActive || isDashboardTabActive) && (
                   <Tooltip

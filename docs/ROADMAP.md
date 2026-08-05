@@ -20,13 +20,13 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Corrupt photo finder
 
+5. Untagged photo view (linked from dashboard widgets about photo tagging)
+
+6. I want to be able to ignore tags in certain folders, like archive folders and backups. I want to be able to right-click on a folder in the tree and say "ignore tags" which would add a little icon on the folder to indicate that it's ignored. Same right-click menu option should reverse the action. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab called Tags
+
 ## Navigation
 
 1. Truncate photo filenames in the tabs so more can fit. Hovering over the tab should reveal the full filename as a tooltip.
-
-2. Add a close all button at the right of the tabs row that will close all open tabs and return to gallery.
-
-3. Make the tab row horizontally scroll instead of wrap to multiple lines. I think this can be achieved with Mantine's Scroller component.
 
 ## Dashboard
 
@@ -39,6 +39,15 @@ To-dos, tasks, and features loosely grouped by feature segment.
 2. Create an alternate display option for the tags panel. This one is a 2-column grid of the tag thumbnails with the tag name and image count overlayed on top of the thumbnail, using Mantine's BackgroundImage component. Use the settings cog pattern used in the Folder section to put the toggle for this.
 
 3. Cursor multi-select
+
+4. If folder in the Gallery is selected and it has sub-folders, the gallery should be split up by sub-folder. So in the below example, The gallery view would display the images from each folder but have <hr> divider line breaks between each child folder, with a header that uses the Mantine Breadcrumbs component to show the hierarchy. If there are no photos (like in the Parent folder below), just show a message that there are no photos in the gallery area below the folder divider / breadcrumb.
+
+Parent (no photos)
+
+> Child (some photos)
+> Child (some photos)
+>
+> > Sub-child (some photos)
 
 ## Tools
 
