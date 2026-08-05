@@ -849,12 +849,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         .filter((photo): photo is PhotoRecord => photo != null)
     }
     if (state.sortBy === 'dateTaken') {
-      // Photos without EXIF date data (screenshots, stripped exports, ...)
-      // always sort to the end regardless of direction, rather than
-      // clustering at whichever end null happens to compare to.
+      // Missing or unparseable dates (some tools write a "0000:00:00
+      // 00:00:00" sentinel, which Date.parse turns into NaN) sort to the end.
       result.sort((a, b) => {
-        const aTime = a.metadata.dateTaken ? Date.parse(a.metadata.dateTaken) : null
-        const bTime = b.metadata.dateTaken ? Date.parse(b.metadata.dateTaken) : null
+        const aParsed = a.metadata.dateTaken ? Date.parse(a.metadata.dateTaken) : NaN
+        const bParsed = b.metadata.dateTaken ? Date.parse(b.metadata.dateTaken) : NaN
+        const aTime = Number.isNaN(aParsed) ? null : aParsed
+        const bTime = Number.isNaN(bParsed) ? null : bParsed
         if (aTime === null && bTime === null) return a.fileName.localeCompare(b.fileName)
         if (aTime === null) return 1
         if (bTime === null) return -1

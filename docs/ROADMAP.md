@@ -12,9 +12,13 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Shell
 
-1. Both the details pane and the left folder / tag panel should be resizable using Mantine Splitter with the no handle setting. Tags and Folders panels within the left sidebar should also be vertically resizable using the same component but vertically oriented. All of these positioning settings should be persisted.
+1. Both the details pane and the left folder / tag panel should be resizable using Mantine Splitter with the no handle setting. Tags and Folders panels within the left sidebar should also be vertically resizable using the same component but vertically oriented. All of these positioning settings should be persisted
 
 2. Implement MenuBar?
+
+3. Add a message on the opening loading screen if new photos are detected / being imported, to alert users that opening the app may take a little longer.
+
+4. Corrupt photo finder
 
 ## Navigation
 
