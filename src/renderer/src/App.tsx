@@ -25,11 +25,9 @@ import {
   Image,
   Kbd,
   Paper,
-  rem,
   Scroller,
   Tabs,
   Text,
-  Title,
   Tooltip
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
@@ -323,12 +321,6 @@ function AppLayout(): React.JSX.Element {
         >
           <AppShell.Header h="auto">
             <Group px="md" justify="space-between" wrap="nowrap">
-              <Group gap="xs" wrap="nowrap">
-                {/* <AppLogo /> */}
-                <Title order={1} size="h5" w={rem(60)}>
-                  Tag Me
-                </Title>
-              </Group>
               <Tabs.List className="tabs-list-no-divider" miw={0} style={{ flexGrow: 1 }}>
                 <Scroller>
                   <Tooltip
