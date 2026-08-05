@@ -30,8 +30,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Dashboard
 
-1. Add a new widget to the dashboard showing the top 5 most viewed photos in a Mantine Bar chart (from @mantine/charts). If possible, have the image itself render as the fill for the bar. If it's not possible, have the thumbnail of the image sit on top of the bar. I'm not sure what's possible here so ask me about feasibility and implementation details.
-
 ## Gallery View
 
 1. Select tag thumbnail photo

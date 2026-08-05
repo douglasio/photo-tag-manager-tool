@@ -25,6 +25,7 @@ import {
   Image,
   Kbd,
   Paper,
+  rem,
   Scroller,
   Tabs,
   Text,
@@ -321,14 +322,14 @@ function AppLayout(): React.JSX.Element {
           padding={0}
         >
           <AppShell.Header h="auto">
-            <Group px="md" justify="space-between">
+            <Group px="md" justify="space-between" wrap="nowrap">
               <Group gap="xs" wrap="nowrap">
                 {/* <AppLogo /> */}
-                <Title order={1} size="h5">
+                <Title order={1} size="h5" w={rem(60)}>
                   Tag Me
                 </Title>
               </Group>
-              <Tabs.List className="tabs-list-no-divider" style={{ flexGrow: 1 }}>
+              <Tabs.List className="tabs-list-no-divider" miw={0} style={{ flexGrow: 1 }}>
                 <Scroller>
                   <Tooltip
                     openDelay={1000}
