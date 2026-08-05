@@ -8,6 +8,7 @@ import type { PhotoRecord } from '@shared/types'
 let mockPhotosByPath: Map<string, PhotoRecord>
 let mockTagCounts: Map<string, number>
 let mockAllTags: string[]
+const mockTagDescriptions = new Map<string, string>()
 const mockOpenPhotoTab = vi.fn()
 const mockSetTagFilter = vi.fn()
 const mockSetActiveTab = vi.fn()
@@ -15,7 +16,7 @@ const mockSetSettingsModalOpened = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { photosByPath: mockPhotosByPath },
+    state: { photosByPath: mockPhotosByPath, tagDescriptions: mockTagDescriptions },
     tagCounts: mockTagCounts,
     allTags: mockAllTags,
     openPhotoTab: mockOpenPhotoTab,

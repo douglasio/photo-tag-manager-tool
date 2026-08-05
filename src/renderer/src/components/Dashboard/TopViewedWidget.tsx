@@ -50,6 +50,7 @@ function makeImageBarShape(
     const { x = 0, y = 0, width = 0, height = 0, payload } = props
     if (!payload) return null
     const clipId = `top-viewed-bar-${payload.id}`
+    const gradientId = `top-viewed-gradient-${payload.id}`
     return (
       <g
         onMouseMove={(event) => {
@@ -58,11 +59,16 @@ function makeImageBarShape(
           }
         }}
         onMouseLeave={() => setHover(null)}
+        className="dashboard-photo-frame"
         style={{ cursor: previewTriggerHeld ? 'zoom-in' : undefined }}
       >
         <clipPath id={clipId}>
           <rect x={x} y={y} width={Math.max(width, 0)} height={height} rx={6} />
         </clipPath>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="40%" stopColor="black" stopOpacity={0} />
+          <stop offset="100%" stopColor="black" stopOpacity={0.75} />
+        </linearGradient>
         <image
           href={payload.thumbnailUrl}
           x={x}
@@ -72,6 +78,15 @@ function makeImageBarShape(
           preserveAspectRatio="xMidYMid slice"
           clipPath={`url(#${clipId})`}
           opacity={0.6}
+        />
+        <rect
+          x={x}
+          y={y}
+          width={Math.max(width, 0)}
+          height={height}
+          fill={`url(#${gradientId})`}
+          clipPath={`url(#${clipId})`}
+          className="dashboard-photo-gradient"
         />
         <text
           x={x + width / 2 + 10}

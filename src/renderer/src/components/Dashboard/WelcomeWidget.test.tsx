@@ -11,6 +11,15 @@ vi.mock('@state', () => ({
   })
 }))
 
+// The greeting's own hour-boundary logic is covered by greeting.test.ts —
+// this just confirms the widget renders whatever it returns. Keeps every
+// other @utils export real (e.g. ACTION_ICONS) rather than needing to
+// hand-mock them too.
+vi.mock('@utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@utils')>()),
+  getGreeting: () => 'Good afternoon'
+}))
+
 import { WelcomeWidget } from './WelcomeWidget'
 
 function renderWidget(): void {
@@ -22,6 +31,11 @@ function renderWidget(): void {
 }
 
 describe('WelcomeWidget', () => {
+  it('renders the greeting', () => {
+    renderWidget()
+    expect(screen.getByRole('heading', { name: 'Good afternoon' })).toBeInTheDocument()
+  })
+
   it('renders a "Go to Gallery" button', () => {
     renderWidget()
     expect(screen.getByRole('button', { name: /Go to Gallery/ })).toBeInTheDocument()

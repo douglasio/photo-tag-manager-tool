@@ -3,6 +3,7 @@ import { type ReactElement, useMemo, useState } from 'react'
 import {
   Anchor,
   Badge,
+  Box,
   Button,
   Group,
   Image,
@@ -14,7 +15,7 @@ import {
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 
-import { GalleryHoverPreview } from '@components'
+import { GalleryHoverPreview, PhotoGradientOverlay } from '@components'
 import { useHoverPreview, useKeyHeld } from '@hooks'
 import { RADIUS_SIZE } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
@@ -101,6 +102,7 @@ function CollageTile({
         }}
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
+        className="dashboard-photo-frame"
         h="100%"
         w="100%"
         display="block"
@@ -118,6 +120,7 @@ function CollageTile({
           w="100%"
           bdrs={0}
         />
+        <PhotoGradientOverlay />
       </UnstyledButton>
       <GalleryHoverPreview
         photo={photo}
@@ -172,11 +175,18 @@ export function FeaturedTagWidget(): ReactElement {
 
   if (selectedTag) {
     return (
-      <Stack bg="dark" p="md" bdrs={RADIUS_SIZE} h="100%" style={{ minHeight: 0 }}>
+      <Stack bg="dark" p="md" gap="xs" bdrs={RADIUS_SIZE} h="100%" style={{ minHeight: 0 }}>
         <Group justify="space-between" w="100%" style={{ flexShrink: 0 }}>
           <Anchor size="xl" fw="bold" onClick={() => goToTag(selectedTag)} variant="gradient">
             #{selectedTag}
           </Anchor>
+          <Box>
+            {state.tagDescriptions.get(selectedTag) && (
+              <Text c="dimmed" fs="italic" size="sm">
+                {state.tagDescriptions.get(selectedTag)}
+              </Text>
+            )}
+          </Box>
           <Badge
             component="button"
             variant="gradient"
@@ -189,6 +199,7 @@ export function FeaturedTagWidget(): ReactElement {
             {tagCounts.get(selectedTag) ?? 0} photos
           </Badge>
         </Group>
+
         <SimpleGrid cols={2} spacing="5" autoRows="1fr" style={{ flex: 1, minHeight: 0 }}>
           {collagePhotos.map((photo, index) => {
             // A lone leftover tile in an odd-count collage spans both

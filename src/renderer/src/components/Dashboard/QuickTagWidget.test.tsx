@@ -32,7 +32,8 @@ vi.mock('@components', () => ({
   // The real GalleryHoverPreview isn't relevant to this widget's own
   // picking/skip logic — a no-op stub keeps these tests from needing to
   // stand up the Portal/motion machinery it renders.
-  GalleryHoverPreview: () => null
+  GalleryHoverPreview: () => null,
+  PhotoGradientOverlay: () => null
 }))
 
 import { QuickTagWidget } from './QuickTagWidget'
