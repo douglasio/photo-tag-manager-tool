@@ -64,6 +64,8 @@ function createMockApi(): {
     setDefaultView: vi.fn().mockResolvedValue(undefined),
     getShowEmptyFolders: vi.fn().mockResolvedValue(false),
     setShowEmptyFolders: vi.fn().mockResolvedValue(undefined),
+    getTagsPanelGridView: vi.fn().mockResolvedValue(false),
+    setTagsPanelGridView: vi.fn().mockResolvedValue(undefined),
     getDetailsPanelCollapsed: vi.fn().mockResolvedValue(false),
     setDetailsPanelCollapsed: vi.fn().mockResolvedValue(undefined),
     getNavbarSplitSizes: vi.fn().mockResolvedValue(null),
@@ -323,6 +325,13 @@ describe('PhotoLibraryContext', () => {
       act(() => result.current.setShowEmptyFolders(true))
       expect(result.current.state.showEmptyFolders).toBe(true)
       expect(mockApi.setShowEmptyFolders).toHaveBeenCalledWith(true)
+    })
+
+    it('setTagsPanelGridView dispatches and persists', () => {
+      const { result } = setup()
+      act(() => result.current.setTagsPanelGridView(true))
+      expect(result.current.state.tagsPanelGridView).toBe(true)
+      expect(mockApi.setTagsPanelGridView).toHaveBeenCalledWith(true)
     })
 
     it('setSort dispatches and persists', () => {

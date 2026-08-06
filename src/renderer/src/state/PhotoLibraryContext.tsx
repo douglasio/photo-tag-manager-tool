@@ -88,6 +88,7 @@ interface PhotoLibraryContextValue {
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
+  setTagsPanelGridView: (value: boolean) => void
   setNavbarSplitSizes: (sizes: [number, number]) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -303,6 +304,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getShowEmptyFolders().then((value) => {
       dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getTagsPanelGridView().then((value) => {
+      dispatch({ type: 'SET_TAGS_PANEL_GRID_VIEW', value })
     })
   }, [])
 
@@ -901,6 +908,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setShowEmptyFolders(value)
   }, [])
 
+  const setTagsPanelGridView = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_TAGS_PANEL_GRID_VIEW', value })
+    void window.api.setTagsPanelGridView(value)
+  }, [])
+
   const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     void window.api.setNavbarSplitSizes(sizes)
@@ -1105,6 +1117,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setSort,
     setDefaultView,
     setShowEmptyFolders,
+    setTagsPanelGridView,
     setNavbarSplitSizes,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,

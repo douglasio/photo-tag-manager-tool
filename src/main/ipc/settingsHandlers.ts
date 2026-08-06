@@ -18,6 +18,7 @@ import {
   getShowEmptyFolders,
   getShowFilenames,
   getShowViewCounts,
+  getTagsPanelGridView,
   setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
@@ -31,7 +32,8 @@ import {
   setNewspaperTitle,
   setShowEmptyFolders,
   setShowFilenames,
-  setShowViewCounts
+  setShowViewCounts,
+  setTagsPanelGridView
 } from '@main/db/settingsRepository'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
@@ -72,6 +74,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setShowEmptyFolders', (_event, value: boolean): void => {
     setShowEmptyFolders(value)
+  })
+
+  ipcMain.handle('settings:getTagsPanelGridView', (): boolean => getTagsPanelGridView())
+
+  ipcMain.handle('settings:setTagsPanelGridView', (_event, value: boolean): void => {
+    setTagsPanelGridView(value)
   })
 
   ipcMain.handle('settings:getDetailsPanelCollapsed', (): boolean => getDetailsPanelCollapsed())

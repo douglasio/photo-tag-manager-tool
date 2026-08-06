@@ -73,6 +73,14 @@ export function setShowEmptyFolders(value: boolean): void {
   setSetting('showEmptyFolders', String(value))
 }
 
+export function getTagsPanelGridView(): boolean {
+  return getSetting('tagsPanelGridView') === 'true'
+}
+
+export function setTagsPanelGridView(value: boolean): void {
+  setSetting('tagsPanelGridView', String(value))
+}
+
 // Defaults to Dashboard, same reasoning as getGalleryAnimationsEnabled above.
 export function getDefaultView(): DefaultView {
   return getSetting('defaultView') === 'gallery' ? 'gallery' : 'dashboard'

@@ -7,7 +7,9 @@ import {
   AspectRatio,
   Badge,
   Button,
+  Group,
   Image,
+  SimpleGrid,
   Stack,
   Text,
   TextInput,
@@ -17,7 +19,7 @@ import { useHover, useMergedRef } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconPencil } from '@tabler/icons-react'
 
-import { PanelSection, TagGroupCreateButton } from '@components'
+import { PanelSection, TagGridTile, TagGroupCreateButton, TagsSettingsMenu } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, TagGroup } from '@shared/types'
 import { usePhotoLibrary } from '@state'
@@ -299,14 +301,17 @@ interface TagGroupSectionProps {
   group: TagGroup | null
   tags: string[]
   existingGroupNames: string[]
-  renderTagRow: (tag: string) => ReactElement
+  // Owns both the per-tag rendering and the container around it (a Stack of
+  // rows in list mode, a SimpleGrid of tiles in grid mode) — left to the
+  // caller since that differs by display mode, not by which group this is.
+  renderTags: (tags: string[]) => ReactElement
 }
 
 function TagGroupSection({
   group,
   tags,
   existingGroupNames,
-  renderTagRow
+  renderTags
 }: TagGroupSectionProps): ReactElement {
   const { renameTagGroup, updateTagGroupPattern, deleteTagGroup } = usePhotoLibrary()
   const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
@@ -385,9 +390,7 @@ function TagGroupSection({
       ) : (
         control
       )}
-      <Accordion.Panel styles={{ content: { paddingLeft: 0 } }}>
-        <Stack gap={0}>{tags.map(renderTagRow)}</Stack>
-      </Accordion.Panel>
+      <Accordion.Panel styles={{ content: { paddingLeft: 0 } }}>{renderTags(tags)}</Accordion.Panel>
       {group && (
         <>
           <TagGroupNameDialog
@@ -448,10 +451,41 @@ export function TagPanel(): ReactElement {
     )
   }
 
+  const renderTagTile = (tag: string): ReactElement => {
+    const isActive = state.selectedTag === tag
+    return (
+      <TagGridTile
+        key={tag}
+        tag={tag}
+        count={tagCounts.get(tag) ?? 0}
+        coverPhoto={tagCoverPhotos.get(tag)}
+        isActive={isActive}
+        draggable={state.tagGroups.length > 0}
+        onSelect={() => setTagFilter(isActive ? null : tag)}
+      />
+    )
+  }
+
+  const renderTags = (tags: string[]): ReactElement =>
+    state.tagsPanelGridView ? (
+      <SimpleGrid cols={2} spacing="xs" p="xs">
+        {tags.map(renderTagTile)}
+      </SimpleGrid>
+    ) : (
+      <Stack gap={0}>{tags.map(renderTagRow)}</Stack>
+    )
+
+  const headerAction = (
+    <Group gap={4} wrap="nowrap">
+      <TagGroupCreateButton />
+      <TagsSettingsMenu />
+    </Group>
+  )
+
   if (state.tagGroups.length === 0) {
     return (
-      <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
-        <Stack gap={0}>{allTags.map(renderTagRow)}</Stack>
+      <PanelSection title="Tags" headerAction={headerAction}>
+        {renderTags(allTags)}
       </PanelSection>
     )
   }
@@ -460,7 +494,7 @@ export function TagPanel(): ReactElement {
   const existingGroupNames = state.tagGroups.map((group) => group.name)
 
   return (
-    <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
+    <PanelSection title="Tags" headerAction={headerAction}>
       <Accordion multiple defaultValue={[...state.tagGroups.map((group) => group.id), '__other__']}>
         {state.tagGroups.map((group) => (
           <TagGroupSection
@@ -468,14 +502,14 @@ export function TagPanel(): ReactElement {
             group={group}
             tags={allTags.filter((tag) => state.tagGroupAssignments.get(tag) === group.id)}
             existingGroupNames={existingGroupNames.filter((name) => name !== group.name)}
-            renderTagRow={renderTagRow}
+            renderTags={renderTags}
           />
         ))}
         <TagGroupSection
           group={null}
           tags={otherTags}
           existingGroupNames={existingGroupNames}
-          renderTagRow={renderTagRow}
+          renderTags={renderTags}
         />
       </Accordion>
     </PanelSection>

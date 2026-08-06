@@ -76,8 +76,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Optimization
 
-1. [possibly already resolved] During photo import of a large number of files, app performance degraded significantly. This should be a background process that doesn't hold up the main
-
 ## Codebase
 
 1. Storybook or env config? Need a way to preview things without affecting data.

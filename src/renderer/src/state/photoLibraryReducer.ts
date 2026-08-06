@@ -49,6 +49,7 @@ export interface PhotoLibraryState {
   // Which pinned tab ('dashboard' or 'gallery') the app loads into on launch.
   defaultView: DefaultView
   showEmptyFolders: boolean
+  tagsPanelGridView: boolean
   // Session-only (not persisted) — whether the Settings modal is open, so
   // other components (e.g. the dashboard's onboarding checklist) can open it
   // without needing a ref/portal into SettingsModal's own local state.
@@ -103,6 +104,7 @@ export const initialState: PhotoLibraryState = {
   allFolderPaths: new Set(),
   defaultView: 'dashboard',
   showEmptyFolders: false,
+  tagsPanelGridView: false,
   settingsModalOpened: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
@@ -142,6 +144,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
+  | { type: 'SET_TAGS_PANEL_GRID_VIEW'; value: boolean }
   | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
@@ -436,6 +439,8 @@ export function photoLibraryReducer(
       return { ...state, defaultView: action.value }
     case 'SET_SHOW_EMPTY_FOLDERS':
       return { ...state, showEmptyFolders: action.value }
+    case 'SET_TAGS_PANEL_GRID_VIEW':
+      return { ...state, tagsPanelGridView: action.value }
     case 'SET_SETTINGS_MODAL_OPENED':
       return { ...state, settingsModalOpened: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':
