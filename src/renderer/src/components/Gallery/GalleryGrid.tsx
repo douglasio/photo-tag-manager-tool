@@ -203,6 +203,20 @@ export function GalleryGrid(): ReactElement {
                   <Text size="sm" c="dimmed">
                     {state.selectedPaths.size} selected
                   </Text>
+                  <Tooltip label="Clear selection">
+                    <ActionIcon
+                      variant="subtle"
+                      onClick={(event) => {
+                        // Same orphaned-tooltip issue as above — this button
+                        // disappears once the selection is cleared.
+                        event.currentTarget.blur()
+                        clearSelection()
+                      }}
+                      aria-label="Clear selection"
+                    >
+                      <IconX size={16} />
+                    </ActionIcon>
+                  </Tooltip>
                   {state.selectedPaths.size >= MIN_COMPARE_PHOTOS &&
                     state.selectedPaths.size <= MAX_COMPARE_PHOTOS && (
                       <Tooltip label="Compare photos">
@@ -221,20 +235,6 @@ export function GalleryGrid(): ReactElement {
                         </ActionIcon>
                       </Tooltip>
                     )}
-                  <Tooltip label="Clear selection">
-                    <ActionIcon
-                      variant="subtle"
-                      onClick={(event) => {
-                        // Same orphaned-tooltip issue as above — this button
-                        // disappears once the selection is cleared.
-                        event.currentTarget.blur()
-                        clearSelection()
-                      }}
-                      aria-label="Clear selection"
-                    >
-                      <IconX size={16} />
-                    </ActionIcon>
-                  </Tooltip>
                 </>
               )}
               <GallerySortMenu />

@@ -113,6 +113,8 @@ const api = {
     ipcRenderer.invoke('tags:delete', tag, filePaths),
   addTagsToPhotos: (tags: string[], filePaths: string[]): Promise<PhotoRecord[]> =>
     ipcRenderer.invoke('tags:addBatch', tags, filePaths),
+  removeTagsFromPhotos: (tags: string[], filePaths: string[]): Promise<PhotoRecord[]> =>
+    ipcRenderer.invoke('tags:removeBatch', tags, filePaths),
   getTagGroupsData: (): Promise<{ groups: TagGroup[]; assignments: Record<string, string> }> =>
     ipcRenderer.invoke('tags:getGroupsData'),
   createTagGroup: (name: string, matchPattern: string | null): Promise<TagGroup> =>

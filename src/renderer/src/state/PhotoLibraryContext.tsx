@@ -81,6 +81,8 @@ interface PhotoLibraryContextValue {
   clearSelection: () => void
   addTagsToSelection: (tags: string[]) => Promise<void>
   addTagsToPhotos: (tags: string[], filePaths: string[]) => Promise<void>
+  removeTagsFromSelection: (tags: string[]) => Promise<void>
+  removeTagsFromPhotos: (tags: string[], filePaths: string[]) => Promise<void>
   movePhotosToFolder: (filePaths: string[], destFolder: string) => Promise<void>
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
@@ -478,6 +480,25 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const addTagsToSelection = useCallback(
     (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
     [addTagsToPhotos, state.selectedPaths]
+  )
+
+  // Mirrors addTagsToPhotos, but for removal — unlike deleteTag, scoped to
+  // just filePaths and never touches the tag's own metadata (others may still carry it).
+  const removeTagsFromPhotos = useCallback(async (tags: string[], filePaths: string[]) => {
+    if (filePaths.length === 0 || tags.length === 0) return
+    try {
+      const photos = await window.api.removeTagsFromPhotos(tags, filePaths)
+      dispatch({ type: 'PHOTOS_UPSERTED', photos })
+    } catch (err) {
+      console.error('failed to remove tags from photos', err)
+      notifications.show({ color: 'red', message: 'Failed to save tags' })
+      throw err
+    }
+  }, [])
+
+  const removeTagsFromSelection = useCallback(
+    (tags: string[]) => removeTagsFromPhotos(tags, Array.from(state.selectedPaths)),
+    [removeTagsFromPhotos, state.selectedPaths]
   )
 
   // Drag-and-drop onto a folder row moves the dragged photo(s) into it. Mirrors
@@ -1110,6 +1131,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     clearSelection,
     addTagsToSelection,
     addTagsToPhotos,
+    removeTagsFromSelection,
+    removeTagsFromPhotos,
     movePhotosToFolder,
     setFolderFilter,
     setTagFilter,

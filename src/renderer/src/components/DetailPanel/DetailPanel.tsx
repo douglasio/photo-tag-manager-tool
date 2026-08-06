@@ -7,6 +7,7 @@ import { usePhotoLibrary } from '@state'
 import { DetailPanelComment } from './DetailPanelComment'
 import { DetailPanelHeader } from './DetailPanelHeader'
 import { DetailPanelMetadata } from './DetailPanelMetadata'
+import { DetailPanelMultiSelect } from './DetailPanelMultiSelect'
 import { DetailPanelQuickTag } from './DetailPanelQuickTag'
 import { DetailPanelTags } from './DetailPanelTags'
 
@@ -18,20 +19,13 @@ export function DetailPanel(): ReactElement {
   // manually close" spec.
   const [quickTagOpen, setQuickTagOpen] = useState(false)
 
-  // Showing one photo's metadata/tags while a multi-selection is active
-  // would misleadingly suggest edits apply to just that one photo (batch
-  // edits go through the gallery's right-click menu instead), so this stays
-  // blank whenever more than one photo is selected — but only on the gallery
-  // screen; a photo-view tab always has exactly one photo open regardless of
-  // whatever multi-selection is lingering in the background gallery.
+  // Single-photo editing (Header/Comment/Tags/Metadata) would misleadingly
+  // suggest edits apply to just one photo, so a multi-selection gets its own
+  // batch-oriented view instead — but only on the gallery screen; a
+  // photo-view tab always has exactly one photo open regardless of whatever
+  // multi-selection is lingering in the background gallery.
   if (state.activeTab === 'gallery' && state.selectedPaths.size > 1) {
-    return (
-      <Center h="100%">
-        <Text c="dimmed" ta="center">
-          {state.selectedPaths.size} photos selected
-        </Text>
-      </Center>
-    )
+    return <DetailPanelMultiSelect />
   }
 
   if (!selectedPhoto) {

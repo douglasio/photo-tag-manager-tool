@@ -99,6 +99,28 @@ export function registerTagHandlers(): void {
     }
   )
 
+  // Batch removal scoped to specific photos (e.g. a multi-selection) — unlike
+  // tags:delete, this never touches the tag's own metadata/group assignment,
+  // since other photos outside filePaths may still carry it.
+  ipcMain.handle(
+    'tags:removeBatch',
+    async (_event, tagsToRemove: string[], filePaths: string[]): Promise<PhotoRecord[]> => {
+      const limit = pLimit(TAG_BATCH_CONCURRENCY)
+      return Promise.all(
+        filePaths.map((filePath) =>
+          limit(async () => {
+            const currentTags = findByPath(filePath)?.record.tags ?? []
+            const nextTags = currentTags.filter((t) => !tagsToRemove.includes(t))
+            suppressNextEvent(filePath)
+            await writeTags(filePath, nextTags)
+            const { photo } = await ingestFile(filePath, (fn) => fn(), { pixelsUnchanged: true })
+            return photo
+          })
+        )
+      )
+    }
+  )
+
   ipcMain.handle(
     'tags:delete',
     async (_event, tag: string, filePaths: string[]): Promise<PhotoRecord[]> => {

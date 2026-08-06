@@ -5,6 +5,8 @@ import type { ReactElement } from 'react'
 import { SectionTitle } from '@components'
 import { type DisplayPhotoRecord, usePhotoLibrary } from '@state'
 
+import { DetailPanelTagChip } from './DetailPanelTagChip'
+
 interface DetailPanelQuickTagProps {
   photo: DisplayPhotoRecord
   onClose: () => void
@@ -40,9 +42,7 @@ export function DetailPanelQuickTag({ photo, onClose }: DetailPanelQuickTagProps
         >
           <Group gap="xs">
             {allTags.map((tag) => (
-              <Chip key={tag} value={tag}>
-                {tag}
-              </Chip>
+              <DetailPanelTagChip key={tag} tag={tag} checked={photo.tags.includes(tag)} />
             ))}
           </Group>
         </Chip.Group>

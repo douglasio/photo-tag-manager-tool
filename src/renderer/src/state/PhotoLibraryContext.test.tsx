@@ -96,6 +96,7 @@ function createMockApi(): {
     renameTag: vi.fn(),
     deleteTag: vi.fn(),
     addTagsToPhotos: vi.fn(),
+    removeTagsFromPhotos: vi.fn(),
     getTagGroupsData: vi.fn().mockResolvedValue({ groups: [], assignments: {} }),
     createTagGroup: vi.fn(),
     renameTagGroup: vi.fn(),
@@ -460,6 +461,17 @@ describe('PhotoLibraryContext', () => {
 
       expect(result.current.state.recentTags).toEqual(['new-tag'])
       expect(result.current.photos.find((p) => p.filePath === '/a.jpg')?.tags).toEqual(['new-tag'])
+    })
+
+    it('removeTagsFromPhotos upserts photos without touching tag metadata', async () => {
+      const updated = [makePhoto('/a.jpg', { tags: [] })]
+      mockApi.removeTagsFromPhotos.mockResolvedValue(updated)
+      const { result } = setup()
+
+      await act(() => result.current.removeTagsFromPhotos(['old-tag'], ['/a.jpg']))
+
+      expect(mockApi.removeTagsFromPhotos).toHaveBeenCalledWith(['old-tag'], ['/a.jpg'])
+      expect(result.current.photos.find((p) => p.filePath === '/a.jpg')?.tags).toEqual([])
     })
 
     it('rotatePhoto upserts the returned photo', async () => {
