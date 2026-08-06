@@ -5,6 +5,7 @@ import eslintPluginReact from 'eslint-plugin-react'
 import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
 import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
 import eslintPluginSimpleImportSort from 'eslint-plugin-simple-import-sort'
+import eslintPluginUnusedImports from 'eslint-plugin-unused-imports'
 
 export default defineConfig(
   { ignores: ['**/node_modules', '**/dist', '**/out'] },
@@ -23,11 +24,18 @@ export default defineConfig(
     plugins: {
       'react-hooks': eslintPluginReactHooks,
       'react-refresh': eslintPluginReactRefresh,
-      'simple-import-sort': eslintPluginSimpleImportSort
+      'simple-import-sort': eslintPluginSimpleImportSort,
+      'unused-imports': eslintPluginUnusedImports
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
       ...eslintPluginReactRefresh.configs.vite.rules,
+      // @typescript-eslint/no-unused-vars (from tseslint.configs.recommended
+      // above) only reports unused imports, it can't remove them via --fix —
+      // this plugin's rule does, so it takes over that half of the job.
+      '@typescript-eslint/no-unused-vars': 'off',
+      'unused-imports/no-unused-imports': 'error',
+      'unused-imports/no-unused-vars': 'error',
       'simple-import-sort/imports': [
         'error',
         {
