@@ -38,15 +38,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 3. Cursor multi-select
 
-4. If folder in the Gallery is selected and it has sub-folders, the gallery should be split up by sub-folder. So in the below example, The gallery view would display the images from each folder but have <hr> divider line breaks between each child folder, with a header that uses the Mantine Breadcrumbs component to show the hierarchy. If there are no photos (like in the Parent folder below), just show a message that there are no photos in the gallery area below the folder divider / breadcrumb.
-
-Parent (no photos)
-
-> Child (some photos)
-> Child (some photos)
->
-> > Sub-child (some photos)
-
 ## Tools
 
 2. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.

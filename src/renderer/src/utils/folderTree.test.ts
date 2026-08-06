@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   addPhotoToFolderTree,
   basename,
+  buildFolderChildrenMap,
+  collectFolderSectionOrder,
   findRootFolder,
+  folderBreadcrumbs,
   foldersToTreeData,
   foldersToTreeDataWithEmpty,
   isPathUnderOrEqual,
@@ -147,5 +150,50 @@ describe('foldersToTreeDataWithEmpty', () => {
 
     expect(tree.children?.map((c) => c.value)).toEqual(['/root/empty'])
     expect(tree.children?.[0].nodeProps).toEqual({ fileCount: 0 })
+  })
+})
+
+describe('buildFolderChildrenMap', () => {
+  it('maps each folder to its direct children only', () => {
+    const allFolderPaths = new Set(['/root', '/root/a', '/root/a/sub', '/root/b'])
+    const childrenOf = buildFolderChildrenMap(allFolderPaths)
+
+    expect(childrenOf.get('/root')).toEqual(new Set(['/root/a', '/root/b']))
+    expect(childrenOf.get('/root/a')).toEqual(new Set(['/root/a/sub']))
+    expect(childrenOf.get('/root/a/sub')).toEqual(new Set())
+  })
+})
+
+describe('collectFolderSectionOrder', () => {
+  it('walks the subtree in DFS pre-order, siblings alphabetical', () => {
+    const childrenOf = new Map([
+      ['/root', new Set(['/root/b', '/root/a'])],
+      ['/root/a', new Set(['/root/a/sub'])]
+    ])
+
+    expect(collectFolderSectionOrder('/root', childrenOf)).toEqual([
+      '/root',
+      '/root/a',
+      '/root/a/sub',
+      '/root/b'
+    ])
+  })
+
+  it('returns just the folder itself when it has no children', () => {
+    expect(collectFolderSectionOrder('/root', new Map())).toEqual(['/root'])
+  })
+})
+
+describe('folderBreadcrumbs', () => {
+  it('builds the ancestor chain from rootFolder down to folder, inclusive', () => {
+    expect(folderBreadcrumbs('/root/a/sub', '/root')).toEqual([
+      { path: '/root', label: 'root' },
+      { path: '/root/a', label: 'a' },
+      { path: '/root/a/sub', label: 'sub' }
+    ])
+  })
+
+  it('is a single crumb when folder is the root itself', () => {
+    expect(folderBreadcrumbs('/root', '/root')).toEqual([{ path: '/root', label: 'root' }])
   })
 })
