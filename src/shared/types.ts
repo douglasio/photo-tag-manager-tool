@@ -1,3 +1,5 @@
+import type { ReactElement } from 'react'
+
 export type DefaultView = 'dashboard' | 'gallery'
 
 export type SupportedFormat = 'JPEG' | 'PNG' | 'TIFF'
@@ -92,7 +94,7 @@ export interface WatchFolderRemovedEvent {
 }
 
 export interface GallerySort {
-  sortBy: 'name' | 'dateTaken' | 'viewCount'
+  sortBy: 'name' | 'dateTaken' | 'viewCount' | 'random'
   sortOrder: 'asc' | 'desc'
 }
 
@@ -108,4 +110,13 @@ export interface TagGroup {
   // Case-insensitive substring a tag must contain to be auto-added to this
   // group; null means no rule.
   matchPattern: string | null
+}
+
+export interface Widget {
+  id: string
+  title: string
+  component: ReactElement
+  // How many of the dashboard grid's columns this widget's cell should span.
+  // Omitted (or 1) is the default single-column width.
+  colSpan?: number
 }

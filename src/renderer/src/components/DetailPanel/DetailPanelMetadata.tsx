@@ -1,4 +1,4 @@
-import { ActionIcon, ActionIconGroup, DataList, Flex, Stack } from '@mantine/core'
+import { ActionIcon, ActionIconGroup, DataList, Flex, Stack, Text, Tooltip } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconCopy, IconExternalLink } from '@tabler/icons-react'
@@ -45,9 +45,13 @@ export function DetailPanelMetadata({ photo }: DetailPanelMetadataProps): ReactE
           ))}
         <DataList.Item>
           <DataList.ItemLabel>Filepath</DataList.ItemLabel>
-          <DataList.ItemValue>
-            <Flex gap="sm" justify="space-between" ref={ref}>
-              {photo.filePath}
+          <DataList.ItemValue w="100%">
+            <Flex gap="sm" justify="space-between" align="center" ref={ref}>
+              <Tooltip label={photo.filePath}>
+                <Text truncate="start" flex={1} miw={0}>
+                  {photo.filePath}
+                </Text>
+              </Tooltip>
               <ActionIconGroup>
                 <ActionIcon
                   style={{ opacity: hovered ? 0.7 : 0 }}

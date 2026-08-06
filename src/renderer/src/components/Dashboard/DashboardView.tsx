@@ -1,34 +1,37 @@
-import { Button, Grid, Stack, Title } from '@mantine/core'
-import { IconLibraryPhoto } from '@tabler/icons-react'
+import { SimpleGrid } from '@mantine/core'
 
-import { FeaturedTagWidget } from '@components'
-import { usePhotoLibrary } from '@state'
+import {
+  FeaturedTagWidget,
+  QuickTagWidget,
+  TaggingProgressWidget,
+  TopTagsWidget,
+  TopViewedWidget,
+  WelcomeWidget
+} from '@components'
+import DashboardWidget from '@renderer/components/Dashboard/DashboardWidget'
+import { Widget } from '@shared/types'
 
 export function DashboardView(): React.JSX.Element {
-  const { setActiveTab } = usePhotoLibrary()
-
-  const gridColProps = { span: 4 }
+  const widgets: Widget[] = [
+    { id: 'welcome', title: 'Welcome', component: <WelcomeWidget /> },
+    { id: 'featuredTag', title: 'Featured Tag', component: <FeaturedTagWidget /> },
+    { id: 'topViewed', title: 'Top Viewed Photos', component: <TopViewedWidget /> },
+    { id: 'quickTag', title: 'Quick Tag', component: <QuickTagWidget /> },
+    { id: 'taggingProgress', title: 'Tagging Progress', component: <TaggingProgressWidget /> },
+    { id: 'topTags', title: 'Top Tags', component: <TopTagsWidget /> }
+  ]
 
   return (
-    <Grid gap="lg" p="md">
-      <Grid.Col {...gridColProps}>
-        <Stack gap="md" align="flex-start">
-          <Title>Welcome to Tag Me</Title>
-          <Button
-            leftSection={<IconLibraryPhoto size={18} />}
-            onClick={() => setActiveTab('gallery')}
-          >
-            Go to Gallery
-          </Button>
-        </Stack>
-      </Grid.Col>
-      <Grid.Col {...gridColProps}></Grid.Col>
-      <Grid.Col {...gridColProps}>
-        <FeaturedTagWidget />
-      </Grid.Col>
-      <Grid.Col {...gridColProps}></Grid.Col>
-      <Grid.Col {...gridColProps}></Grid.Col>
-      <Grid.Col {...gridColProps}></Grid.Col>
-    </Grid>
+    <SimpleGrid
+      cols={3}
+      spacing="lg"
+      p="md"
+      autoRows="1fr"
+      style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
+    >
+      {widgets.map((widget) => (
+        <DashboardWidget key={widget.id} {...widget} />
+      ))}
+    </SimpleGrid>
   )
 }

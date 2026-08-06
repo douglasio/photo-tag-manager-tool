@@ -51,6 +51,22 @@ button {
   -webkit-user-drag: none;
 }
 
+/* Dashboard widget photos: shared bottom-anchored gradient, deepening on
+   hover for a bit of depth/intrigue over otherwise flat thumbnails. */
+.dashboard-photo-frame {
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-photo-gradient {
+  opacity: 1;
+  transition: opacity 200ms ease;
+}
+
+.dashboard-photo-frame:hover .dashboard-photo-gradient {
+  opacity: 0.75;
+}
+
 /* UnstyledButton doesn't reset the browser's native :focus-visible outline.
    Clicking a thumbnail focuses it via mouse, so Chromium's heuristic
    normally keeps the ring hidden — but pressing a modifier key like Shift
@@ -75,4 +91,21 @@ button {
    against Mantine's own stylesheet (same selector specificity otherwise). */
 .tabs-list-no-divider::before {
   display: none !important;
+}
+
+/* "Saved" hint shown after an auto-save text input blurs — stays fully
+   visible, then fades over the animation's last ~400ms so it reads as a
+   deliberate fade-out rather than an abrupt disappearance. */
+@keyframes settings-save-fade {
+  0%,
+  92.6% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.settings-save-message {
+  animation: settings-save-fade 5400ms ease forwards;
 }

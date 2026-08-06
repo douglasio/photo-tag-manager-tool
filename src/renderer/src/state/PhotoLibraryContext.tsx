@@ -7,14 +7,15 @@ import {
   useEffect,
   useMemo,
   useReducer,
-  useRef
+  useRef,
+  useState
 } from 'react'
 
 import { notifications } from '@mantine/notifications'
 
 import { MoveProgressToast } from '@components'
 import type { DefaultView, PhotoRecord, RotateDirection } from '@shared/types'
-import { basename, isPhotoInFolder } from '@utils'
+import { basename, isPhotoInFolder, shuffle } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
 import {
@@ -80,6 +81,8 @@ interface PhotoLibraryContextValue {
   clearSelection: () => void
   addTagsToSelection: (tags: string[]) => Promise<void>
   addTagsToPhotos: (tags: string[], filePaths: string[]) => Promise<void>
+  removeTagsFromSelection: (tags: string[]) => Promise<void>
+  removeTagsFromPhotos: (tags: string[], filePaths: string[]) => Promise<void>
   movePhotosToFolder: (filePaths: string[], destFolder: string) => Promise<void>
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
@@ -87,6 +90,9 @@ interface PhotoLibraryContextValue {
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
+  setTagsPanelGridView: (value: boolean) => void
+  setNavbarSplitSizes: (sizes: [number, number]) => void
+  setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
   setShowFilenames: (value: boolean) => void
@@ -114,6 +120,7 @@ interface PhotoLibraryContextValue {
   openCompareTab: (paths: string[]) => void
   removeFromCompareTab: (tabId: string, filePath: string) => void
   closePhotoTab: (filePath: string) => void
+  closeAllTabs: () => void
   setActiveTab: (tab: string) => void
   reorderPhotoTabs: (openTabs: string[]) => void
   navigateToPhoto: (
@@ -303,6 +310,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   }, [])
 
   useEffect(() => {
+    window.api.getTagsPanelGridView().then((value) => {
+      dispatch({ type: 'SET_TAGS_PANEL_GRID_VIEW', value })
+    })
+  }, [])
+
+  useEffect(() => {
     window.api.getExcludePatterns().then((patterns) => {
       dispatch({ type: 'SET_EXCLUDE_PATTERNS', patterns })
     })
@@ -311,6 +324,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getDetailsPanelCollapsed().then((value) => {
       dispatch({ type: 'SET_DETAILS_PANEL_COLLAPSED', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getNavbarSplitSizes().then((sizes) => {
+      if (sizes) dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     })
   }, [])
 
@@ -461,6 +480,25 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const addTagsToSelection = useCallback(
     (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
     [addTagsToPhotos, state.selectedPaths]
+  )
+
+  // Mirrors addTagsToPhotos, but for removal — unlike deleteTag, scoped to
+  // just filePaths and never touches the tag's own metadata (others may still carry it).
+  const removeTagsFromPhotos = useCallback(async (tags: string[], filePaths: string[]) => {
+    if (filePaths.length === 0 || tags.length === 0) return
+    try {
+      const photos = await window.api.removeTagsFromPhotos(tags, filePaths)
+      dispatch({ type: 'PHOTOS_UPSERTED', photos })
+    } catch (err) {
+      console.error('failed to remove tags from photos', err)
+      notifications.show({ color: 'red', message: 'Failed to save tags' })
+      throw err
+    }
+  }, [])
+
+  const removeTagsFromSelection = useCallback(
+    (tags: string[]) => removeTagsFromPhotos(tags, Array.from(state.selectedPaths)),
+    [removeTagsFromPhotos, state.selectedPaths]
   )
 
   // Drag-and-drop onto a folder row moves the dragged photo(s) into it. Mirrors
@@ -771,6 +809,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'CLOSE_PHOTO_TAB', filePath })
   }, [])
 
+  const closeAllTabs = useCallback(() => {
+    dispatch({ type: 'CLOSE_ALL_TABS' })
+  }, [])
+
   const setActiveTab = useCallback((tab: string) => {
     dispatch({ type: 'SET_ACTIVE_TAB', tab })
   }, [])
@@ -818,16 +860,42 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return visualization
   }, [])
 
+  // Locked in when Random is (re)selected or the photo count changes while
+  // already in Random mode — adjusted during render, per this codebase's
+  // convention, rather than an effect. Recomputing the shuffle on every
+  // render (e.g. via state.photosByPath identity, which changes on any
+  // photo update) would reshuffle the whole grid on incidental interactions
+  // like a view-count bump, same as the existing viewCount-sort issue but
+  // worse since it'd affect every field, not just the one being sorted on.
+  // randomOrderSize resets to null on leaving Random so the next time it's
+  // selected always starts from a fresh shuffle, matching a "shuffle" button.
+  const [randomOrder, setRandomOrder] = useState<string[]>([])
+  const [randomOrderSize, setRandomOrderSize] = useState<number | null>(null)
+  if (state.sortBy === 'random') {
+    if (state.photosByPath.size !== randomOrderSize) {
+      setRandomOrderSize(state.photosByPath.size)
+      setRandomOrder(shuffle(Array.from(state.photosByPath.keys())))
+    }
+  } else if (randomOrderSize !== null) {
+    setRandomOrderSize(null)
+  }
+
   const photos = useMemo(() => {
     const direction = state.sortOrder === 'desc' ? -1 : 1
     const result = Array.from(state.photosByPath.values())
+    if (state.sortBy === 'random') {
+      return randomOrder
+        .map((filePath) => state.photosByPath.get(filePath))
+        .filter((photo): photo is PhotoRecord => photo != null)
+    }
     if (state.sortBy === 'dateTaken') {
-      // Photos without EXIF date data (screenshots, stripped exports, ...)
-      // always sort to the end regardless of direction, rather than
-      // clustering at whichever end null happens to compare to.
+      // Missing or unparseable dates (some tools write a "0000:00:00
+      // 00:00:00" sentinel, which Date.parse turns into NaN) sort to the end.
       result.sort((a, b) => {
-        const aTime = a.metadata.dateTaken ? Date.parse(a.metadata.dateTaken) : null
-        const bTime = b.metadata.dateTaken ? Date.parse(b.metadata.dateTaken) : null
+        const aParsed = a.metadata.dateTaken ? Date.parse(a.metadata.dateTaken) : NaN
+        const bParsed = b.metadata.dateTaken ? Date.parse(b.metadata.dateTaken) : NaN
+        const aTime = Number.isNaN(aParsed) ? null : aParsed
+        const bTime = Number.isNaN(bParsed) ? null : bParsed
         if (aTime === null && bTime === null) return a.fileName.localeCompare(b.fileName)
         if (aTime === null) return 1
         if (bTime === null) return -1
@@ -844,7 +912,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       result.sort((a, b) => direction * a.fileName.localeCompare(b.fileName))
     }
     return result
-  }, [state.photosByPath, state.sortBy, state.sortOrder])
+  }, [state.photosByPath, state.sortBy, state.sortOrder, randomOrder])
 
   const setSort = useCallback((sortBy: GallerySortBy, sortOrder: GallerySortOrder) => {
     dispatch({ type: 'SET_SORT', sortBy, sortOrder })
@@ -859,6 +927,22 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const setShowEmptyFolders = useCallback((value: boolean) => {
     dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
     void window.api.setShowEmptyFolders(value)
+  }, [])
+
+  const setTagsPanelGridView = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_TAGS_PANEL_GRID_VIEW', value })
+    void window.api.setTagsPanelGridView(value)
+  }, [])
+
+  const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
+    dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
+    void window.api.setNavbarSplitSizes(sizes)
+  }, [])
+
+  // Session-only UI state — no window.api persistence, unlike the settings
+  // toggles above (a modal should always start closed on launch).
+  const setSettingsModalOpened = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_SETTINGS_MODAL_OPENED', value })
   }, [])
 
   const setDetailsPanelCollapsed = useCallback((value: boolean) => {
@@ -1047,6 +1131,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     clearSelection,
     addTagsToSelection,
     addTagsToPhotos,
+    removeTagsFromSelection,
+    removeTagsFromPhotos,
     movePhotosToFolder,
     setFolderFilter,
     setTagFilter,
@@ -1054,6 +1140,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setSort,
     setDefaultView,
     setShowEmptyFolders,
+    setTagsPanelGridView,
+    setNavbarSplitSizes,
+    setSettingsModalOpened,
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,
     setShowFilenames,
@@ -1081,6 +1170,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     openCompareTab,
     removeFromCompareTab,
     closePhotoTab,
+    closeAllTabs,
     setActiveTab,
     reorderPhotoTabs,
     navigateToPhoto,

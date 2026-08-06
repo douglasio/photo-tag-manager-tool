@@ -8,18 +8,21 @@ import type { PhotoRecord } from '@shared/types'
 let mockPhotosByPath: Map<string, PhotoRecord>
 let mockTagCounts: Map<string, number>
 let mockAllTags: string[]
+const mockTagDescriptions = new Map<string, string>()
 const mockOpenPhotoTab = vi.fn()
 const mockSetTagFilter = vi.fn()
 const mockSetActiveTab = vi.fn()
+const mockSetSettingsModalOpened = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { photosByPath: mockPhotosByPath },
+    state: { photosByPath: mockPhotosByPath, tagDescriptions: mockTagDescriptions },
     tagCounts: mockTagCounts,
     allTags: mockAllTags,
     openPhotoTab: mockOpenPhotoTab,
     setTagFilter: mockSetTagFilter,
-    setActiveTab: mockSetActiveTab
+    setActiveTab: mockSetActiveTab,
+    setSettingsModalOpened: mockSetSettingsModalOpened
   })
 }))
 
@@ -60,8 +63,8 @@ function setLibrary(photos: PhotoRecord[]): void {
   mockAllTags = Array.from(counts.keys()).sort()
 }
 
-function renderWidget(): void {
-  render(
+function renderWidget(): ReturnType<typeof render> {
+  return render(
     <MantineProvider>
       <FeaturedTagWidget />
     </MantineProvider>
@@ -70,18 +73,9 @@ function renderWidget(): void {
 
 function threeVacationPhotos(): PhotoRecord[] {
   return [
-    makePhoto('/a.jpg', {
-      tags: ['vacation'],
-      metadata: { ...makePhoto('/a.jpg').metadata, dateTaken: '2024-01-01T00:00:00Z' }
-    }),
-    makePhoto('/b.jpg', {
-      tags: ['vacation'],
-      metadata: { ...makePhoto('/b.jpg').metadata, dateTaken: '2024-03-01T00:00:00Z' }
-    }),
-    makePhoto('/c.jpg', {
-      tags: ['vacation'],
-      metadata: { ...makePhoto('/c.jpg').metadata, dateTaken: '2024-02-01T00:00:00Z' }
-    })
+    makePhoto('/a.jpg', { tags: ['vacation'] }),
+    makePhoto('/b.jpg', { tags: ['vacation'] }),
+    makePhoto('/c.jpg', { tags: ['vacation'] })
   ]
 }
 
@@ -90,123 +84,158 @@ describe('FeaturedTagWidget', () => {
     mockOpenPhotoTab.mockClear()
     mockSetTagFilter.mockClear()
     mockSetActiveTab.mockClear()
+    mockSetSettingsModalOpened.mockClear()
   })
 
-  it('shows onboarding instructions when the library is empty', () => {
-    setLibrary([])
-    renderWidget()
-    expect(screen.getByText('Featured Tag')).toBeInTheDocument()
-    expect(screen.getByText('Add photos to your library')).toBeInTheDocument()
+  describe('onboarding (no tag has reached the threshold)', () => {
+    it('shows the onboarding checklist when the library is empty', () => {
+      setLibrary([])
+      renderWidget()
+
+      expect(
+        screen.getByText('Tag 3 or more photos with the same tag to feature them here.')
+      ).toBeInTheDocument()
+      expect(screen.getByText('Add photos to your library')).toBeInTheDocument()
+    })
+
+    it('does not feature a tag with fewer than 3 photos even if it is the closest', () => {
+      setLibrary([
+        makePhoto('/a.jpg', { tags: ['vacation'] }),
+        makePhoto('/b.jpg', { tags: ['vacation'] })
+      ])
+      renderWidget()
+
+      expect(screen.queryByText('#vacation')).not.toBeInTheDocument()
+    })
+
+    it("opens Settings when the first step's link is clicked", async () => {
+      const user = userEvent.setup()
+      setLibrary([])
+      renderWidget()
+
+      await user.click(screen.getByRole('button', { name: 'Open Settings' }))
+
+      expect(mockSetSettingsModalOpened).toHaveBeenCalledExactlyOnceWith(true)
+    })
+
+    it("switches to the gallery when the second step's link is clicked", async () => {
+      const user = userEvent.setup()
+      // photosByPath non-empty completes step 1, making step 2 the active one.
+      setLibrary([makePhoto('/a.jpg')])
+      renderWidget()
+
+      await user.click(screen.getByRole('button', { name: 'Open Gallery' }))
+
+      expect(mockSetActiveTab).toHaveBeenCalledExactlyOnceWith('gallery')
+    })
+
+    it("hides a completed step's link", () => {
+      // Photos exist (step 1 done) and a tag has 1 use (step 2 done), so
+      // only step 3's bullet is active — steps 1 and 2's links should be gone.
+      setLibrary([makePhoto('/a.jpg', { tags: ['vacation'] })])
+      renderWidget()
+
+      expect(screen.queryByRole('button', { name: 'Open Settings' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Open Gallery' })).not.toBeInTheDocument()
+      expect(screen.getByText('Add photos to your library')).toBeInTheDocument()
+    })
   })
 
-  it('stays on the onboarding timeline while the closest tag has fewer than 3 photos', () => {
-    setLibrary([
-      makePhoto('/a.jpg', { tags: ['vacation'] }),
-      makePhoto('/b.jpg', { tags: ['vacation'] })
-    ])
-    renderWidget()
-    expect(screen.getByText('Featured Tag')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: /Featured Tag:/ })).not.toBeInTheDocument()
-  })
+  describe('featured tag (a tag has reached the threshold)', () => {
+    it('features the qualifying tag with its photo count and a collage of its photos', () => {
+      setLibrary(threeVacationPhotos())
+      renderWidget()
 
-  it('features a tag once it reaches 3 photos, with a collage of its photos', () => {
-    setLibrary(threeVacationPhotos())
-    renderWidget()
-    expect(screen.getByRole('heading', { name: /Featured Tag:\s*#vacation/ })).toBeInTheDocument()
-    expect(screen.getByText('3 photos')).toBeInTheDocument()
-    // Order is randomized (not necessarily recency), but with only 3
-    // candidates and room for 4, all of them should appear.
-    expect(
-      screen
+      expect(screen.getByText('#vacation')).toBeInTheDocument()
+      expect(screen.getByText('3 photos')).toBeInTheDocument()
+      // Order is randomized (not necessarily recency), but with only 3
+      // candidates and room for 4, all of them should appear.
+      expect(
+        screen
+          .getAllByRole('img')
+          .map((img) => img.getAttribute('alt'))
+          .sort()
+      ).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
+    })
+
+    it('keeps the same featured tag across rerenders even as another tag overtakes it', () => {
+      setLibrary(threeVacationPhotos())
+      const { rerender } = renderWidget()
+      expect(screen.getByText('#vacation')).toBeInTheDocument()
+
+      setLibrary([
+        ...threeVacationPhotos(),
+        makePhoto('/d.jpg', { tags: ['family'] }),
+        makePhoto('/e.jpg', { tags: ['family'] }),
+        makePhoto('/f.jpg', { tags: ['family'] }),
+        makePhoto('/g.jpg', { tags: ['family'] })
+      ])
+      rerender(
+        <MantineProvider>
+          <FeaturedTagWidget />
+        </MantineProvider>
+      )
+      expect(screen.getByText('#vacation')).toBeInTheDocument()
+    })
+
+    it('keeps the same random photo selection across rerenders instead of reshuffling', () => {
+      const photos = Array.from({ length: 6 }, (_, i) =>
+        makePhoto(`/p${i}.jpg`, { tags: ['vacation'] })
+      )
+      setLibrary(photos)
+      const { rerender } = renderWidget()
+      const firstPass = screen
         .getAllByRole('img')
         .map((img) => img.getAttribute('alt'))
         .sort()
-    ).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
-  })
 
-  it('does not feature a tag with fewer than 3 photos even if it is the closest', () => {
-    setLibrary([
-      makePhoto('/a.jpg', { tags: ['vacation'] }),
-      makePhoto('/b.jpg', { tags: ['vacation'] })
-    ])
-    renderWidget()
-    expect(screen.queryByRole('heading', { name: /Featured Tag:/ })).not.toBeInTheDocument()
-  })
+      // A fresh Map with the same underlying photos — mimics an unrelated
+      // library update triggering a rerender, not a real change in candidates.
+      setLibrary(photos)
+      rerender(
+        <MantineProvider>
+          <FeaturedTagWidget />
+        </MantineProvider>
+      )
+      const secondPass = screen
+        .getAllByRole('img')
+        .map((img) => img.getAttribute('alt'))
+        .sort()
 
-  it('keeps the same featured tag across rerenders even as another tag overtakes it', () => {
-    setLibrary(threeVacationPhotos())
-    const { rerender } = render(
-      <MantineProvider>
-        <FeaturedTagWidget />
-      </MantineProvider>
-    )
-    expect(screen.getByRole('heading', { name: /Featured Tag:\s*#vacation/ })).toBeInTheDocument()
+      expect(secondPass).toEqual(firstPass)
+    })
 
-    setLibrary([
-      ...threeVacationPhotos(),
-      makePhoto('/d.jpg', { tags: ['family'] }),
-      makePhoto('/e.jpg', { tags: ['family'] }),
-      makePhoto('/f.jpg', { tags: ['family'] }),
-      makePhoto('/g.jpg', { tags: ['family'] })
-    ])
-    rerender(
-      <MantineProvider>
-        <FeaturedTagWidget />
-      </MantineProvider>
-    )
-    expect(screen.getByRole('heading', { name: /Featured Tag:\s*#vacation/ })).toBeInTheDocument()
-  })
+    it('opens a photo in a new tab when it is clicked', async () => {
+      const user = userEvent.setup()
+      setLibrary(threeVacationPhotos())
+      renderWidget()
 
-  it('keeps the same random photo selection across rerenders instead of reshuffling', () => {
-    const photos = Array.from({ length: 6 }, (_, i) =>
-      makePhoto(`/p${i}.jpg`, { tags: ['vacation'] })
-    )
-    setLibrary(photos)
-    const { rerender } = render(
-      <MantineProvider>
-        <FeaturedTagWidget />
-      </MantineProvider>
-    )
-    const firstPass = screen
-      .getAllByRole('img')
-      .map((img) => img.getAttribute('alt'))
-      .sort()
+      const firstImage = screen.getAllByRole('img')[0]
+      await user.click(firstImage.closest('button')!)
 
-    // A fresh Map with the same underlying photos — mimics an unrelated
-    // library update triggering a rerender, not a real change in candidates.
-    setLibrary(photos)
-    rerender(
-      <MantineProvider>
-        <FeaturedTagWidget />
-      </MantineProvider>
-    )
-    const secondPass = screen
-      .getAllByRole('img')
-      .map((img) => img.getAttribute('alt'))
-      .sort()
+      expect(mockOpenPhotoTab).toHaveBeenCalledExactlyOnceWith(`/${firstImage.getAttribute('alt')}`)
+    })
 
-    expect(secondPass).toEqual(firstPass)
-  })
+    it('filters the gallery by the featured tag when the tag name is clicked', async () => {
+      const user = userEvent.setup()
+      setLibrary(threeVacationPhotos())
+      renderWidget()
 
-  it('opens a photo in a new tab when it is clicked', async () => {
-    const user = userEvent.setup()
-    setLibrary(threeVacationPhotos())
-    renderWidget()
+      await user.click(screen.getByText('#vacation'))
 
-    const firstImage = screen.getAllByRole('img')[0]
-    await user.click(firstImage.closest('button')!)
+      expect(mockSetTagFilter).toHaveBeenCalledExactlyOnceWith('vacation')
+      expect(mockSetActiveTab).toHaveBeenCalledExactlyOnceWith('gallery')
+    })
 
-    expect(mockOpenPhotoTab).toHaveBeenCalledExactlyOnceWith(`/${firstImage.getAttribute('alt')}`)
-  })
+    it('filters the gallery by the featured tag when the photo-count badge is clicked', async () => {
+      const user = userEvent.setup()
+      setLibrary(threeVacationPhotos())
+      renderWidget()
 
-  it('filters the gallery by the featured tag when the photo-count badge is clicked', async () => {
-    const user = userEvent.setup()
-    setLibrary(threeVacationPhotos())
-    renderWidget()
+      await user.click(screen.getByRole('button', { name: '3 photos' }))
 
-    await user.click(screen.getByRole('button', { name: '3 photos' }))
-
-    expect(mockSetTagFilter).toHaveBeenCalledExactlyOnceWith('vacation')
-    expect(mockSetActiveTab).toHaveBeenCalledExactlyOnceWith('gallery')
+      expect(mockSetTagFilter).toHaveBeenCalledExactlyOnceWith('vacation')
+      expect(mockSetActiveTab).toHaveBeenCalledExactlyOnceWith('gallery')
+    })
   })
 })

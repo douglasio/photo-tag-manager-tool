@@ -10,7 +10,7 @@ import {
   Tooltip
 } from '@mantine/core'
 
-export const radiusSize = 'md'
+export const RADIUS_SIZE = 'md'
 
 export const theme = createTheme({
   primaryColor: 'indigo',
@@ -31,8 +31,8 @@ export const theme = createTheme({
     // an explicit radius="md" prop to stay consistent with the rest of the UI.
     ActionIcon: ActionIcon.extend({
       defaultProps: {
-        radius: radiusSize,
-        size: 'sm',
+        radius: RADIUS_SIZE,
+        size: 'md',
         variant: 'subtle',
         styles: {
           root: { transition: 'opacity 120ms ease' }
@@ -41,27 +41,27 @@ export const theme = createTheme({
     }),
     Blockquote: Blockquote.extend({
       defaultProps: {
-        radius: radiusSize
+        radius: RADIUS_SIZE
       }
     }),
     Button: Button.extend({
       defaultProps: {
-        radius: radiusSize
+        radius: RADIUS_SIZE
       }
     }),
     Group: Group.extend({
       defaultProps: {
-        bdrs: radiusSize
+        bdrs: RADIUS_SIZE
       }
     }),
     Image: Image.extend({
       defaultProps: {
-        radius: radiusSize
+        radius: RADIUS_SIZE
       }
     }),
     Popover: Popover.extend({
       defaultProps: {
-        radius: radiusSize
+        radius: RADIUS_SIZE
       }
     }),
     Tooltip: Tooltip.extend({

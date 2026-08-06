@@ -1,0 +1,5 @@
+export const ACTION_ICONS = {
+  BUTTON_SIZE: 30,
+  ICON_SIZE: 20,
+  GREETING_ICON_SIZE: 30
+}

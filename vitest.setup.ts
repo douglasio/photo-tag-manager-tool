@@ -20,6 +20,25 @@ if (typeof window !== 'undefined' && !window.electron) {
   })
 }
 
+// jsdom doesn't implement ResizeObserver — several components/hooks use it
+// to measure elements after layout (e.g. GalleryHoverPreview sizing its
+// preview box, useGalleryGridLayout sizing the grid). A no-op stub is enough
+// for tests that don't specifically exercise resize-driven behavior; those
+// that do can vi.spyOn/replace it themselves.
+if (typeof window !== 'undefined' && !window.ResizeObserver) {
+  window.ResizeObserver = class {
+    observe(): void {
+      // no-op: jsdom never fires resize entries in tests
+    }
+    unobserve(): void {
+      // no-op
+    }
+    disconnect(): void {
+      // no-op
+    }
+  } as unknown as typeof ResizeObserver
+}
+
 // jsdom doesn't implement matchMedia — Mantine's color-scheme detection and
 // useReducedMotion both read it, so any component test using MantineProvider
 // (or a hook that calls useReducedMotion) needs this stub.

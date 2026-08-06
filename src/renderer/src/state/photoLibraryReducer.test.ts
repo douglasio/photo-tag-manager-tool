@@ -238,6 +238,7 @@ describe('photoLibraryReducer', () => {
   describe('settings toggles', () => {
     it.each([
       ['SET_SHOW_EMPTY_FOLDERS', 'showEmptyFolders'],
+      ['SET_TAGS_PANEL_GRID_VIEW', 'tagsPanelGridView'],
       ['SET_DETAILS_PANEL_COLLAPSED', 'detailsPanelCollapsed'],
       ['SET_GALLERY_ANIMATIONS_ENABLED', 'galleryAnimationsEnabled'],
       ['SET_SHOW_FILENAMES', 'showFilenames'],

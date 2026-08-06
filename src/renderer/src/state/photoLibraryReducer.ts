@@ -9,7 +9,7 @@ import {
 
 type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 
-export type GallerySortBy = 'name' | 'dateTaken' | 'viewCount'
+export type GallerySortBy = 'name' | 'dateTaken' | 'viewCount' | 'random'
 export type GallerySortOrder = 'asc' | 'desc'
 
 export const RECENT_TAGS_LIMIT = 3
@@ -49,10 +49,17 @@ export interface PhotoLibraryState {
   // Which pinned tab ('dashboard' or 'gallery') the app loads into on launch.
   defaultView: DefaultView
   showEmptyFolders: boolean
+  tagsPanelGridView: boolean
+  // Session-only (not persisted) — whether the Settings modal is open, so
+  // other components (e.g. the dashboard's onboarding checklist) can open it
+  // without needing a ref/portal into SettingsModal's own local state.
+  settingsModalOpened: boolean
   detailsPanelCollapsed: boolean
   galleryAnimationsEnabled: boolean
   showFilenames: boolean
   showViewCounts: boolean
+  // Percentage split [tags, folders] of the navbar's Tags/Folders Splitter.
+  navbarSplitSizes: [number, number]
   // Global masthead/studio text for PhotoView's magazine/newspaper/DVD
   // visualizations, editable from Settings.
   magazineTitle: string
@@ -97,10 +104,13 @@ export const initialState: PhotoLibraryState = {
   allFolderPaths: new Set(),
   defaultView: 'dashboard',
   showEmptyFolders: false,
+  tagsPanelGridView: false,
+  settingsModalOpened: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
   showFilenames: true,
   showViewCounts: false,
+  navbarSplitSizes: [50, 50],
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
   dvdStudioName: 'TAG ME PICTURES',
@@ -134,10 +144,13 @@ export type PhotoLibraryAction =
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
+  | { type: 'SET_TAGS_PANEL_GRID_VIEW'; value: boolean }
+  | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
   | { type: 'SET_SHOW_FILENAMES'; value: boolean }
   | { type: 'SET_SHOW_VIEW_COUNTS'; value: boolean }
+  | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: [number, number] }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
   | { type: 'SET_DVD_STUDIO_NAME'; value: string }
@@ -165,6 +178,7 @@ export type PhotoLibraryAction =
   | { type: 'OPEN_COMPARE_TAB'; paths: string[] }
   | { type: 'REMOVE_FROM_COMPARE_TAB'; tabId: string; filePath: string }
   | { type: 'CLOSE_PHOTO_TAB'; filePath: string }
+  | { type: 'CLOSE_ALL_TABS' }
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
@@ -425,6 +439,10 @@ export function photoLibraryReducer(
       return { ...state, defaultView: action.value }
     case 'SET_SHOW_EMPTY_FOLDERS':
       return { ...state, showEmptyFolders: action.value }
+    case 'SET_TAGS_PANEL_GRID_VIEW':
+      return { ...state, tagsPanelGridView: action.value }
+    case 'SET_SETTINGS_MODAL_OPENED':
+      return { ...state, settingsModalOpened: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':
       return { ...state, detailsPanelCollapsed: action.value }
     case 'SET_GALLERY_ANIMATIONS_ENABLED':
@@ -433,6 +451,8 @@ export function photoLibraryReducer(
       return { ...state, showFilenames: action.value }
     case 'SET_SHOW_VIEW_COUNTS':
       return { ...state, showViewCounts: action.value }
+    case 'SET_NAVBAR_SPLIT_SIZES':
+      return { ...state, navbarSplitSizes: action.sizes }
     case 'SET_MAGAZINE_TITLE':
       return { ...state, magazineTitle: action.value }
     case 'SET_NEWSPAPER_TITLE':
@@ -640,6 +660,8 @@ export function photoLibraryReducer(
       }
       return { ...state, openTabs, activeTab, compareTabs }
     }
+    case 'CLOSE_ALL_TABS':
+      return { ...state, openTabs: [], compareTabs: new Map(), activeTab: 'gallery' }
     case 'SET_ACTIVE_TAB':
       return { ...state, activeTab: action.tab }
     // Repoints a renamed photo's tab (and active-tab pointer) at its new

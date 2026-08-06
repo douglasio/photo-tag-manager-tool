@@ -26,9 +26,9 @@ import {
   Kbd,
   Paper,
   Scroller,
+  Splitter,
   Tabs,
   Text,
-  Title,
   Tooltip
 } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
@@ -49,20 +49,18 @@ import {
   CompareView,
   DashboardView,
   DetailPanel,
-  FolderSettingsMenu,
   FolderTree,
   GalleryGrid,
-  PanelSection,
   PhotoView,
   ScanProgressBar,
   SettingsModal,
   SortableTab,
   StartupLoadingScreen,
   TabLabel,
-  TagGroupCreateButton,
   TagPanel
 } from '@components'
-import { radiusSize } from '@renderer/theme'
+import { RADIUS_SIZE } from '@renderer/theme'
+import { ACTION_ICONS } from '@renderer/utils'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 
@@ -106,7 +104,7 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
         w={DRAG_PREVIEW_SIZE}
         h={DRAG_PREVIEW_SIZE}
         opacity={0.75}
-        bdrs={radiusSize}
+        bdrs={RADIUS_SIZE}
         style={{
           overflow: 'hidden',
           boxShadow: 'var(--mantine-shadow-md)',
@@ -122,7 +120,7 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
           />
         ) : (
           <Center w={DRAG_PREVIEW_SIZE} h={DRAG_PREVIEW_SIZE} bg="var(--mantine-color-default)">
-            <IconPhoto />
+            <IconPhoto size={ACTION_ICONS.ICON_SIZE} />
           </Center>
         )}
       </Box>
@@ -147,7 +145,14 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
 // much lighter than DragPreview above, no thumbnail to show.
 function TagDragPreview({ tag }: { tag: string }): React.JSX.Element {
   return (
-    <Paper withBorder shadow="md" px="sm" py={4} radius={radiusSize} style={{ cursor: 'grabbing' }}>
+    <Paper
+      withBorder
+      shadow="md"
+      px="sm"
+      py={4}
+      radius={RADIUS_SIZE}
+      style={{ cursor: 'grabbing' }}
+    >
       <Text size="sm" fw={500}>
         #{tag}
       </Text>
@@ -162,12 +167,14 @@ function AppLayout(): React.JSX.Element {
     state,
     openTabEntries,
     closePhotoTab,
+    closeAllTabs,
     setActiveTab,
     addTagsToPhotos,
     movePhotosToFolder,
     setDetailsPanelCollapsed,
     reorderPhotoTabs,
-    assignTagToGroup
+    assignTagToGroup,
+    setNavbarSplitSizes
   } = usePhotoLibrary()
   // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
   const isPhotoTabActive = state.activeTab !== 'gallery'
@@ -312,14 +319,8 @@ function AppLayout(): React.JSX.Element {
           padding={0}
         >
           <AppShell.Header h="auto">
-            <Group px="md" justify="space-between">
-              <Group gap="xs" wrap="nowrap">
-                {/* <AppLogo /> */}
-                <Title order={1} size="h5">
-                  Tag Me
-                </Title>
-              </Group>
-              <Tabs.List className="tabs-list-no-divider" style={{ flexGrow: 1 }}>
+            <Group px="md" justify="space-between" wrap="nowrap">
+              <Tabs.List className="tabs-list-no-divider" miw={0} style={{ flexGrow: 1 }}>
                 <Scroller>
                   <Tooltip
                     openDelay={1000}
@@ -366,7 +367,9 @@ function AppLayout(): React.JSX.Element {
                           id={entry.id}
                           value={entry.id}
                           leftSection={
-                            entry.kind === 'compare' ? <IconColumns2 size={14} /> : undefined
+                            entry.kind === 'compare' ? (
+                              <IconColumns2 size={ACTION_ICONS.ICON_SIZE} />
+                            ) : undefined
                           }
                           rightSection={
                             <ActionIcon
@@ -379,7 +382,7 @@ function AppLayout(): React.JSX.Element {
                                 closePhotoTab(entry.id)
                               }}
                             >
-                              <IconX size={12} />
+                              <IconX size={ACTION_ICONS.ICON_SIZE} />
                             </ActionIcon>
                           }
                         >
@@ -397,6 +400,18 @@ function AppLayout(): React.JSX.Element {
                 </Scroller>
               </Tabs.List>
               <Group gap="md" wrap="nowrap">
+                {state.openTabs.length > 0 && (
+                  <Tooltip label="Close all tabs">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      aria-label="Close all tabs"
+                      onClick={closeAllTabs}
+                    >
+                      <IconX size={ACTION_ICONS.ICON_SIZE} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
                 <ScanProgressBar />
                 {!(isCompareTabActive || isDashboardTabActive) && (
                   <Tooltip
@@ -410,9 +425,9 @@ function AppLayout(): React.JSX.Element {
                       onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
                     >
                       {state.detailsPanelCollapsed ? (
-                        <IconLayoutSidebarRightExpand size={18} />
+                        <IconLayoutSidebarRightExpand size={ACTION_ICONS.ICON_SIZE} />
                       ) : (
-                        <IconLayoutSidebarRightCollapse size={18} />
+                        <IconLayoutSidebarRightCollapse size={ACTION_ICONS.ICON_SIZE} />
                       )}
                     </ActionIcon>
                   </Tooltip>
@@ -422,17 +437,36 @@ function AppLayout(): React.JSX.Element {
             </Group>
           </AppShell.Header>
           <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
-            <Box p="md" style={{ flexShrink: 0 }}>
-              <AllPhotosRow />
-            </Box>
+            <AppShell.Section component={AllPhotosRow} />
             <Divider />
-            <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
-              <TagPanel />
-            </PanelSection>
-            <Divider />
-            <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
-              <FolderTree />
-            </PanelSection>
+            <AppShell.Section grow mih={0} display="flex" style={{ flexDirection: 'column' }}>
+              <Splitter
+                orientation="vertical"
+                withHandle={false}
+                handleColor="var(--mantine-color-default-border)"
+                sizes={state.navbarSplitSizes}
+                onSizeChange={(sizes) => setNavbarSplitSizes(sizes as [number, number])}
+                flex={1}
+                mih={0}
+              >
+                <Splitter.Pane
+                  defaultSize={50}
+                  mih={0}
+                  display="flex"
+                  style={{ flexDirection: 'column', overflow: 'hidden' }}
+                >
+                  <TagPanel />
+                </Splitter.Pane>
+                <Splitter.Pane
+                  defaultSize={50}
+                  mih={0}
+                  display="flex"
+                  style={{ flexDirection: 'column', overflow: 'hidden' }}
+                >
+                  <FolderTree />
+                </Splitter.Pane>
+              </Splitter>
+            </AppShell.Section>
           </AppShell.Navbar>
           <AppShell.Main>
             <Box

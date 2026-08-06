@@ -1,32 +1,39 @@
 import { type ReactElement, useMemo, useState } from 'react'
 
 import {
-  AspectRatio,
+  Anchor,
   Badge,
-  Grid,
+  Box,
+  Button,
   Group,
   Image,
-  Paper,
+  SimpleGrid,
+  Stack,
   Text,
   Timeline,
-  Title,
   UnstyledButton
 } from '@mantine/core'
+import { useReducedMotion } from '@mantine/hooks'
 
+import { GalleryHoverPreview, PhotoGradientOverlay } from '@components'
+import { useHoverPreview, useKeyHeld } from '@hooks'
+import { RADIUS_SIZE } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { pickRandom, shuffle } from '@utils'
+import { pickRandom, PREVIEW_TRIGGER_KEY, shuffle } from '@utils'
 
 // A tag needs at least this many photos before it's eligible to be featured.
 const FEATURED_TAG_MIN_PHOTOS = 3
 const COLLAGE_PHOTO_COUNT = 4
 
-const ONBOARDING_STEPS = [
-  'Add photos to your library',
-  'Tag a photo',
-  'Use that tag on a second photo',
-  'Use that tag on a third photo'
+// `action` names which handler (below, in the component) the step's link
+// should call — steps with no action render as plain text.
+const ONBOARDING_STEPS: { text: string; linkLabel?: string; action?: 'settings' | 'gallery' }[] = [
+  { text: 'Add photos to your library', linkLabel: 'Open Settings', action: 'settings' },
+  { text: 'Tag a photo', linkLabel: 'Open Gallery', action: 'gallery' },
+  { text: 'Use that tag on a second photo' },
+  { text: 'Use that tag on a third photo' }
 ]
 
 interface FeaturedSelection {
@@ -66,8 +73,78 @@ function pickSelection(
   return { tag, photoPaths: pickRandomCollagePaths(photosByPath, tag, COLLAGE_PHOTO_COUNT) }
 }
 
+// Each tile gets its own hover-preview session (mirrors gallery thumbnails)
+// rather than sharing one at the widget level, since a SimpleGrid of
+// independent buttons has no shared "currently hovered photo" state to hang
+// a single preview off of.
+function CollageTile({
+  photo,
+  spanTwoColumns,
+  previewTriggerHeld,
+  motionEnabled,
+  onOpen
+}: {
+  photo: PhotoRecord
+  spanTwoColumns: boolean
+  previewTriggerHeld: boolean
+  motionEnabled: boolean
+  onOpen: () => void
+}): ReactElement {
+  const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
+  const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+
+  return (
+    <>
+      <UnstyledButton
+        onClick={onOpen}
+        onKeyDown={(event) => {
+          if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+        }}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+        className="dashboard-photo-frame"
+        h="100%"
+        w="100%"
+        display="block"
+        style={{
+          minHeight: 0,
+          cursor: canPreview ? 'zoom-in' : undefined,
+          ...(spanTwoColumns && { gridColumn: 'span 2' })
+        }}
+      >
+        <Image
+          src={toThumbProtocolUrl(photo.thumbnailKey!)}
+          alt={photo.fileName}
+          fit="cover"
+          h="100%"
+          w="100%"
+          bdrs={0}
+        />
+        <PhotoGradientOverlay />
+      </UnstyledButton>
+      <GalleryHoverPreview
+        photo={photo}
+        position={canPreview ? position : null}
+        scale={1}
+        motionEnabled={motionEnabled}
+      />
+    </>
+  )
+}
+
 export function FeaturedTagWidget(): ReactElement {
-  const { state, tagCounts, allTags, openPhotoTab, setTagFilter, setActiveTab } = usePhotoLibrary()
+  const {
+    state,
+    tagCounts,
+    allTags,
+    openPhotoTab,
+    setTagFilter,
+    setActiveTab,
+    setSettingsModalOpened
+  } = usePhotoLibrary()
+  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const prefersReducedMotion = useReducedMotion()
+  const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
   // Picks a tag (and its collage) on first render that persists through the
   // session — see FeaturedSelection above for why the collage is locked in
@@ -91,32 +168,30 @@ export function FeaturedTagWidget(): ReactElement {
       .filter((photo): photo is PhotoRecord => photo != null)
   }, [selection, state.photosByPath])
 
-  const goToTag = (tag): void => {
+  const goToTag = (tag: string): void => {
     setTagFilter(tag)
     setActiveTab('gallery')
   }
 
   if (selectedTag) {
     return (
-      <Paper withBorder p="md">
-        <Group justify="space-between" mb="sm" wrap="nowrap">
-          <Title order={2} flex={1} miw={0} lineClamp={1}>
-            Featured Tag:{' '}
-            <Text
-              component="button"
-              onClick={() => goToTag(selectedTag)}
-              bd={0}
-              variant="gradient"
-              span
-              inherit
-            >
-              #{selectedTag}
-            </Text>
-          </Title>
+      <Stack bg="dark" p="md" gap="xs" bdrs={RADIUS_SIZE} h="100%" style={{ minHeight: 0 }}>
+        <Group justify="space-between" w="100%" style={{ flexShrink: 0 }}>
+          <Anchor size="xl" fw="bold" onClick={() => goToTag(selectedTag)} variant="gradient">
+            #{selectedTag}
+          </Anchor>
+          <Box>
+            {state.tagDescriptions.get(selectedTag) && (
+              <Text c="dimmed" fs="italic" size="sm">
+                {state.tagDescriptions.get(selectedTag)}
+              </Text>
+            )}
+          </Box>
           <Badge
             component="button"
-            variant="light"
-            style={{ flexShrink: 0, cursor: 'pointer' }}
+            variant="gradient"
+            size="md"
+            style={{ cursor: 'pointer' }}
             onClick={() => {
               goToTag(selectedTag)
             }}
@@ -124,36 +199,26 @@ export function FeaturedTagWidget(): ReactElement {
             {tagCounts.get(selectedTag) ?? 0} photos
           </Badge>
         </Group>
-        <Grid grow>
+
+        <SimpleGrid cols={2} spacing="5" autoRows="1fr" style={{ flex: 1, minHeight: 0 }}>
           {collagePhotos.map((photo, index) => {
-            // Two per row (span={6} of 12) — with `grow`, a lone leftover in
-            // the last row stretches to fill the full row width instead of
-            // sitting half-width next to nothing. Doubling its aspect ratio
-            // alongside that doubled width keeps its height matched to the
-            // square photos above it, rather than rendering twice as tall.
+            // A lone leftover tile in an odd-count collage spans both
+            // columns instead of sitting half-width next to an empty cell.
             const isLastOfOddRow =
               collagePhotos.length % 2 === 1 && index === collagePhotos.length - 1
             return (
-              <Grid.Col key={photo.id} span={6}>
-                <UnstyledButton
-                  onClick={() => openPhotoTab(photo.filePath)}
-                  w="100%"
-                  display="block"
-                >
-                  <AspectRatio ratio={isLastOfOddRow ? 2 : 1}>
-                    <Image
-                      src={toThumbProtocolUrl(photo.thumbnailKey!)}
-                      alt={photo.fileName}
-                      fit="cover"
-                      radius="sm"
-                    />
-                  </AspectRatio>
-                </UnstyledButton>
-              </Grid.Col>
+              <CollageTile
+                key={photo.id}
+                photo={photo}
+                spanTwoColumns={isLastOfOddRow}
+                previewTriggerHeld={previewTriggerHeld}
+                motionEnabled={motionEnabled}
+                onOpen={() => openPhotoTab(photo.filePath)}
+              />
             )
           })}
-        </Grid>
-      </Paper>
+        </SimpleGrid>
+      </Stack>
     )
   }
 
@@ -169,19 +234,43 @@ export function FeaturedTagWidget(): ReactElement {
   ]
   const activeIndex = stepsDone.filter(Boolean).length
 
+  const runStepAction = (action?: 'settings' | 'gallery'): void => {
+    if (action === 'settings') setSettingsModalOpened(true)
+    else if (action === 'gallery') setActiveTab('gallery')
+  }
+
   return (
-    <Paper withBorder p="md">
-      <Title order={4} mb="sm">
-        Featured Tag
-      </Title>
-      <Text c="dimmed" size="sm" mb="md">
-        Tag {FEATURED_TAG_MIN_PHOTOS} or more photos the same way to feature them here.
+    <>
+      <Text c="dimmed" mb="md">
+        Tag {FEATURED_TAG_MIN_PHOTOS} or more photos with the same tag to feature them here.
       </Text>
       <Timeline active={activeIndex} bulletSize={20}>
-        {ONBOARDING_STEPS.map((step) => (
-          <Timeline.Item key={step} title={step} />
-        ))}
+        {ONBOARDING_STEPS.map((step, index) => {
+          const isDone = index < activeIndex
+          return (
+            <Timeline.Item
+              key={step.text}
+              title={
+                <Group>
+                  <Text span c={isDone ? 'dimmed' : undefined} fs={isDone ? 'italic' : undefined}>
+                    {step.text}
+                  </Text>
+                  {step.linkLabel && !isDone && (
+                    <Button
+                      variant="outline"
+                      size="compact-sm"
+                      onClick={() => runStepAction(step.action)}
+                      m="0"
+                    >
+                      {step.linkLabel}
+                    </Button>
+                  )}
+                </Group>
+              }
+            />
+          )
+        })}
       </Timeline>
-    </Paper>
+    </>
   )
 }

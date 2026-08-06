@@ -1,4 +1,4 @@
-import { Box, Group } from '@mantine/core'
+import { Box, Group, ScrollArea } from '@mantine/core'
 import type { ReactElement, ReactNode } from 'react'
 
 import { SectionTitle } from './SectionTitle'
@@ -18,7 +18,7 @@ export function PanelSection({ title, headerAction, children }: PanelSectionProp
         {headerAction}
       </Group>
       <Box flex={1} mih={0} style={{ overflowY: 'auto' }}>
-        {children}
+        <ScrollArea>{children}</ScrollArea>
       </Box>
     </Box>
   )

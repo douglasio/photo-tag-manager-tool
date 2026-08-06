@@ -28,10 +28,12 @@ import { Grid } from 'react-window'
 import { TagDeleteButton, TagDescriptionField } from '@components'
 import { useGalleryGridLayout } from '@hooks'
 import { useGalleryPreviewZoom } from '@hooks'
+import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '@state'
-import { basename } from '@utils'
+import { basename, buildFolderChildrenMap, collectFolderSectionOrder, dirname } from '@utils'
 
+import { GalleryFolderSections } from './GalleryFolderSections'
 import { type GalleryCellProps, GalleryPhotoCell } from './GalleryPhotoCell'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
@@ -52,6 +54,29 @@ export function GalleryGrid(): ReactElement {
     renameFile,
     openCompareTab
   } = usePhotoLibrary()
+
+  // Only set once the selected folder actually has subfolders — a leaf
+  // folder (or "All Photos"/tag-only view) keeps the flat virtualized grid.
+  const folderSections = useMemo(() => {
+    if (!state.selectedFolder) return null
+    const childrenOf = buildFolderChildrenMap(state.allFolderPaths)
+    const hasSubfolders = (childrenOf.get(state.selectedFolder)?.size ?? 0) > 0
+    if (!hasSubfolders) return null
+    return collectFolderSectionOrder(state.selectedFolder, childrenOf)
+  }, [state.selectedFolder, state.allFolderPaths])
+
+  // Buckets the already folder+tag-filtered `photos` by which section folder
+  // directly contains each one (not recursively) — sort order within each
+  // bucket falls out of `photos`' own order for free.
+  const photosBySection = useMemo(() => {
+    if (!folderSections) return null
+    const map = new Map<string, PhotoRecord[]>()
+    for (const folder of folderSections) map.set(folder, [])
+    for (const photo of photos) {
+      map.get(dirname(photo.filePath))?.push(photo)
+    }
+    return map
+  }, [folderSections, photos])
 
   const {
     containerRef,
@@ -178,6 +203,20 @@ export function GalleryGrid(): ReactElement {
                   <Text size="sm" c="dimmed">
                     {state.selectedPaths.size} selected
                   </Text>
+                  <Tooltip label="Clear selection">
+                    <ActionIcon
+                      variant="subtle"
+                      onClick={(event) => {
+                        // Same orphaned-tooltip issue as above — this button
+                        // disappears once the selection is cleared.
+                        event.currentTarget.blur()
+                        clearSelection()
+                      }}
+                      aria-label="Clear selection"
+                    >
+                      <IconX size={16} />
+                    </ActionIcon>
+                  </Tooltip>
                   {state.selectedPaths.size >= MIN_COMPARE_PHOTOS &&
                     state.selectedPaths.size <= MAX_COMPARE_PHOTOS && (
                       <Tooltip label="Compare photos">
@@ -196,20 +235,6 @@ export function GalleryGrid(): ReactElement {
                         </ActionIcon>
                       </Tooltip>
                     )}
-                  <Tooltip label="Clear selection">
-                    <ActionIcon
-                      variant="subtle"
-                      onClick={(event) => {
-                        // Same orphaned-tooltip issue as above — this button
-                        // disappears once the selection is cleared.
-                        event.currentTarget.blur()
-                        clearSelection()
-                      }}
-                      aria-label="Clear selection"
-                    >
-                      <IconX size={16} />
-                    </ActionIcon>
-                  </Tooltip>
                 </>
               )}
               <GallerySortMenu />
@@ -252,7 +277,7 @@ export function GalleryGrid(): ReactElement {
         ref={containerRef}
         flex={1}
         miw={0}
-        style={{ overflow: 'hidden' }}
+        style={{ overflow: folderSections ? 'auto' : 'hidden' }}
         onClick={(event) => {
           // Only clears on a direct click here (not bubbled from a
           // thumbnail) — the usual "click empty space to deselect" convention.
@@ -270,6 +295,13 @@ export function GalleryGrid(): ReactElement {
               <Text c="dimmed">No photos yet. Add a folder to begin.</Text>
             )}
           </Center>
+        ) : folderSections && photosBySection ? (
+          <GalleryFolderSections
+            {...cellProps}
+            rootFolder={state.selectedFolder!}
+            sections={folderSections}
+            photosBySection={photosBySection}
+          />
         ) : (
           // Hidden while a resize is settling — the grid below is still
           // rendering at its stale column count/size at that point, so this

@@ -58,6 +58,9 @@ const api = {
   getShowEmptyFolders: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowEmptyFolders'),
   setShowEmptyFolders: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowEmptyFolders', value),
+  getTagsPanelGridView: (): Promise<boolean> => ipcRenderer.invoke('settings:getTagsPanelGridView'),
+  setTagsPanelGridView: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setTagsPanelGridView', value),
   getDetailsPanelCollapsed: (): Promise<boolean> =>
     ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
   setDetailsPanelCollapsed: (value: boolean): Promise<void> =>
@@ -81,6 +84,10 @@ const api = {
   getDvdStudioName: (): Promise<string> => ipcRenderer.invoke('settings:getDvdStudioName'),
   setDvdStudioName: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setDvdStudioName', value),
+  getNavbarSplitSizes: (): Promise<[number, number] | null> =>
+    ipcRenderer.invoke('settings:getNavbarSplitSizes'),
+  setNavbarSplitSizes: (sizes: [number, number]): Promise<void> =>
+    ipcRenderer.invoke('settings:setNavbarSplitSizes', sizes),
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),
@@ -106,6 +113,8 @@ const api = {
     ipcRenderer.invoke('tags:delete', tag, filePaths),
   addTagsToPhotos: (tags: string[], filePaths: string[]): Promise<PhotoRecord[]> =>
     ipcRenderer.invoke('tags:addBatch', tags, filePaths),
+  removeTagsFromPhotos: (tags: string[], filePaths: string[]): Promise<PhotoRecord[]> =>
+    ipcRenderer.invoke('tags:removeBatch', tags, filePaths),
   getTagGroupsData: (): Promise<{ groups: TagGroup[]; assignments: Record<string, string> }> =>
     ipcRenderer.invoke('tags:getGroupsData'),
   createTagGroup: (name: string, matchPattern: string | null): Promise<TagGroup> =>

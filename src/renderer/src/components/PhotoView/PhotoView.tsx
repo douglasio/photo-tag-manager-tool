@@ -45,6 +45,15 @@ function clampScale(value: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value))
 }
 
+// Mantine doesn't stop Escape from bubbling here, so without this check
+// closing a tag dropdown or edit field would also close the whole tab.
+function isEditableElement(el: Element | null): boolean {
+  if (!el) return false
+  return (
+    el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable
+  )
+}
+
 export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   const {
     state,
@@ -244,14 +253,19 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (!isActiveRef.current) return
       if (event.key === 'Escape') {
+        if (isEditableElement(document.activeElement)) return
         closePhotoTab(photo.filePath)
         return
       }
       // Alt+arrow switches tabs instead (handled globally in App.tsx).
       if (event.altKey) return
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        // Don't steal the keypress from the zoom slider's own arrow handling.
-        if ((document.activeElement as HTMLElement | null)?.getAttribute('role') === 'slider') {
+        // Don't steal the keypress from the zoom slider or a focused field
+        // (e.g. moving the text cursor while typing a tag).
+        if (
+          (document.activeElement as HTMLElement | null)?.getAttribute('role') === 'slider' ||
+          isEditableElement(document.activeElement)
+        ) {
           return
         }
         const ordered = visiblePhotos.map((p) => p.filePath)

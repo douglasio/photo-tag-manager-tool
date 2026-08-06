@@ -13,10 +13,12 @@ import {
   getGalleryCellWidth,
   getGallerySort,
   getMagazineTitle,
+  getNavbarSplitSizes,
   getNewspaperTitle,
   getShowEmptyFolders,
   getShowFilenames,
   getShowViewCounts,
+  getTagsPanelGridView,
   setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
@@ -26,10 +28,12 @@ import {
   setGalleryCellWidth,
   setGallerySort,
   setMagazineTitle,
+  setNavbarSplitSizes,
   setNewspaperTitle,
   setShowEmptyFolders,
   setShowFilenames,
-  setShowViewCounts
+  setShowViewCounts,
+  setTagsPanelGridView
 } from '@main/db/settingsRepository'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
@@ -70,6 +74,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setShowEmptyFolders', (_event, value: boolean): void => {
     setShowEmptyFolders(value)
+  })
+
+  ipcMain.handle('settings:getTagsPanelGridView', (): boolean => getTagsPanelGridView())
+
+  ipcMain.handle('settings:setTagsPanelGridView', (_event, value: boolean): void => {
+    setTagsPanelGridView(value)
   })
 
   ipcMain.handle('settings:getDetailsPanelCollapsed', (): boolean => getDetailsPanelCollapsed())
@@ -114,6 +124,14 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setDvdStudioName', (_event, value: string): void => {
     setDvdStudioName(value)
+  })
+
+  ipcMain.handle('settings:getNavbarSplitSizes', (): [number, number] | null =>
+    getNavbarSplitSizes()
+  )
+
+  ipcMain.handle('settings:setNavbarSplitSizes', (_event, sizes: [number, number]): void => {
+    setNavbarSplitSizes(sizes)
   })
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())

@@ -1,6 +1,6 @@
 import type { TreeNodeData } from '@mantine/core'
 
-function dirname(path: string): string {
+export function dirname(path: string): string {
   const idx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
   return idx === -1 ? path : path.slice(0, idx)
 }
@@ -135,6 +135,23 @@ export function foldersToTreeData(
 }
 
 /**
+ * Direct-child relationships (parent folder -> its immediate subfolders) for
+ * every folder in `allFolderPaths`, derived purely from path structure —
+ * doesn't require photos, so folders with zero photos in them are included.
+ */
+export function buildFolderChildrenMap(allFolderPaths: Set<string>): Map<string, Set<string>> {
+  const childrenOf = new Map<string, Set<string>>()
+  for (const folder of allFolderPaths) {
+    if (!childrenOf.has(folder)) childrenOf.set(folder, new Set())
+  }
+  for (const folder of allFolderPaths) {
+    const parent = dirname(folder)
+    if (childrenOf.has(parent)) childrenOf.get(parent)!.add(folder)
+  }
+  return childrenOf
+}
+
+/**
  * Same output shape as foldersToTreeData, but built from the full on-disk
  * folder listing (allFolderPaths, captured separately at scan time) rather
  * than photo-derived childrenOf — so folders with zero photos in them are
@@ -145,17 +162,47 @@ export function foldersToTreeDataWithEmpty(
   allFolderPaths: Set<string>,
   counts: Map<string, number>
 ): TreeNodeData {
-  const childrenOf = new Map<string, Set<string>>()
-  for (const folder of allFolderPaths) {
-    if (!childrenOf.has(folder)) childrenOf.set(folder, new Set())
-  }
+  const childrenOf = buildFolderChildrenMap(allFolderPaths)
   if (!childrenOf.has(rootPath)) childrenOf.set(rootPath, new Set())
-
-  for (const folder of allFolderPaths) {
-    if (folder === rootPath) continue
-    const parent = dirname(folder)
-    childrenOf.get(parent)?.add(folder)
-  }
-
   return buildTreeNode(rootPath, childrenOf, counts)
+}
+
+/**
+ * Every folder from `rootFolder` down through its full subtree, in DFS
+ * pre-order (parent before children, siblings alphabetical) — the section
+ * order for splitting a folder's gallery view by subfolder.
+ */
+export function collectFolderSectionOrder(
+  rootFolder: string,
+  childrenOf: Map<string, Set<string>>
+): string[] {
+  const order: string[] = []
+  const visit = (folder: string): void => {
+    order.push(folder)
+    const kids = Array.from(childrenOf.get(folder) ?? []).sort((a, b) =>
+      basename(a).localeCompare(basename(b))
+    )
+    for (const kid of kids) visit(kid)
+  }
+  visit(rootFolder)
+  return order
+}
+
+export interface FolderBreadcrumb {
+  path: string
+  label: string
+}
+
+/** Ancestor chain from `rootFolder` down to `folder`, inclusive of both. */
+export function folderBreadcrumbs(folder: string, rootFolder: string): FolderBreadcrumb[] {
+  const chain: FolderBreadcrumb[] = []
+  let current = folder
+  while (true) {
+    chain.push({ path: current, label: basename(current) || current })
+    if (current === rootFolder) break
+    const parent = dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+  return chain.reverse()
 }

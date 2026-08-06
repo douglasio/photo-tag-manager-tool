@@ -73,6 +73,14 @@ export function setShowEmptyFolders(value: boolean): void {
   setSetting('showEmptyFolders', String(value))
 }
 
+export function getTagsPanelGridView(): boolean {
+  return getSetting('tagsPanelGridView') === 'true'
+}
+
+export function setTagsPanelGridView(value: boolean): void {
+  setSetting('tagsPanelGridView', String(value))
+}
+
 // Defaults to Dashboard, same reasoning as getGalleryAnimationsEnabled above.
 export function getDefaultView(): DefaultView {
   return getSetting('defaultView') === 'gallery' ? 'gallery' : 'dashboard'
@@ -162,4 +170,26 @@ export function getDvdStudioName(): string {
 
 export function setDvdStudioName(value: string): void {
   setSetting('dvdStudioName', value)
+}
+
+export function getNavbarSplitSizes(): [number, number] | null {
+  const raw = getSetting('navbarSplitSizes')
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      parsed.every((n) => typeof n === 'number')
+    ) {
+      return parsed as [number, number]
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function setNavbarSplitSizes(sizes: [number, number]): void {
+  setSetting('navbarSplitSizes', JSON.stringify(sizes))
 }
