@@ -17,6 +17,7 @@ import { useHover, useMergedRef } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconPencil } from '@tabler/icons-react'
 
+import { PanelSection, TagGroupCreateButton } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, TagGroup } from '@shared/types'
 import { usePhotoLibrary } from '@state'
@@ -28,7 +29,6 @@ import { TagGroupDeleteDialog } from './TagGroupDeleteDialog'
 import { TagGroupNameDialog } from './TagGroupNameDialog'
 import { TagGroupPatternDialog } from './TagGroupPatternDialog'
 import { TagRenameDialog } from './TagRenameDialog'
-
 const COVER_SIZE = 28
 
 interface TagListItemProps {
@@ -449,29 +449,35 @@ export function TagPanel(): ReactElement {
   }
 
   if (state.tagGroups.length === 0) {
-    return <Stack gap={0}>{allTags.map(renderTagRow)}</Stack>
+    return (
+      <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
+        <Stack gap={0}>{allTags.map(renderTagRow)}</Stack>
+      </PanelSection>
+    )
   }
 
   const otherTags = allTags.filter((tag) => !state.tagGroupAssignments.has(tag))
   const existingGroupNames = state.tagGroups.map((group) => group.name)
 
   return (
-    <Accordion multiple defaultValue={[...state.tagGroups.map((group) => group.id), '__other__']}>
-      {state.tagGroups.map((group) => (
+    <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
+      <Accordion multiple defaultValue={[...state.tagGroups.map((group) => group.id), '__other__']}>
+        {state.tagGroups.map((group) => (
+          <TagGroupSection
+            key={group.id}
+            group={group}
+            tags={allTags.filter((tag) => state.tagGroupAssignments.get(tag) === group.id)}
+            existingGroupNames={existingGroupNames.filter((name) => name !== group.name)}
+            renderTagRow={renderTagRow}
+          />
+        ))}
         <TagGroupSection
-          key={group.id}
-          group={group}
-          tags={allTags.filter((tag) => state.tagGroupAssignments.get(tag) === group.id)}
-          existingGroupNames={existingGroupNames.filter((name) => name !== group.name)}
+          group={null}
+          tags={otherTags}
+          existingGroupNames={existingGroupNames}
           renderTagRow={renderTagRow}
         />
-      ))}
-      <TagGroupSection
-        group={null}
-        tags={otherTags}
-        existingGroupNames={existingGroupNames}
-        renderTagRow={renderTagRow}
-      />
-    </Accordion>
+      </Accordion>
+    </PanelSection>
   )
 }

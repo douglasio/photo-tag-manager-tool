@@ -16,10 +16,16 @@ import {
 import { useHover, useMergedRef } from '@mantine/hooks'
 import { IconChevronDown, IconChevronRight, IconPencil } from '@tabler/icons-react'
 
+import { FolderSettingsMenu, PanelSection } from '@components'
 import { usePhotoLibrary } from '@state'
-import { foldersToTreeData, foldersToTreeDataWithEmpty } from '@utils'
-import { splitFolderPath, validateFolderNameBase } from '@utils'
-import { activeHoverBackground, PREVIEW_TRIGGER_KEY } from '@utils'
+import {
+  activeHoverBackground,
+  foldersToTreeData,
+  foldersToTreeDataWithEmpty,
+  PREVIEW_TRIGGER_KEY,
+  splitFolderPath,
+  validateFolderNameBase
+} from '@utils'
 
 import { FolderBadge } from './FolderBadge'
 import { FolderContextMenu } from './FolderContextMenu'
@@ -287,23 +293,25 @@ export function FolderTree(): ReactElement {
   }
 
   return (
-    <Stack gap="md">
-      {state.folders.map((folder) => (
-        <FolderTreeInner
-          key={folder}
-          rootPath={folder}
-          folderCounts={state.folderCounts}
-          folderChildren={state.folderChildren}
-          allFolderPaths={state.allFolderPaths}
-          showEmptyFolders={state.showEmptyFolders}
-          selectedFolder={state.selectedFolder}
-          setFolderFilter={setFolderFilter}
-          editingFolder={editingFolder}
-          onStartEdit={setEditingFolder}
-          onStopEdit={() => setEditingFolder(null)}
-          onRenameFolder={renameFolder}
-        />
-      ))}
-    </Stack>
+    <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
+      <Stack gap="md">
+        {state.folders.map((folder) => (
+          <FolderTreeInner
+            key={folder}
+            rootPath={folder}
+            folderCounts={state.folderCounts}
+            folderChildren={state.folderChildren}
+            allFolderPaths={state.allFolderPaths}
+            showEmptyFolders={state.showEmptyFolders}
+            selectedFolder={state.selectedFolder}
+            setFolderFilter={setFolderFilter}
+            editingFolder={editingFolder}
+            onStartEdit={setEditingFolder}
+            onStopEdit={() => setEditingFolder(null)}
+            onRenameFolder={renameFolder}
+          />
+        ))}
+      </Stack>
+    </PanelSection>
   )
 }

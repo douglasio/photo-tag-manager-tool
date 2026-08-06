@@ -163,3 +163,25 @@ export function getDvdStudioName(): string {
 export function setDvdStudioName(value: string): void {
   setSetting('dvdStudioName', value)
 }
+
+export function getNavbarSplitSizes(): [number, number] | null {
+  const raw = getSetting('navbarSplitSizes')
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      parsed.every((n) => typeof n === 'number')
+    ) {
+      return parsed as [number, number]
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function setNavbarSplitSizes(sizes: [number, number]): void {
+  setSetting('navbarSplitSizes', JSON.stringify(sizes))
+}

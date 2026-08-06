@@ -66,6 +66,8 @@ function createMockApi(): {
     setShowEmptyFolders: vi.fn().mockResolvedValue(undefined),
     getDetailsPanelCollapsed: vi.fn().mockResolvedValue(false),
     setDetailsPanelCollapsed: vi.fn().mockResolvedValue(undefined),
+    getNavbarSplitSizes: vi.fn().mockResolvedValue(null),
+    setNavbarSplitSizes: vi.fn().mockResolvedValue(undefined),
     getGalleryAnimationsEnabled: vi.fn().mockResolvedValue(true),
     setGalleryAnimationsEnabled: vi.fn().mockResolvedValue(undefined),
     getShowFilenames: vi.fn().mockResolvedValue(true),

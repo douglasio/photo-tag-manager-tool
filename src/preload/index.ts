@@ -81,6 +81,10 @@ const api = {
   getDvdStudioName: (): Promise<string> => ipcRenderer.invoke('settings:getDvdStudioName'),
   setDvdStudioName: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setDvdStudioName', value),
+  getNavbarSplitSizes: (): Promise<[number, number] | null> =>
+    ipcRenderer.invoke('settings:getNavbarSplitSizes'),
+  setNavbarSplitSizes: (sizes: [number, number]): Promise<void> =>
+    ipcRenderer.invoke('settings:setNavbarSplitSizes', sizes),
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),

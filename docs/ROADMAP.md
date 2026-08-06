@@ -12,7 +12,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Shell
 
-1. Both the details pane and the left folder / tag panel should be resizable using Mantine Splitter with the no handle setting. Tags and Folders panels within the left sidebar should also be vertically resizable using the same component but vertically oriented. All of these positioning settings should be persisted
+1. [Tags/Folders vertical split done, persisted] The details pane and the left folder/tag panel (the sidebar's overall width, not the Tags/Folders split within it) should still be resizable using Mantine Splitter with the no handle setting, persisted. Blocked on reconciling Splitter's own flex-pane sizing with AppShell's Navbar/Aside, which currently own width + collapse-animation via their own `width`/`collapsed` config rather than a Splitter pane.
 
 2. Implement MenuBar?
 
@@ -63,6 +63,8 @@ Parent (no photos)
 
 1. When multiple photos are selected, we should replace the simple photo count view with options for multi-photo select. I want to see two sections - one that's a button to Compare (same functionality and icon as the one that appears at the top of the gallery). The second should display a list of all the tags in all the photos selected. It should utilize the same TagList format as other areas. From here, you should be able to batch add or batch delete any of the tags from the selected photos.
 
+2. Add a button next to the Tags header called "Quick Tag" that switches the details panel to a view where all the available tags are listed as Mantine Chips. Tags that have already been added should appear as selected. From here, I want to be able to just quickly check off as many tags as I want, and it will instantly add them to the selected photo. I should be able to remain in this view until I manually close the "quick tag" window, at which point it returns to the normal details panel.
+
 ## Photo view
 
 1. Adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
@@ -90,3 +92,5 @@ Parent (no photos)
 1. Storybook or env config? Need a way to preview things without affecting data.
 
 2. Enforce component export style
+
+3. Update all deps

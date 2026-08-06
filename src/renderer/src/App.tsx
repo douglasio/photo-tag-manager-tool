@@ -26,6 +26,7 @@ import {
   Kbd,
   Paper,
   Scroller,
+  Splitter,
   Tabs,
   Text,
   Tooltip
@@ -48,17 +49,14 @@ import {
   CompareView,
   DashboardView,
   DetailPanel,
-  FolderSettingsMenu,
   FolderTree,
   GalleryGrid,
-  PanelSection,
   PhotoView,
   ScanProgressBar,
   SettingsModal,
   SortableTab,
   StartupLoadingScreen,
   TabLabel,
-  TagGroupCreateButton,
   TagPanel
 } from '@components'
 import { RADIUS_SIZE } from '@renderer/theme'
@@ -175,7 +173,8 @@ function AppLayout(): React.JSX.Element {
     movePhotosToFolder,
     setDetailsPanelCollapsed,
     reorderPhotoTabs,
-    assignTagToGroup
+    assignTagToGroup,
+    setNavbarSplitSizes
   } = usePhotoLibrary()
   // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
   const isPhotoTabActive = state.activeTab !== 'gallery'
@@ -438,17 +437,36 @@ function AppLayout(): React.JSX.Element {
             </Group>
           </AppShell.Header>
           <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
-            <Box p="md" style={{ flexShrink: 0 }}>
-              <AllPhotosRow />
-            </Box>
+            <AppShell.Section component={AllPhotosRow} />
             <Divider />
-            <PanelSection title="Tags" headerAction={<TagGroupCreateButton />}>
-              <TagPanel />
-            </PanelSection>
-            <Divider />
-            <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
-              <FolderTree />
-            </PanelSection>
+            <AppShell.Section grow mih={0} display="flex" style={{ flexDirection: 'column' }}>
+              <Splitter
+                orientation="vertical"
+                withHandle={false}
+                handleColor="var(--mantine-color-default-border)"
+                sizes={state.navbarSplitSizes}
+                onSizeChange={(sizes) => setNavbarSplitSizes(sizes as [number, number])}
+                flex={1}
+                mih={0}
+              >
+                <Splitter.Pane
+                  defaultSize={50}
+                  mih={0}
+                  display="flex"
+                  style={{ flexDirection: 'column', overflow: 'hidden' }}
+                >
+                  <TagPanel />
+                </Splitter.Pane>
+                <Splitter.Pane
+                  defaultSize={50}
+                  mih={0}
+                  display="flex"
+                  style={{ flexDirection: 'column', overflow: 'hidden' }}
+                >
+                  <FolderTree />
+                </Splitter.Pane>
+              </Splitter>
+            </AppShell.Section>
           </AppShell.Navbar>
           <AppShell.Main>
             <Box

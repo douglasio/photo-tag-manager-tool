@@ -13,6 +13,7 @@ import {
   getGalleryCellWidth,
   getGallerySort,
   getMagazineTitle,
+  getNavbarSplitSizes,
   getNewspaperTitle,
   getShowEmptyFolders,
   getShowFilenames,
@@ -26,6 +27,7 @@ import {
   setGalleryCellWidth,
   setGallerySort,
   setMagazineTitle,
+  setNavbarSplitSizes,
   setNewspaperTitle,
   setShowEmptyFolders,
   setShowFilenames,
@@ -114,6 +116,14 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setDvdStudioName', (_event, value: string): void => {
     setDvdStudioName(value)
+  })
+
+  ipcMain.handle('settings:getNavbarSplitSizes', (): [number, number] | null =>
+    getNavbarSplitSizes()
+  )
+
+  ipcMain.handle('settings:setNavbarSplitSizes', (_event, sizes: [number, number]): void => {
+    setNavbarSplitSizes(sizes)
   })
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())

@@ -88,6 +88,7 @@ interface PhotoLibraryContextValue {
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
+  setNavbarSplitSizes: (sizes: [number, number]) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
@@ -314,6 +315,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getDetailsPanelCollapsed().then((value) => {
       dispatch({ type: 'SET_DETAILS_PANEL_COLLAPSED', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getNavbarSplitSizes().then((sizes) => {
+      if (sizes) dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     })
   }, [])
 
@@ -894,6 +901,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setShowEmptyFolders(value)
   }, [])
 
+  const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
+    dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
+    void window.api.setNavbarSplitSizes(sizes)
+  }, [])
+
   // Session-only UI state — no window.api persistence, unlike the settings
   // toggles above (a modal should always start closed on launch).
   const setSettingsModalOpened = useCallback((value: boolean) => {
@@ -1093,6 +1105,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setSort,
     setDefaultView,
     setShowEmptyFolders,
+    setNavbarSplitSizes,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,

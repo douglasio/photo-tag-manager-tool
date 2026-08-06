@@ -57,6 +57,8 @@ export interface PhotoLibraryState {
   galleryAnimationsEnabled: boolean
   showFilenames: boolean
   showViewCounts: boolean
+  // Percentage split [tags, folders] of the navbar's Tags/Folders Splitter.
+  navbarSplitSizes: [number, number]
   // Global masthead/studio text for PhotoView's magazine/newspaper/DVD
   // visualizations, editable from Settings.
   magazineTitle: string
@@ -106,6 +108,7 @@ export const initialState: PhotoLibraryState = {
   galleryAnimationsEnabled: true,
   showFilenames: true,
   showViewCounts: false,
+  navbarSplitSizes: [50, 50],
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
   dvdStudioName: 'TAG ME PICTURES',
@@ -144,6 +147,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
   | { type: 'SET_SHOW_FILENAMES'; value: boolean }
   | { type: 'SET_SHOW_VIEW_COUNTS'; value: boolean }
+  | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: [number, number] }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
   | { type: 'SET_DVD_STUDIO_NAME'; value: string }
@@ -442,6 +446,8 @@ export function photoLibraryReducer(
       return { ...state, showFilenames: action.value }
     case 'SET_SHOW_VIEW_COUNTS':
       return { ...state, showViewCounts: action.value }
+    case 'SET_NAVBAR_SPLIT_SIZES':
+      return { ...state, navbarSplitSizes: action.sizes }
     case 'SET_MAGAZINE_TITLE':
       return { ...state, magazineTitle: action.value }
     case 'SET_NEWSPAPER_TITLE':
