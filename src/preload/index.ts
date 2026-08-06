@@ -12,6 +12,7 @@ import type {
   ScanProgressEvent,
   ScanStartResult,
   TagGroup,
+  TagSuggestion,
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
@@ -61,6 +62,15 @@ const api = {
   getTagsPanelGridView: (): Promise<boolean> => ipcRenderer.invoke('settings:getTagsPanelGridView'),
   setTagsPanelGridView: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setTagsPanelGridView', value),
+  getAiTagSuggestionsEnabled: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:getAiTagSuggestionsEnabled'),
+  setAiTagSuggestionsEnabled: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setAiTagSuggestionsEnabled', value),
+  ensureAiModelReady: (): Promise<void> => ipcRenderer.invoke('ai:ensureModelReady'),
+  onAiDownloadProgress: (callback: (progress: number) => void): (() => void) =>
+    subscribe('ai:downloadProgress', callback),
+  suggestTags: (filePath: string, candidateLabels: string[]): Promise<TagSuggestion[]> =>
+    ipcRenderer.invoke('ai:suggestTags', filePath, candidateLabels),
   getDetailsPanelCollapsed: (): Promise<boolean> =>
     ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
   setDetailsPanelCollapsed: (value: boolean): Promise<void> =>

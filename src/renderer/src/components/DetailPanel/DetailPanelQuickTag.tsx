@@ -2,7 +2,8 @@ import { ActionIcon, Chip, Group, Stack, Text, Tooltip } from '@mantine/core'
 import { IconX } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
-import { SectionTitle } from '@components'
+import { SectionTitle, SuggestedTagsRow } from '@components'
+import { useTagSuggestions } from '@hooks'
 import { type DisplayPhotoRecord, usePhotoLibrary } from '@state'
 
 import { DetailPanelTagChip } from './DetailPanelTagChip'
@@ -18,7 +19,12 @@ interface DetailPanelQuickTagProps {
 // array, so each toggle is just a direct updateTags call, same contract as
 // TagList's onChange.
 export function DetailPanelQuickTag({ photo, onClose }: DetailPanelQuickTagProps): ReactElement {
-  const { allTags, updateTags } = usePhotoLibrary()
+  const { allTags, updateTags, state } = usePhotoLibrary()
+  const { suggestions, loading } = useTagSuggestions(
+    photo.filePath,
+    photo.tags,
+    state.aiTagSuggestionsEnabled
+  )
 
   return (
     <Stack>
@@ -30,6 +36,13 @@ export function DetailPanelQuickTag({ photo, onClose }: DetailPanelQuickTagProps
           </ActionIcon>
         </Tooltip>
       </Group>
+
+      <SuggestedTagsRow
+        suggestions={suggestions}
+        loading={loading}
+        onAccept={(tag) => void updateTags(photo.filePath, [...photo.tags, tag])}
+      />
+
       {allTags.length === 0 ? (
         <Text c="dimmed" size="sm">
           No tags yet — add one from the Tags panel first.

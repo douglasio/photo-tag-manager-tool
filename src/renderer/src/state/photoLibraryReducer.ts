@@ -50,6 +50,10 @@ export interface PhotoLibraryState {
   defaultView: DefaultView
   showEmptyFolders: boolean
   tagsPanelGridView: boolean
+  aiTagSuggestionsEnabled: boolean
+  // Session-only — null when no download is in flight, 0-100 while the
+  // Settings toggle's first-time model download is running.
+  aiModelDownloadProgress: number | null
   // Session-only (not persisted) — whether the Settings modal is open, so
   // other components (e.g. the dashboard's onboarding checklist) can open it
   // without needing a ref/portal into SettingsModal's own local state.
@@ -105,6 +109,8 @@ export const initialState: PhotoLibraryState = {
   defaultView: 'dashboard',
   showEmptyFolders: false,
   tagsPanelGridView: false,
+  aiTagSuggestionsEnabled: false,
+  aiModelDownloadProgress: null,
   settingsModalOpened: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
@@ -145,6 +151,8 @@ export type PhotoLibraryAction =
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_TAGS_PANEL_GRID_VIEW'; value: boolean }
+  | { type: 'SET_AI_TAG_SUGGESTIONS_ENABLED'; value: boolean }
+  | { type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS'; progress: number | null }
   | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
@@ -441,6 +449,10 @@ export function photoLibraryReducer(
       return { ...state, showEmptyFolders: action.value }
     case 'SET_TAGS_PANEL_GRID_VIEW':
       return { ...state, tagsPanelGridView: action.value }
+    case 'SET_AI_TAG_SUGGESTIONS_ENABLED':
+      return { ...state, aiTagSuggestionsEnabled: action.value }
+    case 'SET_AI_MODEL_DOWNLOAD_PROGRESS':
+      return { ...state, aiModelDownloadProgress: action.progress }
     case 'SET_SETTINGS_MODAL_OPENED':
       return { ...state, settingsModalOpened: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':

@@ -14,7 +14,7 @@ import {
 import { notifications } from '@mantine/notifications'
 
 import { MoveProgressToast } from '@components'
-import type { DefaultView, PhotoRecord, RotateDirection } from '@shared/types'
+import type { DefaultView, PhotoRecord, RotateDirection, TagSuggestion } from '@shared/types'
 import { basename, isPhotoInFolder, shuffle } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
@@ -91,6 +91,9 @@ interface PhotoLibraryContextValue {
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
   setTagsPanelGridView: (value: boolean) => void
+  setAiTagSuggestionsEnabled: (value: boolean) => void
+  ensureAiModelReady: () => Promise<void>
+  suggestTags: (filePath: string, candidateLabels: string[]) => Promise<TagSuggestion[]>
   setNavbarSplitSizes: (sizes: [number, number]) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -312,6 +315,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getTagsPanelGridView().then((value) => {
       dispatch({ type: 'SET_TAGS_PANEL_GRID_VIEW', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getAiTagSuggestionsEnabled().then((value) => {
+      dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value })
     })
   }, [])
 
@@ -934,6 +943,33 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setTagsPanelGridView(value)
   }, [])
 
+  const setAiTagSuggestionsEnabled = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value })
+    void window.api.setAiTagSuggestionsEnabled(value)
+  }, [])
+
+  // Downloads (first time only) and loads the CLIP model — called by the
+  // Settings toggle before it persists "enabled", streaming progress via
+  // the same subscribe/unsubscribe-around-the-call pattern as movePhotosToFolder.
+  const ensureAiModelReady = useCallback(async () => {
+    dispatch({ type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS', progress: 0 })
+    const unsubscribe = window.api.onAiDownloadProgress((progress) => {
+      dispatch({ type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS', progress })
+    })
+    try {
+      await window.api.ensureAiModelReady()
+    } finally {
+      unsubscribe()
+      dispatch({ type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS', progress: null })
+    }
+  }, [])
+
+  const suggestTags = useCallback(
+    (filePath: string, candidateLabels: string[]) =>
+      window.api.suggestTags(filePath, candidateLabels),
+    []
+  )
+
   const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     void window.api.setNavbarSplitSizes(sizes)
@@ -1141,6 +1177,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setDefaultView,
     setShowEmptyFolders,
     setTagsPanelGridView,
+    setAiTagSuggestionsEnabled,
+    ensureAiModelReady,
+    suggestTags,
     setNavbarSplitSizes,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,

@@ -4,6 +4,7 @@ import { dirname, join } from 'path'
 
 import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
+  getAiTagSuggestionsEnabled,
   getDefaultView,
   getDetailsPanelCollapsed,
   getDvdStudioName,
@@ -19,6 +20,7 @@ import {
   getShowFilenames,
   getShowViewCounts,
   getTagsPanelGridView,
+  setAiTagSuggestionsEnabled,
   setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
@@ -35,6 +37,7 @@ import {
   setShowViewCounts,
   setTagsPanelGridView
 } from '@main/db/settingsRepository'
+import { disposeTagSuggestionWorker } from '@main/services/tagSuggestionService'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
 import type { DefaultView, GallerySort } from '@shared/types'
@@ -81,6 +84,18 @@ export function registerSettingsHandlers(): void {
   ipcMain.handle('settings:setTagsPanelGridView', (_event, value: boolean): void => {
     setTagsPanelGridView(value)
   })
+
+  ipcMain.handle('settings:getAiTagSuggestionsEnabled', (): boolean => getAiTagSuggestionsEnabled())
+
+  // Turning it off also frees the worker's model weights/session rather than
+  // leaving them loaded in memory for a feature the user just disabled.
+  ipcMain.handle(
+    'settings:setAiTagSuggestionsEnabled',
+    async (_event, value: boolean): Promise<void> => {
+      setAiTagSuggestionsEnabled(value)
+      if (!value) await disposeTagSuggestionWorker()
+    }
+  )
 
   ipcMain.handle('settings:getDetailsPanelCollapsed', (): boolean => getDetailsPanelCollapsed())
 

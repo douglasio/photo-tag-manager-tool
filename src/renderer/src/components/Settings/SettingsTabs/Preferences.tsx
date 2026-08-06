@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { Kbd, Stack, Switch, Text, TextInput } from '@mantine/core'
+import { Kbd, Progress, Stack, Switch, Text, TextInput } from '@mantine/core'
 
 import { usePhotoLibrary } from '@state'
 
@@ -141,10 +141,57 @@ function VisualizationsSection(): ReactElement {
   )
 }
 
+function AiSection(): ReactElement {
+  const { state, setAiTagSuggestionsEnabled, ensureAiModelReady } = usePhotoLibrary()
+  const [error, setError] = useState<string | null>(null)
+  const downloading = state.aiModelDownloadProgress !== null
+
+  const handleToggle = async (checked: boolean): Promise<void> => {
+    setError(null)
+    if (!checked) {
+      setAiTagSuggestionsEnabled(false)
+      return
+    }
+    try {
+      await ensureAiModelReady()
+      setAiTagSuggestionsEnabled(true)
+    } catch (err) {
+      console.error('failed to download AI tag suggestion model', err)
+      setError('Failed to download the AI model. Check your connection and try again.')
+    }
+  }
+
+  return (
+    <Stack gap="xs">
+      <Switch
+        label="Enable AI tag suggestions"
+        description="Downloads a small on-device model (~50-90MB) the first time you turn this on. Runs fully offline afterward — nothing leaves your device."
+        checked={state.aiTagSuggestionsEnabled}
+        disabled={downloading}
+        onChange={(event) => void handleToggle(event.currentTarget.checked)}
+      />
+      {downloading && (
+        <Stack gap={4}>
+          <Progress value={state.aiModelDownloadProgress ?? 0} animated />
+          <Text size="xs" c="dimmed">
+            Downloading model… {Math.round(state.aiModelDownloadProgress ?? 0)}%
+          </Text>
+        </Stack>
+      )}
+      {error && (
+        <Text size="xs" c="red">
+          {error}
+        </Text>
+      )}
+    </Stack>
+  )
+}
+
 const sections = [
   { label: 'General', component: <GeneralSection /> },
   { label: 'Gallery', component: <GallerySection /> },
-  { label: 'Visualizations', component: <VisualizationsSection /> }
+  { label: 'Visualizations', component: <VisualizationsSection /> },
+  { label: 'AI', component: <AiSection /> }
 ]
 
 export const Preferences: React.FC = () => {

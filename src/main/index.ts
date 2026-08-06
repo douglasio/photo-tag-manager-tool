@@ -5,6 +5,7 @@ import { join } from 'path'
 // eslint-disable-next-line no-restricted-imports -- resources/ lives outside src/, so no alias covers it
 import icon from '../../resources/icon.png?asset'
 import { getFolders } from './db/settingsRepository'
+import { registerAiHandlers } from './ipc/aiHandlers'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
 import { registerPhotoHandlers } from './ipc/photoHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
@@ -17,6 +18,7 @@ import {
   registerThumbProtocolScheme
 } from './protocols/thumbProtocol'
 import { shutdownExifTool } from './services/metadataService'
+import { disposeTagSuggestionWorker } from './services/tagSuggestionService'
 import { setWatchTarget, unwatchAllFolders, watchFolder } from './services/watchManager'
 
 app.setName('Tag Me')
@@ -94,6 +96,7 @@ if (!app.requestSingleInstanceLock()) {
     registerScanHandlers()
     registerSettingsHandlers()
     registerTagHandlers()
+    registerAiHandlers()
 
     createWindow()
 
@@ -116,5 +119,6 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     void shutdownExifTool()
     void unwatchAllFolders()
+    void disposeTagSuggestionWorker()
   })
 }

@@ -8,17 +8,21 @@ import type { PhotoRecord } from '@shared/types'
 let mockPhotosByPath: Map<string, PhotoRecord>
 let mockAllTags: string[]
 let mockRecentTags: string[]
+let mockAiTagSuggestionsEnabled: boolean
 const mockUpdateTags = vi.fn()
+const mockSuggestTags = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
     state: {
       photosByPath: mockPhotosByPath,
       galleryAnimationsEnabled: false,
-      recentTags: mockRecentTags
+      recentTags: mockRecentTags,
+      aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled
     },
     allTags: mockAllTags,
-    updateTags: mockUpdateTags
+    updateTags: mockUpdateTags,
+    suggestTags: mockSuggestTags
   })
 }))
 
@@ -33,7 +37,22 @@ vi.mock('@components', () => ({
   // picking/skip logic — a no-op stub keeps these tests from needing to
   // stand up the Portal/motion machinery it renders.
   GalleryHoverPreview: () => null,
-  PhotoGradientOverlay: () => null
+  PhotoGradientOverlay: () => null,
+  SuggestedTagsRow: ({
+    suggestions,
+    onAccept
+  }: {
+    suggestions: { tag: string }[]
+    onAccept: (tag: string) => void
+  }) => (
+    <div>
+      {suggestions.map((s) => (
+        <button key={s.tag} onClick={() => onAccept(s.tag)}>
+          + {s.tag}
+        </button>
+      ))}
+    </div>
+  )
 }))
 
 import { QuickTagWidget } from './QuickTagWidget'
@@ -67,6 +86,8 @@ function setLibrary(photos: PhotoRecord[]): void {
   mockPhotosByPath = new Map(photos.map((photo) => [photo.filePath, photo]))
   mockAllTags = []
   mockRecentTags = []
+  mockAiTagSuggestionsEnabled = false
+  mockSuggestTags.mockReset().mockResolvedValue([])
 }
 
 function renderWidget(): ReturnType<typeof render> {
@@ -129,5 +150,37 @@ describe('QuickTagWidget', () => {
 
     expect(screen.getByRole('button', { name: /Tag another/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument()
+  })
+
+  it('does not request suggestions when AI tag suggestions are disabled', () => {
+    setLibrary([makePhoto('/a.jpg', { tags: [] })])
+    mockAllTags = ['vacation']
+    renderWidget()
+
+    expect(mockSuggestTags).not.toHaveBeenCalled()
+  })
+
+  it('requests and renders suggestions for the current photo when enabled', async () => {
+    setLibrary([makePhoto('/a.jpg', { tags: [] })])
+    mockAllTags = ['vacation']
+    mockAiTagSuggestionsEnabled = true
+    mockSuggestTags.mockResolvedValue([{ tag: 'vacation', score: 0.9 }])
+    renderWidget()
+
+    expect(mockSuggestTags).toHaveBeenCalledExactlyOnceWith('/a.jpg', ['vacation'])
+    expect(await screen.findByRole('button', { name: '+ vacation' })).toBeInTheDocument()
+  })
+
+  it('adds a suggested tag to the current photo when accepted', async () => {
+    setLibrary([makePhoto('/a.jpg', { tags: [] })])
+    mockAllTags = ['vacation']
+    mockAiTagSuggestionsEnabled = true
+    mockSuggestTags.mockResolvedValue([{ tag: 'vacation', score: 0.9 }])
+    const user = userEvent.setup()
+    renderWidget()
+
+    await user.click(await screen.findByRole('button', { name: '+ vacation' }))
+
+    expect(mockUpdateTags).toHaveBeenCalledExactlyOnceWith('/a.jpg', ['vacation'])
   })
 })

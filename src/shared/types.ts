@@ -120,3 +120,8 @@ export interface Widget {
   // Omitted (or 1) is the default single-column width.
   colSpan?: number
 }
+
+export interface TagSuggestion {
+  tag: string
+  score: number
+}

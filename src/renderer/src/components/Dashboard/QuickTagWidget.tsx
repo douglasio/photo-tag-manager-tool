@@ -5,8 +5,8 @@ import { useReducedMotion } from '@mantine/hooks'
 import { IconArrowRight } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'motion/react'
 
-import { GalleryHoverPreview, PhotoGradientOverlay, TagList } from '@components'
-import { useHoverPreview, useKeyHeld } from '@hooks'
+import { GalleryHoverPreview, PhotoGradientOverlay, SuggestedTagsRow, TagList } from '@components'
+import { useHoverPreview, useKeyHeld, useTagSuggestions } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
@@ -47,6 +47,11 @@ export function QuickTagWidget(): ReactElement {
   const currentPhoto = currentPath ? (state.photosByPath.get(currentPath) ?? null) : null
   const canPreview = previewTriggerHeld && currentPhoto?.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+  const { suggestions, loading: loadingSuggestions } = useTagSuggestions(
+    currentPhoto?.filePath ?? '',
+    currentPhoto?.tags ?? [],
+    Boolean(currentPhoto) && state.aiTagSuggestionsEnabled
+  )
 
   const handleNext = (): void => {
     setCurrentPath(pickUntagged(state.photosByPath, currentPath))
@@ -91,6 +96,13 @@ export function QuickTagWidget(): ReactElement {
                 position={canPreview ? position : null}
                 scale={1}
                 motionEnabled={motionEnabled}
+              />
+              <SuggestedTagsRow
+                suggestions={suggestions}
+                loading={loadingSuggestions}
+                onAccept={(tag) =>
+                  void updateTags(currentPhoto.filePath, [...currentPhoto.tags, tag])
+                }
               />
               <Group wrap="nowrap" mt="md">
                 <Box style={{ flex: 1, minWidth: 0 }}>

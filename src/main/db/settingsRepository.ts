@@ -81,6 +81,14 @@ export function setTagsPanelGridView(value: boolean): void {
   setSetting('tagsPanelGridView', String(value))
 }
 
+export function getAiTagSuggestionsEnabled(): boolean {
+  return getSetting('aiTagSuggestionsEnabled') === 'true'
+}
+
+export function setAiTagSuggestionsEnabled(value: boolean): void {
+  setSetting('aiTagSuggestionsEnabled', String(value))
+}
+
 // Defaults to Dashboard, same reasoning as getGalleryAnimationsEnabled above.
 export function getDefaultView(): DefaultView {
   return getSetting('defaultView') === 'gallery' ? 'gallery' : 'dashboard'

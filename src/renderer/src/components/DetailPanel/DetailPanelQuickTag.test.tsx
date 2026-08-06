@@ -1,18 +1,22 @@
 import { MantineProvider } from '@mantine/core'
 import type { DisplayPhotoRecord } from '@state'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { toDisplayMetadata } from '@utils'
 
 let mockAllTags: string[]
+let mockAiTagSuggestionsEnabled: boolean
 const mockUpdateTags = vi.fn()
+const mockSuggestTags = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
     allTags: mockAllTags,
-    updateTags: mockUpdateTags
+    updateTags: mockUpdateTags,
+    state: { aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled },
+    suggestTags: mockSuggestTags
   })
 }))
 
@@ -54,6 +58,9 @@ function renderQuickTag(tags: string[], onClose = vi.fn()): { onClose: typeof on
 describe('DetailPanelQuickTag', () => {
   beforeEach(() => {
     mockUpdateTags.mockClear()
+    mockSuggestTags.mockClear()
+    mockSuggestTags.mockResolvedValue([])
+    mockAiTagSuggestionsEnabled = false
   })
 
   it('shows every known tag as a chip, pre-checking ones already on the photo', () => {
@@ -100,5 +107,46 @@ describe('DetailPanelQuickTag', () => {
     await user.click(screen.getByRole('button', { name: 'Close quick tag' }))
 
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('does not request suggestions when AI tag suggestions are disabled', () => {
+    mockAiTagSuggestionsEnabled = false
+    mockAllTags = ['vacation']
+    renderQuickTag(['vacation'])
+
+    expect(mockSuggestTags).not.toHaveBeenCalled()
+  })
+
+  it('requests and renders suggestions, excluding already-applied tags', async () => {
+    mockAiTagSuggestionsEnabled = true
+    mockAllTags = ['vacation', 'family', 'work']
+    mockSuggestTags.mockResolvedValue([
+      { tag: 'vacation', score: 0.9 },
+      { tag: 'work', score: 0.4 }
+    ])
+    renderQuickTag(['vacation'])
+
+    expect(mockSuggestTags).toHaveBeenCalledExactlyOnceWith('/a.jpg', [
+      'vacation',
+      'family',
+      'work'
+    ])
+    await waitFor(() => expect(screen.getByText('+ work')).toBeInTheDocument())
+    // "vacation" is already applied, so it's excluded from the suggested row
+    // even though the mock returned it as a suggestion.
+    expect(screen.queryByText('+ vacation')).not.toBeInTheDocument()
+  })
+
+  it('adds a suggested tag when its badge is clicked', async () => {
+    mockAiTagSuggestionsEnabled = true
+    mockAllTags = ['vacation', 'work']
+    mockSuggestTags.mockResolvedValue([{ tag: 'work', score: 0.8 }])
+    const user = userEvent.setup()
+    renderQuickTag(['vacation'])
+
+    const badge = await screen.findByText('+ work')
+    await user.click(badge)
+
+    expect(mockUpdateTags).toHaveBeenCalledExactlyOnceWith('/a.jpg', ['vacation', 'work'])
   })
 })
