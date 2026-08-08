@@ -2,7 +2,6 @@ import { SimpleGrid } from '@mantine/core'
 
 import {
   FeaturedTagWidget,
-  QuickTagWidget,
   TaggingProgressWidget,
   TopTagsWidget,
   TopViewedWidget,
@@ -16,8 +15,12 @@ export function DashboardView(): React.JSX.Element {
     { id: 'welcome', title: 'Welcome', component: <WelcomeWidget /> },
     { id: 'featuredTag', title: 'Featured Tag', component: <FeaturedTagWidget /> },
     { id: 'topViewed', title: 'Top Viewed Photos', component: <TopViewedWidget /> },
-    { id: 'quickTag', title: 'Quick Tag', component: <QuickTagWidget /> },
-    { id: 'taggingProgress', title: 'Tagging Progress', component: <TaggingProgressWidget /> },
+    {
+      id: 'taggingProgress',
+      title: 'Tagging Progress',
+      component: <TaggingProgressWidget />,
+      colSpan: 2
+    },
     { id: 'topTags', title: 'Top Tags', component: <TopTagsWidget /> }
   ]
 

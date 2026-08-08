@@ -53,10 +53,13 @@ export function useTagSuggestions(
     }
   }, [filePath, suggestionsActive, allTags, suggestTags])
 
+  // Slice before filtering — locks the visible set to what was on top when
+  // suggestions were fetched, so accepting one shrinks the row instead of
+  // backfilling from candidates that were originally ranked below the cutoff.
   const topSuggestions = suggestionsActive
     ? suggestions
-        .filter((suggestion) => !currentTags.includes(suggestion.tag))
         .slice(0, MAX_SUGGESTIONS)
+        .filter((suggestion) => !currentTags.includes(suggestion.tag))
     : []
 
   return { suggestions: topSuggestions, loading: suggestionsActive && loading }

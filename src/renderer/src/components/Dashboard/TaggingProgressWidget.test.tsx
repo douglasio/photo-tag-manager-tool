@@ -24,6 +24,12 @@ vi.mock('@mantine/charts', () => ({
   }
 }))
 
+// QuickTagWidget has its own test coverage and needs a much larger state
+// shape (allTags, recentTags, updateTags, ...) than this widget cares about.
+vi.mock('@components', () => ({
+  QuickTagWidget: () => <div data-testid="quick-tag-widget" />
+}))
+
 import { TaggingProgressWidget } from './TaggingProgressWidget'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {

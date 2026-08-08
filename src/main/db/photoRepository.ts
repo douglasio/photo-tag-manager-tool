@@ -1,6 +1,7 @@
 import type { PhotoRecord } from '@shared/types'
 
 import { getDb } from './database'
+import { deleteEmbedding, renameEmbedding } from './embeddingRepository'
 import { reconcileTagGroups } from './tagMetadataRepository'
 
 interface PhotoRow {
@@ -108,6 +109,39 @@ export function incrementViewCount(filePath: string): void {
   getDb().prepare('UPDATE photos SET viewCount = viewCount + 1 WHERE path = ?').run(filePath)
 }
 
+/** Up to `limit` ready-thumbnail photos carrying `tag` — used to build a tag's
+ * exemplar embedding set. `tags` is stored as a JSON array string, so this
+ * pre-filters with a cheap substring search, then confirms with a real parse. */
+export function findPhotoPathsWithTag(
+  tag: string,
+  limit: number
+): { filePath: string; thumbnailKey: string }[] {
+  const matches: { filePath: string; thumbnailKey: string }[] = []
+  const rows = getDb()
+    .prepare(
+      `SELECT path, tags, thumbnailKey FROM photos
+       WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL AND instr(tags, ?) > 0`
+    )
+    .iterate(`"${tag}"`) as IterableIterator<{
+    path: string
+    tags: string
+    thumbnailKey: string
+  }>
+
+  for (const row of rows) {
+    if (matches.length >= limit) break
+    try {
+      if ((JSON.parse(row.tags) as string[]).includes(tag)) {
+        matches.push({ filePath: row.path, thumbnailKey: row.thumbnailKey })
+      }
+    } catch {
+      // Malformed tags JSON on this row — skip it.
+    }
+  }
+
+  return matches
+}
+
 export function updateThumbnail(
   filePath: string,
   thumbnailKey: string,
@@ -127,6 +161,7 @@ export function removePhoto(filePath: string): string | null {
 
   db.prepare('DELETE FROM photos WHERE path = ?').run(filePath)
   reconcileTagGroups()
+  deleteEmbedding(filePath)
   return row.thumbnailKey
 }
 
@@ -137,6 +172,7 @@ export function renamePhotoPath(oldPath: string, newPath: string, fileName: stri
   getDb()
     .prepare('UPDATE photos SET path = @newPath, fileName = @fileName WHERE path = @oldPath')
     .run({ oldPath, newPath, fileName })
+  renameEmbedding(oldPath, newPath)
 }
 
 function isPathUnderFolder(path: string, folder: string): boolean {
@@ -168,6 +204,7 @@ export function renamePhotoPathPrefix(oldFolder: string, newFolder: string): voi
     for (const pair of pairs) update.run(pair)
   })
   updateMany(affected)
+  for (const { oldPath, newPath } of affected) renameEmbedding(oldPath, newPath)
 }
 
 export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[] {
@@ -185,6 +222,7 @@ export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[]
   })
   deleteMany(stale.map((row) => row.path))
   reconcileTagGroups()
+  for (const row of stale) deleteEmbedding(row.path)
 
   return stale.map((row) => row.thumbnailKey).filter((key): key is string => Boolean(key))
 }

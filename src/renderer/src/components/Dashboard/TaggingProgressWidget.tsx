@@ -1,7 +1,8 @@
 import { DonutChart } from '@mantine/charts'
-import { Stack, Text } from '@mantine/core'
+import { Group, Stack, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 
+import { QuickTagWidget } from '@components'
 import { usePhotoLibrary } from '@state'
 
 export function TaggingProgressWidget(): ReactElement {
@@ -20,20 +21,23 @@ export function TaggingProgressWidget(): ReactElement {
   }
 
   return (
-    <Stack h="100%" align="center" justify="center" gap={4}>
-      <DonutChart
-        data={[
-          { name: 'Tagged', value: taggedCount, color: 'indigo' },
-          { name: 'Untagged', value: untaggedCount, color: 'gray' }
-        ]}
-        chartLabel={String(photos.length)}
-        size={140}
-        thickness={20}
-        withTooltip
-      />
-      <Text size="xs" c="dimmed">
-        {taggedCount} of {photos.length} tagged
-      </Text>
-    </Stack>
+    <Group wrap="nowrap" className="flex-fill" justify="space-around">
+      <Stack h="100%" align="center" justify="center" gap="sm" style={{ flexShrink: 0 }}>
+        <DonutChart
+          data={[
+            { name: 'Tagged', value: taggedCount, color: 'indigo' },
+            { name: 'Untagged', value: untaggedCount, color: 'gray' }
+          ]}
+          chartLabel={String(photos.length)}
+          size={200}
+          thickness={50}
+          withTooltip={false}
+        />
+        <Text size="xs" c="dimmed">
+          {taggedCount} of {photos.length} tagged
+        </Text>
+      </Stack>
+      <QuickTagWidget />
+    </Group>
   )
 }

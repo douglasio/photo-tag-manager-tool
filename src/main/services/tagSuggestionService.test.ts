@@ -30,7 +30,12 @@ vi.mock('worker_threads', () => ({
   })
 }))
 
-import { disposeTagSuggestionWorker, ensureModelReady, suggestTags } from './tagSuggestionService'
+import {
+  disposeTagSuggestionWorker,
+  embedImage,
+  ensureModelReady,
+  suggestTags
+} from './tagSuggestionService'
 
 // Lets pending .then/.catch continuations run before the next assertion.
 function flush(): Promise<void> {
@@ -130,5 +135,63 @@ describe('tagSuggestionService', () => {
 
     expect(worker.terminate).toHaveBeenCalledOnce()
     await expect(promise).rejects.toThrow()
+  })
+
+  it('embedImage waits for the model, then resolves with the embedding', async () => {
+    const promise = embedImage('/thumb.jpg')
+    workerTracker.current!.emit('message', { type: 'ready' })
+    await flush()
+
+    const embedMessage = workerTracker.current!.posted.find((m) => m.type === 'embed')
+    expect(embedMessage).toMatchObject({ type: 'embed', imagePath: '/thumb.jpg' })
+
+    workerTracker.current!.emit('message', {
+      type: 'embedResult',
+      requestId: embedMessage!.requestId,
+      embedding: [0.1, 0.2, 0.3]
+    })
+
+    await expect(promise).resolves.toEqual([0.1, 0.2, 0.3])
+  })
+
+  it('embedImage rejects when the worker reports an embed error', async () => {
+    const promise = embedImage('/thumb.jpg')
+    workerTracker.current!.emit('message', { type: 'ready' })
+    await flush()
+
+    const embedMessage = workerTracker.current!.posted.find((m) => m.type === 'embed')
+    workerTracker.current!.emit('message', {
+      type: 'embedError',
+      requestId: embedMessage!.requestId,
+      message: 'embedding failed'
+    })
+
+    await expect(promise).rejects.toThrow('embedding failed')
+  })
+
+  it('classify and embed requests track independently by requestId', async () => {
+    const classifyPromise = suggestTags('/thumb-a.jpg', ['a'])
+    const embedPromise = embedImage('/thumb-b.jpg')
+    workerTracker.current!.emit('message', { type: 'ready' })
+    await flush()
+
+    const classifyMessage = workerTracker.current!.posted.find((m) => m.type === 'classify')
+    const embedMessage = workerTracker.current!.posted.find((m) => m.type === 'embed')
+    expect(classifyMessage!.requestId).not.toBe(embedMessage!.requestId)
+
+    // Resolving embed first shouldn't affect the still-pending classify call.
+    workerTracker.current!.emit('message', {
+      type: 'embedResult',
+      requestId: embedMessage!.requestId,
+      embedding: [1]
+    })
+    await expect(embedPromise).resolves.toEqual([1])
+
+    workerTracker.current!.emit('message', {
+      type: 'result',
+      requestId: classifyMessage!.requestId,
+      results: [{ tag: 'a', score: 0.5 }]
+    })
+    await expect(classifyPromise).resolves.toEqual([{ tag: 'a', score: 0.5 }])
   })
 })

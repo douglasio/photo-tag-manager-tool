@@ -115,6 +115,7 @@ export interface TagGroup {
 export interface Widget {
   id: string
   title: string
+  description?: string
   component: ReactElement
   // How many of the dashboard grid's columns this widget's cell should span.
   // Omitted (or 1) is the default single-column width.

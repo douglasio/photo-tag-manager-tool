@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 
 import { findByPath } from '@main/db/photoRepository'
+import { suggestTagsByExemplar } from '@main/services/tagExemplarService'
 import { ensureModelReady, suggestTags } from '@main/services/tagSuggestionService'
 import { thumbnailFilePath } from '@main/services/thumbnailService'
 import type { TagSuggestion } from '@shared/types'
@@ -15,13 +16,25 @@ export function registerAiHandlers(): void {
     })
   })
 
+  // Blends zero-shot text matching (works from day one) with similarity to a
+  // tag's own tagged photos (more personalized) — exemplar wins where both apply.
   ipcMain.handle(
     'ai:suggestTags',
     async (_event, filePath: string, candidateLabels: string[]): Promise<TagSuggestion[]> => {
       const found = findByPath(filePath)
       if (!found?.record.thumbnailKey) return []
-      const imagePath = await thumbnailFilePath(found.record.thumbnailKey)
-      return suggestTags(imagePath, candidateLabels)
+      const thumbnailKey = found.record.thumbnailKey
+      const imagePath = await thumbnailFilePath(thumbnailKey)
+
+      const [zeroShotResults, exemplarResults] = await Promise.all([
+        suggestTags(imagePath, candidateLabels),
+        suggestTagsByExemplar(filePath, thumbnailKey, candidateLabels)
+      ])
+
+      const exemplarTags = new Set(exemplarResults.map((result) => result.tag))
+      const zeroShotOnly = zeroShotResults.filter((result) => !exemplarTags.has(result.tag))
+
+      return [...exemplarResults, ...zeroShotOnly]
     }
   )
 }

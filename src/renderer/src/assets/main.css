@@ -109,3 +109,11 @@ button {
 .settings-save-message {
   animation: settings-save-fade 5400ms ease forwards;
 }
+
+/* Lets a flex child grow to fill its parent while still allowing its own
+   content to scroll/shrink instead of overflowing — a flex item's default
+   min-height is `auto`, which otherwise forces it to grow to fit content. */
+.flex-fill {
+  flex: 1;
+  min-height: 0;
+}

@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { Box, Button, Card, Group, Image, Stack, Text } from '@mantine/core'
+import { Box, Button, Card, Group, Image, Text } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { IconArrowRight } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -58,85 +58,82 @@ export function QuickTagWidget(): ReactElement {
   }
 
   return (
-    <Stack h="100%" mih={0} gap="sm">
-      <Text c="dimmed" flex="0 0 auto">
-        Add a tag to this untagged photo:
-      </Text>
-      <AnimatePresence mode="wait">
-        {currentPhoto ? (
-          <motion.div
-            key={currentPhoto.filePath}
-            initial={motionEnabled ? { opacity: 0, x: 24 } : false}
-            animate={{ opacity: 1, x: 0 }}
-            exit={motionEnabled ? { opacity: 0, x: -24 } : undefined}
-            transition={TRANSITION}
-            style={{ width: '100%', flex: 1, minHeight: 0 }}
+    <AnimatePresence mode="wait">
+      {currentPhoto ? (
+        <motion.div
+          key={currentPhoto.filePath}
+          className="flex-fill"
+          initial={motionEnabled ? { opacity: 0, x: 24 } : false}
+          animate={{ opacity: 1, x: 0 }}
+          exit={motionEnabled ? { opacity: 0, x: -24 } : undefined}
+          transition={TRANSITION}
+          style={{ height: '100%', maxWidth: 500 }}
+        >
+          <Card
+            h="100%"
+            // style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
           >
-            <Card
-              h="100%"
-              style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+            <Card.Section
+              onMouseMove={onMouseMove}
+              onMouseLeave={onMouseLeave}
+              pos="relative"
+              className="dashboard-photo-frame"
+              style={{ cursor: canPreview ? 'zoom-in' : undefined }}
             >
-              <Card.Section
-                onMouseMove={onMouseMove}
-                onMouseLeave={onMouseLeave}
-                pos="relative"
-                className="dashboard-photo-frame"
-                style={{ cursor: canPreview ? 'zoom-in' : undefined }}
-              >
-                <Image
-                  src={toThumbProtocolUrl(currentPhoto.thumbnailKey!)}
-                  alt={currentPhoto.fileName}
-                  radius="sm"
-                  fit="fill"
+              <Image
+                src={toThumbProtocolUrl(currentPhoto.thumbnailKey!)}
+                alt={currentPhoto.fileName}
+                radius="sm"
+                fit="fill"
+              />
+              <PhotoGradientOverlay />
+            </Card.Section>
+            <GalleryHoverPreview
+              photo={currentPhoto}
+              position={canPreview ? position : null}
+              scale={1}
+              motionEnabled={motionEnabled}
+            />
+            <SuggestedTagsRow
+              suggestions={suggestions}
+              loading={loadingSuggestions}
+              size="large"
+              onAccept={(tag) =>
+                void updateTags(currentPhoto.filePath, [...currentPhoto.tags, tag])
+              }
+            />
+            <Group wrap="nowrap" mt="md">
+              <Box style={{ flex: 1, minWidth: 0 }}>
+                <TagList
+                  tags={currentPhoto.tags}
+                  allTags={allTags}
+                  recentTags={state.recentTags}
+                  onChange={(tags) => void updateTags(currentPhoto.filePath, tags)}
                 />
-                <PhotoGradientOverlay />
-              </Card.Section>
-              <GalleryHoverPreview
-                photo={currentPhoto}
-                position={canPreview ? position : null}
-                scale={1}
-                motionEnabled={motionEnabled}
-              />
-              <SuggestedTagsRow
-                suggestions={suggestions}
-                loading={loadingSuggestions}
-                onAccept={(tag) =>
-                  void updateTags(currentPhoto.filePath, [...currentPhoto.tags, tag])
-                }
-              />
-              <Group wrap="nowrap" mt="md">
-                <Box style={{ flex: 1, minWidth: 0 }}>
-                  <TagList
-                    tags={currentPhoto.tags}
-                    allTags={allTags}
-                    recentTags={state.recentTags}
-                    onChange={(tags) => void updateTags(currentPhoto.filePath, tags)}
-                  />
-                </Box>
-                {currentPhoto.tags.length > 0 ? (
-                  <Button
-                    rightSection={<IconArrowRight size={14} />}
-                    onClick={handleNext}
-                    style={{ flexShrink: 0 }}
-                  >
-                    Tag another
-                  </Button>
-                ) : (
-                  <Button variant="subtle" onClick={handleNext} style={{ flexShrink: 0 }}>
-                    Skip
-                  </Button>
-                )}
-              </Group>
-            </Card>
-          </motion.div>
-        ) : (
-          <motion.div key="empty" style={{ width: '100%' }}>
-            <Text c="dimmed" size="sm">
-              Every photo is tagged — nice work!
-            </Text>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Stack>
+              </Box>
+              {currentPhoto.tags.length > 0 ? (
+                <Button
+                  rightSection={<IconArrowRight size={14} />}
+                  onClick={handleNext}
+                  style={{ flexShrink: 0 }}
+                >
+                  Tag another
+                </Button>
+              ) : (
+                <Button variant="subtle" onClick={handleNext} style={{ flexShrink: 0 }}>
+                  Skip
+                </Button>
+              )}
+            </Group>
+          </Card>
+        </motion.div>
+      ) : (
+        <motion.div key="empty" style={{ width: '100%' }}>
+          <Text c="dimmed" size="sm">
+            Every photo is tagged — nice work!
+          </Text>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

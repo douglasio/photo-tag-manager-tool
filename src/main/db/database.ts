@@ -59,6 +59,16 @@ export function getDb(): Database.Database {
     )
   `)
 
+  // CLIP image embeddings, cached per photo once computed (see
+  // tagExemplarService) — lets "photos visually similar to this tag's
+  // existing examples" suggestions reuse work across requests.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS photo_embeddings (
+      path TEXT PRIMARY KEY,
+      embedding BLOB NOT NULL
+    )
+  `)
+
   const photoColumns = db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]
   if (!photoColumns.some((column) => column.name === 'comment')) {
     db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')

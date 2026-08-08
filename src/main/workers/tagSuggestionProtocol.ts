@@ -7,6 +7,7 @@ import type { TagSuggestion } from '@shared/types'
 export type WorkerRequest =
   | { type: 'init'; cacheDir: string }
   | { type: 'classify'; requestId: number; imagePath: string; candidateLabels: string[] }
+  | { type: 'embed'; requestId: number; imagePath: string }
 
 export type WorkerResponse =
   | { type: 'downloadProgress'; progress: number }
@@ -14,3 +15,5 @@ export type WorkerResponse =
   | { type: 'initError'; message: string }
   | { type: 'result'; requestId: number; results: TagSuggestion[] }
   | { type: 'classifyError'; requestId: number; message: string }
+  | { type: 'embedResult'; requestId: number; embedding: number[] }
+  | { type: 'embedError'; requestId: number; message: string }
