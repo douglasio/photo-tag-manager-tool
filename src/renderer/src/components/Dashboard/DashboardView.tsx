@@ -3,6 +3,7 @@ import { SimpleGrid } from '@mantine/core'
 import {
   FeaturedTagWidget,
   TaggingProgressWidget,
+  ThrowbackWidget,
   TopTagsWidget,
   TopViewedWidget,
   WelcomeWidget
@@ -21,7 +22,8 @@ export function DashboardView(): React.JSX.Element {
       component: <TaggingProgressWidget />,
       colSpan: 2
     },
-    { id: 'topTags', title: 'Top Tags', component: <TopTagsWidget /> }
+    { id: 'topTags', title: 'Top Tags', component: <TopTagsWidget /> },
+    { id: 'throwback', title: 'Throwback', component: <ThrowbackWidget />, colSpan: 2 }
   ]
 
   return (
@@ -29,8 +31,11 @@ export function DashboardView(): React.JSX.Element {
       cols={3}
       spacing="lg"
       p="md"
-      autoRows="1fr"
-      style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
+      // minmax (not a flat 1fr) — rows still match each other by default, but
+      // can grow past that floor for taller content (e.g. Throwback's
+      // Timeline), with the grid itself scrolling instead of clipping.
+      autoRows="minmax(340px, auto)"
+      style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
     >
       {widgets.map((widget) => (
         <DashboardWidget key={widget.id} {...widget} />

@@ -145,3 +145,21 @@ export interface SimilarPhoto {
   filePath: string
   score: number
 }
+
+// One year's representative photo — used by the Throwback widget for both
+// its real cross-year similarity result and its random "preview" mode
+// (same shape, different selection method).
+export interface ThrowbackEntry {
+  year: number
+  filePath: string
+}
+
+export interface ThrowbackYearSample {
+  year: number
+  filePaths: string[]
+}
+
+export interface EmbedLibraryProgress {
+  done: number
+  total: number
+}

@@ -12,6 +12,7 @@ import { registerScanHandlers } from './ipc/scanHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
 import { registerShellHandlers } from './ipc/shellHandlers'
 import { registerTagHandlers } from './ipc/tagHandlers'
+import { registerThrowbackHandlers } from './ipc/throwbackHandlers'
 import { registerFileProtocolHandler, registerFileProtocolScheme } from './protocols/fileProtocol'
 import {
   registerThumbProtocolHandler,
@@ -97,6 +98,7 @@ if (!app.requestSingleInstanceLock()) {
     registerSettingsHandlers()
     registerTagHandlers()
     registerAiHandlers()
+    registerThrowbackHandlers()
 
     createWindow()
 

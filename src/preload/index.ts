@@ -5,6 +5,7 @@ import type {
   DefaultView,
   DuplicateGroup,
   DuplicateProgress,
+  EmbedLibraryProgress,
   GallerySort,
   GalleryViewMode,
   MetadataBatchEvent,
@@ -17,6 +18,8 @@ import type {
   SimilarPhoto,
   TagGroup,
   TagSuggestion,
+  ThrowbackEntry,
+  ThrowbackYearSample,
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
@@ -85,6 +88,16 @@ const api = {
     subscribe('ai:duplicateProgress', callback),
   findSimilarPhotos: (filePath: string, limit: number): Promise<SimilarPhoto[]> =>
     ipcRenderer.invoke('ai:findSimilarPhotos', filePath, limit),
+  getThrowbackSimilarity: (): Promise<ThrowbackEntry[] | null> =>
+    ipcRenderer.invoke('throwback:getSimilarity'),
+  getThrowbackYearSample: (): Promise<ThrowbackYearSample | null> =>
+    ipcRenderer.invoke('throwback:getYearSample'),
+  getThrowbackPreview: (): Promise<ThrowbackEntry[] | null> =>
+    ipcRenderer.invoke('throwback:getPreview'),
+  embedLibrary: (): Promise<void> => ipcRenderer.invoke('throwback:embedLibrary'),
+  cancelEmbedLibrary: (): Promise<void> => ipcRenderer.invoke('throwback:cancelEmbedLibrary'),
+  onEmbedLibraryProgress: (callback: (progress: EmbedLibraryProgress) => void): (() => void) =>
+    subscribe('throwback:embedLibraryProgress', callback),
   getDetailsPanelCollapsed: (): Promise<boolean> =>
     ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
   setDetailsPanelCollapsed: (value: boolean): Promise<void> =>

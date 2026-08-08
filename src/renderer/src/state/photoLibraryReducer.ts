@@ -1,6 +1,7 @@
 import type {
   DefaultView,
   DuplicateProgress,
+  EmbedLibraryProgress,
   GalleryViewMode,
   PhotoRecord,
   ScanCompleteEvent,
@@ -101,6 +102,9 @@ export interface PhotoLibraryState {
   // Session-only — progress while the Duplicates tab's findDuplicateGroups
   // scan is running, null otherwise.
   duplicateScanProgress: DuplicateProgress | null
+  // Session-only — progress while the Throwback widget's opt-in "Time Warp"
+  // full-library embed scan is running, null otherwise.
+  embedLibraryProgress: EmbedLibraryProgress | null
 }
 
 export const initialState: PhotoLibraryState = {
@@ -145,7 +149,8 @@ export const initialState: PhotoLibraryState = {
   openTabs: [],
   activeTab: 'dashboard',
   compareTabs: new Map(),
-  duplicateScanProgress: null
+  duplicateScanProgress: null,
+  embedLibraryProgress: null
 }
 
 export type PhotoLibraryAction =
@@ -212,6 +217,7 @@ export type PhotoLibraryAction =
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
   | { type: 'OPEN_DUPLICATES_TAB' }
   | { type: 'SET_DUPLICATE_SCAN_PROGRESS'; progress: DuplicateProgress | null }
+  | { type: 'SET_EMBED_LIBRARY_PROGRESS'; progress: EmbedLibraryProgress | null }
 
 // Shared by CLOSE_PHOTO_TAB and REMOVE_FROM_COMPARE_TAB (which closes its
 // whole tab once too few photos remain) — falls back to the tab immediately
@@ -723,6 +729,8 @@ export function photoLibraryReducer(
     }
     case 'SET_DUPLICATE_SCAN_PROGRESS':
       return { ...state, duplicateScanProgress: action.progress }
+    case 'SET_EMBED_LIBRARY_PROGRESS':
+      return { ...state, embedLibraryProgress: action.progress }
     case 'CLOSE_ALL_TABS':
       return { ...state, openTabs: [], compareTabs: new Map(), activeTab: 'gallery' }
     case 'SET_ACTIVE_TAB':

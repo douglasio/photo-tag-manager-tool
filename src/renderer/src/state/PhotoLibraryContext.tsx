@@ -18,11 +18,14 @@ import type {
   DefaultView,
   DuplicateGroup,
   DuplicateProgress,
+  EmbedLibraryProgress,
   GalleryViewMode,
   PhotoRecord,
   RotateDirection,
   SimilarPhoto,
-  TagSuggestion
+  TagSuggestion,
+  ThrowbackEntry,
+  ThrowbackYearSample
 } from '@shared/types'
 import { basename, isPhotoInFolder, shuffle } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
@@ -110,6 +113,11 @@ interface PhotoLibraryContextValue {
   findDuplicateGroups: () => Promise<DuplicateGroup[]>
   findSimilarPhotos: (filePath: string, limit: number) => Promise<SimilarPhoto[]>
   openDuplicatesTab: () => void
+  getThrowbackSimilarity: () => Promise<ThrowbackEntry[] | null>
+  getThrowbackYearSample: () => Promise<ThrowbackYearSample | null>
+  getThrowbackPreview: () => Promise<ThrowbackEntry[] | null>
+  embedLibrary: () => Promise<void>
+  cancelEmbedLibrary: () => void
   setNavbarSplitSizes: (sizes: [number, number]) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -1029,6 +1037,41 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'OPEN_DUPLICATES_TAB' })
   }, [])
 
+  const getThrowbackSimilarity = useCallback(
+    (): Promise<ThrowbackEntry[] | null> => window.api.getThrowbackSimilarity(),
+    []
+  )
+
+  const getThrowbackYearSample = useCallback(
+    (): Promise<ThrowbackYearSample | null> => window.api.getThrowbackYearSample(),
+    []
+  )
+
+  const getThrowbackPreview = useCallback(
+    (): Promise<ThrowbackEntry[] | null> => window.api.getThrowbackPreview(),
+    []
+  )
+
+  // Same subscribe/unsubscribe-around-the-call progress pattern as
+  // findDuplicateGroups above — the Throwback widget's opt-in "Time Warp"
+  // full-library embed scan.
+  const embedLibrary = useCallback(async () => {
+    dispatch({ type: 'SET_EMBED_LIBRARY_PROGRESS', progress: { done: 0, total: 0 } })
+    const unsubscribe = window.api.onEmbedLibraryProgress((progress: EmbedLibraryProgress) => {
+      dispatch({ type: 'SET_EMBED_LIBRARY_PROGRESS', progress })
+    })
+    try {
+      await window.api.embedLibrary()
+    } finally {
+      unsubscribe()
+      dispatch({ type: 'SET_EMBED_LIBRARY_PROGRESS', progress: null })
+    }
+  }, [])
+
+  const cancelEmbedLibrary = useCallback(() => {
+    void window.api.cancelEmbedLibrary()
+  }, [])
+
   const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     void window.api.setNavbarSplitSizes(sizes)
@@ -1257,6 +1300,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     findDuplicateGroups,
     findSimilarPhotos,
     openDuplicatesTab,
+    getThrowbackSimilarity,
+    getThrowbackYearSample,
+    getThrowbackPreview,
+    embedLibrary,
+    cancelEmbedLibrary,
     setNavbarSplitSizes,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,

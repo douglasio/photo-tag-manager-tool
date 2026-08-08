@@ -1,36 +1,45 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockGetAllEmbeddings, mockFindAllReadyPhotos, mockGetOrComputeEmbedding } = vi.hoisted(
+const { mockGetAllEmbeddings, mockEmbedAllReadyPhotos, mockGetOrComputeEmbedding } = vi.hoisted(
   () => ({
     mockGetAllEmbeddings: vi.fn(),
-    mockFindAllReadyPhotos: vi.fn(),
+    mockEmbedAllReadyPhotos: vi.fn(),
     mockGetOrComputeEmbedding: vi.fn()
   })
 )
 
 vi.mock('@main/db/embeddingRepository', () => ({ getAllEmbeddings: mockGetAllEmbeddings }))
-vi.mock('@main/db/photoRepository', () => ({ findAllReadyPhotos: mockFindAllReadyPhotos }))
-vi.mock('./photoEmbedding', () => ({ getOrComputeEmbedding: mockGetOrComputeEmbedding }))
+vi.mock('./photoEmbedding', () => ({
+  embedAllReadyPhotos: mockEmbedAllReadyPhotos,
+  getOrComputeEmbedding: mockGetOrComputeEmbedding
+}))
 
 import { findDuplicateGroups, findSimilarPhotos } from './duplicatePhotoService'
 
-function makePhotos(paths: string[]): { filePath: string; thumbnailKey: string }[] {
-  return paths.map((filePath) => ({ filePath, thumbnailKey: `${filePath}-key` }))
+function makeEmbedded(
+  entries: [string, number[]][]
+): { filePath: string; thumbnailKey: string; embedding: number[] }[] {
+  return entries.map(([filePath, embedding]) => ({
+    filePath,
+    thumbnailKey: `${filePath}-key`,
+    embedding
+  }))
 }
 
 describe('findDuplicateGroups', () => {
   beforeEach(() => {
-    mockFindAllReadyPhotos.mockReset()
-    mockGetOrComputeEmbedding.mockReset()
+    mockEmbedAllReadyPhotos.mockReset()
   })
 
   it('groups photos whose embeddings are near-identical', async () => {
-    mockFindAllReadyPhotos.mockReturnValue(makePhotos(['/a.jpg', '/b.jpg', '/c.jpg']))
-    mockGetOrComputeEmbedding
-      .mockResolvedValueOnce([1, 0])
-      .mockResolvedValueOnce([1, 0])
-      .mockResolvedValueOnce([0, 1])
+    mockEmbedAllReadyPhotos.mockResolvedValue(
+      makeEmbedded([
+        ['/a.jpg', [1, 0]],
+        ['/b.jpg', [1, 0]],
+        ['/c.jpg', [0, 1]]
+      ])
+    )
 
     const groups = await findDuplicateGroups()
 
@@ -40,13 +49,15 @@ describe('findDuplicateGroups', () => {
   })
 
   it('chains transitively-linked duplicates into one group', async () => {
-    mockFindAllReadyPhotos.mockReturnValue(makePhotos(['/a.jpg', '/b.jpg', '/c.jpg']))
     // a~b close, b~c close, a~c not directly close enough on their own —
     // still one group via the union-find transitive link through b.
-    mockGetOrComputeEmbedding
-      .mockResolvedValueOnce([1, 0])
-      .mockResolvedValueOnce([0.985, Math.sqrt(1 - 0.985 ** 2)])
-      .mockResolvedValueOnce([0.97, Math.sqrt(1 - 0.97 ** 2)])
+    mockEmbedAllReadyPhotos.mockResolvedValue(
+      makeEmbedded([
+        ['/a.jpg', [1, 0]],
+        ['/b.jpg', [0.985, Math.sqrt(1 - 0.985 ** 2)]],
+        ['/c.jpg', [0.97, Math.sqrt(1 - 0.97 ** 2)]]
+      ])
+    )
 
     const groups = await findDuplicateGroups()
 
@@ -55,17 +66,29 @@ describe('findDuplicateGroups', () => {
   })
 
   it('omits photos with no duplicates', async () => {
-    mockFindAllReadyPhotos.mockReturnValue(makePhotos(['/a.jpg', '/b.jpg']))
-    mockGetOrComputeEmbedding.mockResolvedValueOnce([1, 0]).mockResolvedValueOnce([0, 1])
+    mockEmbedAllReadyPhotos.mockResolvedValue(
+      makeEmbedded([
+        ['/a.jpg', [1, 0]],
+        ['/b.jpg', [0, 1]]
+      ])
+    )
 
     const groups = await findDuplicateGroups()
 
     expect(groups).toEqual([])
   })
 
-  it('reports embedding progress for each photo', async () => {
-    mockFindAllReadyPhotos.mockReturnValue(makePhotos(['/a.jpg', '/b.jpg']))
-    mockGetOrComputeEmbedding.mockResolvedValueOnce([1, 0]).mockResolvedValueOnce([0, 1])
+  it('forwards embedding progress from embedAllReadyPhotos', async () => {
+    mockEmbedAllReadyPhotos.mockImplementation(
+      async (onProgress?: (done: number, total: number) => void) => {
+        onProgress?.(1, 2)
+        onProgress?.(2, 2)
+        return makeEmbedded([
+          ['/a.jpg', [1, 0]],
+          ['/b.jpg', [0, 1]]
+        ])
+      }
+    )
     const onProgress = vi.fn()
 
     await findDuplicateGroups(onProgress)

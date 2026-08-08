@@ -6,6 +6,8 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 - Gallery preview zoom is not very smooth and doesn't zoom in enough
 
+- The gap with the embedding scan being lazy / on-demand is if they enable Time Warp, the embeddings are added to all photos, and then new photos are added to the library, there will never be a re-trigger of the embed for the new photos so they'd never appear in the Time Warp widget. I think every time a new photo is added after enabling that feature, an embedding is also created as it's scanned. And then we can just add a setting in the settings menu to disable Time Warp at any time, which would turn off this scan.
+
 # Features
 
 To-dos, tasks, and features loosely grouped by feature segment.
@@ -36,9 +38,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 2. Cursor multi-select
 
-3. Create different views for the gallery. The first one is simple, a big list, one image per row, with the filename, comment, tags, and date taken to the right of it in a list -- all appearing as they do in the details panel and editable. This view should support all the same sorting/filtering/selection/preview options as the regular gallery view. And selected view should be persisted. Add the button for this view as an ActionIcon in a new ActionIcon.Group to the right of the sort/filters with a gap in between.
+3. The next view should be...
 
-4.
+4. Contact sheet?
 
 ## Tools
 
@@ -51,6 +53,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 5. Removing folders should not delete photo data
 
 6. Collage?
+
+7. X "over the years" same-date-across-years nostalgia view, easy with dateTaken you already have. Ideally should show AI-derived "similar" photos that date back years.
+
+8. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
 
 ## Details Panel
 

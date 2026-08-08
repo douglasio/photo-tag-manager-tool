@@ -153,6 +153,29 @@ export function findAllReadyPhotos(): { filePath: string; thumbnailKey: string }
   return rows.map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
 }
 
+// A regenerated thumbnail (e.g. after rotate) means the pixels underneath
+// any cached embedding changed too, so that embedding is stale — deleting it
+// here lets it recompute lazily next time something needs it.
+/** Every thumbnail-ready photo with a known dateTaken — used to group
+ * photos by year for the Throwback widget. */
+export function findAllReadyPhotosWithDate(): {
+  filePath: string
+  thumbnailKey: string
+  dateTaken: string
+}[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT path, thumbnailKey, dateTaken FROM photos
+       WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL AND dateTaken IS NOT NULL`
+    )
+    .all() as { path: string; thumbnailKey: string; dateTaken: string }[]
+  return rows.map((row) => ({
+    filePath: row.path,
+    thumbnailKey: row.thumbnailKey,
+    dateTaken: row.dateTaken
+  }))
+}
+
 export function updateThumbnail(
   filePath: string,
   thumbnailKey: string,
@@ -161,6 +184,7 @@ export function updateThumbnail(
   getDb()
     .prepare('UPDATE photos SET thumbnailKey = ?, thumbnailStatus = ? WHERE path = ?')
     .run(thumbnailKey, status, filePath)
+  deleteEmbedding(filePath)
 }
 
 /** Deletes a single photo row (used by the folder watcher on file removal). Returns its thumbnailKey, if any, so the caller can clean up the thumbnail file. */

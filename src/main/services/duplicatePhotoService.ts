@@ -1,9 +1,8 @@
 import { getAllEmbeddings } from '@main/db/embeddingRepository'
-import { findAllReadyPhotos } from '@main/db/photoRepository'
 import type { DuplicateGroup, DuplicateProgress, SimilarPhoto } from '@shared/types'
 
-import { cosineSimilarity } from './embeddingSimilarity'
-import { getOrComputeEmbedding } from './photoEmbedding'
+import { cosineSimilarity, DisjointSet } from './embeddingSimilarity'
+import { embedAllReadyPhotos, getOrComputeEmbedding } from './photoEmbedding'
 
 // Near-identical shots (burst mode, minor crop/exposure differences) score
 // above this; genuinely different photos essentially never do.
@@ -17,31 +16,6 @@ function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve))
 }
 
-// Union-find — merges any two photos whose embeddings are similarity-linked,
-// transitively, so a chain of near-duplicates ends up in one group rather
-// than several overlapping pairs.
-class DisjointSet {
-  private parent: number[]
-
-  constructor(size: number) {
-    this.parent = Array.from({ length: size }, (_, i) => i)
-  }
-
-  find(i: number): number {
-    while (this.parent[i] !== i) {
-      this.parent[i] = this.parent[this.parent[i]]
-      i = this.parent[i]
-    }
-    return i
-  }
-
-  union(a: number, b: number): void {
-    const rootA = this.find(a)
-    const rootB = this.find(b)
-    if (rootA !== rootB) this.parent[rootA] = rootB
-  }
-}
-
 // Embeds every not-yet-cached photo (reporting progress as it goes, since
 // this is the slow part on a cold cache), then clusters the full set by
 // pairwise cosine similarity. Cached embeddings make every run after the
@@ -49,12 +23,11 @@ class DisjointSet {
 export async function findDuplicateGroups(
   onProgress?: (progress: DuplicateProgress) => void
 ): Promise<DuplicateGroup[]> {
-  const photos = findAllReadyPhotos()
-  const embeddings: number[][] = []
-  for (let i = 0; i < photos.length; i++) {
-    embeddings.push(await getOrComputeEmbedding(photos[i].filePath, photos[i].thumbnailKey))
-    onProgress?.({ phase: 'embedding', done: i + 1, total: photos.length })
-  }
+  const embedded = await embedAllReadyPhotos((done, total) => {
+    onProgress?.({ phase: 'embedding', done, total })
+  })
+  const photos = embedded
+  const embeddings = embedded.map((photo) => photo.embedding)
 
   const disjointSet = new DisjointSet(photos.length)
   const totalPairs = (photos.length * (photos.length - 1)) / 2
