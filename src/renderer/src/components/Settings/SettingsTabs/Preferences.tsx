@@ -1,7 +1,8 @@
 import { type ReactElement, useState } from 'react'
 
-import { Kbd, Progress, Stack, Switch, Text, TextInput } from '@mantine/core'
+import { Group, Kbd, Progress, Radio, Stack, Switch, Text, TextInput } from '@mantine/core'
 
+import type { DefaultView } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 
 import SettingsTabSection from './SettingsTabSection'
@@ -71,13 +72,18 @@ function GeneralSection(): ReactElement {
   const { state, setDefaultView, setGalleryAnimationsEnabled } = usePhotoLibrary()
 
   return (
-    <Stack gap="xs">
-      <Switch
-        label="Open to Dashboard on launch"
-        description="When off, the app opens to Gallery instead."
-        checked={state.defaultView === 'dashboard'}
-        onChange={(event) => setDefaultView(event.currentTarget.checked ? 'dashboard' : 'gallery')}
-      />
+    <Stack>
+      <Radio.Group
+        label="Start tab:"
+        value={state.defaultView}
+        onChange={(value) => setDefaultView(value as DefaultView)}
+        styles={{ label: { paddingBottom: 'var(--mantine-spacing-sm)' } }}
+      >
+        <Group>
+          <Radio value="dashboard" label="Dashboard" />
+          <Radio value="gallery" label="Gallery" />
+        </Group>
+      </Radio.Group>
 
       <Switch
         label="Enable animations"
@@ -141,7 +147,7 @@ function VisualizationsSection(): ReactElement {
   )
 }
 
-function AiSection(): ReactElement {
+function TagsSection(): ReactElement {
   const { state, setAiTagSuggestionsEnabled, ensureAiModelReady } = usePhotoLibrary()
   const [error, setError] = useState<string | null>(null)
   const downloading = state.aiModelDownloadProgress !== null
@@ -190,8 +196,8 @@ function AiSection(): ReactElement {
 const sections = [
   { label: 'General', component: <GeneralSection /> },
   { label: 'Gallery', component: <GallerySection /> },
-  { label: 'Visualizations', component: <VisualizationsSection /> },
-  { label: 'AI', component: <AiSection /> }
+  { label: 'Tags', component: <TagsSection /> },
+  { label: 'Visualizations', component: <VisualizationsSection /> }
 ]
 
 export const Preferences: React.FC = () => {
