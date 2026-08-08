@@ -21,7 +21,7 @@ import {
   Tooltip
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
-import { IconColumns2, IconPhoto, IconX } from '@tabler/icons-react'
+import { IconColumns2, IconPhoto, IconStack2, IconX } from '@tabler/icons-react'
 import { motion } from 'motion/react'
 import { Grid } from 'react-window'
 
@@ -52,7 +52,8 @@ export function GalleryGrid(): ReactElement {
     folderTags,
     setFolderTagFilter,
     renameFile,
-    openCompareTab
+    openCompareTab,
+    openDuplicatesTab
   } = usePhotoLibrary()
 
   // Only set once the selected folder actually has subfolders — a leaf
@@ -223,7 +224,8 @@ export function GalleryGrid(): ReactElement {
                     state.selectedPaths.size <= MAX_COMPARE_PHOTOS && (
                       <Tooltip label="Compare photos">
                         <ActionIcon
-                          variant="subtle"
+                          variant="default"
+                          ml="xs"
                           aria-label="Compare photos"
                           onClick={(event) => {
                             // Blurs before the tab switch below unmounts this
@@ -239,6 +241,15 @@ export function GalleryGrid(): ReactElement {
                     )}
                 </>
               )}
+              <Tooltip label="Show duplicate photos">
+                <ActionIcon
+                  variant="default"
+                  aria-label="Show duplicate photos"
+                  onClick={openDuplicatesTab}
+                >
+                  <IconStack2 size={16} />
+                </ActionIcon>
+              </Tooltip>
               <GallerySortMenu />
               <GallerySettingsMenu />
             </Group>

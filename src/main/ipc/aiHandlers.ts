@@ -1,10 +1,11 @@
 import { ipcMain } from 'electron'
 
 import { findByPath } from '@main/db/photoRepository'
+import { findDuplicateGroups, findSimilarPhotos } from '@main/services/duplicatePhotoService'
 import { suggestTagsByExemplar } from '@main/services/tagExemplarService'
 import { ensureModelReady, suggestTags } from '@main/services/tagSuggestionService'
 import { thumbnailFilePath } from '@main/services/thumbnailService'
-import type { TagSuggestion } from '@shared/types'
+import type { DuplicateGroup, SimilarPhoto, TagSuggestion } from '@shared/types'
 
 export function registerAiHandlers(): void {
   // Downloads (first time only) and loads the CLIP model — invoked by the
@@ -35,6 +36,23 @@ export function registerAiHandlers(): void {
       const zeroShotOnly = zeroShotResults.filter((result) => !exemplarTags.has(result.tag))
 
       return [...exemplarResults, ...zeroShotOnly]
+    }
+  )
+
+  // Streams progress back to the same call's sender, same pattern as
+  // ai:ensureModelReady's download progress.
+  ipcMain.handle('ai:findDuplicateGroups', async (event): Promise<DuplicateGroup[]> => {
+    return findDuplicateGroups((progress) => {
+      event.sender.send('ai:duplicateProgress', progress)
+    })
+  })
+
+  ipcMain.handle(
+    'ai:findSimilarPhotos',
+    async (_event, filePath: string, limit: number): Promise<SimilarPhoto[]> => {
+      const found = findByPath(filePath)
+      if (!found?.record.thumbnailKey) return []
+      return findSimilarPhotos(filePath, found.record.thumbnailKey, limit)
     }
   )
 }

@@ -1,4 +1,10 @@
-import type { DefaultView, PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
+import type {
+  DefaultView,
+  DuplicateProgress,
+  PhotoRecord,
+  ScanCompleteEvent,
+  TagGroup
+} from '@shared/types'
 import {
   addPhotoToFolderTree,
   findRootFolder,
@@ -90,6 +96,9 @@ export interface PhotoLibraryState {
   // Resolves a compare-tab's synthetic id (from openTabs/activeTab) to its
   // actual photo paths (MIN_COMPARE_PHOTOS to MAX_COMPARE_PHOTOS of them).
   compareTabs: Map<string, string[]>
+  // Session-only — progress while the Duplicates tab's findDuplicateGroups
+  // scan is running, null otherwise.
+  duplicateScanProgress: DuplicateProgress | null
 }
 
 export const initialState: PhotoLibraryState = {
@@ -132,7 +141,8 @@ export const initialState: PhotoLibraryState = {
   recentTags: [],
   openTabs: [],
   activeTab: 'dashboard',
-  compareTabs: new Map()
+  compareTabs: new Map(),
+  duplicateScanProgress: null
 }
 
 export type PhotoLibraryAction =
@@ -196,6 +206,8 @@ export type PhotoLibraryAction =
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
+  | { type: 'OPEN_DUPLICATES_TAB' }
+  | { type: 'SET_DUPLICATE_SCAN_PROGRESS'; progress: DuplicateProgress | null }
 
 // Shared by CLOSE_PHOTO_TAB and REMOVE_FROM_COMPARE_TAB (which closes its
 // whole tab once too few photos remain) — falls back to the tab immediately
@@ -695,6 +707,16 @@ export function photoLibraryReducer(
       }
       return { ...state, openTabs, activeTab, compareTabs }
     }
+    // Singleton tab — reactivates the existing one instead of opening a
+    // second "Duplicates" tab if it's already open.
+    case 'OPEN_DUPLICATES_TAB': {
+      const openTabs = state.openTabs.includes('duplicates')
+        ? state.openTabs
+        : [...state.openTabs, 'duplicates']
+      return { ...state, openTabs, activeTab: 'duplicates' }
+    }
+    case 'SET_DUPLICATE_SCAN_PROGRESS':
+      return { ...state, duplicateScanProgress: action.progress }
     case 'CLOSE_ALL_TABS':
       return { ...state, openTabs: [], compareTabs: new Map(), activeTab: 'gallery' }
     case 'SET_ACTIVE_TAB':

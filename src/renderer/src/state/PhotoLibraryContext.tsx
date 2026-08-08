@@ -14,7 +14,15 @@ import {
 import { notifications } from '@mantine/notifications'
 
 import { MoveProgressToast } from '@components'
-import type { DefaultView, PhotoRecord, RotateDirection, TagSuggestion } from '@shared/types'
+import type {
+  DefaultView,
+  DuplicateGroup,
+  DuplicateProgress,
+  PhotoRecord,
+  RotateDirection,
+  SimilarPhoto,
+  TagSuggestion
+} from '@shared/types'
 import { basename, isPhotoInFolder, shuffle } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
@@ -56,6 +64,7 @@ export type PhotoVisualization = 'none' | 'magazine' | 'newspaper' | 'dvd'
 export type OpenTabEntry =
   | { kind: 'photo'; id: string; photo: PhotoRecord }
   | { kind: 'compare'; id: string; photos: PhotoRecord[] }
+  | { kind: 'duplicates'; id: string }
 
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
@@ -96,6 +105,9 @@ interface PhotoLibraryContextValue {
   setAiTagSuggestionsEnabled: (value: boolean) => void
   ensureAiModelReady: () => Promise<void>
   suggestTags: (filePath: string, candidateLabels: string[]) => Promise<TagSuggestion[]>
+  findDuplicateGroups: () => Promise<DuplicateGroup[]>
+  findSimilarPhotos: (filePath: string, limit: number) => Promise<SimilarPhoto[]>
+  openDuplicatesTab: () => void
   setNavbarSplitSizes: (sizes: [number, number]) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -976,6 +988,34 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     []
   )
 
+  // Same subscribe/unsubscribe-around-the-call progress pattern as
+  // ensureAiModelReady above, just with a two-phase {phase, done, total}
+  // shape instead of a single percentage.
+  const findDuplicateGroups = useCallback(async () => {
+    dispatch({
+      type: 'SET_DUPLICATE_SCAN_PROGRESS',
+      progress: { phase: 'embedding', done: 0, total: 0 }
+    })
+    const unsubscribe = window.api.onDuplicateProgress((progress: DuplicateProgress) => {
+      dispatch({ type: 'SET_DUPLICATE_SCAN_PROGRESS', progress })
+    })
+    try {
+      return await window.api.findDuplicateGroups()
+    } finally {
+      unsubscribe()
+      dispatch({ type: 'SET_DUPLICATE_SCAN_PROGRESS', progress: null })
+    }
+  }, [])
+
+  const findSimilarPhotos = useCallback(
+    (filePath: string, limit: number) => window.api.findSimilarPhotos(filePath, limit),
+    []
+  )
+
+  const openDuplicatesTab = useCallback(() => {
+    dispatch({ type: 'OPEN_DUPLICATES_TAB' })
+  }, [])
+
   const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     void window.api.setNavbarSplitSizes(sizes)
@@ -1150,6 +1190,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     () =>
       state.openTabs
         .map((id): OpenTabEntry | null => {
+          if (id === 'duplicates') return { kind: 'duplicates', id }
           const paths = state.compareTabs.get(id)
           if (paths) {
             const photos = paths
@@ -1199,6 +1240,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setAiTagSuggestionsEnabled,
     ensureAiModelReady,
     suggestTags,
+    findDuplicateGroups,
+    findSimilarPhotos,
+    openDuplicatesTab,
     setNavbarSplitSizes,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,

@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 import type {
   DefaultView,
+  DuplicateGroup,
+  DuplicateProgress,
   GallerySort,
   MetadataBatchEvent,
   MoveProgressEvent,
@@ -11,6 +13,7 @@ import type {
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
+  SimilarPhoto,
   TagGroup,
   TagSuggestion,
   WatchFolderAddedEvent,
@@ -71,6 +74,12 @@ const api = {
     subscribe('ai:downloadProgress', callback),
   suggestTags: (filePath: string, candidateLabels: string[]): Promise<TagSuggestion[]> =>
     ipcRenderer.invoke('ai:suggestTags', filePath, candidateLabels),
+  findDuplicateGroups: (): Promise<DuplicateGroup[]> =>
+    ipcRenderer.invoke('ai:findDuplicateGroups'),
+  onDuplicateProgress: (callback: (progress: DuplicateProgress) => void): (() => void) =>
+    subscribe('ai:duplicateProgress', callback),
+  findSimilarPhotos: (filePath: string, limit: number): Promise<SimilarPhoto[]> =>
+    ipcRenderer.invoke('ai:findSimilarPhotos', filePath, limit),
   getDetailsPanelCollapsed: (): Promise<boolean> =>
     ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
   setDetailsPanelCollapsed: (value: boolean): Promise<void> =>

@@ -39,6 +39,7 @@ import {
   IconLayoutSidebarRightExpand,
   IconLibraryPhoto,
   IconPhoto,
+  IconStack2,
   IconX
 } from '@tabler/icons-react'
 
@@ -49,6 +50,7 @@ import {
   CompareView,
   DashboardView,
   DetailPanel,
+  DuplicatesView,
   FolderTree,
   GalleryGrid,
   PhotoView,
@@ -182,6 +184,9 @@ function AppLayout(): React.JSX.Element {
   const isCompareTabActive = state.compareTabs.has(state.activeTab)
   // Dashboard is full-screen — no details panel either.
   const isDashboardTabActive = state.activeTab === 'dashboard'
+  // Duplicates tab browses across many photos at once — no single photo for
+  // the details panel to describe.
+  const isDuplicatesTabActive = state.activeTab === 'duplicates'
 
   // Universal "jump to gallery" / "jump to dashboard" shortcuts
   useEffect(() => {
@@ -312,8 +317,16 @@ function AppLayout(): React.JSX.Element {
             width: 320,
             breakpoint: 0,
             collapsed: {
-              desktop: state.detailsPanelCollapsed || isCompareTabActive || isDashboardTabActive,
-              mobile: state.detailsPanelCollapsed || isCompareTabActive || isDashboardTabActive
+              desktop:
+                state.detailsPanelCollapsed ||
+                isCompareTabActive ||
+                isDashboardTabActive ||
+                isDuplicatesTabActive,
+              mobile:
+                state.detailsPanelCollapsed ||
+                isCompareTabActive ||
+                isDashboardTabActive ||
+                isDuplicatesTabActive
             }
           }}
           padding={0}
@@ -369,6 +382,8 @@ function AppLayout(): React.JSX.Element {
                           leftSection={
                             entry.kind === 'compare' ? (
                               <IconColumns2 size={ACTION_ICONS.ICON_SIZE} />
+                            ) : entry.kind === 'duplicates' ? (
+                              <IconStack2 size={ACTION_ICONS.ICON_SIZE} />
                             ) : undefined
                           }
                           rightSection={
@@ -390,6 +405,8 @@ function AppLayout(): React.JSX.Element {
                             <CompareTabLabel
                               fileNames={entry.photos.map((photo) => photo.fileName)}
                             />
+                          ) : entry.kind === 'duplicates' ? (
+                            'Duplicates'
                           ) : (
                             <TabLabel fileName={entry.photo.fileName} />
                           )}
@@ -413,7 +430,7 @@ function AppLayout(): React.JSX.Element {
                   </Tooltip>
                 )}
                 <ScanProgressBar />
-                {!(isCompareTabActive || isDashboardTabActive) && (
+                {!(isCompareTabActive || isDashboardTabActive || isDuplicatesTabActive) && (
                   <Tooltip
                     label={
                       state.detailsPanelCollapsed ? 'Show details panel' : 'Hide details panel'
@@ -488,6 +505,8 @@ function AppLayout(): React.JSX.Element {
                 >
                   {entry.kind === 'compare' ? (
                     <CompareView id={entry.id} photos={entry.photos} />
+                  ) : entry.kind === 'duplicates' ? (
+                    <DuplicatesView />
                   ) : (
                     <PhotoView photo={entry.photo} />
                   )}

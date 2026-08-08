@@ -126,3 +126,20 @@ export interface TagSuggestion {
   tag: string
   score: number
 }
+
+export interface DuplicateProgress {
+  phase: 'embedding' | 'comparing'
+  done: number
+  total: number
+}
+
+export interface DuplicateGroup {
+  filePaths: string[]
+  // Average pairwise cosine similarity across the group's members.
+  similarity: number
+}
+
+export interface SimilarPhoto {
+  filePath: string
+  score: number
+}

@@ -22,6 +22,23 @@ export function setEmbedding(filePath: string, embedding: Float32Array): void {
     .run({ path: filePath, embedding: buffer })
 }
 
+/** Every cached embedding — used for duplicate detection, which needs to
+ * compare a photo against the whole set rather than one tag's examples. */
+export function getAllEmbeddings(): { filePath: string; embedding: Float32Array }[] {
+  const rows = getDb().prepare('SELECT path, embedding FROM photo_embeddings').all() as {
+    path: string
+    embedding: Buffer
+  }[]
+  return rows.map((row) => ({
+    filePath: row.path,
+    embedding: new Float32Array(
+      row.embedding.buffer,
+      row.embedding.byteOffset,
+      row.embedding.byteLength / Float32Array.BYTES_PER_ELEMENT
+    )
+  }))
+}
+
 export function deleteEmbedding(filePath: string): void {
   getDb().prepare('DELETE FROM photo_embeddings WHERE path = ?').run(filePath)
 }

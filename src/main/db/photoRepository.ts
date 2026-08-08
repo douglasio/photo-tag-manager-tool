@@ -142,6 +142,17 @@ export function findPhotoPathsWithTag(
   return matches
 }
 
+/** Every thumbnail-ready photo — used to build the duplicate-detection
+ * embedding set (unlike findPhotoPathsWithTag, no filtering needed here). */
+export function findAllReadyPhotos(): { filePath: string; thumbnailKey: string }[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT path, thumbnailKey FROM photos WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL`
+    )
+    .all() as { path: string; thumbnailKey: string }[]
+  return rows.map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
+}
+
 export function updateThumbnail(
   filePath: string,
   thumbnailKey: string,
