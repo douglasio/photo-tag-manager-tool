@@ -11,7 +11,8 @@ import { FolderBadge } from './FolderBadge'
 export function AllPhotosRow(): ReactElement {
   const { state, setFolderFilter } = usePhotoLibrary()
   const { hovered, ref } = useHover<HTMLButtonElement>()
-  const isActive = state.selectedFolder === null && state.selectedTag === null
+  const isActive =
+    state.selectedFolder === null && state.selectedTag === null && !state.untaggedFilterActive
 
   return (
     <Box p="md" style={{ flexShrink: 0 }}>

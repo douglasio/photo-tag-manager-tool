@@ -69,6 +69,7 @@ interface PhotoLibraryContextValue {
   allTags: string[]
   tagCounts: Map<string, number>
   tagCoverPhotos: Map<string, PhotoRecord>
+  untaggedCount: number
   folderTags: string[]
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
@@ -87,6 +88,7 @@ interface PhotoLibraryContextValue {
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
+  setUntaggedFilter: (active: boolean) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
@@ -629,6 +631,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_FOLDER_TAG_FILTER', tag })
   }, [])
 
+  const setUntaggedFilter = useCallback((active: boolean) => {
+    dispatch({ type: 'SET_UNTAGGED_FILTER', active })
+  }, [])
+
   const setTagDescription = useCallback(
     async (tag: string, description: string) => {
       const previous = state.tagDescriptions.get(tag) ?? ''
@@ -1032,6 +1038,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
   // current folder instead of replacing it with a folder-agnostic tag view.
   const visiblePhotos = useMemo(() => {
+    if (state.untaggedFilterActive) {
+      return photos.filter((photo) => photo.tags.length === 0)
+    }
     let result = photos
     if (state.selectedFolder) {
       result = result.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
@@ -1040,7 +1049,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       result = result.filter((photo) => photo.tags.includes(state.selectedTag!))
     }
     return result
-  }, [photos, state.selectedFolder, state.selectedTag])
+  }, [photos, state.selectedFolder, state.selectedTag, state.untaggedFilterActive])
 
   // Shift+click range-select, anchored at the current selectedPath (the
   // last-engaged photo) through targetPath, within the currently visible
@@ -1112,6 +1121,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return { tagCounts: counts, tagCoverPhotos: covers }
   }, [state.photosByPath])
 
+  const untaggedCount = useMemo(() => {
+    let count = 0
+    for (const photo of state.photosByPath.values()) {
+      if (photo.tags.length === 0) count++
+    }
+    return count
+  }, [state.photosByPath])
+
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
 
   // Tags found among photos in the currently selected folder (independent of
@@ -1155,6 +1172,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     allTags,
     tagCounts,
     tagCoverPhotos,
+    untaggedCount,
     folderTags,
     addFolder,
     removeFolder,
@@ -1173,6 +1191,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,
+    setUntaggedFilter,
     setSort,
     setDefaultView,
     setShowEmptyFolders,

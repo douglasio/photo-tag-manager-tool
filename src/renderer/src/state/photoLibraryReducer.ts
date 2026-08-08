@@ -38,6 +38,10 @@ export interface PhotoLibraryState {
   selectedPaths: Set<string>
   selectedFolder: string | null
   selectedTag: string | null
+  // Pseudo-filter for photos with no tags — mutually exclusive with
+  // selectedTag/selectedFolder rather than a sentinel value on selectedTag,
+  // since a real tag could otherwise collide with it.
+  untaggedFilterActive: boolean
   sortBy: GallerySortBy
   sortOrder: GallerySortOrder
   folderCounts: Map<string, number>
@@ -101,6 +105,7 @@ export const initialState: PhotoLibraryState = {
   selectedPaths: new Set(),
   selectedFolder: null,
   selectedTag: null,
+  untaggedFilterActive: false,
   sortBy: 'name',
   sortOrder: 'asc',
   folderCounts: new Map(),
@@ -147,6 +152,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_FOLDER_FILTER'; folder: string | null }
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
+  | { type: 'SET_UNTAGGED_FILTER'; active: boolean }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
@@ -434,13 +440,30 @@ export function photoLibraryReducer(
       return { ...state, photosByPath }
     }
     case 'SET_FOLDER_FILTER':
-      return { ...state, selectedFolder: action.folder, selectedTag: null }
+      return {
+        ...state,
+        selectedFolder: action.folder,
+        selectedTag: null,
+        untaggedFilterActive: false
+      }
     case 'SET_TAG_FILTER':
-      return { ...state, selectedTag: action.tag, selectedFolder: null }
+      return {
+        ...state,
+        selectedTag: action.tag,
+        selectedFolder: null,
+        untaggedFilterActive: false
+      }
     // Unlike SET_TAG_FILTER, keeps selectedFolder intact — for the
     // per-folder tag pills that narrow within a folder rather than replace it.
     case 'SET_FOLDER_TAG_FILTER':
-      return { ...state, selectedTag: action.tag }
+      return { ...state, selectedTag: action.tag, untaggedFilterActive: false }
+    case 'SET_UNTAGGED_FILTER':
+      return {
+        ...state,
+        untaggedFilterActive: action.active,
+        selectedTag: null,
+        selectedFolder: null
+      }
     case 'SET_SORT':
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'SET_DEFAULT_VIEW':

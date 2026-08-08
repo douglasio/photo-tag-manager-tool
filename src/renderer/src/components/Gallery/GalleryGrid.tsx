@@ -161,13 +161,15 @@ export function GalleryGrid(): ReactElement {
   // instead, since the tag there is just a filter.
   const isPureTagView = state.selectedTag !== null && state.selectedFolder === null
 
-  const galleryTitle = isPureTagView
-    ? `#${state.selectedTag}`
-    : state.selectedFolder
-      ? basename(state.selectedFolder)
-      : state.folders.length > 0
-        ? 'All Photos'
-        : null
+  const galleryTitle = state.untaggedFilterActive
+    ? 'Untagged'
+    : isPureTagView
+      ? `#${state.selectedTag}`
+      : state.selectedFolder
+        ? basename(state.selectedFolder)
+        : state.folders.length > 0
+          ? 'All Photos'
+          : null
 
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 

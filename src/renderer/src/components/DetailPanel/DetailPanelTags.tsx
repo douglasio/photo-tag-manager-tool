@@ -23,13 +23,8 @@ export function DetailPanelTags({ photo, onOpenQuickTag }: DetailPanelTagsProps)
     <Stack>
       <Group justify="space-between" wrap="nowrap">
         <SectionTitle>Tags</SectionTitle>
-        <Button
-          variant="outline"
-          size="compact-sm"
-          leftSection={<IconTagPlus size={14} />}
-          onClick={onOpenQuickTag}
-        >
-          Quick Tag
+        <Button variant="outline" size="compact-sm" title="quick tag" onClick={onOpenQuickTag}>
+          <IconTagPlus size={14} />
         </Button>
       </Group>
       <SuggestedTagsRow

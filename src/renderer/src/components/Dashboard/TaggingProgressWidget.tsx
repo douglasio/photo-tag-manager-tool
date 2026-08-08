@@ -1,12 +1,12 @@
 import { DonutChart } from '@mantine/charts'
-import { Group, Stack, Text } from '@mantine/core'
+import { Anchor, Group, Stack, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 import { QuickTagWidget } from '@components'
 import { usePhotoLibrary } from '@state'
 
 export function TaggingProgressWidget(): ReactElement {
-  const { state } = usePhotoLibrary()
+  const { state, setUntaggedFilter, setActiveTab } = usePhotoLibrary()
 
   const photos = Array.from(state.photosByPath.values())
   const taggedCount = photos.filter((photo) => photo.tags.length > 0).length
@@ -18,6 +18,11 @@ export function TaggingProgressWidget(): ReactElement {
         Add some photos to see your tagging progress.
       </Text>
     )
+  }
+
+  const goToUntagged = (): void => {
+    setUntaggedFilter(true)
+    setActiveTab('gallery')
   }
 
   return (
@@ -32,10 +37,20 @@ export function TaggingProgressWidget(): ReactElement {
           size={200}
           thickness={50}
           withTooltip={false}
+          cellProps={(cell) =>
+            cell.name === 'Untagged' && untaggedCount > 0
+              ? { onClick: goToUntagged, style: { cursor: 'pointer' } }
+              : {}
+          }
         />
         <Text size="xs" c="dimmed">
           {taggedCount} of {photos.length} tagged
         </Text>
+        {untaggedCount > 0 && (
+          <Anchor size="xs" onClick={goToUntagged}>
+            View untagged photos
+          </Anchor>
+        )}
       </Stack>
       <QuickTagWidget />
     </Group>

@@ -20,7 +20,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Corrupt photo finder
 
-5. Untagged photo view (linked from dashboard widgets about photo tagging)
+5. Implement an "untagged photos" filter for the Gallery. It should live in the Tags Panel in the gallery view navbar. It should just filter the gallery to only untagged photos. It should also be linked from the Tagging Progress widget, under the donut chart (and if you click the untagged photos segment of the donut chart).
 
 6. I want to be able to ignore tags in certain folders, like archive folders and backups. I want to be able to right-click on a folder in the tree and say "ignore tags" which would add a little icon on the folder to indicate that it's ignored. Same right-click menu option should reverse the action. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab called Tags
 
@@ -49,10 +49,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 6. Removing folders should not delete photo data
 
 ## Details Panel
-
-1. When multiple photos are selected, we should replace the simple photo count view with options for multi-photo select. I want to see two sections - one that's a button to Compare (same functionality and icon as the one that appears at the top of the gallery). The second should display a list of all the tags in all the photos selected. It should utilize the same TagList format as other areas. From here, you should be able to batch add or batch delete any of the tags from the selected photos.
-
-2. Add a button next to the Tags header called "Quick Tag" that switches the details panel to a view where all the available tags are listed as Mantine Chips. Tags that have already been added should appear as selected. From here, I want to be able to just quickly check off as many tags as I want, and it will instantly add them to the selected photo. I should be able to remain in this view until I manually close the "quick tag" window, at which point it returns to the normal details panel.
 
 ## Photo view
 

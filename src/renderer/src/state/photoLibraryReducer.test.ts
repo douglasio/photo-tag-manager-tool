@@ -233,6 +233,20 @@ describe('photoLibraryReducer', () => {
       expect(state.selectedFolder).toBe('/root')
       expect(state.selectedTag).toBe('vacation')
     })
+
+    it('untagged filter clears folder and tag filters, and vice versa', () => {
+      let state = photoLibraryReducer(initialState, { type: 'SET_UNTAGGED_FILTER', active: true })
+      expect(state.untaggedFilterActive).toBe(true)
+
+      state = photoLibraryReducer(state, { type: 'SET_TAG_FILTER', tag: 'vacation' })
+      expect(state.untaggedFilterActive).toBe(false)
+
+      state = photoLibraryReducer(state, { type: 'SET_UNTAGGED_FILTER', active: true })
+      expect(state.selectedTag).toBeNull()
+
+      state = photoLibraryReducer(state, { type: 'SET_FOLDER_FILTER', folder: '/root' })
+      expect(state.untaggedFilterActive).toBe(false)
+    })
   })
 
   describe('settings toggles', () => {
