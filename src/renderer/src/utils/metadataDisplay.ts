@@ -38,15 +38,17 @@ function formatPixels(value: number | null): string {
 // view modes never drift apart.
 export const DATE_TAKEN_FORMAT = 'MMM D, YYYY h:mm A'
 
-type DateTakenStyle = 'full' | 'dateOnly' | 'monthYear'
+type DateTakenStyle = 'full' | 'dateOnly' | 'monthYear' | 'weekday'
 
 // dayjs format string per style — 'full' matches DATE_TAKEN_FORMAT above;
 // 'dateOnly' drops the time-of-day (used by the newspaper cover's dateline);
-// 'monthYear' reads like a real magazine issue date ("MARCH 2026").
+// 'monthYear' reads like a real magazine issue date ("MARCH 2026");
+// 'weekday' is 'dateOnly' plus the day name (used by the gallery list view).
 const DATE_TAKEN_STYLE_FORMATS: Record<DateTakenStyle, string> = {
   full: DATE_TAKEN_FORMAT,
   dateOnly: 'MMM D, YYYY',
-  monthYear: 'MMMM YYYY'
+  monthYear: 'MMMM YYYY',
+  weekday: 'dddd, MMM D, YYYY'
 }
 
 export function formatDateTaken(value: string | null, style: DateTakenStyle = 'full'): string {

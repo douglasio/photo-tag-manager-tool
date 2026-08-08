@@ -18,6 +18,7 @@ import type {
   DefaultView,
   DuplicateGroup,
   DuplicateProgress,
+  GalleryViewMode,
   PhotoRecord,
   RotateDirection,
   SimilarPhoto,
@@ -102,6 +103,7 @@ interface PhotoLibraryContextValue {
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
   setTagsPanelGridView: (value: boolean) => void
+  setGalleryViewMode: (value: GalleryViewMode) => void
   setAiTagSuggestionsEnabled: (value: boolean) => void
   ensureAiModelReady: () => Promise<void>
   suggestTags: (filePath: string, candidateLabels: string[]) => Promise<TagSuggestion[]>
@@ -329,6 +331,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getTagsPanelGridView().then((value) => {
       dispatch({ type: 'SET_TAGS_PANEL_GRID_VIEW', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getGalleryViewMode().then((value) => {
+      dispatch({ type: 'SET_GALLERY_VIEW_MODE', value })
     })
   }, [])
 
@@ -961,6 +969,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setTagsPanelGridView(value)
   }, [])
 
+  const setGalleryViewMode = useCallback((value: GalleryViewMode) => {
+    dispatch({ type: 'SET_GALLERY_VIEW_MODE', value })
+    void window.api.setGalleryViewMode(value)
+  }, [])
+
   const setAiTagSuggestionsEnabled = useCallback((value: boolean) => {
     dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value })
     void window.api.setAiTagSuggestionsEnabled(value)
@@ -1237,6 +1250,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setDefaultView,
     setShowEmptyFolders,
     setTagsPanelGridView,
+    setGalleryViewMode,
     setAiTagSuggestionsEnabled,
     ensureAiModelReady,
     suggestTags,

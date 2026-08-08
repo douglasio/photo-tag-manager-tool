@@ -272,6 +272,14 @@ describe('photoLibraryReducer', () => {
       expect(state.defaultView).toBe('dashboard')
     })
 
+    it('sets the gallery view mode', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_GALLERY_VIEW_MODE',
+        value: 'list'
+      })
+      expect(state.galleryViewMode).toBe('list')
+    })
+
     it('sets the sort order', () => {
       const state = photoLibraryReducer(initialState, {
         type: 'SET_SORT',

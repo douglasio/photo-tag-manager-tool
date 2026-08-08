@@ -66,6 +66,8 @@ function createMockApi(): {
     setShowEmptyFolders: vi.fn().mockResolvedValue(undefined),
     getTagsPanelGridView: vi.fn().mockResolvedValue(false),
     setTagsPanelGridView: vi.fn().mockResolvedValue(undefined),
+    getGalleryViewMode: vi.fn().mockResolvedValue('grid'),
+    setGalleryViewMode: vi.fn().mockResolvedValue(undefined),
     getAiTagSuggestionsEnabled: vi.fn().mockResolvedValue(false),
     setAiTagSuggestionsEnabled: vi.fn().mockResolvedValue(undefined),
     ensureAiModelReady: vi.fn().mockResolvedValue(undefined),

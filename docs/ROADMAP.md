@@ -12,17 +12,17 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Shell
 
-1. [Tags/Folders vertical split done, persisted] The details pane and the left folder/tag panel (the sidebar's overall width, not the Tags/Folders split within it) should still be resizable using Mantine Splitter with the no handle setting, persisted. Blocked on reconciling Splitter's own flex-pane sizing with AppShell's Navbar/Aside, which currently own width + collapse-animation via their own `width`/`collapsed` config rather than a Splitter pane.
-
 2. Implement MenuBar?
 
 3. Add a message on the opening loading screen if new photos are detected / being imported, to alert users that opening the app may take a little longer.
 
 4. Corrupt photo finder
 
-5. Implement an "untagged photos" filter for the Gallery. It should live in the Tags Panel in the gallery view navbar. It should just filter the gallery to only untagged photos. It should also be linked from the Tagging Progress widget, under the donut chart (and if you click the untagged photos segment of the donut chart).
+5. I want to be able to ignore tags in certain folders, like archive folders and backups. I want to be able to right-click on a folder in the tree and say "ignore tags" which would add a little icon on the folder to indicate that it's ignored. Same right-click menu option should reverse the action. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab called Tags
 
-6. I want to be able to ignore tags in certain folders, like archive folders and backups. I want to be able to right-click on a folder in the tree and say "ignore tags" which would add a little icon on the folder to indicate that it's ignored. Same right-click menu option should reverse the action. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab called Tags
+## AI
+
+- Face detection?
 
 ## Navigation
 
@@ -36,17 +36,21 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 2. Cursor multi-select
 
+3. Create different views for the gallery. The first one is simple, a big list, one image per row, with the filename, comment, tags, and date taken to the right of it in a list -- all appearing as they do in the details panel and editable. This view should support all the same sorting/filtering/selection/preview options as the regular gallery view. And selected view should be persisted. Add the button for this view as an ActionIcon in a new ActionIcon.Group to the right of the sort/filters with a gap in between.
+
+4.
+
 ## Tools
 
 2. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.
 
-3. Suggested tags?
+3. Reset view counts
 
-4. Reset view counts
+4. Export database
 
-5. Export database
+5. Removing folders should not delete photo data
 
-6. Removing folders should not delete photo data
+6. Collage?
 
 ## Details Panel
 
@@ -69,6 +73,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
 ## Optimization
+
+## Duplicates View
+
+1. Add actions like delete, merge, show in folder, etc.
 
 ## Codebase
 

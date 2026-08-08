@@ -1,6 +1,7 @@
 import type {
   DefaultView,
   DuplicateProgress,
+  GalleryViewMode,
   PhotoRecord,
   ScanCompleteEvent,
   TagGroup
@@ -60,6 +61,7 @@ export interface PhotoLibraryState {
   defaultView: DefaultView
   showEmptyFolders: boolean
   tagsPanelGridView: boolean
+  galleryViewMode: GalleryViewMode
   aiTagSuggestionsEnabled: boolean
   // Session-only — null when no download is in flight, 0-100 while the
   // Settings toggle's first-time model download is running.
@@ -123,6 +125,7 @@ export const initialState: PhotoLibraryState = {
   defaultView: 'dashboard',
   showEmptyFolders: false,
   tagsPanelGridView: false,
+  galleryViewMode: 'grid',
   aiTagSuggestionsEnabled: false,
   aiModelDownloadProgress: null,
   settingsModalOpened: false,
@@ -167,6 +170,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_TAGS_PANEL_GRID_VIEW'; value: boolean }
+  | { type: 'SET_GALLERY_VIEW_MODE'; value: GalleryViewMode }
   | { type: 'SET_AI_TAG_SUGGESTIONS_ENABLED'; value: boolean }
   | { type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS'; progress: number | null }
   | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
@@ -484,6 +488,8 @@ export function photoLibraryReducer(
       return { ...state, showEmptyFolders: action.value }
     case 'SET_TAGS_PANEL_GRID_VIEW':
       return { ...state, tagsPanelGridView: action.value }
+    case 'SET_GALLERY_VIEW_MODE':
+      return { ...state, galleryViewMode: action.value }
     case 'SET_AI_TAG_SUGGESTIONS_ENABLED':
       return { ...state, aiTagSuggestionsEnabled: action.value }
     case 'SET_AI_MODEL_DOWNLOAD_PROGRESS':

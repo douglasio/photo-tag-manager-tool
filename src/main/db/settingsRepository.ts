@@ -1,4 +1,4 @@
-import type { DefaultView, GallerySort } from '@shared/types'
+import type { DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
 
 import { getDb } from './database'
 
@@ -96,6 +96,14 @@ export function getDefaultView(): DefaultView {
 
 export function setDefaultView(value: DefaultView): void {
   setSetting('defaultView', value)
+}
+
+export function getGalleryViewMode(): GalleryViewMode {
+  return getSetting('galleryViewMode') === 'list' ? 'list' : 'grid'
+}
+
+export function setGalleryViewMode(value: GalleryViewMode): void {
+  setSetting('galleryViewMode', value)
 }
 
 export function getDetailsPanelCollapsed(): boolean {

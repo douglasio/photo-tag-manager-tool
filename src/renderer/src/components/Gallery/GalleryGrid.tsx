@@ -21,7 +21,14 @@ import {
   Tooltip
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
-import { IconColumns2, IconPhoto, IconStack2, IconX } from '@tabler/icons-react'
+import {
+  IconColumns2,
+  IconLayoutGrid,
+  IconLayoutList,
+  IconPhoto,
+  IconStack2,
+  IconX
+} from '@tabler/icons-react'
 import { motion } from 'motion/react'
 import { Grid } from 'react-window'
 
@@ -34,6 +41,7 @@ import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '@state'
 import { basename, buildFolderChildrenMap, collectFolderSectionOrder, dirname } from '@utils'
 
 import { GalleryFolderSections } from './GalleryFolderSections'
+import { GalleryListView } from './GalleryListView'
 import { type GalleryCellProps, GalleryPhotoCell } from './GalleryPhotoCell'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
@@ -53,7 +61,8 @@ export function GalleryGrid(): ReactElement {
     setFolderTagFilter,
     renameFile,
     openCompareTab,
-    openDuplicatesTab
+    openDuplicatesTab,
+    setGalleryViewMode
   } = usePhotoLibrary()
 
   // Only set once the selected folder actually has subfolders — a leaf
@@ -252,6 +261,26 @@ export function GalleryGrid(): ReactElement {
               </Tooltip>
               <GallerySortMenu />
               <GallerySettingsMenu />
+              <ActionIcon.Group>
+                <Tooltip label="Grid view">
+                  <ActionIcon
+                    variant={state.galleryViewMode === 'grid' ? 'filled' : 'default'}
+                    aria-label="Grid view"
+                    onClick={() => setGalleryViewMode('grid')}
+                  >
+                    <IconLayoutGrid size={16} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="List view">
+                  <ActionIcon
+                    variant={state.galleryViewMode === 'list' ? 'filled' : 'default'}
+                    aria-label="List view"
+                    onClick={() => setGalleryViewMode('list')}
+                  >
+                    <IconLayoutList size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </ActionIcon.Group>
             </Group>
           </Group>
           {isPureTagView && (
@@ -308,6 +337,8 @@ export function GalleryGrid(): ReactElement {
               <Text c="dimmed">No photos yet. Add a folder to begin.</Text>
             )}
           </Center>
+        ) : state.galleryViewMode === 'list' ? (
+          <GalleryListView photos={photos} />
         ) : folderSections && photosBySection ? (
           <GalleryFolderSections
             {...cellProps}
@@ -344,7 +375,7 @@ export function GalleryGrid(): ReactElement {
           </motion.div>
         )}
       </Box>
-      {photos.length > 0 && (
+      {photos.length > 0 && state.galleryViewMode === 'grid' && (
         <Group gap="xs" wrap="nowrap" justify="flex-end" px="md" py="xs" style={{ flexShrink: 0 }}>
           <ActionIcon onClick={() => stepToMark(-1)} aria-label="Decrease thumbnail size">
             <IconPhoto size={12} />

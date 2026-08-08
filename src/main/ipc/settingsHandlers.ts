@@ -13,6 +13,7 @@ import {
   getGalleryAnimationsEnabled,
   getGalleryCellWidth,
   getGallerySort,
+  getGalleryViewMode,
   getMagazineTitle,
   getNavbarSplitSizes,
   getNewspaperTitle,
@@ -29,6 +30,7 @@ import {
   setGalleryAnimationsEnabled,
   setGalleryCellWidth,
   setGallerySort,
+  setGalleryViewMode,
   setMagazineTitle,
   setNavbarSplitSizes,
   setNewspaperTitle,
@@ -40,7 +42,7 @@ import {
 import { disposeTagSuggestionWorker } from '@main/services/tagSuggestionService'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
-import type { DefaultView, GallerySort } from '@shared/types'
+import type { DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
 
 // Conservative cross-platform block list — matches photoHandlers.ts's file
 // rename validation, since folder names share the same filesystem constraints.
@@ -83,6 +85,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setTagsPanelGridView', (_event, value: boolean): void => {
     setTagsPanelGridView(value)
+  })
+
+  ipcMain.handle('settings:getGalleryViewMode', (): GalleryViewMode => getGalleryViewMode())
+
+  ipcMain.handle('settings:setGalleryViewMode', (_event, value: GalleryViewMode): void => {
+    setGalleryViewMode(value)
   })
 
   ipcMain.handle('settings:getAiTagSuggestionsEnabled', (): boolean => getAiTagSuggestionsEnabled())

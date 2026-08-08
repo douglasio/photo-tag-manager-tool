@@ -6,6 +6,7 @@ import type {
   DuplicateGroup,
   DuplicateProgress,
   GallerySort,
+  GalleryViewMode,
   MetadataBatchEvent,
   MoveProgressEvent,
   PhotoRecord,
@@ -65,6 +66,10 @@ const api = {
   getTagsPanelGridView: (): Promise<boolean> => ipcRenderer.invoke('settings:getTagsPanelGridView'),
   setTagsPanelGridView: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setTagsPanelGridView', value),
+  getGalleryViewMode: (): Promise<GalleryViewMode> =>
+    ipcRenderer.invoke('settings:getGalleryViewMode'),
+  setGalleryViewMode: (value: GalleryViewMode): Promise<void> =>
+    ipcRenderer.invoke('settings:setGalleryViewMode', value),
   getAiTagSuggestionsEnabled: (): Promise<boolean> =>
     ipcRenderer.invoke('settings:getAiTagSuggestionsEnabled'),
   setAiTagSuggestionsEnabled: (value: boolean): Promise<void> =>

@@ -2,6 +2,8 @@ import type { ReactElement } from 'react'
 
 export type DefaultView = 'dashboard' | 'gallery'
 
+export type GalleryViewMode = 'grid' | 'list'
+
 export type SupportedFormat = 'JPEG' | 'PNG' | 'TIFF'
 
 // Lossless EXIF-orientation-flip rotation — only meaningful for formats
