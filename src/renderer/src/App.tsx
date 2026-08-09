@@ -188,6 +188,26 @@ function AppLayout(): React.JSX.Element {
   // the details panel to describe.
   const isDuplicatesTabActive = state.activeTab === 'duplicates'
 
+  // Mantine's Tooltip only closes on a real mouseleave (it's built on
+  // floating-ui's useHover) — clicking a tooltip's own trigger doesn't
+  // dismiss it, so if that click's handler navigates away (e.g. opens a
+  // different tab) while the mouse never actually left the button, the
+  // tooltip has no event left to close it and stays floating over whatever
+  // renders next. floating-ui supports exactly this case via useDismiss's
+  // referencePress option, but Mantine's Tooltip doesn't expose it. This
+  // reproduces the same effect globally: every Mantine floating element
+  // (Tooltip, Popover, Menu, ...) closes on a real Escape keydown via its
+  // own built-in dismiss handling, so dispatching one on every pointerdown
+  // — before the target's own click handler runs — closes whatever's
+  // currently open first, regardless of what that click goes on to do.
+  useEffect(() => {
+    const handlePointerDown = (): void => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
   // Universal "jump to gallery" / "jump to dashboard" shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {

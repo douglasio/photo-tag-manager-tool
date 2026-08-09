@@ -116,13 +116,6 @@ export function GalleryGrid(): ReactElement {
   // instances, so per-cell state would leak "is renaming" onto the wrong photo.
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
 
-  // Controlled explicitly (rather than Mantine's default hover/focus
-  // tracking) so it's guaranteed closed on click — the Gallery tab stays
-  // mounted (Tabs' keepMounted "activity" mode) when this button switches to
-  // the Duplicates tab, so the tooltip's hover state never got a real
-  // mouseleave to clear it and stayed floating on top of the new tab.
-  const [duplicatesTooltipOpened, setDuplicatesTooltipOpened] = useState(false)
-
   // Ctrl/Cmd+click toggles selection; Shift+click extends a range from
   // selectedPath; a plain click replaces the selection with just this photo.
   const handleSelect = useCallback(
@@ -225,12 +218,7 @@ export function GalleryGrid(): ReactElement {
                   <Tooltip label="Clear selection">
                     <ActionIcon
                       variant="subtle"
-                      onClick={(event) => {
-                        // Same orphaned-tooltip issue as above — this button
-                        // disappears once the selection is cleared.
-                        event.currentTarget.blur()
-                        clearSelection()
-                      }}
+                      onClick={() => clearSelection()}
                       aria-label="Clear selection"
                     >
                       <IconX size={16} />
@@ -243,13 +231,7 @@ export function GalleryGrid(): ReactElement {
                           variant="default"
                           ml="xs"
                           aria-label="Compare photos"
-                          onClick={(event) => {
-                            // Blurs before the tab switch below unmounts this
-                            // button, so the tooltip closes instead of being
-                            // orphaned open.
-                            event.currentTarget.blur()
-                            openCompareTab(Array.from(state.selectedPaths))
-                          }}
+                          onClick={() => openCompareTab(Array.from(state.selectedPaths))}
                         >
                           <IconColumns2 size={16} />
                         </ActionIcon>
@@ -257,18 +239,11 @@ export function GalleryGrid(): ReactElement {
                     )}
                 </>
               )}
-              <Tooltip label="Show duplicate photos" opened={duplicatesTooltipOpened}>
+              <Tooltip label="Show duplicate photos">
                 <ActionIcon
                   variant="default"
                   aria-label="Show duplicate photos"
-                  onMouseEnter={() => setDuplicatesTooltipOpened(true)}
-                  onMouseLeave={() => setDuplicatesTooltipOpened(false)}
-                  onFocus={() => setDuplicatesTooltipOpened(true)}
-                  onBlur={() => setDuplicatesTooltipOpened(false)}
-                  onClick={() => {
-                    setDuplicatesTooltipOpened(false)
-                    openDuplicatesTab()
-                  }}
+                  onClick={openDuplicatesTab}
                 >
                   <IconStack2 size={16} />
                 </ActionIcon>

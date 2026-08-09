@@ -8,7 +8,7 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 2. Gallery preview zoom is not very smooth and doesn't zoom in enough
 
-3. It seems like all tooltips can potentially remain visible after switching tabs. Is there a more global fix that can address this behavior?
+3. ~~It seems like all tooltips can potentially remain visible after switching tabs. Is there a more global fix that can address this behavior?~~ Fixed — see `setActiveTab` in `PhotoLibraryContext.tsx`.
 
 4. The cancel button on the AI initialization popup isn't working as expected. It seems like it may eventually stop the process, but it signals that it's completed, not stopped. So when you go to view the duplicate photos again, it still has some scanning to do. This is obviously misleading, the cancel button should actually cancel and dismiss the toast immediately and turn the AI feature flag back off.
 
