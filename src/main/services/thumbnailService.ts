@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 import { app } from 'electron'
-import { mkdir, unlink } from 'fs/promises'
+import { mkdir, rm, unlink } from 'fs/promises'
 import { join } from 'path'
 import sharp from 'sharp'
 
@@ -58,4 +58,13 @@ export async function generateThumbnail(filePath: string, thumbnailKey: string):
 export async function deleteThumbnail(thumbnailKey: string): Promise<void> {
   const filePath = await thumbnailFilePath(thumbnailKey)
   await unlink(filePath).catch(() => undefined)
+}
+
+// Wipes the entire thumbnail cache (clearing the library) — the cached
+// directory path is reset too, so the next thumbnailFilePath/generateThumbnail
+// call recreates the directory rather than assuming it still exists.
+export async function deleteAllThumbnails(): Promise<void> {
+  const dir = await getThumbnailDir()
+  await rm(dir, { recursive: true, force: true })
+  thumbnailDir = null
 }

@@ -127,6 +127,9 @@ const api = {
     ipcRenderer.invoke('settings:removeFolder', folder),
   renameFolder: (folder: string, newBaseName: string): Promise<string> =>
     ipcRenderer.invoke('settings:renameFolder', folder, newBaseName),
+  exportDatabase: (): Promise<boolean> => ipcRenderer.invoke('library:exportDatabase'),
+  importDatabase: (): Promise<void> => ipcRenderer.invoke('library:importDatabase'),
+  clearLibrary: (): Promise<void> => ipcRenderer.invoke('library:clearLibrary'),
   startScan: (rootPath: string): Promise<ScanStartResult> =>
     ipcRenderer.invoke('scan:start', rootPath),
   startScanAll: (rootPaths: string[]): Promise<ScanStartResult> =>

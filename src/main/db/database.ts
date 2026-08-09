@@ -4,11 +4,14 @@ import { join } from 'path'
 
 let db: Database.Database | null = null
 
+export function getDbPath(): string {
+  return join(app.getPath('userData'), 'photag.db')
+}
+
 export function getDb(): Database.Database {
   if (db) return db
 
-  const dbPath = join(app.getPath('userData'), 'photag.db')
-  db = new Database(dbPath)
+  db = new Database(getDbPath())
   db.pragma('journal_mode = WAL')
 
   db.exec(`
@@ -136,4 +139,12 @@ export function getDb(): Database.Database {
   }
 
   return db
+}
+
+// Closes the live connection so its file can be safely deleted or replaced
+// out from under it (importing/clearing the library) — the next getDb()
+// call transparently reopens (and re-migrates, if needed) from disk.
+export function closeDb(): void {
+  db?.close()
+  db = null
 }
