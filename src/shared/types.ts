@@ -129,12 +129,6 @@ export interface TagSuggestion {
   score: number
 }
 
-export interface DuplicateProgress {
-  phase: 'embedding' | 'comparing'
-  done: number
-  total: number
-}
-
 export interface DuplicateGroup {
   filePaths: string[]
   // Average pairwise cosine similarity across the group's members.
@@ -159,7 +153,21 @@ export interface ThrowbackYearSample {
   filePaths: string[]
 }
 
-export interface EmbedLibraryProgress {
+// Spans the whole "enable AI features" flow: model download, then warming
+// the shared embedding cache, then clustering duplicates. 'clustering's
+// done/total are a normalized 0-100 percentage, never the raw n*(n-1)/2
+// pair count — that number is huge even for modest libraries and reads as
+// alarming/broken if shown directly.
+export type AiScanPhase = 'downloading' | 'embedding' | 'clustering'
+
+export interface AiScanProgress {
+  phase: AiScanPhase
   done: number
   total: number
+}
+
+export interface AiScanResult {
+  duplicateGroups: DuplicateGroup[]
+  photosScanned: number
+  canceled: boolean
 }

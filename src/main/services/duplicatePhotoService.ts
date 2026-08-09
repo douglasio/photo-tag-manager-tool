@@ -1,77 +1,96 @@
-import { getAllEmbeddings } from '@main/db/embeddingRepository'
-import type { DuplicateGroup, DuplicateProgress, SimilarPhoto } from '@shared/types'
+import { join } from 'path'
+import { Worker } from 'worker_threads'
 
-import { cosineSimilarity, DisjointSet } from './embeddingSimilarity'
-import { embedAllReadyPhotos, getOrComputeEmbedding } from './photoEmbedding'
+import { getAllEmbeddings } from '@main/db/embeddingRepository'
+import type {
+  ClusterInputPhoto,
+  WorkerRequest,
+  WorkerResponse
+} from '@main/workers/duplicateClusterProtocol'
+import { rejectAllPending } from '@main/workers/pendingRequests'
+import type { DuplicateGroup, SimilarPhoto } from '@shared/types'
+
+import { cosineSimilarity } from './embeddingSimilarity'
+import type { EmbeddedPhoto } from './photoEmbedding'
+import { getOrComputeEmbedding } from './photoEmbedding'
 
 // Near-identical shots (burst mode, minor crop/exposure differences) score
 // above this; genuinely different photos essentially never do.
 const DUPLICATE_THRESHOLD = 0.97
 
-// Yield to the event loop every this-many pairwise comparisons during
-// clustering, so a large library doesn't freeze the main process.
-const YIELD_EVERY = 20_000
+let worker: Worker | null = null
+let nextRequestId = 0
+const pendingCluster = new Map<
+  number,
+  {
+    resolve: (result: { groups: DuplicateGroup[]; canceled: boolean }) => void
+    reject: (err: Error) => void
+    onProgress?: (comparisons: number, totalPairs: number) => void
+  }
+>()
 
-function yieldToEventLoop(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve))
+function getWorker(): Worker {
+  if (worker) return worker
+  const workerPath = join(__dirname, 'duplicateClusterWorker.js')
+  worker = new Worker(workerPath)
+  worker.on('message', (message: WorkerResponse) => {
+    const pending = pendingCluster.get(message.requestId)
+    if (!pending) return
+    if (message.type === 'progress') {
+      pending.onProgress?.(message.comparisons, message.totalPairs)
+    } else if (message.type === 'result') {
+      pending.resolve({ groups: message.groups, canceled: message.canceled })
+      pendingCluster.delete(message.requestId)
+    } else if (message.type === 'error') {
+      pending.reject(new Error(message.message))
+      pendingCluster.delete(message.requestId)
+    }
+  })
+  worker.on('error', (err: Error) => {
+    rejectAllPending(pendingCluster, err)
+  })
+  return worker
 }
 
-// Embeds every not-yet-cached photo (reporting progress as it goes, since
-// this is the slow part on a cold cache), then clusters the full set by
-// pairwise cosine similarity. Cached embeddings make every run after the
-// first fast — only new/changed photos need embedding again.
-export async function findDuplicateGroups(
-  onProgress?: (progress: DuplicateProgress) => void
-): Promise<DuplicateGroup[]> {
-  const embedded = await embedAllReadyPhotos((done, total) => {
-    onProgress?.({ phase: 'embedding', done, total })
-  })
-  const photos = embedded
-  const embeddings = embedded.map((photo) => photo.embedding)
+function send(message: WorkerRequest): void {
+  getWorker().postMessage(message)
+}
 
-  const disjointSet = new DisjointSet(photos.length)
-  const totalPairs = (photos.length * (photos.length - 1)) / 2
-  let comparisons = 0
-  for (let i = 0; i < photos.length; i++) {
-    for (let j = i + 1; j < photos.length; j++) {
-      if (cosineSimilarity(embeddings[i], embeddings[j]) >= DUPLICATE_THRESHOLD) {
-        disjointSet.union(i, j)
-      }
-      comparisons++
-      if (comparisons % YIELD_EVERY === 0) {
-        onProgress?.({ phase: 'comparing', done: comparisons, total: totalPairs })
-        await yieldToEventLoop()
-      }
+// Clusters already-embedded photos by pairwise cosine similarity, off the
+// main process — the O(n²) comparison used to run inline here and could
+// visibly block the app on a large library. isCancelled is polled (the
+// worker can't see the caller's flag directly) and forwarded as a 'cancel'
+// message the first time it flips true.
+export async function clusterDuplicates(
+  photos: EmbeddedPhoto[],
+  onProgress?: (comparisons: number, totalPairs: number) => void,
+  isCancelled?: () => boolean
+): Promise<{ groups: DuplicateGroup[]; canceled: boolean }> {
+  const requestId = nextRequestId++
+  const clusterInput: ClusterInputPhoto[] = photos.map(({ filePath, embedding }) => ({
+    filePath,
+    embedding
+  }))
+
+  const resultPromise = new Promise<{ groups: DuplicateGroup[]; canceled: boolean }>(
+    (resolve, reject) => {
+      pendingCluster.set(requestId, { resolve, reject, onProgress })
     }
-  }
-  onProgress?.({ phase: 'comparing', done: totalPairs, total: totalPairs })
+  )
+  send({ type: 'cluster', requestId, photos: clusterInput, threshold: DUPLICATE_THRESHOLD })
 
-  const groupIndices = new Map<number, number[]>()
-  for (let i = 0; i < photos.length; i++) {
-    const root = disjointSet.find(i)
-    const indices = groupIndices.get(root)
-    if (indices) indices.push(i)
-    else groupIndices.set(root, [i])
+  let cancelTimer: ReturnType<typeof setInterval> | null = null
+  if (isCancelled) {
+    cancelTimer = setInterval(() => {
+      if (isCancelled()) send({ type: 'cancel', requestId })
+    }, 200)
   }
 
-  // Average pairwise similarity within the group — a more meaningful label
-  // than an arbitrary group number, and cheap since groups are small.
-  return Array.from(groupIndices.values())
-    .filter((indices) => indices.length > 1)
-    .map((indices) => {
-      let total = 0
-      let pairs = 0
-      for (let i = 0; i < indices.length; i++) {
-        for (let j = i + 1; j < indices.length; j++) {
-          total += cosineSimilarity(embeddings[indices[i]], embeddings[indices[j]])
-          pairs++
-        }
-      }
-      return {
-        filePaths: indices.map((i) => photos[i].filePath),
-        similarity: total / pairs
-      }
-    })
+  try {
+    return await resultPromise
+  } finally {
+    if (cancelTimer) clearInterval(cancelTimer)
+  }
 }
 
 // For one photo's Details Panel — only compares against embeddings already
@@ -93,4 +112,15 @@ export async function findSimilarPhotos(
 
   results.sort((a, b) => b.score - a.score)
   return results.slice(0, limit)
+}
+
+// Frees the worker when AI features are disabled or the app quits — the
+// next cluster request transparently respawns it.
+export async function disposeDuplicateClusterWorker(): Promise<void> {
+  if (!worker) return
+  const w = worker
+  worker = null
+  const disposedError = new Error('Duplicate detection worker disposed')
+  rejectAllPending(pendingCluster, disposedError)
+  await w.terminate()
 }

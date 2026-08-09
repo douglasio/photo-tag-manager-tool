@@ -3,10 +3,13 @@ import { type ReactElement, useEffect, useState } from 'react'
 import {
   Alert,
   Badge,
+  Box,
   Button,
   Card,
+  Center,
   Group,
   Image,
+  Loader,
   Progress,
   ScrollArea,
   Stack,
@@ -15,36 +18,49 @@ import {
 } from '@mantine/core'
 import { IconRefresh } from '@tabler/icons-react'
 
+import { EnableAiFeaturesDialog } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { DuplicateGroup } from '@shared/types'
 import { usePhotoLibrary } from '@state'
+import { aiScanStepLabel } from '@utils'
 
 const THUMB_SIZE = 120
 
 // Opened via the Gallery's "Show duplicates" button (see GalleryGrid) as its
-// own tab — runs findDuplicateGroups on mount/recompute and renders each
-// resulting cluster as a row of thumbnails.
+// own tab — runs the shared AI scan on mount/recompute (via rescanAiFeatures,
+// which also warms tag suggestions and Time Warp) and renders each resulting
+// duplicate cluster as a row of thumbnails.
 export function DuplicatesView(): ReactElement {
-  const { state, findDuplicateGroups, openPhotoTab } = usePhotoLibrary()
+  const { state, rescanAiFeatures, enableAiFeatures, cancelAiScan, openPhotoTab } =
+    usePhotoLibrary()
   const [groups, setGroups] = useState<DuplicateGroup[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [canceled, setCanceled] = useState(false)
   const [scanCount, setScanCount] = useState(0)
+  // Duplicate detection rides the same AI model/embeddings as tag
+  // suggestions and Time Warp — gated the same way, rather than silently
+  // downloading the model in the background the moment this tab opens.
+  const [enableAiOpened, setEnableAiOpened] = useState(false)
 
   // Adjust-during-render (not inside the effect below) the instant
-  // "Recompute" bumps scanCount — same pattern useTagSuggestions uses to
+  // "Scan again" bumps scanCount — same pattern useTagSuggestions uses to
   // reset state synchronously without triggering the set-state-in-effect lint rule.
   const [trackedScanCount, setTrackedScanCount] = useState(scanCount)
   if (trackedScanCount !== scanCount) {
     setTrackedScanCount(scanCount)
     setGroups(null)
     setError(null)
+    setCanceled(false)
   }
 
   useEffect(() => {
+    if (!state.aiTagSuggestionsEnabled) return
     let cancelled = false
-    findDuplicateGroups()
+    rescanAiFeatures()
       .then((result) => {
-        if (!cancelled) setGroups(result)
+        if (cancelled) return
+        setGroups(result.duplicateGroups)
+        setCanceled(result.canceled)
       })
       .catch((err: unknown) => {
         console.error('failed to scan for duplicate photos', err)
@@ -53,9 +69,27 @@ export function DuplicatesView(): ReactElement {
     return () => {
       cancelled = true
     }
-  }, [findDuplicateGroups, scanCount])
+  }, [rescanAiFeatures, scanCount, state.aiTagSuggestionsEnabled])
 
-  const progress = state.duplicateScanProgress
+  if (!state.aiTagSuggestionsEnabled) {
+    return (
+      <Center flex={1} mih={0} p="md">
+        <Stack align="center" gap="sm" w={360}>
+          <Text ta="center" c="dimmed">
+            Duplicate detection requires AI features to be enabled.
+          </Text>
+          <Button onClick={() => setEnableAiOpened(true)}>Enable AI features</Button>
+        </Stack>
+        <EnableAiFeaturesDialog
+          opened={enableAiOpened}
+          onCancel={() => setEnableAiOpened(false)}
+          onConfirm={enableAiFeatures}
+        />
+      </Center>
+    )
+  }
+
+  const progress = state.aiScanProgress
   const loading = groups === null && !error
 
   return (
@@ -70,32 +104,46 @@ export function DuplicatesView(): ReactElement {
           disabled={loading}
           onClick={() => setScanCount((count) => count + 1)}
         >
-          Recompute
+          Scan again
         </Button>
       </Group>
 
       {loading && (
-        <Stack gap={4} style={{ flexShrink: 0 }}>
-          <Progress
-            value={progress && progress.total > 0 ? (progress.done / progress.total) * 100 : 0}
-            animated
-          />
-          <Text size="xs" c="dimmed">
-            {progress?.phase === 'comparing' ? 'Comparing photos' : 'Analyzing photos'}…{' '}
-            {progress?.done ?? 0}/{progress?.total ?? 0}
-          </Text>
-        </Stack>
+        <Center flex={1} mih={0}>
+          <Stack align="center" gap="xl" w={320}>
+            {progress ? (
+              <Stack align="center" gap="xs" w="100%">
+                <Progress
+                  value={progress.total > 0 ? (progress.done / progress.total) * 100 : 0}
+                  size="sm"
+                  w="100%"
+                  animated
+                />
+                <Text c="dimmed" size="sm">
+                  {aiScanStepLabel(progress.phase)}
+                </Text>
+              </Stack>
+            ) : (
+              <Loader size="sm" />
+            )}
+            <Button variant="subtle" color="red" size="xs" onClick={cancelAiScan}>
+              Cancel
+            </Button>
+          </Stack>
+        </Center>
       )}
 
       {error && (
-        <Alert color="red" style={{ flexShrink: 0 }}>
-          {error}
-        </Alert>
+        <Box>
+          <Alert display="inline-block" color="red" style={{ flexShrink: 0 }}>
+            {error}
+          </Alert>
+        </Box>
       )}
 
       {groups && groups.length === 0 && (
         <Text c="dimmed" style={{ flexShrink: 0 }}>
-          No duplicates found.
+          {canceled ? 'Scan canceled.' : 'No duplicates found.'}
         </Text>
       )}
 

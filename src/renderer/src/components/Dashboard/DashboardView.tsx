@@ -31,6 +31,7 @@ export function DashboardView(): React.JSX.Element {
       cols={3}
       spacing="lg"
       p="md"
+      pb="lg"
       // minmax (not a flat 1fr) — rows still match each other by default, but
       // can grow past that floor for taller content (e.g. Throwback's
       // Timeline), with the grid itself scrolling instead of clipping.

@@ -17,7 +17,9 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/main/index.ts'),
-          tagSuggestionWorker: resolve('src/main/workers/tagSuggestionWorker.ts')
+          tagSuggestionWorker: resolve('src/main/workers/tagSuggestionWorker.ts'),
+          duplicateClusterWorker: resolve('src/main/workers/duplicateClusterWorker.ts'),
+          throwbackSimilarityWorker: resolve('src/main/workers/throwbackSimilarityWorker.ts')
         }
       }
     },

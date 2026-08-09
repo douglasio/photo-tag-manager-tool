@@ -25,6 +25,13 @@ export interface EmbeddedPhoto {
   embedding: number[]
 }
 
+// Reporting on every single photo flooded the renderer with a progress
+// dispatch (and a notification re-render) per photo — invisible on a small
+// library, but enough on a large one to make the whole app feel locked up.
+// Cancellation is checked every iteration regardless (cheap, and must stay
+// responsive); only the onProgress call itself is throttled.
+const PROGRESS_INTERVAL_MS = 150
+
 // Embeds every not-yet-cached ready photo, reporting progress as it goes and
 // checking isCancelled between photos — shared by duplicate detection (no
 // cancellation) and the Throwback widget's opt-in "Time Warp" library scan
@@ -37,11 +44,17 @@ export async function embedAllReadyPhotos(
 ): Promise<EmbeddedPhoto[]> {
   const photos = findAllReadyPhotos()
   const results: EmbeddedPhoto[] = []
+  let lastProgressAt = 0
   for (let i = 0; i < photos.length; i++) {
     if (isCancelled?.()) break
     const embedding = await getOrComputeEmbedding(photos[i].filePath, photos[i].thumbnailKey)
     results.push({ ...photos[i], embedding })
-    onProgress?.(i + 1, photos.length)
+    const done = i + 1
+    const now = Date.now()
+    if (done === photos.length || now - lastProgressAt >= PROGRESS_INTERVAL_MS) {
+      lastProgressAt = now
+      onProgress?.(done, photos.length)
+    }
   }
   return results
 }

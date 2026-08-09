@@ -89,6 +89,18 @@ export function setAiTagSuggestionsEnabled(value: boolean): void {
   setSetting('aiTagSuggestionsEnabled', String(value))
 }
 
+// Set while a scan is running and cleared when it finishes for any reason
+// while the app is still alive (success, error, or user cancel) — so if it's
+// still true on the next launch, the previous scan was cut off by a quit
+// rather than resolved, and is safe to silently resume.
+export function getAiScanInProgress(): boolean {
+  return getSetting('aiScanInProgress') === 'true'
+}
+
+export function setAiScanInProgress(value: boolean): void {
+  setSetting('aiScanInProgress', String(value))
+}
+
 // Defaults to Dashboard, same reasoning as getGalleryAnimationsEnabled above.
 export function getDefaultView(): DefaultView {
   return getSetting('defaultView') === 'gallery' ? 'gallery' : 'dashboard'

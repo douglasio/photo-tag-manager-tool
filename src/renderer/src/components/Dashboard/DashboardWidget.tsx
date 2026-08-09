@@ -14,17 +14,17 @@ const DashboardWidget: React.FC<Widget> = ({ id, title, description, component, 
       id={id}
       h="100%"
       display="flex"
-      bg="#282b4c"
+      bg="dark"
       style={{
         flexDirection: 'column',
-        overflowX: 'hidden',
+        // overflowX: 'hidden',
         // auto (not hidden) — a widget's content can be taller than the
         // grid row it landed in (rows don't truly auto-grow to content
         // height here, since every widget's own h=100%/flex-fill layout
         // depends on a bounded parent height, which conflicts with CSS
         // Grid's auto-track-sizing); scrolling keeps that content reachable
         // instead of silently clipping it.
-        overflowY: 'auto',
+        // overflowY: 'auto',
         minHeight: 0,
         ...(colSpan && colSpan > 1 && { gridColumn: `span ${colSpan}` })
       }}

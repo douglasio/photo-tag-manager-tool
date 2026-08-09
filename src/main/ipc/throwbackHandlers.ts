@@ -1,6 +1,5 @@
 import { ipcMain } from 'electron'
 
-import { embedAllReadyPhotos } from '@main/services/photoEmbedding'
 import {
   findThrowbackPreview,
   findThrowbackSimilarity,
@@ -8,11 +7,11 @@ import {
 } from '@main/services/throwbackService'
 import type { ThrowbackEntry, ThrowbackYearSample } from '@shared/types'
 
-// Owns the currently in-flight "Time Warp" scan's cancellation flag, if
-// any — a fresh object per run so a cancel request from a previous
-// (already-finished) run can never affect a new one.
-let currentScan: { cancelled: boolean } | null = null
-
+// Read-only queries against whatever the shared embedding cache already
+// holds — the scan that actually populates it (embedding + duplicate
+// clustering) lives in aiScanService.ts/aiHandlers.ts now, shared with tag
+// suggestions and duplicate detection instead of Time Warp running its own
+// private copy.
 export function registerThrowbackHandlers(): void {
   ipcMain.handle('throwback:getSimilarity', (): Promise<ThrowbackEntry[] | null> =>
     findThrowbackSimilarity()
@@ -23,23 +22,4 @@ export function registerThrowbackHandlers(): void {
   )
 
   ipcMain.handle('throwback:getPreview', (): ThrowbackEntry[] | null => findThrowbackPreview())
-
-  ipcMain.handle('throwback:embedLibrary', async (event): Promise<void> => {
-    const scan = { cancelled: false }
-    currentScan = scan
-    try {
-      await embedAllReadyPhotos(
-        (done, total) => {
-          event.sender.send('throwback:embedLibraryProgress', { done, total })
-        },
-        () => scan.cancelled
-      )
-    } finally {
-      if (currentScan === scan) currentScan = null
-    }
-  })
-
-  ipcMain.handle('throwback:cancelEmbedLibrary', (): void => {
-    if (currentScan) currentScan.cancelled = true
-  })
 }

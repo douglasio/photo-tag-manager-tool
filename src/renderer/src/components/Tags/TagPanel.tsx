@@ -238,12 +238,7 @@ function TagListItem({
                     </ActionIcon>
                   </Tooltip>
                 )}
-                <Badge
-                  circle
-                  size="lg"
-                  variant={isActive ? 'filled' : 'light'}
-                  style={{ flexShrink: 0 }}
-                >
+                <Badge size="md" variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
                   {count}
                 </Badge>
               </>
@@ -320,7 +315,7 @@ function UntaggedRow({ count, isActive, onSelect }: UntaggedRowProps): ReactElem
       bg={activeHoverBackground(isActive, hovered)}
       // leftSection={<IconTagOff size={16} />}
       rightSection={
-        <Badge circle size="lg" variant={isActive ? 'filled' : 'light'}>
+        <Badge size="md" variant={isActive ? 'filled' : 'light'}>
           {count}
         </Badge>
       }

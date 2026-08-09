@@ -49,7 +49,9 @@ describe('tagSuggestionService', () => {
   })
 
   it('spawns the worker and sends init when ensureModelReady is first called', () => {
-    void ensureModelReady()
+    // Never resolved in this test — the next test's beforeEach disposal
+    // rejects it, so swallow that here rather than leave it unhandled.
+    void ensureModelReady().catch(() => undefined)
 
     expect(workerTracker.current).not.toBeNull()
     expect(workerTracker.current!.posted).toEqual([
@@ -83,7 +85,8 @@ describe('tagSuggestionService', () => {
 
   it('reports download progress via the onProgress callback', () => {
     const onProgress = vi.fn()
-    void ensureModelReady(onProgress)
+    // Never resolved in this test — see the identical note above.
+    void ensureModelReady(onProgress).catch(() => undefined)
     workerTracker.current!.emit('message', { type: 'downloadProgress', progress: 42 })
 
     expect(onProgress).toHaveBeenCalledExactlyOnceWith(42)
@@ -123,6 +126,17 @@ describe('tagSuggestionService', () => {
     })
 
     await expect(promise).rejects.toThrow('inference failed')
+  })
+
+  it('disposeTagSuggestionWorker rejects a caller still awaiting ensureModelReady', async () => {
+    // Regression: disposing used to null out readyPromise without settling
+    // it, leaving a caller mid-download (e.g. one Cancel needs to unblock)
+    // hanging forever instead of seeing the model become unavailable.
+    const promise = ensureModelReady()
+
+    await disposeTagSuggestionWorker()
+
+    await expect(promise).rejects.toThrow()
   })
 
   it('disposeTagSuggestionWorker terminates the worker and rejects pending requests', async () => {

@@ -264,6 +264,22 @@ describe('photoLibraryReducer', () => {
       expect(flipped[key]).toBe(false)
     })
 
+    it('SET_AI_TAG_SUGGESTIONS_ENABLED flips the flag but returns the same state when unchanged', () => {
+      const enabled = photoLibraryReducer(initialState, {
+        type: 'SET_AI_TAG_SUGGESTIONS_ENABLED',
+        value: true
+      })
+      expect(enabled.aiTagSuggestionsEnabled).toBe(true)
+
+      // Guarded (unlike the toggles above) since runAiScan dispatches this
+      // repeatedly on every throttled progress tick once embedding starts.
+      const repeated = photoLibraryReducer(enabled, {
+        type: 'SET_AI_TAG_SUGGESTIONS_ENABLED',
+        value: true
+      })
+      expect(repeated).toBe(enabled)
+    })
+
     it('sets the default view', () => {
       const state = photoLibraryReducer(initialState, {
         type: 'SET_DEFAULT_VIEW',

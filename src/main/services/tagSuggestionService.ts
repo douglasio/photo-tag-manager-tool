@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 
+import { rejectAllPending } from '@main/workers/pendingRequests'
 import type { WorkerRequest, WorkerResponse } from '@main/workers/tagSuggestionProtocol'
 import type { TagSuggestion } from '@shared/types'
 
@@ -10,6 +11,11 @@ let worker: Worker | null = null
 // opening around the same time) share one in-flight init instead of each
 // sending their own 'init' message.
 let readyPromise: Promise<void> | null = null
+// The pending readyPromise's own reject — disposeTagSuggestionWorker uses
+// this to unblock a caller stuck awaiting ensureModelReady() when the
+// worker is torn down mid-download, since nulling readyPromise alone
+// doesn't settle the promise callers are already awaiting.
+let readyReject: ((err: Error) => void) | null = null
 
 let nextRequestId = 0
 const pendingClassify = new Map<
@@ -41,10 +47,8 @@ function getWorker(): Worker {
     }
   })
   worker.on('error', (err: Error) => {
-    for (const { reject } of pendingClassify.values()) reject(err)
-    pendingClassify.clear()
-    for (const { reject } of pendingEmbed.values()) reject(err)
-    pendingEmbed.clear()
+    rejectAllPending(pendingClassify, err)
+    rejectAllPending(pendingEmbed, err)
   })
   return worker
 }
@@ -60,16 +64,19 @@ export function ensureModelReady(onProgress?: (progress: number) => void): Promi
   if (readyPromise) return readyPromise
 
   readyPromise = new Promise<void>((resolve, reject) => {
+    readyReject = reject
     const w = getWorker()
     const handleMessage = (message: WorkerResponse): void => {
       if (message.type === 'downloadProgress') {
         onProgress?.(message.progress)
       } else if (message.type === 'ready') {
         w.off('message', handleMessage)
+        readyReject = null
         resolve()
       } else if (message.type === 'initError') {
         w.off('message', handleMessage)
         readyPromise = null
+        readyReject = null
         reject(new Error(message.message))
       }
     }
@@ -111,9 +118,9 @@ export async function disposeTagSuggestionWorker(): Promise<void> {
   worker = null
   readyPromise = null
   const disposedError = new Error('AI tag suggestions disabled')
-  for (const { reject } of pendingClassify.values()) reject(disposedError)
-  pendingClassify.clear()
-  for (const { reject } of pendingEmbed.values()) reject(disposedError)
-  pendingEmbed.clear()
+  readyReject?.(disposedError)
+  readyReject = null
+  rejectAllPending(pendingClassify, disposedError)
+  rejectAllPending(pendingEmbed, disposedError)
   await w.terminate()
 }

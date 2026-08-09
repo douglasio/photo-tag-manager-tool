@@ -1,17 +1,41 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockGetAllEmbeddings, mockFindAllReadyPhotosWithDate } = vi.hoisted(() => ({
-  mockGetAllEmbeddings: vi.fn(),
-  mockFindAllReadyPhotosWithDate: vi.fn()
-}))
+const { mockGetAllEmbeddings, mockFindAllReadyPhotosWithDate, workerTracker } = vi.hoisted(() => {
+  // require, not the top-level `import`, since vi.hoisted's callback runs
+  // before even non-mocked imports are evaluated.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { EventEmitter } = require('node:events')
+  class FakeWorker extends EventEmitter {
+    posted: { type: string; requestId?: number }[] = []
+    terminate = vi.fn().mockResolvedValue(undefined)
+    postMessage(message: { type: string; requestId?: number }): void {
+      this.posted.push(message)
+    }
+  }
+  return {
+    mockGetAllEmbeddings: vi.fn(),
+    mockFindAllReadyPhotosWithDate: vi.fn(),
+    workerTracker: { current: null as InstanceType<typeof FakeWorker> | null, FakeWorker }
+  }
+})
 
 vi.mock('@main/db/embeddingRepository', () => ({ getAllEmbeddings: mockGetAllEmbeddings }))
 vi.mock('@main/db/photoRepository', () => ({
   findAllReadyPhotosWithDate: mockFindAllReadyPhotosWithDate
 }))
+vi.mock('worker_threads', () => ({
+  // A regular function, not an arrow function — vi.fn()'s mock
+  // implementation is invoked with `new`, which arrow functions can't be.
+  Worker: vi.fn().mockImplementation(function (this: unknown) {
+    const worker = new workerTracker.FakeWorker()
+    workerTracker.current = worker
+    return worker
+  })
+}))
 
 import {
+  disposeThrowbackSimilarityWorker,
   findThrowbackPreview,
   findThrowbackSimilarity,
   findThrowbackYearSample
@@ -28,19 +52,80 @@ function makeRawPhoto(filePath: string, year: number): RawPhoto {
 }
 
 describe('findThrowbackSimilarity', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await disposeThrowbackSimilarityWorker()
+    workerTracker.current = null
     mockGetAllEmbeddings.mockReset()
     mockFindAllReadyPhotosWithDate.mockReset()
   })
 
-  it('returns null when fewer than 2 cached-and-dated photos exist', async () => {
+  it('returns null without spawning a worker when fewer than 2 cached-and-dated photos exist', async () => {
     mockFindAllReadyPhotosWithDate.mockReturnValue([makeRawPhoto('/a.jpg', 2020)])
     mockGetAllEmbeddings.mockReturnValue([{ filePath: '/a.jpg', embedding: [1, 0] }])
 
     expect(await findThrowbackSimilarity()).toBeNull()
+    expect(workerTracker.current).toBeNull()
   })
 
-  it('returns null when no cross-year pair clears the similarity threshold', async () => {
+  it('sends only cached-and-dated photos to the worker, joined with their year', async () => {
+    // /undated.jpg has an embedding but never shows up in
+    // findAllReadyPhotosWithDate (no dateTaken) — should be excluded, not
+    // sent to the worker at all.
+    mockFindAllReadyPhotosWithDate.mockReturnValue([
+      makeRawPhoto('/2020.jpg', 2020),
+      makeRawPhoto('/2021.jpg', 2021)
+    ])
+    mockGetAllEmbeddings.mockReturnValue([
+      { filePath: '/2020.jpg', embedding: [1, 0] },
+      { filePath: '/2021.jpg', embedding: [0, 1] },
+      { filePath: '/undated.jpg', embedding: [1, 0] }
+    ])
+
+    const promise = findThrowbackSimilarity()
+    const computeMessage = workerTracker.current!.posted.find((m) => m.type === 'compute')
+
+    expect(computeMessage).toMatchObject({
+      type: 'compute',
+      photos: [
+        { filePath: '/2020.jpg', embedding: [1, 0], year: 2020 },
+        { filePath: '/2021.jpg', embedding: [0, 1], year: 2021 }
+      ]
+    })
+
+    workerTracker.current!.emit('message', {
+      type: 'result',
+      requestId: computeMessage!.requestId,
+      entries: null
+    })
+    await promise
+  })
+
+  it('resolves with whatever the worker returns', async () => {
+    mockFindAllReadyPhotosWithDate.mockReturnValue([
+      makeRawPhoto('/2019.jpg', 2019),
+      makeRawPhoto('/2022.jpg', 2022)
+    ])
+    mockGetAllEmbeddings.mockReturnValue([
+      { filePath: '/2019.jpg', embedding: [1, 0] },
+      { filePath: '/2022.jpg', embedding: [0, 1] }
+    ])
+    const entries = [
+      { year: 2019, filePath: '/2019.jpg' },
+      { year: 2022, filePath: '/2022.jpg' }
+    ]
+
+    const promise = findThrowbackSimilarity()
+    const computeMessage = workerTracker.current!.posted.find((m) => m.type === 'compute')
+    workerTracker.current!.emit('message', {
+      type: 'result',
+      requestId: computeMessage!.requestId,
+      entries
+    })
+
+    await expect(promise).resolves.toEqual(entries)
+  })
+
+  it('rejects when the worker reports an error', async () => {
     mockFindAllReadyPhotosWithDate.mockReturnValue([
       makeRawPhoto('/a.jpg', 2020),
       makeRawPhoto('/b.jpg', 2021)
@@ -50,74 +135,34 @@ describe('findThrowbackSimilarity', () => {
       { filePath: '/b.jpg', embedding: [0, 1] }
     ])
 
-    expect(await findThrowbackSimilarity()).toBeNull()
+    const promise = findThrowbackSimilarity()
+    const computeMessage = workerTracker.current!.posted.find((m) => m.type === 'compute')
+    workerTracker.current!.emit('message', {
+      type: 'error',
+      requestId: computeMessage!.requestId,
+      message: 'compute failed'
+    })
+
+    await expect(promise).rejects.toThrow('compute failed')
   })
 
-  it('pairs similar photos from different years, sorted oldest first', async () => {
+  it('disposeThrowbackSimilarityWorker terminates the worker and rejects pending requests', async () => {
     mockFindAllReadyPhotosWithDate.mockReturnValue([
-      makeRawPhoto('/2019.jpg', 2019),
-      makeRawPhoto('/2022.jpg', 2022)
+      makeRawPhoto('/a.jpg', 2020),
+      makeRawPhoto('/b.jpg', 2021)
     ])
     mockGetAllEmbeddings.mockReturnValue([
-      { filePath: '/2022.jpg', embedding: [1, 0] },
-      { filePath: '/2019.jpg', embedding: [0.9, Math.sqrt(1 - 0.9 ** 2)] }
+      { filePath: '/a.jpg', embedding: [1, 0] },
+      { filePath: '/b.jpg', embedding: [0, 1] }
     ])
 
-    const result = await findThrowbackSimilarity()
+    const promise = findThrowbackSimilarity()
+    const worker = workerTracker.current!
 
-    expect(result).toEqual([
-      { year: 2019, filePath: '/2019.jpg' },
-      { year: 2022, filePath: '/2022.jpg' }
-    ])
-  })
+    await disposeThrowbackSimilarityWorker()
 
-  it('never links two photos from the same year, even if visually near-identical', async () => {
-    mockFindAllReadyPhotosWithDate.mockReturnValue([
-      makeRawPhoto('/2020-a.jpg', 2020),
-      makeRawPhoto('/2020-b.jpg', 2020)
-    ])
-    mockGetAllEmbeddings.mockReturnValue([
-      { filePath: '/2020-a.jpg', embedding: [1, 0] },
-      { filePath: '/2020-b.jpg', embedding: [1, 0] }
-    ])
-
-    expect(await findThrowbackSimilarity()).toBeNull()
-  })
-
-  it('ignores cached embeddings for photos with no known dateTaken', async () => {
-    // /undated.jpg has an embedding but never shows up in
-    // findAllReadyPhotosWithDate (no dateTaken) — should be excluded, not
-    // crash on a missing year lookup.
-    mockFindAllReadyPhotosWithDate.mockReturnValue([makeRawPhoto('/2020.jpg', 2020)])
-    mockGetAllEmbeddings.mockReturnValue([
-      { filePath: '/2020.jpg', embedding: [1, 0] },
-      { filePath: '/undated.jpg', embedding: [1, 0] }
-    ])
-
-    expect(await findThrowbackSimilarity()).toBeNull()
-  })
-
-  it('picks the cluster spanning the most distinct years when multiple qualify', async () => {
-    mockFindAllReadyPhotosWithDate.mockReturnValue([
-      makeRawPhoto('/2018.jpg', 2018),
-      makeRawPhoto('/2019.jpg', 2019),
-      makeRawPhoto('/2020.jpg', 2020),
-      makeRawPhoto('/x1.jpg', 2021),
-      makeRawPhoto('/x2.jpg', 2022)
-    ])
-    mockGetAllEmbeddings.mockReturnValue([
-      // A 3-year cluster around [1, 0]...
-      { filePath: '/2018.jpg', embedding: [1, 0] },
-      { filePath: '/2019.jpg', embedding: [1, 0] },
-      { filePath: '/2020.jpg', embedding: [1, 0] },
-      // ...vs. a 2-year cluster around [0, 1].
-      { filePath: '/x1.jpg', embedding: [0, 1] },
-      { filePath: '/x2.jpg', embedding: [0, 1] }
-    ])
-
-    const result = await findThrowbackSimilarity()
-
-    expect(result?.map((entry) => entry.year)).toEqual([2018, 2019, 2020])
+    expect(worker.terminate).toHaveBeenCalledOnce()
+    await expect(promise).rejects.toThrow()
   })
 })
 

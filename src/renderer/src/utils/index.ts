@@ -1,4 +1,5 @@
 export * from './actionIcons'
+export * from './aiScanCopy'
 export * from './fileNameValidation'
 export * from './folderNameValidation'
 export * from './folderTree'

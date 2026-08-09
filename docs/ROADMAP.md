@@ -4,9 +4,21 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
-- Gallery preview zoom is not very smooth and doesn't zoom in enough
+1. The Throwback widget still has a loading state even with AI features disabled. It's just supposed to be displaying 5 random images from previous years, what's taking so long? Also, if I navigate to the Dashboard while this loading state is active, the app lock up until it resolves. (Don't revert my changes to the widget / dashboard heights, these were intentional)
 
-- The gap with the embedding scan being lazy / on-demand is if they enable Time Warp, the embeddings are added to all photos, and then new photos are added to the library, there will never be a re-trigger of the embed for the new photos so they'd never appear in the Time Warp widget. I think every time a new photo is added after enabling that feature, an embedding is also created as it's scanned. And then we can just add a setting in the settings menu to disable Time Warp at any time, which would turn off this scan.
+2. Gallery preview zoom is not very smooth and doesn't zoom in enough
+
+3. It seems like all tooltips can potentially remain visible after switching tabs. Is there a more global fix that can address this behavior?
+
+4. The cancel button on the AI initialization popup isn't working as expected. It seems like it may eventually stop the process, but it signals that it's completed, not stopped. So when you go to view the duplicate photos again, it still has some scanning to do. This is obviously misleading, the cancel button should actually cancel and dismiss the toast immediately and turn the AI feature flag back off.
+
+5. The duplicates tab should not re-scan for duplicates if you toggle back and forth. This is an extremely expensive calculation on larger libraries and should only app on the initial AI
+
+6. Duplicate scan still freezes up the app. If we can't get the app to run smoothly independent of these background jobs, there should be a full end-to-end process when AI features are enabled that takes over the window so the user is prevented from trying to keep working while everything is slow and janky.
+
+7. We need to globally disable "space bar to page down" as it interferes with the spacebar preview.
+
+8. The throwback widget should not re-calculate every time the tab is opened. Once per session.
 
 # Features
 
@@ -20,17 +32,33 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Corrupt photo finder
 
-5. I want to be able to ignore tags in certain folders, like archive folders and backups. I want to be able to right-click on a folder in the tree and say "ignore tags" which would add a little icon on the folder to indicate that it's ignored. Same right-click menu option should reverse the action. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab called Tags
+5. I want a global way to "ignore" a folder from appearing in the various features, including AI features. Ex. If there's a folder called "test", I should be able to right click it in the folder tree and say "Exclude from features" or something like that. In that case, it should not show up basically anywhere except if the folder is navigated to directly., All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab.
 
 ## AI
 
 - Face detection?
+
+- Disabling AI should actually uninstall the models, not just hide the features from the UI.
+
+- There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
 
 ## Navigation
 
 1. Truncate photo filenames in the tabs so more can fit. Hovering over the tab should reveal the full filename as a tooltip.
 
 ## Dashboard
+
+1. Turn dashboard into a tabbed experience using the Mantine Tabs Pills variant. Last selected tab should be persisted as the default tab whenever the Dashboard is re-opened later.
+
+- Home: Welcome widget, top viewed photos, "Recently Added" - new widget, see below
+- Tags: Tagging Progress, Featured Tag
+- History: Throwback Widget, Time Warp widget (displayed as its own widget if AI features are enabled)
+
+2. Add a Today widget showing photos added in the most recent scan.
+
+### Throwback Widget
+
+1. Let's ramp up the similarity threshold a bit on the Throwback widget timeline -- getting some really odd choices in there. There should be logic to skip a year if no images are found that are similar enough.
 
 ## Gallery View
 
@@ -58,7 +86,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 8. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
 
-## Details Panel
+## Tags
+
+1. Hovering over tags anywhere in the app should show a Popover with the full tag name and description (if available), after a short delay. Make sure this is shared functionality, do not duplicate the Popover layout in multiple places.
 
 ## Photo view
 
@@ -74,9 +104,15 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 2. Refine visualizations...
 
+3. Add "Art Gallery" and "movie theater" visualizations
+
 ## Settings
 
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
+
+2. Clean up AI enable flag UX
+
+3. Export db, clear db
 
 ## Optimization
 

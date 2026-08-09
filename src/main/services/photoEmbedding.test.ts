@@ -50,6 +50,21 @@ describe('embedAllReadyPhotos', () => {
     expect(onProgress).toHaveBeenNthCalledWith(2, 2, 2)
   })
 
+  it('throttles progress on a fast run, but always reports the final tally', async () => {
+    mockFindAllReadyPhotos.mockReturnValue(
+      makePhotos(['/a.jpg', '/b.jpg', '/c.jpg', '/d.jpg', '/e.jpg'])
+    )
+    const onProgress = vi.fn()
+
+    await embedAllReadyPhotos(onProgress)
+
+    // Unthrottled, this would fire once per photo (5 times); each mocked
+    // embed resolves near-instantly, well under the progress-throttle
+    // window, so the in-between ticks collapse away.
+    expect(onProgress.mock.calls.length).toBeLessThan(5)
+    expect(onProgress).toHaveBeenLastCalledWith(5, 5)
+  })
+
   it('reuses an already-cached embedding instead of re-embedding', async () => {
     mockFindAllReadyPhotos.mockReturnValue(makePhotos(['/a.jpg']))
     mockGetEmbedding.mockReturnValue(new Float32Array([1, 0]))

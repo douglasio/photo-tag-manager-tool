@@ -2,10 +2,9 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 
 import type {
+  AiScanProgress,
+  AiScanResult,
   DefaultView,
-  DuplicateGroup,
-  DuplicateProgress,
-  EmbedLibraryProgress,
   GallerySort,
   GalleryViewMode,
   MetadataBatchEvent,
@@ -77,15 +76,14 @@ const api = {
     ipcRenderer.invoke('settings:getAiTagSuggestionsEnabled'),
   setAiTagSuggestionsEnabled: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setAiTagSuggestionsEnabled', value),
-  ensureAiModelReady: (): Promise<void> => ipcRenderer.invoke('ai:ensureModelReady'),
-  onAiDownloadProgress: (callback: (progress: number) => void): (() => void) =>
-    subscribe('ai:downloadProgress', callback),
   suggestTags: (filePath: string, candidateLabels: string[]): Promise<TagSuggestion[]> =>
     ipcRenderer.invoke('ai:suggestTags', filePath, candidateLabels),
-  findDuplicateGroups: (): Promise<DuplicateGroup[]> =>
-    ipcRenderer.invoke('ai:findDuplicateGroups'),
-  onDuplicateProgress: (callback: (progress: DuplicateProgress) => void): (() => void) =>
-    subscribe('ai:duplicateProgress', callback),
+  enableAiFeaturesAndScan: (): Promise<AiScanResult> => ipcRenderer.invoke('ai:enableAndScan'),
+  rescanAiFeatures: (): Promise<AiScanResult> => ipcRenderer.invoke('ai:rescan'),
+  cancelAiScan: (): Promise<void> => ipcRenderer.invoke('ai:cancelScan'),
+  wasAiScanInterrupted: (): Promise<boolean> => ipcRenderer.invoke('ai:wasScanInterrupted'),
+  onAiScanProgress: (callback: (progress: AiScanProgress) => void): (() => void) =>
+    subscribe('ai:scanProgress', callback),
   findSimilarPhotos: (filePath: string, limit: number): Promise<SimilarPhoto[]> =>
     ipcRenderer.invoke('ai:findSimilarPhotos', filePath, limit),
   getThrowbackSimilarity: (): Promise<ThrowbackEntry[] | null> =>
@@ -94,10 +92,6 @@ const api = {
     ipcRenderer.invoke('throwback:getYearSample'),
   getThrowbackPreview: (): Promise<ThrowbackEntry[] | null> =>
     ipcRenderer.invoke('throwback:getPreview'),
-  embedLibrary: (): Promise<void> => ipcRenderer.invoke('throwback:embedLibrary'),
-  cancelEmbedLibrary: (): Promise<void> => ipcRenderer.invoke('throwback:cancelEmbedLibrary'),
-  onEmbedLibraryProgress: (callback: (progress: EmbedLibraryProgress) => void): (() => void) =>
-    subscribe('throwback:embedLibraryProgress', callback),
   getDetailsPanelCollapsed: (): Promise<boolean> =>
     ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
   setDetailsPanelCollapsed: (value: boolean): Promise<void> =>

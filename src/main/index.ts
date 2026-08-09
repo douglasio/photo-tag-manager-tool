@@ -19,7 +19,6 @@ import {
   registerThumbProtocolScheme
 } from './protocols/thumbProtocol'
 import { shutdownExifTool } from './services/metadataService'
-import { disposeTagSuggestionWorker } from './services/tagSuggestionService'
 import { setWatchTarget, unwatchAllFolders, watchFolder } from './services/watchManager'
 
 app.setName('Tag Me')
@@ -119,8 +118,14 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.on('before-quit', () => {
+    // Deliberately NOT canceling/disposing an in-flight AI scan here: doing
+    // so used to synchronously reject the scan's in-flight worker request,
+    // which tripped runFullAiScan's `finally` and cleared the persisted
+    // "scan in progress" flag before the process actually exited — silently
+    // undoing resume-on-launch. Letting the process die untouched leaves
+    // that flag exactly as it was, so the next launch resumes correctly;
+    // the OS reclaims the worker threads on process exit regardless.
     void shutdownExifTool()
     void unwatchAllFolders()
-    void disposeTagSuggestionWorker()
   })
 }

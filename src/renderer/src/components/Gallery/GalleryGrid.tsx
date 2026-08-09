@@ -116,6 +116,13 @@ export function GalleryGrid(): ReactElement {
   // instances, so per-cell state would leak "is renaming" onto the wrong photo.
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
 
+  // Controlled explicitly (rather than Mantine's default hover/focus
+  // tracking) so it's guaranteed closed on click — the Gallery tab stays
+  // mounted (Tabs' keepMounted "activity" mode) when this button switches to
+  // the Duplicates tab, so the tooltip's hover state never got a real
+  // mouseleave to clear it and stayed floating on top of the new tab.
+  const [duplicatesTooltipOpened, setDuplicatesTooltipOpened] = useState(false)
+
   // Ctrl/Cmd+click toggles selection; Shift+click extends a range from
   // selectedPath; a plain click replaces the selection with just this photo.
   const handleSelect = useCallback(
@@ -250,11 +257,18 @@ export function GalleryGrid(): ReactElement {
                     )}
                 </>
               )}
-              <Tooltip label="Show duplicate photos">
+              <Tooltip label="Show duplicate photos" opened={duplicatesTooltipOpened}>
                 <ActionIcon
                   variant="default"
                   aria-label="Show duplicate photos"
-                  onClick={openDuplicatesTab}
+                  onMouseEnter={() => setDuplicatesTooltipOpened(true)}
+                  onMouseLeave={() => setDuplicatesTooltipOpened(false)}
+                  onFocus={() => setDuplicatesTooltipOpened(true)}
+                  onBlur={() => setDuplicatesTooltipOpened(false)}
+                  onClick={() => {
+                    setDuplicatesTooltipOpened(false)
+                    openDuplicatesTab()
+                  }}
                 >
                   <IconStack2 size={16} />
                 </ActionIcon>

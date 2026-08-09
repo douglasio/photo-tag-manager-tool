@@ -1,3 +1,12 @@
+// Shared by duplicateClustering and throwbackSimilarity — yield to the event
+// loop every this-many pairwise comparisons, so a large embedding count
+// doesn't hog whichever thread one of their O(n²) loops runs on.
+export const SIMILARITY_YIELD_EVERY = 20_000
+
+export function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve))
+}
+
 // Shared by tagExemplarService (tag prototypes) and duplicatePhotoService
 // (near-duplicate detection) — both compare CLIP image embeddings.
 export function cosineSimilarity(a: ArrayLike<number>, b: ArrayLike<number>): number {

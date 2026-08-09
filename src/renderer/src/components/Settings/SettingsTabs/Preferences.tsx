@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { Group, Kbd, Progress, Radio, Stack, Switch, Text, TextInput } from '@mantine/core'
+import { Group, Kbd, Radio, Stack, Switch, Text, TextInput } from '@mantine/core'
 
 import type { DefaultView } from '@shared/types'
 import { usePhotoLibrary } from '@state'
@@ -148,9 +148,9 @@ function VisualizationsSection(): ReactElement {
 }
 
 function TagsSection(): ReactElement {
-  const { state, setAiTagSuggestionsEnabled, ensureAiModelReady } = usePhotoLibrary()
+  const { state, setAiTagSuggestionsEnabled, enableAiFeatures } = usePhotoLibrary()
   const [error, setError] = useState<string | null>(null)
-  const downloading = state.aiModelDownloadProgress !== null
+  const scanning = state.aiScanProgress !== null
 
   const handleToggle = async (checked: boolean): Promise<void> => {
     setError(null)
@@ -159,10 +159,11 @@ function TagsSection(): ReactElement {
       return
     }
     try {
-      await ensureAiModelReady()
-      setAiTagSuggestionsEnabled(true)
+      // enableAiFeatures drives its own progress/"ready" toast, tracked
+      // regardless of which tab you're on — no separate feedback needed here.
+      await enableAiFeatures()
     } catch (err) {
-      console.error('failed to download AI tag suggestion model', err)
+      console.error('failed to enable AI features', err)
       setError('Failed to download the AI model. Check your connection and try again.')
     }
   }
@@ -171,19 +172,11 @@ function TagsSection(): ReactElement {
     <Stack gap="xs">
       <Switch
         label="Enable AI tag suggestions"
-        description="Downloads a small on-device model (~50-90MB) the first time you turn this on. Runs fully offline afterward — nothing leaves your device."
+        description="Downloads a small on-device model (~50-90MB) the first time you turn this on, then scans your library for tag suggestions, duplicate detection, and Time Warp — tracked in a progress toast. Runs fully offline afterward."
         checked={state.aiTagSuggestionsEnabled}
-        disabled={downloading}
+        disabled={scanning}
         onChange={(event) => void handleToggle(event.currentTarget.checked)}
       />
-      {downloading && (
-        <Stack gap={4}>
-          <Progress value={state.aiModelDownloadProgress ?? 0} animated />
-          <Text size="xs" c="dimmed">
-            Downloading model… {Math.round(state.aiModelDownloadProgress ?? 0)}%
-          </Text>
-        </Stack>
-      )}
       {error && (
         <Text size="xs" c="red">
           {error}

@@ -13,12 +13,11 @@ import {
 
 import { notifications } from '@mantine/notifications'
 
-import { MoveProgressToast } from '@components'
+import { AiScanProgressToast, MoveProgressToast } from '@components'
 import type {
+  AiScanProgress,
+  AiScanResult,
   DefaultView,
-  DuplicateGroup,
-  DuplicateProgress,
-  EmbedLibraryProgress,
   GalleryViewMode,
   PhotoRecord,
   RotateDirection,
@@ -49,6 +48,10 @@ export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
 // How long to wait after the last file-watcher event before summarizing the
 // batch into a single toast, so a bulk copy/delete doesn't spam a toast per file.
 const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
+
+// Stable (not per-call) id — only one AI scan can be in flight app-wide at a
+// time, so re-triggering updates the same toast instead of stacking a new one.
+const AI_SCAN_NOTIFICATION_ID = 'ai-scan'
 
 // Which arrow key drove a photo-to-photo navigation — 'right' means the
 // photo being navigated to should visually enter from the right (the user
@@ -108,16 +111,21 @@ interface PhotoLibraryContextValue {
   setTagsPanelGridView: (value: boolean) => void
   setGalleryViewMode: (value: GalleryViewMode) => void
   setAiTagSuggestionsEnabled: (value: boolean) => void
-  ensureAiModelReady: () => Promise<void>
   suggestTags: (filePath: string, candidateLabels: string[]) => Promise<TagSuggestion[]>
-  findDuplicateGroups: () => Promise<DuplicateGroup[]>
   findSimilarPhotos: (filePath: string, limit: number) => Promise<SimilarPhoto[]>
   openDuplicatesTab: () => void
   getThrowbackSimilarity: () => Promise<ThrowbackEntry[] | null>
   getThrowbackYearSample: () => Promise<ThrowbackYearSample | null>
   getThrowbackPreview: () => Promise<ThrowbackEntry[] | null>
-  embedLibrary: () => Promise<void>
-  cancelEmbedLibrary: () => void
+  // Downloads the model (if needed), enables the AI features flag, then runs
+  // the shared scan (embedding + duplicate clustering) that warms tag
+  // suggestions, duplicate detection, and Time Warp all at once. Drives its
+  // own progress/"ready" toast directly, so it works regardless of which
+  // component calls it.
+  enableAiFeatures: () => Promise<AiScanResult>
+  // Re-runs the shared scan without the model-download step (AI already on).
+  rescanAiFeatures: () => Promise<AiScanResult>
+  cancelAiScan: () => void
   setNavbarSplitSizes: (sizes: [number, number]) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -987,46 +995,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setAiTagSuggestionsEnabled(value)
   }, [])
 
-  // Downloads (first time only) and loads the CLIP model — called by the
-  // Settings toggle before it persists "enabled", streaming progress via
-  // the same subscribe/unsubscribe-around-the-call pattern as movePhotosToFolder.
-  const ensureAiModelReady = useCallback(async () => {
-    dispatch({ type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS', progress: 0 })
-    const unsubscribe = window.api.onAiDownloadProgress((progress) => {
-      dispatch({ type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS', progress })
-    })
-    try {
-      await window.api.ensureAiModelReady()
-    } finally {
-      unsubscribe()
-      dispatch({ type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS', progress: null })
-    }
-  }, [])
-
   const suggestTags = useCallback(
     (filePath: string, candidateLabels: string[]) =>
       window.api.suggestTags(filePath, candidateLabels),
     []
   )
-
-  // Same subscribe/unsubscribe-around-the-call progress pattern as
-  // ensureAiModelReady above, just with a two-phase {phase, done, total}
-  // shape instead of a single percentage.
-  const findDuplicateGroups = useCallback(async () => {
-    dispatch({
-      type: 'SET_DUPLICATE_SCAN_PROGRESS',
-      progress: { phase: 'embedding', done: 0, total: 0 }
-    })
-    const unsubscribe = window.api.onDuplicateProgress((progress: DuplicateProgress) => {
-      dispatch({ type: 'SET_DUPLICATE_SCAN_PROGRESS', progress })
-    })
-    try {
-      return await window.api.findDuplicateGroups()
-    } finally {
-      unsubscribe()
-      dispatch({ type: 'SET_DUPLICATE_SCAN_PROGRESS', progress: null })
-    }
-  }, [])
 
   const findSimilarPhotos = useCallback(
     (filePath: string, limit: number) => window.api.findSimilarPhotos(filePath, limit),
@@ -1052,25 +1025,91 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     []
   )
 
-  // Same subscribe/unsubscribe-around-the-call progress pattern as
-  // findDuplicateGroups above — the Throwback widget's opt-in "Time Warp"
-  // full-library embed scan.
-  const embedLibrary = useCallback(async () => {
-    dispatch({ type: 'SET_EMBED_LIBRARY_PROGRESS', progress: { done: 0, total: 0 } })
-    const unsubscribe = window.api.onEmbedLibraryProgress((progress: EmbedLibraryProgress) => {
-      dispatch({ type: 'SET_EMBED_LIBRARY_PROGRESS', progress })
-    })
-    try {
-      await window.api.embedLibrary()
-    } finally {
-      unsubscribe()
-      dispatch({ type: 'SET_EMBED_LIBRARY_PROGRESS', progress: null })
-    }
+  // Shared by enableAiFeatures/rescanAiFeatures below — drives the progress
+  // toast directly from the action itself (same pattern movePhotosToFolder
+  // uses above), rather than a mounted component's effect, which is what
+  // makes it work "regardless of where the scan is kicked off."
+  const runAiScan = useCallback(
+    async (invoke: () => Promise<AiScanResult>): Promise<AiScanResult> => {
+      const handleCancel = (): void => void window.api.cancelAiScan()
+      const initialProgress: AiScanProgress = { phase: 'downloading', done: 0, total: 100 }
+      dispatch({ type: 'SET_AI_SCAN_PROGRESS', progress: initialProgress })
+      notifications.show({
+        id: AI_SCAN_NOTIFICATION_ID,
+        autoClose: false,
+        withCloseButton: true,
+        onClose: handleCancel,
+        message: <AiScanProgressToast progress={initialProgress} onCancel={handleCancel} />
+      })
+      const unsubscribe = window.api.onAiScanProgress((progress) => {
+        dispatch({ type: 'SET_AI_SCAN_PROGRESS', progress })
+        // The backend only flips the setting once the model download
+        // finishes and the scan itself starts (see enableAiFeaturesAndScan)
+        // — mirrored here, rather than optimistically enabling on click, so
+        // a cancel during download correctly leaves it off. The reducer
+        // guards this action, so the repeat dispatches on later ticks are
+        // cheap no-ops.
+        if (progress.phase === 'embedding') {
+          dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value: true })
+        }
+        notifications.update({
+          id: AI_SCAN_NOTIFICATION_ID,
+          message: <AiScanProgressToast progress={progress} onCancel={handleCancel} />
+        })
+      })
+      try {
+        const result = await invoke()
+        notifications.update({
+          id: AI_SCAN_NOTIFICATION_ID,
+          color: result.canceled ? 'yellow' : 'teal',
+          autoClose: 4000,
+          message: result.canceled
+            ? 'AI scan canceled.'
+            : result.photosScanned === 0
+              ? 'AI features enabled — add some photos to get suggestions and duplicate detection.'
+              : 'AI features ready.'
+        })
+        return result
+      } catch (err) {
+        notifications.update({
+          id: AI_SCAN_NOTIFICATION_ID,
+          color: 'red',
+          autoClose: 4000,
+          message: 'Something went wrong scanning your library.'
+        })
+        throw err
+      } finally {
+        unsubscribe()
+        dispatch({ type: 'SET_AI_SCAN_PROGRESS', progress: null })
+      }
+    },
+    []
+  )
+
+  const enableAiFeatures = useCallback(
+    () => runAiScan(() => window.api.enableAiFeaturesAndScan()),
+    [runAiScan]
+  )
+
+  const rescanAiFeatures = useCallback(
+    () => runAiScan(() => window.api.rescanAiFeatures()),
+    [runAiScan]
+  )
+
+  const cancelAiScan = useCallback(() => {
+    void window.api.cancelAiScan()
   }, [])
 
-  const cancelEmbedLibrary = useCallback(() => {
-    void window.api.cancelEmbedLibrary()
-  }, [])
+  // A scan still marked "in progress" on launch means the app quit before it
+  // finished, not that it was resolved/canceled — resume it silently (the
+  // toast reappears via rescanAiFeatures/runAiScan) rather than leaving it
+  // stuck forever. Cheap even for a full library since embeddings already
+  // computed are cached in the DB.
+  useEffect(() => {
+    window.api.wasAiScanInterrupted().then((interrupted) => {
+      if (interrupted) void rescanAiFeatures()
+    })
+  }, [rescanAiFeatures])
 
   const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
@@ -1295,16 +1334,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setTagsPanelGridView,
     setGalleryViewMode,
     setAiTagSuggestionsEnabled,
-    ensureAiModelReady,
     suggestTags,
-    findDuplicateGroups,
     findSimilarPhotos,
     openDuplicatesTab,
     getThrowbackSimilarity,
     getThrowbackYearSample,
     getThrowbackPreview,
-    embedLibrary,
-    cancelEmbedLibrary,
+    enableAiFeatures,
+    rescanAiFeatures,
+    cancelAiScan,
     setNavbarSplitSizes,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,

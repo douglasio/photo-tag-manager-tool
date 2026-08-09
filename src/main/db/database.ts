@@ -118,7 +118,12 @@ export function getDb(): Database.Database {
   // Bumped to 3: generateThumbnail now auto-orients via EXIF before resizing,
   // so previously-cached thumbnails for rotated photos were baked in the
   // wrong orientation and need to be regenerated once.
-  const THUMBNAIL_GENERATION = '3'
+  // Bumped to 4: generateThumbnail now normalizes to sRGB, since a
+  // grayscale/CMYK/unusual-ICC-profile source otherwise carried an ambiguous
+  // colourspace into the thumbnail, crashing the AI embedding pipeline's
+  // raw-buffer resize with a libvips "colourspace: parameter space not set"
+  // error on some photos.
+  const THUMBNAIL_GENERATION = '4'
   const storedGeneration = db
     .prepare("SELECT value FROM settings WHERE key = 'thumbnailGeneration'")
     .get() as { value: string } | undefined

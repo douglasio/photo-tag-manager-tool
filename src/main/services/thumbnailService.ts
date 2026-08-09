@@ -40,6 +40,11 @@ export async function generateThumbnail(filePath: string, thumbnailKey: string):
     // in the full-res view (browsers respect EXIF orientation by default)
     // but sideways/upside-down in its own thumbnail.
     .rotate()
+    // Grayscale/CMYK/unusual-ICC-profile sources otherwise carry an
+    // ambiguous colourspace into the thumbnail, which crashes the AI
+    // embedding pipeline's own raw-buffer resize with a libvips
+    // "colourspace: parameter space not set" error on some photos.
+    .toColourspace('srgb')
     .resize({
       width: THUMBNAIL_LONG_EDGE,
       height: THUMBNAIL_LONG_EDGE,

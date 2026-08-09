@@ -1,17 +1,22 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react'
 
-import { Badge, Button, Group, Image, SimpleGrid, Stack, Text, Timeline } from '@mantine/core'
+import {
+  Badge,
+  Button,
+  Group,
+  Image,
+  Loader,
+  SimpleGrid,
+  Stack,
+  Text,
+  Timeline
+} from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 
-import { ConfirmDialog } from '@components'
+import { EnableAiFeaturesDialog } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { ThrowbackEntry, ThrowbackYearSample } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-
-import { TimeWarpProgressToast } from './TimeWarpProgressToast'
-
-const TIME_WARP_NOTIFICATION_ID = 'time-warp-scan'
-const THUMB_SIZE = 100
 
 interface ThrowbackTimelineProps {
   entries: ThrowbackEntry[]
@@ -30,8 +35,8 @@ function ThrowbackTimeline({ entries }: ThrowbackTimelineProps): ReactElement {
               <Image
                 src={toThumbProtocolUrl(photo.thumbnailKey)}
                 alt={photo.fileName}
-                w={THUMB_SIZE}
-                h={THUMB_SIZE}
+                w={100}
+                h={100}
                 fit="cover"
                 radius="sm"
                 style={{ cursor: 'pointer' }}
@@ -50,102 +55,55 @@ function ThrowbackTimeline({ entries }: ThrowbackTimelineProps): ReactElement {
 // (same subject/scene, loosely), wherever the cache already supports that —
 // see throwbackService for the actual selection logic. Falls back to a
 // random sample from a single past year when nothing qualifies yet.
+//
+// Time Warp rides the same shared AI scan as tag suggestions and duplicate
+// detection — once AI features are enabled there's no separate "enable"
+// step here at all, the timeline (or the year-sample fallback) just loads.
 export function ThrowbackWidget(): ReactElement | null {
   const {
     state,
     getThrowbackSimilarity,
     getThrowbackYearSample,
     getThrowbackPreview,
-    embedLibrary,
-    cancelEmbedLibrary
+    enableAiFeatures
   } = usePhotoLibrary()
 
   const [loading, setLoading] = useState(true)
   const [similarity, setSimilarity] = useState<ThrowbackEntry[] | null>(null)
   const [yearSample, setYearSample] = useState<ThrowbackYearSample | null>(null)
   const [previewEntries, setPreviewEntries] = useState<ThrowbackEntry[] | null>(null)
-  const [confirmOpened, setConfirmOpened] = useState(false)
+  const [enableAiOpened, setEnableAiOpened] = useState(false)
+  // Only the very first fetch shows the loading spinner (see below) — once
+  // it's flipped false, later refetches swap content in silently.
+  const hasLoadedOnceRef = useRef(false)
+  const scanning = state.aiScanProgress !== null
 
-  const canceledRef = useRef(false)
-  const notificationShownRef = useRef(false)
-
+  // Re-fetches on scan start/finish, not just on mount, so a completed or
+  // canceled scan can't leave this stuck on stale data. Skips the
+  // similarity query entirely while AI is disabled (it isn't rendered then
+  // anyway — see below) since it's the expensive half of this pair.
   useEffect(() => {
     let cancelled = false
-    getThrowbackSimilarity()
-      .then(async (result) => {
+    if (!hasLoadedOnceRef.current) setLoading(true)
+    const similarityPromise = state.aiTagSuggestionsEnabled
+      ? getThrowbackSimilarity()
+      : Promise.resolve(null)
+    Promise.all([similarityPromise, getThrowbackYearSample()])
+      .then(([similarityResult, sampleResult]) => {
         if (cancelled) return
-        if (result) {
-          setSimilarity(result)
-        } else {
-          const sample = await getThrowbackYearSample()
-          if (!cancelled) setYearSample(sample)
-        }
+        setSimilarity(similarityResult)
+        setYearSample(sampleResult)
       })
       .catch((err: unknown) => console.error('failed to load Throwback data', err))
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (cancelled) return
+        hasLoadedOnceRef.current = true
+        setLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [getThrowbackSimilarity, getThrowbackYearSample])
-
-  // Drives the scan-progress toast as state.embedLibraryProgress changes —
-  // shown once on the first progress tick, updated in place after that.
-  useEffect(() => {
-    const progress = state.embedLibraryProgress
-    if (!progress) return
-    const handleCancel = (): void => {
-      canceledRef.current = true
-      cancelEmbedLibrary()
-    }
-    const message = (
-      <TimeWarpProgressToast done={progress.done} total={progress.total} onCancel={handleCancel} />
-    )
-    if (!notificationShownRef.current) {
-      notificationShownRef.current = true
-      notifications.show({
-        id: TIME_WARP_NOTIFICATION_ID,
-        loading: true,
-        autoClose: false,
-        withCloseButton: true,
-        onClose: handleCancel,
-        message
-      })
-    } else {
-      notifications.update({ id: TIME_WARP_NOTIFICATION_ID, message })
-    }
-  }, [state.embedLibraryProgress, cancelEmbedLibrary])
-
-  const handleEnableTimeWarp = (): void => {
-    setConfirmOpened(false)
-    canceledRef.current = false
-    notificationShownRef.current = false
-    embedLibrary()
-      .then(async () => {
-        notifications.update({
-          id: TIME_WARP_NOTIFICATION_ID,
-          loading: false,
-          color: canceledRef.current ? 'yellow' : 'teal',
-          autoClose: 4000,
-          message: canceledRef.current
-            ? 'Time Warp scan canceled.'
-            : 'Time Warp enabled — your library has been scanned.'
-        })
-        const result = await getThrowbackSimilarity()
-        if (result) setSimilarity(result)
-      })
-      .catch((err: unknown) => {
-        console.error('failed to run the Time Warp library scan', err)
-        notifications.update({
-          id: TIME_WARP_NOTIFICATION_ID,
-          loading: false,
-          color: 'red',
-          autoClose: 4000,
-          message: 'Something went wrong scanning your library.'
-        })
-      })
-  }
+  }, [getThrowbackSimilarity, getThrowbackYearSample, scanning, state.aiTagSuggestionsEnabled])
 
   const handlePreview = (): void => {
     getThrowbackPreview()
@@ -162,9 +120,18 @@ export function ThrowbackWidget(): ReactElement | null {
       .catch((err: unknown) => console.error('failed to load the Time Warp preview', err))
   }
 
-  if (loading) return null
+  if (loading) {
+    return (
+      <Group>
+        <Loader size="sm" />
+        <Text>Loading...</Text>
+      </Group>
+    )
+  }
 
-  if (similarity) return <ThrowbackTimeline entries={similarity} />
+  // Gated on aiTagSuggestionsEnabled so disabling AI falls through to the
+  // yearSample view below instead of showing stale AI-derived content.
+  if (state.aiTagSuggestionsEnabled && similarity) return <ThrowbackTimeline entries={similarity} />
 
   if (previewEntries) {
     return (
@@ -207,28 +174,20 @@ export function ThrowbackWidget(): ReactElement | null {
           })}
         </SimpleGrid>
         <Group gap="xs">
-          <Button size="compact-sm" onClick={() => setConfirmOpened(true)}>
-            Enable Time Warp
-          </Button>
+          {!state.aiTagSuggestionsEnabled && (
+            <Button size="compact-sm" onClick={() => setEnableAiOpened(true)}>
+              Enable Time Warp
+            </Button>
+          )}
           <Button size="compact-sm" variant="subtle" onClick={handlePreview}>
             Preview Time Warp
           </Button>
         </Group>
-        <ConfirmDialog
-          title="Enable Time Warp?"
-          opened={confirmOpened}
-          saving={false}
-          confirmLabel="Scan library"
-          onConfirm={handleEnableTimeWarp}
-          onCancel={() => setConfirmOpened(false)}
-        >
-          <Text size="sm">
-            This scans your whole library in the background to find photos that look similar across
-            different years. It can take a while on a large library, but runs off the main app
-            thread and won&apos;t block you from working — you can cancel it any time from the
-            progress notification.
-          </Text>
-        </ConfirmDialog>
+        <EnableAiFeaturesDialog
+          opened={enableAiOpened}
+          onCancel={() => setEnableAiOpened(false)}
+          onConfirm={enableAiFeatures}
+        />
       </Stack>
     )
   }

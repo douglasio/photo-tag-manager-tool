@@ -1,7 +1,6 @@
 import type {
+  AiScanProgress,
   DefaultView,
-  DuplicateProgress,
-  EmbedLibraryProgress,
   GalleryViewMode,
   PhotoRecord,
   ScanCompleteEvent,
@@ -64,9 +63,12 @@ export interface PhotoLibraryState {
   tagsPanelGridView: boolean
   galleryViewMode: GalleryViewMode
   aiTagSuggestionsEnabled: boolean
-  // Session-only — null when no download is in flight, 0-100 while the
-  // Settings toggle's first-time model download is running.
-  aiModelDownloadProgress: number | null
+  // Session-only — null when no AI scan is in flight. Spans the whole
+  // "enable AI features" flow (model download, then embedding, then
+  // duplicate clustering), driven from PhotoLibraryContext's
+  // enableAiFeatures/rescanAiFeatures regardless of which component
+  // triggered it.
+  aiScanProgress: AiScanProgress | null
   // Session-only (not persisted) — whether the Settings modal is open, so
   // other components (e.g. the dashboard's onboarding checklist) can open it
   // without needing a ref/portal into SettingsModal's own local state.
@@ -99,12 +101,6 @@ export interface PhotoLibraryState {
   // Resolves a compare-tab's synthetic id (from openTabs/activeTab) to its
   // actual photo paths (MIN_COMPARE_PHOTOS to MAX_COMPARE_PHOTOS of them).
   compareTabs: Map<string, string[]>
-  // Session-only — progress while the Duplicates tab's findDuplicateGroups
-  // scan is running, null otherwise.
-  duplicateScanProgress: DuplicateProgress | null
-  // Session-only — progress while the Throwback widget's opt-in "Time Warp"
-  // full-library embed scan is running, null otherwise.
-  embedLibraryProgress: EmbedLibraryProgress | null
 }
 
 export const initialState: PhotoLibraryState = {
@@ -131,7 +127,7 @@ export const initialState: PhotoLibraryState = {
   tagsPanelGridView: false,
   galleryViewMode: 'grid',
   aiTagSuggestionsEnabled: false,
-  aiModelDownloadProgress: null,
+  aiScanProgress: null,
   settingsModalOpened: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
@@ -148,9 +144,7 @@ export const initialState: PhotoLibraryState = {
   recentTags: [],
   openTabs: [],
   activeTab: 'dashboard',
-  compareTabs: new Map(),
-  duplicateScanProgress: null,
-  embedLibraryProgress: null
+  compareTabs: new Map()
 }
 
 export type PhotoLibraryAction =
@@ -177,7 +171,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_TAGS_PANEL_GRID_VIEW'; value: boolean }
   | { type: 'SET_GALLERY_VIEW_MODE'; value: GalleryViewMode }
   | { type: 'SET_AI_TAG_SUGGESTIONS_ENABLED'; value: boolean }
-  | { type: 'SET_AI_MODEL_DOWNLOAD_PROGRESS'; progress: number | null }
+  | { type: 'SET_AI_SCAN_PROGRESS'; progress: AiScanProgress | null }
   | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
@@ -216,8 +210,6 @@ export type PhotoLibraryAction =
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
   | { type: 'OPEN_DUPLICATES_TAB' }
-  | { type: 'SET_DUPLICATE_SCAN_PROGRESS'; progress: DuplicateProgress | null }
-  | { type: 'SET_EMBED_LIBRARY_PROGRESS'; progress: EmbedLibraryProgress | null }
 
 // Shared by CLOSE_PHOTO_TAB and REMOVE_FROM_COMPARE_TAB (which closes its
 // whole tab once too few photos remain) — falls back to the tab immediately
@@ -497,9 +489,13 @@ export function photoLibraryReducer(
     case 'SET_GALLERY_VIEW_MODE':
       return { ...state, galleryViewMode: action.value }
     case 'SET_AI_TAG_SUGGESTIONS_ENABLED':
-      return { ...state, aiTagSuggestionsEnabled: action.value }
-    case 'SET_AI_MODEL_DOWNLOAD_PROGRESS':
-      return { ...state, aiModelDownloadProgress: action.progress }
+      // Guarded (unlike most setters here) because runAiScan dispatches this
+      // on every throttled progress tick once embedding starts, not just once.
+      return state.aiTagSuggestionsEnabled === action.value
+        ? state
+        : { ...state, aiTagSuggestionsEnabled: action.value }
+    case 'SET_AI_SCAN_PROGRESS':
+      return { ...state, aiScanProgress: action.progress }
     case 'SET_SETTINGS_MODAL_OPENED':
       return { ...state, settingsModalOpened: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':
@@ -727,10 +723,6 @@ export function photoLibraryReducer(
         : [...state.openTabs, 'duplicates']
       return { ...state, openTabs, activeTab: 'duplicates' }
     }
-    case 'SET_DUPLICATE_SCAN_PROGRESS':
-      return { ...state, duplicateScanProgress: action.progress }
-    case 'SET_EMBED_LIBRARY_PROGRESS':
-      return { ...state, embedLibraryProgress: action.progress }
     case 'CLOSE_ALL_TABS':
       return { ...state, openTabs: [], compareTabs: new Map(), activeTab: 'gallery' }
     case 'SET_ACTIVE_TAB':

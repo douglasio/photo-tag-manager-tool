@@ -1,8 +1,15 @@
+import { join } from 'path'
+import { Worker } from 'worker_threads'
+
 import { getAllEmbeddings } from '@main/db/embeddingRepository'
 import { findAllReadyPhotosWithDate } from '@main/db/photoRepository'
+import { rejectAllPending } from '@main/workers/pendingRequests'
+import type {
+  SimilarityInputPhoto,
+  WorkerRequest,
+  WorkerResponse
+} from '@main/workers/throwbackSimilarityProtocol'
 import type { ThrowbackEntry, ThrowbackYearSample } from '@shared/types'
-
-import { cosineSimilarity, DisjointSet } from './embeddingSimilarity'
 
 // "Kinda similar, not a match" — much looser than duplicate detection's
 // 0.97, since these are meant to be the same general subject/scene across
@@ -11,11 +18,6 @@ const THROWBACK_SIMILARITY_THRESHOLD = 0.7
 
 const MIN_YEAR_SAMPLE_PHOTOS = 4
 const YEAR_SAMPLE_SIZE = 4
-
-const YIELD_EVERY = 20_000
-function yieldToEventLoop(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve))
-}
 
 function shuffle<T>(items: T[]): T[] {
   const shuffled = [...items]
@@ -44,10 +46,41 @@ function readyPhotosByYear(): Map<number, YearPhoto[]> {
   return byYear
 }
 
+let worker: Worker | null = null
+let nextRequestId = 0
+const pendingCompute = new Map<
+  number,
+  { resolve: (entries: ThrowbackEntry[] | null) => void; reject: (err: Error) => void }
+>()
+
+function getWorker(): Worker {
+  if (worker) return worker
+  const workerPath = join(__dirname, 'throwbackSimilarityWorker.js')
+  worker = new Worker(workerPath)
+  worker.on('message', (message: WorkerResponse) => {
+    const pending = pendingCompute.get(message.requestId)
+    if (!pending) return
+    pendingCompute.delete(message.requestId)
+    if (message.type === 'result') pending.resolve(message.entries)
+    else pending.reject(new Error(message.message))
+  })
+  worker.on('error', (err: Error) => {
+    rejectAllPending(pendingCompute, err)
+  })
+  return worker
+}
+
+function send(message: WorkerRequest): void {
+  getWorker().postMessage(message)
+}
+
 // Cache-only — never triggers embedding compute, so this stays fast and
 // automatic on every Dashboard load (the opt-in "Time Warp" scan is what
-// populates the cache; see embedAllReadyPhotos). Returns null once fewer
-// than 2 distinct years show up in the best-matching cross-year cluster.
+// populates the cache; see embedAllReadyPhotos). The O(n²) cross-year
+// comparison runs in a worker (mirrors duplicate detection) since a large
+// cached-embeddings backlog used to visibly block the main process here.
+// Returns null once fewer than 2 distinct years show up in the
+// best-matching cross-year cluster.
 export async function findThrowbackSimilarity(): Promise<ThrowbackEntry[] | null> {
   const yearByPath = new Map<string, number>()
   for (const [year, photos] of readyPhotosByYear()) {
@@ -57,70 +90,29 @@ export async function findThrowbackSimilarity(): Promise<ThrowbackEntry[] | null
   const cached = getAllEmbeddings().filter((embedded) => yearByPath.has(embedded.filePath))
   if (cached.length < 2) return null
 
-  const disjointSet = new DisjointSet(cached.length)
-  let comparisons = 0
-  for (let i = 0; i < cached.length; i++) {
-    for (let j = i + 1; j < cached.length; j++) {
-      const yearI = yearByPath.get(cached[i].filePath)!
-      const yearJ = yearByPath.get(cached[j].filePath)!
-      if (
-        yearI !== yearJ &&
-        cosineSimilarity(cached[i].embedding, cached[j].embedding) >= THROWBACK_SIMILARITY_THRESHOLD
-      ) {
-        disjointSet.union(i, j)
-      }
-      comparisons++
-      if (comparisons % YIELD_EVERY === 0) await yieldToEventLoop()
-    }
-  }
+  const photos: SimilarityInputPhoto[] = cached.map((embedded) => ({
+    filePath: embedded.filePath,
+    embedding: Array.from(embedded.embedding),
+    year: yearByPath.get(embedded.filePath)!
+  }))
 
-  const groupIndices = new Map<number, number[]>()
-  for (let i = 0; i < cached.length; i++) {
-    const root = disjointSet.find(i)
-    const indices = groupIndices.get(root)
-    if (indices) indices.push(i)
-    else groupIndices.set(root, [i])
-  }
+  const requestId = nextRequestId++
+  const resultPromise = new Promise<ThrowbackEntry[] | null>((resolve, reject) => {
+    pendingCompute.set(requestId, { resolve, reject })
+  })
+  send({ type: 'compute', requestId, photos, threshold: THROWBACK_SIMILARITY_THRESHOLD })
+  return resultPromise
+}
 
-  // The cluster spanning the most distinct years is the most
-  // "throwback"-worthy set to show.
-  let best: { indices: number[]; years: Set<number> } | null = null
-  for (const indices of groupIndices.values()) {
-    const years = new Set(indices.map((i) => yearByPath.get(cached[i].filePath)!))
-    if (years.size < 2) continue
-    if (!best || years.size > best.years.size) best = { indices, years }
-  }
-  if (!best) return null
-
-  // At most one photo per year within the winning cluster — pick whichever
-  // has the highest average similarity to the rest of the group.
-  const indicesByYear = new Map<number, number[]>()
-  for (const i of best.indices) {
-    const year = yearByPath.get(cached[i].filePath)!
-    const list = indicesByYear.get(year)
-    if (list) list.push(i)
-    else indicesByYear.set(year, [i])
-  }
-
-  const entries: ThrowbackEntry[] = []
-  for (const [year, indices] of indicesByYear) {
-    let bestIndex = indices[0]
-    let bestScore = -Infinity
-    for (const i of indices) {
-      let total = 0
-      for (const j of best.indices) {
-        if (j !== i) total += cosineSimilarity(cached[i].embedding, cached[j].embedding)
-      }
-      if (total > bestScore) {
-        bestScore = total
-        bestIndex = i
-      }
-    }
-    entries.push({ year, filePath: cached[bestIndex].filePath })
-  }
-
-  entries.sort((a, b) => a.year - b.year)
-  return entries
+// Frees the worker when AI features are disabled — the next dashboard load
+// transparently respawns it.
+export async function disposeThrowbackSimilarityWorker(): Promise<void> {
+  if (!worker) return
+  const w = worker
+  worker = null
+  const disposedError = new Error('Throwback similarity worker disposed')
+  rejectAllPending(pendingCompute, disposedError)
+  await w.terminate()
 }
 
 // Fallback for when there's no similarity match (yet) — a random sample from

@@ -1,21 +1,40 @@
 import { ipcMain } from 'electron'
 
 import { findByPath } from '@main/db/photoRepository'
-import { findDuplicateGroups, findSimilarPhotos } from '@main/services/duplicatePhotoService'
+import {
+  cancelAiScan,
+  enableAiFeaturesAndScan,
+  runFullAiScan,
+  wasAiScanInterrupted
+} from '@main/services/aiScanService'
+import { findSimilarPhotos } from '@main/services/duplicatePhotoService'
 import { suggestTagsByExemplar } from '@main/services/tagExemplarService'
-import { ensureModelReady, suggestTags } from '@main/services/tagSuggestionService'
+import { suggestTags } from '@main/services/tagSuggestionService'
 import { thumbnailFilePath } from '@main/services/thumbnailService'
-import type { DuplicateGroup, SimilarPhoto, TagSuggestion } from '@shared/types'
+import type { AiScanResult, SimilarPhoto, TagSuggestion } from '@shared/types'
 
 export function registerAiHandlers(): void {
-  // Downloads (first time only) and loads the CLIP model — invoked by the
-  // Settings toggle when turning the feature on, streaming progress back to
-  // that same renderer call's sender.
-  ipcMain.handle('ai:ensureModelReady', async (event): Promise<void> => {
-    await ensureModelReady((progress) => {
-      event.sender.send('ai:downloadProgress', progress)
-    })
+  // The one call that takes AI features from off to fully scanned: downloads
+  // the model (streaming 'downloading' progress), enables the setting, then
+  // runs the shared scan (streaming 'embedding'/'clustering' progress) that
+  // warms tag suggestions, duplicate detection, and Time Warp all at once —
+  // triggerable from Settings, the Time Warp widget, or the Duplicates tab.
+  ipcMain.handle('ai:enableAndScan', async (event): Promise<AiScanResult> => {
+    return enableAiFeaturesAndScan((progress) => event.sender.send('ai:scanProgress', progress))
   })
+
+  // Re-runs the shared scan (no model download — AI is already enabled),
+  // e.g. "Scan again" on the Duplicates tab, or Time Warp picking up
+  // newly-added photos.
+  ipcMain.handle('ai:rescan', async (event): Promise<AiScanResult> => {
+    return runFullAiScan((progress) => event.sender.send('ai:scanProgress', progress))
+  })
+
+  ipcMain.handle('ai:cancelScan', (): void => {
+    cancelAiScan()
+  })
+
+  ipcMain.handle('ai:wasScanInterrupted', (): boolean => wasAiScanInterrupted())
 
   // Blends zero-shot text matching (works from day one) with similarity to a
   // tag's own tagged photos (more personalized) — exemplar wins where both apply.
@@ -38,14 +57,6 @@ export function registerAiHandlers(): void {
       return [...exemplarResults, ...zeroShotOnly]
     }
   )
-
-  // Streams progress back to the same call's sender, same pattern as
-  // ai:ensureModelReady's download progress.
-  ipcMain.handle('ai:findDuplicateGroups', async (event): Promise<DuplicateGroup[]> => {
-    return findDuplicateGroups((progress) => {
-      event.sender.send('ai:duplicateProgress', progress)
-    })
-  })
 
   ipcMain.handle(
     'ai:findSimilarPhotos',
