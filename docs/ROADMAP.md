@@ -8,17 +8,15 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 2. Gallery preview zoom is not very smooth and doesn't zoom in enough
 
-3. ~~It seems like all tooltips can potentially remain visible after switching tabs. Is there a more global fix that can address this behavior?~~ Fixed — see `setActiveTab` in `PhotoLibraryContext.tsx`.
+3. The cancel button on the AI initialization popup isn't working as expected. It seems like it may eventually stop the process, but it signals that it's completed, not stopped. So when you go to view the duplicate photos again, it still has some scanning to do. This is obviously misleading, the cancel button should actually cancel and dismiss the toast immediately and turn the AI feature flag back off.
 
-4. The cancel button on the AI initialization popup isn't working as expected. It seems like it may eventually stop the process, but it signals that it's completed, not stopped. So when you go to view the duplicate photos again, it still has some scanning to do. This is obviously misleading, the cancel button should actually cancel and dismiss the toast immediately and turn the AI feature flag back off.
+4. The duplicates tab should not re-scan for duplicates if you toggle back and forth. This is an extremely expensive calculation on larger libraries and should only app on the initial AI
 
-5. The duplicates tab should not re-scan for duplicates if you toggle back and forth. This is an extremely expensive calculation on larger libraries and should only app on the initial AI
+5. Duplicate scan still freezes up the app. If we can't get the app to run smoothly independent of these background jobs, there should be a full end-to-end process when AI features are enabled that takes over the window so the user is prevented from trying to keep working while everything is slow and janky.
 
-6. Duplicate scan still freezes up the app. If we can't get the app to run smoothly independent of these background jobs, there should be a full end-to-end process when AI features are enabled that takes over the window so the user is prevented from trying to keep working while everything is slow and janky.
+6. We need to globally disable "space bar to page down" as it interferes with the spacebar preview.
 
-7. We need to globally disable "space bar to page down" as it interferes with the spacebar preview.
-
-8. The throwback widget should not re-calculate every time the tab is opened. Once per session.
+7. The throwback widget should not re-calculate every time the tab is opened. Once per session.
 
 # Features
 
@@ -54,7 +52,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 - Tags: Tagging Progress, Featured Tag
 - History: Throwback Widget, Time Warp widget (displayed as its own widget if AI features are enabled)
 
-2. Add a Today widget showing photos added in the most recent scan.
+2. Add a Recently Added widget showing photos added in the most recent scan.
 
 ### Throwback Widget
 

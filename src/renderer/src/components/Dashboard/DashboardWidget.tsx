@@ -15,6 +15,8 @@ const DashboardWidget: React.FC<Widget> = ({ id, title, description, component, 
       h="100%"
       display="flex"
       bg="dark"
+      shadow="xs"
+      radius="md"
       style={{
         flexDirection: 'column',
         // overflowX: 'hidden',
