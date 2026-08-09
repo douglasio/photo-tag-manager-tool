@@ -153,9 +153,6 @@ export function findAllReadyPhotos(): { filePath: string; thumbnailKey: string }
   return rows.map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
 }
 
-// A regenerated thumbnail (e.g. after rotate) means the pixels underneath
-// any cached embedding changed too, so that embedding is stale — deleting it
-// here lets it recompute lazily next time something needs it.
 /** Every thumbnail-ready photo with a known dateTaken — used to group
  * photos by year for the Throwback widget. */
 export function findAllReadyPhotosWithDate(): {
@@ -176,6 +173,19 @@ export function findAllReadyPhotosWithDate(): {
   }))
 }
 
+/** Reverse lookup for the thumbnail protocol handler's regenerate-on-miss
+ * fallback — the request only carries the thumbnailKey, not the photo's
+ * actual filePath. */
+export function findByThumbnailKey(thumbnailKey: string): { filePath: string } | null {
+  const row = getDb()
+    .prepare('SELECT path FROM photos WHERE thumbnailKey = ?')
+    .get(thumbnailKey) as { path: string } | undefined
+  return row ? { filePath: row.path } : null
+}
+
+// A regenerated thumbnail (e.g. after rotate) means the pixels underneath
+// any cached embedding changed too, so that embedding is stale — deleting it
+// here lets it recompute lazily next time something needs it.
 export function updateThumbnail(
   filePath: string,
   thumbnailKey: string,

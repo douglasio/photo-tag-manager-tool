@@ -13,6 +13,7 @@ const {
   mockAppRelaunch,
   mockAppExit,
   mockAppGetPath,
+  mockReleaseSingleInstanceLock,
   mockCopyFile,
   mockRm,
   databaseConstructor
@@ -28,6 +29,7 @@ const {
   mockAppRelaunch: vi.fn(),
   mockAppExit: vi.fn(),
   mockAppGetPath: vi.fn().mockReturnValue('/userData'),
+  mockReleaseSingleInstanceLock: vi.fn(),
   mockCopyFile: vi.fn().mockResolvedValue(undefined),
   mockRm: vi.fn().mockResolvedValue(undefined),
   databaseConstructor: vi.fn()
@@ -50,7 +52,12 @@ vi.mock('./throwbackService', () => ({
 vi.mock('./thumbnailService', () => ({ deleteAllThumbnails: mockDeleteAllThumbnails }))
 vi.mock('./watchManager', () => ({ unwatchAllFolders: mockUnwatchAllFolders }))
 vi.mock('electron', () => ({
-  app: { relaunch: mockAppRelaunch, exit: mockAppExit, getPath: mockAppGetPath }
+  app: {
+    relaunch: mockAppRelaunch,
+    exit: mockAppExit,
+    getPath: mockAppGetPath,
+    releaseSingleInstanceLock: mockReleaseSingleInstanceLock
+  }
 }))
 vi.mock('fs/promises', () => ({ copyFile: mockCopyFile, rm: mockRm }))
 vi.mock('better-sqlite3', () => ({ default: databaseConstructor }))
@@ -129,6 +136,9 @@ describe('importDatabase', () => {
     mockAppRelaunch.mockImplementation(() => {
       callOrder.push('relaunch')
     })
+    mockReleaseSingleInstanceLock.mockImplementation(() => {
+      callOrder.push('releaseLock')
+    })
 
     await importDatabase('/picked/backup.db')
 
@@ -136,6 +146,10 @@ describe('importDatabase', () => {
     expect(callOrder.indexOf('disposeTagSuggestion')).toBeLessThan(callOrder.indexOf('closeDb'))
     expect(callOrder.indexOf('closeDb')).toBeLessThan(callOrder.indexOf('copyFile'))
     expect(callOrder.indexOf('copyFile')).toBeLessThan(callOrder.indexOf('relaunch'))
+    // Releasing the lock before relaunching avoids a race where the newly
+    // spawned process's own lock request loses to this process's not-yet-
+    // released one, silently skipping window/handler setup.
+    expect(callOrder.indexOf('releaseLock')).toBeLessThan(callOrder.indexOf('relaunch'))
     expect(mockCopyFile).toHaveBeenCalledWith('/picked/backup.db', '/userData/photag.db')
     expect(mockRm).toHaveBeenCalledWith('/userData/photag.db-wal', { force: true })
     expect(mockRm).toHaveBeenCalledWith('/userData/photag.db-shm', { force: true })
@@ -166,6 +180,7 @@ describe('clearLibrary', () => {
       recursive: true,
       force: true
     })
+    expect(mockReleaseSingleInstanceLock).toHaveBeenCalled()
     expect(mockAppRelaunch).toHaveBeenCalled()
     expect(mockAppExit).toHaveBeenCalledWith(0)
   })

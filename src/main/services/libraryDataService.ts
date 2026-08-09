@@ -51,7 +51,13 @@ async function shutDownForDataChange(): Promise<void> {
   closeDb()
 }
 
+// app.relaunch() spawns the new process immediately — it doesn't wait for
+// this one to actually exit, so the new process's requestSingleInstanceLock()
+// can race this process's (delayed until real OS exit) lock release and
+// lose, silently skipping window/handler setup entirely. Releasing the lock
+// explicitly first closes that race.
 function relaunch(): void {
+  app.releaseSingleInstanceLock()
   app.relaunch()
   app.exit(0)
 }

@@ -11,7 +11,7 @@ const DB_FILE_FILTER = { name: 'SQLite Database', extensions: ['db'] }
 
 function defaultBackupFileName(): string {
   const date = new Date().toISOString().slice(0, 10)
-  return `photag-backup-${date}.db`
+  return `tagme-backup-${date}.db`
 }
 
 export function registerLibraryDataHandlers(): void {
