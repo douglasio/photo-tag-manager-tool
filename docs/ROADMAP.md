@@ -18,6 +18,8 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 7. The throwback widget should not re-calculate every time the tab is opened. Once per session.
 
+8. Clicking a suggested tag from the photo view brings you back to the gallery and doesn't apply the tag
+
 # Features
 
 To-dos, tasks, and features loosely grouped by feature segment.

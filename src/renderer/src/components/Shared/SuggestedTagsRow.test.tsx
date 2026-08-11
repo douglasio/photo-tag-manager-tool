@@ -3,6 +3,11 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+// TagHoverCard (wrapping each suggestion badge) needs a tagDescriptions map.
+vi.mock('@state', () => ({
+  usePhotoLibrary: () => ({ state: { tagDescriptions: new Map() } })
+}))
+
 import { SuggestedTagsRow } from './SuggestedTagsRow'
 
 describe('SuggestedTagsRow', () => {

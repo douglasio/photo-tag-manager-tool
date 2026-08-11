@@ -14,7 +14,11 @@ const mockRemoveTagsFromSelection = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { photosByPath: mockPhotosByPath, selectedPaths: mockSelectedPaths },
+    state: {
+      photosByPath: mockPhotosByPath,
+      selectedPaths: mockSelectedPaths,
+      tagDescriptions: new Map()
+    },
     allTags: mockAllTags,
     openCompareTab: mockOpenCompareTab,
     addTagsToSelection: mockAddTagsToSelection,

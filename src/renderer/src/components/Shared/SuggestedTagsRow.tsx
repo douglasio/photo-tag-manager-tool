@@ -7,6 +7,8 @@ import type { ReactElement } from 'react'
 import { ACTION_ICONS } from '@renderer/utils'
 import type { TagSuggestion } from '@shared/types'
 
+import { TagHoverCard } from './TagHoverCard'
+
 interface SuggestedTagsRowProps {
   suggestions: TagSuggestion[]
   loading: boolean
@@ -51,20 +53,22 @@ export function SuggestedTagsRow({
                 exit={motionEnabled ? { scale: 2, opacity: 0, filter: 'blur(5)' } : undefined}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
               >
-                <Badge
-                  component="button"
-                  variant="gradient"
-                  size="lg"
-                  // size={size === 'large' ? 'xl' : 'lg'}
-                  tt="none"
-                  // fs={size === 'large' ? 'md' : 'xl'}
-                  style={{
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => onAccept(suggestion.tag)}
-                >
-                  + {suggestion.tag}
-                </Badge>
+                <TagHoverCard tag={suggestion.tag}>
+                  <Badge
+                    component="button"
+                    variant="gradient"
+                    size="lg"
+                    // size={size === 'large' ? 'xl' : 'lg'}
+                    tt="none"
+                    // fs={size === 'large' ? 'md' : 'xl'}
+                    style={{
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => onAccept(suggestion.tag)}
+                  >
+                    + {suggestion.tag}
+                  </Badge>
+                </TagHoverCard>
               </motion.div>
             ))}
           </AnimatePresence>

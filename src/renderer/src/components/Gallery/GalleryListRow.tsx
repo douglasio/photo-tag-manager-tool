@@ -5,7 +5,7 @@ import type { ReactElement } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { RowComponentProps } from 'react-window'
 
-import { GalleryHoverPreview } from '@components'
+import { GalleryHoverPreview, TagHoverCard } from '@components'
 import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
@@ -119,9 +119,11 @@ export function GalleryListRow({
               {photo.tags.length > 0 && (
                 <Group gap={4}>
                   {photo.tags.map((tag) => (
-                    <Badge key={tag} variant="light" size="lg" tt="none">
-                      {tag}
-                    </Badge>
+                    <TagHoverCard key={tag} tag={tag}>
+                      <Badge variant="light" size="lg" tt="none">
+                        {tag}
+                      </Badge>
+                    </TagHoverCard>
                   ))}
                 </Group>
               )}

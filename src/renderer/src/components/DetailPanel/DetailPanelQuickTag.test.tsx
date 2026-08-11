@@ -15,7 +15,10 @@ vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
     allTags: mockAllTags,
     updateTags: mockUpdateTags,
-    state: { aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled },
+    state: {
+      aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled,
+      tagDescriptions: new Map()
+    },
     suggestTags: mockSuggestTags
   })
 }))

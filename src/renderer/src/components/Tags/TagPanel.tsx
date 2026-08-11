@@ -19,7 +19,13 @@ import { useHover, useMergedRef } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconPencil } from '@tabler/icons-react'
 
-import { PanelSection, TagGridTile, TagGroupCreateButton, TagsSettingsMenu } from '@components'
+import {
+  PanelSection,
+  TagGridTile,
+  TagGroupCreateButton,
+  TagHoverCardContent,
+  TagsSettingsMenu
+} from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, TagGroup } from '@shared/types'
 import { usePhotoLibrary } from '@state'
@@ -151,20 +157,7 @@ function TagListItem({
             as FolderTree's rename row). */}
         <Tooltip
           position="right"
-          label={
-            description ? (
-              <Stack gap={2}>
-                <Text size="sm" fw={600}>
-                  #{tag}
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {description}
-                </Text>
-              </Stack>
-            ) : (
-              `#${tag}`
-            )
-          }
+          label={<TagHoverCardContent tag={tag} description={description || undefined} />}
           disabled={editing}
           openDelay={700}
           multiline
