@@ -6,13 +6,17 @@ const {
   mockSetEmbedding,
   mockFindAllReadyPhotos,
   mockEmbedImage,
-  mockThumbnailFilePath
+  mockThumbnailFilePath,
+  mockGenerateThumbnail,
+  mockAccess
 } = vi.hoisted(() => ({
   mockGetEmbedding: vi.fn(),
   mockSetEmbedding: vi.fn(),
   mockFindAllReadyPhotos: vi.fn(),
   mockEmbedImage: vi.fn(),
-  mockThumbnailFilePath: vi.fn()
+  mockThumbnailFilePath: vi.fn(),
+  mockGenerateThumbnail: vi.fn(),
+  mockAccess: vi.fn()
 }))
 
 vi.mock('@main/db/embeddingRepository', () => ({
@@ -21,7 +25,11 @@ vi.mock('@main/db/embeddingRepository', () => ({
 }))
 vi.mock('@main/db/photoRepository', () => ({ findAllReadyPhotos: mockFindAllReadyPhotos }))
 vi.mock('./tagSuggestionService', () => ({ embedImage: mockEmbedImage }))
-vi.mock('./thumbnailService', () => ({ thumbnailFilePath: mockThumbnailFilePath }))
+vi.mock('./thumbnailService', () => ({
+  thumbnailFilePath: mockThumbnailFilePath,
+  generateThumbnail: mockGenerateThumbnail
+}))
+vi.mock('fs/promises', () => ({ access: mockAccess }))
 
 import { embedAllReadyPhotos } from './photoEmbedding'
 
@@ -36,6 +44,8 @@ describe('embedAllReadyPhotos', () => {
     mockFindAllReadyPhotos.mockReset()
     mockEmbedImage.mockReset().mockResolvedValue([1, 0])
     mockThumbnailFilePath.mockReset().mockImplementation((key: string) => `/thumbs/${key}`)
+    mockGenerateThumbnail.mockReset().mockResolvedValue(undefined)
+    mockAccess.mockReset().mockResolvedValue(undefined)
   })
 
   it('embeds and caches every ready photo, reporting progress as it goes', async () => {
@@ -72,6 +82,27 @@ describe('embedAllReadyPhotos', () => {
     await embedAllReadyPhotos()
 
     expect(mockEmbedImage).not.toHaveBeenCalled()
+  })
+
+  it('regenerates a missing thumbnail file before embedding, rather than failing', async () => {
+    mockFindAllReadyPhotos.mockReturnValue(makePhotos(['/a.jpg']))
+    mockAccess.mockRejectedValue(new Error('ENOENT'))
+
+    await embedAllReadyPhotos()
+
+    expect(mockGenerateThumbnail).toHaveBeenCalledExactlyOnceWith('/a.jpg', '/a.jpg-key')
+    expect(mockEmbedImage).toHaveBeenCalledExactlyOnceWith('/thumbs//a.jpg-key')
+  })
+
+  it('skips a photo that fails to embed instead of aborting the whole scan', async () => {
+    mockFindAllReadyPhotos.mockReturnValue(makePhotos(['/a.jpg', '/b.jpg', '/c.jpg']))
+    mockEmbedImage.mockImplementation((path: string) =>
+      path.includes('/b.jpg') ? Promise.reject(new Error('corrupt image')) : Promise.resolve([1, 0])
+    )
+
+    const results = await embedAllReadyPhotos()
+
+    expect(results.map((r) => r.filePath)).toEqual(['/a.jpg', '/c.jpg'])
   })
 
   it('stops early once isCancelled reports true, without discarding already-embedded results', async () => {

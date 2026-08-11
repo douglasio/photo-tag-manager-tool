@@ -28,7 +28,7 @@ export function SuggestedTagsRow({
   if (!loading && suggestions.length === 0) return null
 
   return (
-    <Stack gap="xs" mt="xs">
+    <Stack gap="md" mt="xs">
       <Group gap="xs" wrap="nowrap">
         <IconSparkles size={ACTION_ICONS.ICON_SIZE} color="var(--mantine-color-dimmed)" />
         <Title order={5} size={size === 'large' ? 'h6' : 'sm'} c="dimmed" tt="uppercase" fw="bold">

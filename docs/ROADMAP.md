@@ -46,13 +46,11 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Dashboard
 
-1. Turn dashboard into a tabbed experience using the Mantine Tabs Pills variant. Last selected tab should be persisted as the default tab whenever the Dashboard is re-opened later.
+2. I can't see the Time Warp timeline preview at all now.
 
-- Home: Welcome widget, top viewed photos, "Recently Added" - new widget, see below
-- Tags: Tagging Progress, Featured Tag
-- History: Throwback Widget, Time Warp widget (displayed as its own widget if AI features are enabled)
+3. The blacked-out photo in the bar chart issue isn't resolved. And we lost the space bar preview and clickable bars. There should be unit tests for all of this so it's less likely to regress.
 
-2. Add a Recently Added widget showing photos added in the most recent scan.
+4. The Aspect Ratio on the Tag This Photo didn't work, again.
 
 ### Throwback Widget
 
@@ -67,6 +65,8 @@ To-dos, tasks, and features loosely grouped by feature segment.
 3. The next view should be...
 
 4. Contact sheet?
+
+5. Instead of the fade-in can you do like a slide-in to match the panel slide animation? The fade gets kind of repetitive.
 
 ## Tools
 
@@ -87,6 +87,8 @@ To-dos, tasks, and features loosely grouped by feature segment.
 ## Tags
 
 1. Hovering over tags anywhere in the app should show a Popover with the full tag name and description (if available), after a short delay. Make sure this is shared functionality, do not duplicate the Popover layout in multiple places.
+
+2. Selecting multiple photos from the gallery should open the taglist to batch add or remove tags to the entire selection.
 
 ## Photo view
 

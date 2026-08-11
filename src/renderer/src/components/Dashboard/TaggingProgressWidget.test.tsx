@@ -24,12 +24,6 @@ vi.mock('@mantine/charts', () => ({
   }
 }))
 
-// QuickTagWidget has its own test coverage and needs a much larger state
-// shape (allTags, recentTags, updateTags, ...) than this widget cares about.
-vi.mock('@components', () => ({
-  QuickTagWidget: () => <div data-testid="quick-tag-widget" />
-}))
-
 import { TaggingProgressWidget } from './TaggingProgressWidget'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
@@ -92,5 +86,18 @@ describe('TaggingProgressWidget', () => {
       { name: 'Untagged', value: 2, color: 'gray' }
     ])
     expect(screen.getByText('1 of 3 tagged')).toBeInTheDocument()
+  })
+
+  it('keeps the chart size within its clamped range regardless of measured height', () => {
+    setLibrary([makePhoto('/a.jpg', { tags: ['vacation'] })])
+    renderWidget()
+
+    const { size, thickness } = mockDonutChart.mock.calls[0][0] as {
+      size: number
+      thickness: number
+    }
+    expect(size).toBeGreaterThanOrEqual(90)
+    expect(size).toBeLessThanOrEqual(200)
+    expect(thickness).toBeCloseTo(size / 4)
   })
 })

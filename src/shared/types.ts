@@ -40,6 +40,12 @@ export interface PhotoRecord {
   // in the local DB, never written back to the file (same reasoning as
   // thumbnailKey/thumbnailStatus above).
   viewCount: number
+  // Epoch ms this photo first entered the library — set once and never
+  // updated by a rescan (unlike lastScannedAt, which isn't otherwise
+  // exposed to the renderer). Optional so the many existing test fixtures
+  // that build a PhotoRecord by hand don't all need updating; genuine
+  // records from the DB always have it.
+  firstSeenAt?: number
 }
 
 export interface ScanStartResult {

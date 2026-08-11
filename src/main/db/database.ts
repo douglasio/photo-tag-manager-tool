@@ -79,6 +79,12 @@ export function getDb(): Database.Database {
   if (!photoColumns.some((column) => column.name === 'viewCount')) {
     db.exec('ALTER TABLE photos ADD COLUMN viewCount INTEGER NOT NULL DEFAULT 0')
   }
+  // Set once on true INSERT only (unlike lastScannedAt) — a durable
+  // "recently added" signal. Existing rows get lastScannedAt as a one-time approximation.
+  if (!photoColumns.some((column) => column.name === 'firstSeenAt')) {
+    db.exec('ALTER TABLE photos ADD COLUMN firstSeenAt INTEGER')
+    db.exec('UPDATE photos SET firstSeenAt = lastScannedAt WHERE firstSeenAt IS NULL')
+  }
 
   // group_id is used now (tag groups); position/hidden/coverPhotoPath are
   // reserved for later tag features (custom ordering, hiding from the UI, a

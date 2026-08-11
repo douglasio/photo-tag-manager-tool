@@ -20,6 +20,7 @@ interface PhotoRow {
   thumbnailKey: string | null
   thumbnailStatus: string
   viewCount: number
+  firstSeenAt: number | null
 }
 
 function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
@@ -44,7 +45,8 @@ function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
     // Callers that actually hit the cache (see scanHandlers.ts's processFile)
     // override this to true; a DB row read on its own isn't "from cache."
     fromCache: false,
-    viewCount: row.viewCount
+    viewCount: row.viewCount,
+    firstSeenAt: row.firstSeenAt ?? undefined
   }
 }
 
@@ -62,10 +64,10 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
     .prepare(
       `INSERT INTO photos (
         path, fileName, mtimeMs, sizeBytes, tags, dateTaken, cameraMake, cameraModel,
-        widthPx, heightPx, format, comment, thumbnailKey, thumbnailStatus, lastScannedAt
+        widthPx, heightPx, format, comment, thumbnailKey, thumbnailStatus, lastScannedAt, firstSeenAt
       ) VALUES (
         @path, @fileName, @mtimeMs, @sizeBytes, @tags, @dateTaken, @cameraMake, @cameraModel,
-        @widthPx, @heightPx, @format, @comment, @thumbnailKey, @thumbnailStatus, @lastScannedAt
+        @widthPx, @heightPx, @format, @comment, @thumbnailKey, @thumbnailStatus, @lastScannedAt, @firstSeenAt
       )
       ON CONFLICT(path) DO UPDATE SET
         fileName = excluded.fileName,
@@ -98,7 +100,9 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
       comment: record.metadata.comment,
       thumbnailKey: record.thumbnailKey,
       thumbnailStatus: record.thumbnailStatus,
-      lastScannedAt: Date.now()
+      lastScannedAt: Date.now(),
+      // Only takes effect on a true INSERT — absent from ON CONFLICT SET above.
+      firstSeenAt: Date.now()
     })
 }
 

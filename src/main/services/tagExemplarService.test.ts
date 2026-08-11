@@ -6,13 +6,17 @@ const {
   mockSetEmbedding,
   mockFindPhotoPathsWithTag,
   mockEmbedImage,
-  mockThumbnailFilePath
+  mockThumbnailFilePath,
+  mockGenerateThumbnail,
+  mockAccess
 } = vi.hoisted(() => ({
   mockGetEmbedding: vi.fn(),
   mockSetEmbedding: vi.fn(),
   mockFindPhotoPathsWithTag: vi.fn(),
   mockEmbedImage: vi.fn(),
-  mockThumbnailFilePath: vi.fn()
+  mockThumbnailFilePath: vi.fn(),
+  mockGenerateThumbnail: vi.fn(),
+  mockAccess: vi.fn()
 }))
 
 vi.mock('@main/db/embeddingRepository', () => ({
@@ -23,7 +27,11 @@ vi.mock('@main/db/photoRepository', () => ({
   findPhotoPathsWithTag: mockFindPhotoPathsWithTag
 }))
 vi.mock('./tagSuggestionService', () => ({ embedImage: mockEmbedImage }))
-vi.mock('./thumbnailService', () => ({ thumbnailFilePath: mockThumbnailFilePath }))
+vi.mock('./thumbnailService', () => ({
+  thumbnailFilePath: mockThumbnailFilePath,
+  generateThumbnail: mockGenerateThumbnail
+}))
+vi.mock('fs/promises', () => ({ access: mockAccess }))
 
 import { suggestTagsByExemplar } from './tagExemplarService'
 
@@ -38,6 +46,8 @@ describe('suggestTagsByExemplar', () => {
     mockFindPhotoPathsWithTag.mockReset()
     mockEmbedImage.mockReset()
     mockThumbnailFilePath.mockReset().mockImplementation((key: string) => `/thumbs/${key}`)
+    mockGenerateThumbnail.mockReset().mockResolvedValue(undefined)
+    mockAccess.mockReset().mockResolvedValue(undefined)
   })
 
   it('omits tags with fewer than the minimum number of tagged examples', async () => {

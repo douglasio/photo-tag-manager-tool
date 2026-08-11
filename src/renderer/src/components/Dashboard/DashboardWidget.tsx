@@ -3,10 +3,8 @@ import React from 'react'
 import { Box, Group, Paper, Text, Title } from '@mantine/core'
 
 import { Widget } from '@shared/types'
-// widget wrapper — the content Box must itself be a flex column (not just a
-// flex item of Paper) for a widget root using className="flex-fill" to have
-// anything to resolve its height against; otherwise that widget's height
-// falls back to auto and it stops constraining its own content.
+// widget wrapper — the content Box must itself be a flex column, not just a
+// flex item of Paper, for a "flex-fill" widget root to have a height to resolve against.
 const DashboardWidget: React.FC<Widget> = ({ id, title, description, component, colSpan }) => {
   return (
     <Paper
@@ -20,13 +18,7 @@ const DashboardWidget: React.FC<Widget> = ({ id, title, description, component, 
       style={{
         flexDirection: 'column',
         // overflowX: 'hidden',
-        // auto (not hidden) — a widget's content can be taller than the
-        // grid row it landed in (rows don't truly auto-grow to content
-        // height here, since every widget's own h=100%/flex-fill layout
-        // depends on a bounded parent height, which conflicts with CSS
-        // Grid's auto-track-sizing); scrolling keeps that content reachable
-        // instead of silently clipping it.
-        // overflowY: 'auto',
+        // overflowY: 'auto', // disabled — see DashboardView's row-height fix instead
         minHeight: 0,
         ...(colSpan && colSpan > 1 && { gridColumn: `span ${colSpan}` })
       }}

@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { Box, Button, Card, Group, Image, Text } from '@mantine/core'
+import { Box, Button, Flex, Image, SimpleGrid, Stack, Text } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { IconArrowRight } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -31,7 +31,7 @@ function pickUntagged(
   return pickRandom(candidates).filePath
 }
 
-export function QuickTagWidget(): ReactElement {
+export function TagThisPhotoWidget(): ReactElement {
   const { state, allTags, updateTags } = usePhotoLibrary()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -67,65 +67,68 @@ export function QuickTagWidget(): ReactElement {
           animate={{ opacity: 1, x: 0 }}
           exit={motionEnabled ? { opacity: 0, x: -24 } : undefined}
           transition={TRANSITION}
-          style={{ height: '100%', maxWidth: 500 }}
+          style={{ height: '100%' }}
         >
-          <Card
-            h="100%"
-            // style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-          >
-            <Card.Section
-              onMouseMove={onMouseMove}
-              onMouseLeave={onMouseLeave}
-              pos="relative"
-              className="dashboard-photo-frame"
-              style={{ cursor: canPreview ? 'zoom-in' : undefined }}
-            >
-              <Image
-                src={toThumbProtocolUrl(currentPhoto.thumbnailKey!)}
-                alt={currentPhoto.fileName}
-                radius="sm"
-                fit="fill"
-              />
-              <PhotoGradientOverlay />
-            </Card.Section>
+          <SimpleGrid cols={2} spacing="md" h="100%" autoRows="100%">
+            <Flex h="100%" w="100%" justify="center" mih="0">
+              <Box
+                onMouseMove={onMouseMove}
+                onMouseLeave={onMouseLeave}
+                pos="relative"
+                h="100%"
+                className="dashboard-photo-frame"
+                style={{
+                  aspectRatio: '1',
+                  cursor: canPreview ? 'zoom-in' : undefined,
+                  overflow: 'hidden'
+                }}
+              >
+                <Image
+                  src={toThumbProtocolUrl(currentPhoto.thumbnailKey!)}
+                  alt={currentPhoto.fileName}
+                  fit="cover"
+                  h="100%"
+                  w="100%"
+                />
+                <PhotoGradientOverlay />
+              </Box>
+            </Flex>
             <GalleryHoverPreview
               photo={currentPhoto}
               position={canPreview ? position : null}
               scale={1}
               motionEnabled={motionEnabled}
             />
-            <SuggestedTagsRow
-              suggestions={suggestions}
-              loading={loadingSuggestions}
-              size="large"
-              onAccept={(tag) =>
-                void updateTags(currentPhoto.filePath, [...currentPhoto.tags, tag])
-              }
-            />
-            <Group wrap="nowrap" mt="md">
-              <Box style={{ flex: 1, minWidth: 0 }}>
-                <TagList
-                  tags={currentPhoto.tags}
-                  allTags={allTags}
-                  recentTags={state.recentTags}
-                  onChange={(tags) => void updateTags(currentPhoto.filePath, tags)}
-                />
-              </Box>
+            <Stack h="100%" gap="md">
+              <SuggestedTagsRow
+                suggestions={suggestions}
+                loading={loadingSuggestions}
+                size="large"
+                onAccept={(tag) =>
+                  void updateTags(currentPhoto.filePath, [...currentPhoto.tags, tag])
+                }
+              />
+              <TagList
+                tags={currentPhoto.tags}
+                allTags={allTags}
+                recentTags={state.recentTags}
+                onChange={(tags) => void updateTags(currentPhoto.filePath, tags)}
+              />
               {currentPhoto.tags.length > 0 ? (
                 <Button
                   rightSection={<IconArrowRight size={14} />}
                   onClick={handleNext}
-                  style={{ flexShrink: 0 }}
+                  style={{ alignSelf: 'flex-start', marginTop: 'auto' }}
                 >
                   Tag another
                 </Button>
               ) : (
-                <Button variant="subtle" onClick={handleNext} style={{ flexShrink: 0 }}>
+                <Button onClick={handleNext} style={{ alignSelf: 'flex-end', marginTop: 'auto' }}>
                   Skip
                 </Button>
               )}
-            </Group>
-          </Card>
+            </Stack>
+          </SimpleGrid>
         </motion.div>
       ) : (
         <motion.div key="empty" style={{ width: '100%' }}>

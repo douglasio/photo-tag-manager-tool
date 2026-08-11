@@ -4,8 +4,11 @@ import type { ReactElement } from 'react'
 
 import {
   FeaturedTagWidget,
+  PhotosFromYearWidget,
+  RecentlyAddedWidget,
   TaggingProgressWidget,
-  ThrowbackWidget,
+  TagThisPhotoWidget,
+  TimeWarpWidget,
   TopTagsWidget,
   TopViewedWidget,
   WelcomeWidget
@@ -13,22 +16,29 @@ import {
 import DashboardWidget from '@renderer/components/Dashboard/DashboardWidget'
 import { Widget } from '@shared/types'
 
-// minmax (not a flat 1fr) — rows still match each other by default, but can
-// grow past that floor for taller content (e.g. Throwback's Timeline), with
-// the page itself scrolling instead of clipping.
+// minmax (not 1fr) — rows match by default, but can grow for tall content
+// (e.g. Throwback's Timeline), with the page scrolling instead of clipping.
 const SECTION_ROW_HEIGHT = 'minmax(340px, auto)'
+// A flat (not minmax/auto) height, roughly a third of the viewport — unlike
+// auto+overflow:hidden, this gives every h="100%" descendant (e.g.
+// BarChart) a real height to resolve against instead of clipping after the fact.
+const SECTION_MAX_HEIGHT = '33vh'
 
 interface DashboardSectionData {
   id: string
   title: string
   icon: typeof IconHome2
   widgets: Widget[]
+  // Off by default — History's Throwback widget is allowed to grow past a
+  // fixed bound (a big Timeline needs the room), page scrolling instead.
+  capped?: boolean
 }
 
 function DashboardSection({
   title,
   icon: Icon,
-  widgets
+  widgets,
+  capped
 }: Omit<DashboardSectionData, 'id'>): ReactElement {
   return (
     <Stack gap="sm">
@@ -39,7 +49,7 @@ function DashboardSection({
         </Title>
       </Group>
       <Divider />
-      <SimpleGrid cols={3} spacing="lg" autoRows={SECTION_ROW_HEIGHT}>
+      <SimpleGrid cols={3} spacing="lg" autoRows={capped ? SECTION_MAX_HEIGHT : SECTION_ROW_HEIGHT}>
         {widgets.map((widget) => (
           <DashboardWidget key={widget.id} {...widget} />
         ))}
@@ -54,20 +64,24 @@ export function DashboardView(): React.JSX.Element {
       id: 'home',
       title: 'Home',
       icon: IconHome2,
+      capped: true,
       widgets: [
         { id: 'welcome', title: 'Welcome', component: <WelcomeWidget /> },
-        { id: 'topViewed', title: 'Top Viewed Photos', component: <TopViewedWidget /> }
+        { id: 'topViewed', title: 'Top Viewed Photos', component: <TopViewedWidget /> },
+        { id: 'recentlyAdded', title: 'Recently Added', component: <RecentlyAddedWidget /> }
       ]
     },
     {
       id: 'tags',
       title: 'Tags',
       icon: IconTags,
+      capped: true,
       widgets: [
+        { id: 'taggingProgress', title: 'Tagging Progress', component: <TaggingProgressWidget /> },
         {
-          id: 'taggingProgress',
-          title: 'Tagging Progress',
-          component: <TaggingProgressWidget />,
+          id: 'tagThisPhoto',
+          title: 'Tag This Photo',
+          component: <TagThisPhotoWidget />,
           colSpan: 2
         },
         { id: 'featuredTag', title: 'Featured Tag', component: <FeaturedTagWidget /> },
@@ -78,7 +92,10 @@ export function DashboardView(): React.JSX.Element {
       id: 'history',
       title: 'History',
       icon: IconHistory,
-      widgets: [{ id: 'throwback', title: 'Throwback', component: <ThrowbackWidget />, colSpan: 3 }]
+      widgets: [
+        { id: 'timeWarp', title: 'Time Warp', component: <TimeWarpWidget />, colSpan: 1 },
+        { id: 'photosFromYear', title: 'Photos From Year', component: <PhotosFromYearWidget /> }
+      ]
     }
   ]
 
@@ -91,6 +108,7 @@ export function DashboardView(): React.JSX.Element {
             title={section.title}
             icon={section.icon}
             widgets={section.widgets}
+            capped={section.capped}
           />
         ))}
       </Stack>

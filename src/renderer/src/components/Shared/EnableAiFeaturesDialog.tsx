@@ -75,14 +75,13 @@ export function EnableAiFeaturesDialog({
       title="Enable AI features?"
       opened={opened}
       saving={downloading}
-      confirmLabel="Enable AI features"
+      confirmLabel="Enable and start scan"
       onConfirm={handleConfirm}
       onCancel={onCancel}
     >
       <Text size="sm">
-        This downloads a small on-device model (~50-90MB) the first time, then scans your library
-        for tag suggestions, duplicate detection, and Time Warp all at once — everything happens
-        automatically once you confirm. Runs fully offline afterward.
+        This downloads a small on-device model (~50-90MB) the first time, then scans your library.
+        It may take a while. AI features can be disabled at any time from the Settings menu.
       </Text>
       {downloading && state.aiScanProgress && (
         <Stack gap={4} mt="sm">

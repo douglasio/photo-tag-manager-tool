@@ -27,7 +27,7 @@ vi.mock('@state', () => ({
 }))
 
 // The real TagList renders a full TagsInput combobox, which isn't needed to
-// exercise QuickTagWidget's own photo-picking/skip logic — a bare button
+// exercise TagThisPhotoWidget's own photo-picking/skip logic — a bare button
 // standing in for "add a tag" keeps these tests focused on that.
 vi.mock('@components', () => ({
   TagList: ({ onChange }: { onChange: (tags: string[]) => void }) => (
@@ -55,7 +55,7 @@ vi.mock('@components', () => ({
   )
 }))
 
-import { QuickTagWidget } from './QuickTagWidget'
+import { TagThisPhotoWidget } from './TagThisPhotoWidget'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {
@@ -93,12 +93,12 @@ function setLibrary(photos: PhotoRecord[]): void {
 function renderWidget(): ReturnType<typeof render> {
   return render(
     <MantineProvider>
-      <QuickTagWidget />
+      <TagThisPhotoWidget />
     </MantineProvider>
   )
 }
 
-describe('QuickTagWidget', () => {
+describe('TagThisPhotoWidget', () => {
   it('shows a congratulatory empty state when every photo is already tagged', () => {
     setLibrary([makePhoto('/a.jpg', { tags: ['vacation'] })])
     renderWidget()
@@ -144,7 +144,7 @@ describe('QuickTagWidget', () => {
     mockPhotosByPath.set('/a.jpg', makePhoto('/a.jpg', { tags: ['vacation'] }))
     rerender(
       <MantineProvider>
-        <QuickTagWidget />
+        <TagThisPhotoWidget />
       </MantineProvider>
     )
 
