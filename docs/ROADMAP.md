@@ -66,8 +66,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Contact sheet?
 
-5. Instead of the fade-in can you do like a slide-in to match the panel slide animation? The fade gets kind of repetitive.
-
 ## Tools
 
 2. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.
@@ -80,13 +78,11 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 6. Collage?
 
-7. X "over the years" same-date-across-years nostalgia view, easy with dateTaken you already have. Ideally should show AI-derived "similar" photos that date back years.
-
-8. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
+7. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
 
 ## Tags
 
-1. Hovering over tags anywhere in the app should show a Popover with the full tag name and description (if available), after a short delay. Make sure this is shared functionality, do not duplicate the Popover layout in multiple places.
+1. Hovering over tags anywhere in the app should show a Popover Card with the full tag name and description (if available), after a short delay. Make sure this is shared functionality (hook or wrapper component), do not duplicate the Popover layout in multiple places.
 
 2. Selecting multiple photos from the gallery should open the taglist to batch add or remove tags to the entire selection.
 
