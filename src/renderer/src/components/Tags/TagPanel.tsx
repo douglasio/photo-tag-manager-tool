@@ -19,7 +19,13 @@ import { useHover, useMergedRef } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconPencil } from '@tabler/icons-react'
 
-import { PanelSection, TagGridTile, TagGroupCreateButton, TagsSettingsMenu } from '@components'
+import {
+  PanelSection,
+  TagGridTile,
+  TagGroupCreateButton,
+  TagHoverCardContent,
+  TagsSettingsMenu
+} from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, TagGroup } from '@shared/types'
 import { usePhotoLibrary } from '@state'
@@ -151,20 +157,7 @@ function TagListItem({
             as FolderTree's rename row). */}
         <Tooltip
           position="right"
-          label={
-            description ? (
-              <Stack gap={2}>
-                <Text size="sm" fw={600}>
-                  #{tag}
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {description}
-                </Text>
-              </Stack>
-            ) : (
-              `#${tag}`
-            )
-          }
+          label={<TagHoverCardContent tag={tag} description={description || undefined} />}
           disabled={editing}
           openDelay={700}
           multiline
@@ -238,12 +231,7 @@ function TagListItem({
                     </ActionIcon>
                   </Tooltip>
                 )}
-                <Badge
-                  circle
-                  size="lg"
-                  variant={isActive ? 'filled' : 'light'}
-                  style={{ flexShrink: 0 }}
-                >
+                <Badge size="md" variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
                   {count}
                 </Badge>
               </>
@@ -292,6 +280,41 @@ function TagListItem({
         onCancel={handleCancelConfirm}
       />
     </>
+  )
+}
+
+interface UntaggedRowProps {
+  count: number
+  isActive: boolean
+  onSelect: () => void
+}
+
+// Pseudo-tag entry for photos with no tags at all — deliberately simpler
+// than TagListItem (no rename, drag, or cover photo; nothing to drag a tag
+// into, and no cover thumbnail makes sense for a set that spans every photo
+// without a tag).
+function UntaggedRow({ count, isActive, onSelect }: UntaggedRowProps): ReactElement {
+  const { hovered, ref } = useHover<HTMLButtonElement>()
+  return (
+    <Button
+      ref={ref}
+      onClick={onSelect}
+      fullWidth
+      h="auto"
+      ml={-3}
+      py="xs"
+      justify="space-between"
+      variant="transparent"
+      bg={activeHoverBackground(isActive, hovered)}
+      // leftSection={<IconTagOff size={16} />}
+      rightSection={
+        <Badge size="md" variant={isActive ? 'filled' : 'light'}>
+          {count}
+        </Badge>
+      }
+    >
+      <Text>Untagged</Text>
+    </Button>
   )
 }
 
@@ -424,11 +447,32 @@ function TagGroupSection({
 }
 
 export function TagPanel(): ReactElement {
-  const { allTags, tagCounts, tagCoverPhotos, state, setTagFilter, renameTag } = usePhotoLibrary()
+  const {
+    allTags,
+    tagCounts,
+    tagCoverPhotos,
+    untaggedCount,
+    state,
+    setTagFilter,
+    setUntaggedFilter,
+    renameTag
+  } = usePhotoLibrary()
   const [editingTag, setEditingTag] = useState<string | null>(null)
 
+  const untaggedEntry = untaggedCount > 0 && (
+    <UntaggedRow
+      count={untaggedCount}
+      isActive={state.untaggedFilterActive}
+      onSelect={() => setUntaggedFilter(!state.untaggedFilterActive)}
+    />
+  )
+
   if (allTags.length === 0) {
-    return <Text c="dimmed">No tags yet.</Text>
+    return untaggedEntry ? (
+      <Stack gap={0}>{untaggedEntry}</Stack>
+    ) : (
+      <Text c="dimmed">No tags yet.</Text>
+    )
   }
 
   const renderTagRow = (tag: string): ReactElement => {
@@ -485,6 +529,7 @@ export function TagPanel(): ReactElement {
   if (state.tagGroups.length === 0) {
     return (
       <PanelSection title="Tags" headerAction={headerAction}>
+        {untaggedEntry}
         {renderTags(allTags)}
       </PanelSection>
     )
@@ -495,6 +540,7 @@ export function TagPanel(): ReactElement {
 
   return (
     <PanelSection title="Tags" headerAction={headerAction}>
+      {untaggedEntry}
       <Accordion multiple defaultValue={[...state.tagGroups.map((group) => group.id), '__other__']}>
         {state.tagGroups.map((group) => (
           <TagGroupSection

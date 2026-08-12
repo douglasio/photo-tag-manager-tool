@@ -1,14 +1,16 @@
 import { MantineProvider } from '@mantine/core'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { PhotoRecord } from '@shared/types'
 
 let mockPhotosByPath: Map<string, PhotoRecord>
+const mockOpenPhotoTab = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { photosByPath: mockPhotosByPath }
+    state: { photosByPath: mockPhotosByPath },
+    openPhotoTab: mockOpenPhotoTab
   })
 }))
 
@@ -24,7 +26,12 @@ vi.mock('@mantine/charts', () => ({
   }
 }))
 
-import { TopViewedWidget } from './TopViewedWidget'
+import {
+  type HoverState,
+  makeImageBarShape,
+  type TopViewedDatum,
+  TopViewedWidget
+} from './TopViewedWidget'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {
@@ -99,7 +106,11 @@ describe('TopViewedWidget', () => {
     renderWidget()
 
     const data = mockBarChart.mock.calls[0][0].data as { fileName: string; viewCount: number }[]
-    expect(data.map((d) => d.fileName)).toEqual(['high.jpg', 'mid.jpg', 'low.jpg'])
+    expect(data.filter((d) => d.viewCount > 0).map((d) => d.fileName)).toEqual([
+      'high.jpg',
+      'mid.jpg',
+      'low.jpg'
+    ])
   })
 
   it('caps the chart at the top 5 most-viewed photos', () => {
@@ -108,5 +119,130 @@ describe('TopViewedWidget', () => {
 
     const data = mockBarChart.mock.calls[0][0].data as unknown[]
     expect(data).toHaveLength(5)
+  })
+
+  it('pads the chart out to a full 5 categories so real bars keep a consistent width', () => {
+    setLibrary([makePhoto('/a.jpg', { viewCount: 5 }), makePhoto('/b.jpg', { viewCount: 2 })])
+    renderWidget()
+
+    const data = mockBarChart.mock.calls[0][0].data as { viewCount: number }[]
+    expect(data).toHaveLength(5)
+    expect(data.filter((d) => d.viewCount > 0)).toHaveLength(2)
+  })
+})
+
+// This renders the actual shape function passed to Recharts (rather than
+// going through the mocked BarChart above) — the previous rounds of
+// "blacked-out photo" / "lost hover" regressions all lived inside this
+// render logic, and a chart-level mock can never catch them.
+describe('makeImageBarShape', () => {
+  function makeDatum(overrides: Partial<TopViewedDatum> = {}): TopViewedDatum {
+    return {
+      id: 'a',
+      fileName: 'a.jpg',
+      viewCount: 7,
+      thumbnailUrl: 'photag-thumb://key',
+      photo: makePhoto('/a.jpg'),
+      ...overrides
+    }
+  }
+
+  it('renders the photo thumbnail and the view count', () => {
+    const shape = makeImageBarShape(false, vi.fn(), vi.fn(), vi.fn())
+    const { container } = render(
+      <svg>{shape({ x: 0, y: 0, width: 100, height: 30, payload: makeDatum() })}</svg>
+    )
+
+    expect(container.querySelector('image')).toHaveAttribute('href', 'photag-thumb://key')
+    expect(screen.getByText('7')).toBeInTheDocument()
+  })
+
+  it('renders nothing for a padding placeholder', () => {
+    const shape = makeImageBarShape(false, vi.fn(), vi.fn(), vi.fn())
+    const { container } = render(
+      <svg>
+        {shape({
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 30,
+          payload: makeDatum({ thumbnailUrl: null })
+        })}
+      </svg>
+    )
+
+    expect(container.querySelector('image')).not.toBeInTheDocument()
+    expect(container.querySelector('g')).not.toBeInTheDocument()
+  })
+
+  it('sanitizes the file path into a valid SVG id so the clip/gradient reference resolves', () => {
+    const shape = makeImageBarShape(false, vi.fn(), vi.fn(), vi.fn())
+    const datum = makeDatum({ id: '/Users/me/Pictures/My Photo (2024).jpg' })
+    const { container } = render(
+      <svg>{shape({ x: 0, y: 0, width: 100, height: 30, payload: datum })}</svg>
+    )
+
+    const clipPathEl = container.querySelector('clipPath')!
+    const gradientEl = container.querySelector('linearGradient')!
+    const image = container.querySelector('image')!
+    const gradientRect = container.querySelectorAll('rect')[1]
+
+    expect(clipPathEl.id).toMatch(/^[a-zA-Z0-9_-]+$/)
+    expect(gradientEl.id).toMatch(/^[a-zA-Z0-9_-]+$/)
+    expect(image.getAttribute('clip-path')).toBe(`url(#${clipPathEl.id})`)
+    expect(gradientRect.getAttribute('fill')).toBe(`url(#${gradientEl.id})`)
+  })
+
+  it('opens the photo tab when the bar is clicked', () => {
+    const onOpen = vi.fn()
+    const shape = makeImageBarShape(false, vi.fn(), vi.fn(), onOpen)
+    const datum = makeDatum()
+    const { container } = render(
+      <svg>{shape({ x: 0, y: 0, width: 100, height: 30, payload: datum })}</svg>
+    )
+
+    fireEvent.click(container.querySelector('g')!)
+
+    expect(onOpen).toHaveBeenCalledExactlyOnceWith(datum)
+  })
+
+  it('reports hover position on mouse move regardless of whether the trigger is held — the parent decides whether to act on it', () => {
+    const onHoverMove = vi.fn()
+    const shape = makeImageBarShape(false, onHoverMove, vi.fn(), vi.fn())
+    const datum = makeDatum()
+    const { container } = render(
+      <svg>{shape({ x: 0, y: 0, width: 100, height: 30, payload: datum })}</svg>
+    )
+
+    fireEvent.mouseMove(container.querySelector('g')!, { clientX: 12, clientY: 34 })
+
+    expect(onHoverMove).toHaveBeenCalledExactlyOnceWith({
+      id: 'a',
+      position: { x: 12, y: 34 }
+    } satisfies HoverState)
+  })
+
+  it('calls onHoverLeave on mouse leave', () => {
+    const onHoverLeave = vi.fn()
+    const shape = makeImageBarShape(true, vi.fn(), onHoverLeave, vi.fn())
+    const { container } = render(
+      <svg>{shape({ x: 0, y: 0, width: 100, height: 30, payload: makeDatum() })}</svg>
+    )
+
+    fireEvent.mouseLeave(container.querySelector('g')!)
+
+    expect(onHoverLeave).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the count text within a very short bar instead of letting it spill out', () => {
+    const shape = makeImageBarShape(false, vi.fn(), vi.fn(), vi.fn())
+    const { container } = render(
+      <svg>{shape({ x: 0, y: 100, width: 100, height: 8, payload: makeDatum() })}</svg>
+    )
+
+    const text = container.querySelector('text')!
+    const textY = Number(text.getAttribute('y'))
+    expect(textY).toBeGreaterThanOrEqual(100)
+    expect(textY).toBeLessThanOrEqual(108)
   })
 })

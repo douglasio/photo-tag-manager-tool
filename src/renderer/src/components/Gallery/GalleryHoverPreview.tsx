@@ -85,7 +85,11 @@ export function GalleryHoverPreview({
     return () => observer.disconnect()
   }, [isVisible])
 
-  const clampedPosition = position ? clampToViewport(position, size) : null
+  // `size` is the content box's unscaled layout size (ResizeObserver ignores
+  // CSS transforms), so it's scaled up here to match what's actually
+  // rendered on screen before being used to clamp against viewport edges.
+  const scaledSize = size ? { width: size.width * scale, height: size.height * scale } : null
+  const clampedPosition = position ? clampToViewport(position, scaledSize) : null
 
   // Counts once per full preview session (open → close), matching "previewed
   // with space bar" in the spec, but deferred until VIEW_COUNT_DELAY_MS after
@@ -123,9 +127,9 @@ export function GalleryHoverPreview({
           >
             <motion.div
               ref={contentRef}
-              initial={motionEnabled ? { opacity: 0, scale: 0.92 } : false}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={motionEnabled ? { opacity: 0, scale: 0.92 } : undefined}
+              initial={motionEnabled ? { opacity: 0, scale: 0.92 * scale } : false}
+              animate={{ opacity: 1, scale }}
+              exit={motionEnabled ? { opacity: 0, scale: 0.92 * scale } : undefined}
               transition={TRANSITION}
               style={{
                 backgroundColor: 'var(--mantine-color-body)',
@@ -138,8 +142,8 @@ export function GalleryHoverPreview({
                 alt={photo.fileName}
                 bdrs="md"
                 fit="contain"
-                maw={`min(${BASE_WIDTH_VW * scale}vw, 92vw)`}
-                mah={`min(${BASE_HEIGHT_VH * scale}vh, 92vh)`}
+                maw={`${BASE_WIDTH_VW}vw`}
+                mah={`${BASE_HEIGHT_VH}vh`}
                 w="auto"
                 h="auto"
               />

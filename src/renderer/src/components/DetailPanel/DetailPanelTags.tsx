@@ -2,7 +2,8 @@ import { Button, Group, Stack } from '@mantine/core'
 import { IconTagPlus } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
-import { SectionTitle, TagList } from '@components'
+import { SectionTitle, SuggestedTagsRow, TagList } from '@components'
+import { useTagSuggestions } from '@hooks'
 import { type DisplayPhotoRecord, usePhotoLibrary } from '@state'
 
 interface DetailPanelTagsProps {
@@ -12,20 +13,25 @@ interface DetailPanelTagsProps {
 
 export function DetailPanelTags({ photo, onOpenQuickTag }: DetailPanelTagsProps): ReactElement {
   const { allTags, state, updateTags } = usePhotoLibrary()
+  const { suggestions, loading } = useTagSuggestions(
+    photo.filePath,
+    photo.tags,
+    state.aiTagSuggestionsEnabled
+  )
 
   return (
     <Stack>
       <Group justify="space-between" wrap="nowrap">
         <SectionTitle>Tags</SectionTitle>
-        <Button
-          variant="outline"
-          size="compact-sm"
-          leftSection={<IconTagPlus size={14} />}
-          onClick={onOpenQuickTag}
-        >
-          Quick Tag
+        <Button variant="outline" size="compact-sm" title="quick tag" onClick={onOpenQuickTag}>
+          <IconTagPlus size={14} />
         </Button>
       </Group>
+      <SuggestedTagsRow
+        suggestions={suggestions}
+        loading={loading}
+        onAccept={(tag) => void updateTags(photo.filePath, [...photo.tags, tag])}
+      />
       <TagList
         tags={photo.tags}
         allTags={allTags}

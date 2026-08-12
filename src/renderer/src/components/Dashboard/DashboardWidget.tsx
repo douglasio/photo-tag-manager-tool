@@ -1,35 +1,59 @@
-import React from 'react'
+import React, { useRef } from 'react'
 
-import { Box, Paper, Title } from '@mantine/core'
+import { Box, Group, Paper, Text, Title } from '@mantine/core'
 
 import { Widget } from '@shared/types'
 
-// widget wrapper — Paper must actually be a flex column (and have a
-// resolved height, via h="100%" from the SimpleGrid cell it sits in) for the
-// content Box's flex={1}/mih={0} below to do anything. Without that, the Box
-// falls back to height:auto, and any widget using h="100%" internally (e.g.
-// TopViewedWidget's chart) resolves against nothing and collapses to 0.
-const DashboardWidget: React.FC<Widget> = ({ id, title, component, colSpan }) => (
-  <Paper
-    withBorder
-    p="md"
-    id={id}
-    h="100%"
-    display="flex"
-    style={{
-      flexDirection: 'column',
-      overflow: 'hidden',
-      minHeight: 0,
-      ...(colSpan && colSpan > 1 && { gridColumn: `span ${colSpan}` })
-    }}
-  >
-    <Title order={2} lts={0.5} tt="uppercase" size="sm" style={{ flexShrink: 0 }}>
-      {title}
-    </Title>
-    <Box flex={1} mih={0} w="100%" pt="sm">
-      {component}
-    </Box>
-  </Paper>
-)
+import { DashboardPreviewZoomProvider } from './DashboardPreviewZoomContext'
+// widget wrapper — the content Box must itself be a flex column, not just a
+// flex item of Paper, for a "flex-fill" widget root to have a height to resolve against.
+const DashboardWidget: React.FC<Widget> = ({ id, title, description, component, colSpan }) => {
+  const contentRef = useRef<HTMLDivElement>(null)
+  return (
+    <Paper
+      p="md"
+      id={id}
+      h="100%"
+      display="flex"
+      bg="dark"
+      shadow="xs"
+      radius="md"
+      style={{
+        flexDirection: 'column',
+        // overflowX: 'hidden',
+        // overflowY: 'auto', // disabled — see DashboardView's row-height fix instead
+        minHeight: 0,
+        ...(colSpan && colSpan > 1 && { gridColumn: `span ${colSpan}` })
+      }}
+    >
+      {description ? (
+        <Group align="center">
+          <Title order={2} lts={0.5} tt="uppercase" size="sm" style={{ flexShrink: 0 }}>
+            {title}
+          </Title>
+          <Text c="dimmed" size="sm" flex="0 0 auto">
+            {description}
+          </Text>
+        </Group>
+      ) : (
+        <Title order={2} lts={0.5} tt="uppercase" size="sm" style={{ flexShrink: 0 }}>
+          {title}
+        </Title>
+      )}
+      <Box
+        ref={contentRef}
+        display="flex"
+        w="100%"
+        pt="sm"
+        className="flex-fill"
+        style={{ flexDirection: 'column' }}
+      >
+        <DashboardPreviewZoomProvider containerRef={contentRef}>
+          {component}
+        </DashboardPreviewZoomProvider>
+      </Box>
+    </Paper>
+  )
+}
 
 export default DashboardWidget

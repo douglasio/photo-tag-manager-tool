@@ -6,6 +6,7 @@ const { mockGetPath, mockMkdir, mockUnlink, mockToFile, mockSharp } = vi.hoisted
   const mockToFile = vi.fn().mockResolvedValue(undefined)
   const chain = {
     rotate: vi.fn().mockReturnThis(),
+    toColourspace: vi.fn().mockReturnThis(),
     resize: vi.fn().mockReturnThis(),
     jpeg: vi.fn().mockReturnThis(),
     toFile: mockToFile

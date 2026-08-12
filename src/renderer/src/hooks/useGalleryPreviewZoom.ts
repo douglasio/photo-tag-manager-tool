@@ -5,7 +5,7 @@ import { PREVIEW_TRIGGER_KEY } from '@utils'
 import { useKeyHeld } from './useKeyHeld'
 
 const MIN_PREVIEW_SCALE = 0.5
-const MAX_PREVIEW_SCALE = 3
+const MAX_PREVIEW_SCALE = 6
 // A typical wheel "notch" reports a deltaY of roughly 100, so this yields
 // about a 0.15x change per notch — noticeable without feeling twitchy.
 const PREVIEW_ZOOM_SENSITIVITY = 0.0015

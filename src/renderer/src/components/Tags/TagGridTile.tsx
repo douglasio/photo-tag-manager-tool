@@ -2,7 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { AspectRatio, BackgroundImage, Box, Stack, Text, UnstyledButton } from '@mantine/core'
 import type { ReactElement } from 'react'
 
-import { PhotoGradientOverlay } from '@components'
+import { PhotoGradientOverlay, TagHoverCard } from '@components'
 import { RADIUS_SIZE } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
@@ -50,39 +50,41 @@ export function TagGridTile({
   )
 
   return (
-    <UnstyledButton
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      onClick={onSelect}
-      // Space is the gallery's preview-trigger key, not a click here — see
-      // TagListItem's identical guard for why.
-      onKeyDown={(event) => {
-        if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
-      }}
-      opacity={isDragging ? 0.4 : undefined}
-      w="100%"
-      bdrs={RADIUS_SIZE}
-      pos="relative"
-      style={{
-        overflow: 'hidden',
-        outline: isActive ? '2px solid var(--mantine-primary-color-filled)' : undefined,
-        outlineOffset: -2
-      }}
-    >
-      <AspectRatio ratio={1}>
-        {hasThumbnail ? (
-          <BackgroundImage
-            src={toThumbProtocolUrl(coverPhoto.thumbnailKey!)}
-            className="dashboard-photo-frame"
-          >
-            <PhotoGradientOverlay />
-          </BackgroundImage>
-        ) : (
-          <Box bg="var(--mantine-primary-color-light)" />
-        )}
-      </AspectRatio>
-      {label}
-    </UnstyledButton>
+    <TagHoverCard tag={tag}>
+      <UnstyledButton
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        onClick={onSelect}
+        // Space is the gallery's preview-trigger key, not a click here — see
+        // TagListItem's identical guard for why.
+        onKeyDown={(event) => {
+          if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+        }}
+        opacity={isDragging ? 0.4 : undefined}
+        w="100%"
+        bdrs={RADIUS_SIZE}
+        pos="relative"
+        style={{
+          overflow: 'hidden',
+          outline: isActive ? '2px solid var(--mantine-primary-color-filled)' : undefined,
+          outlineOffset: -2
+        }}
+      >
+        <AspectRatio ratio={1}>
+          {hasThumbnail ? (
+            <BackgroundImage
+              src={toThumbProtocolUrl(coverPhoto.thumbnailKey!)}
+              className="dashboard-photo-frame"
+            >
+              <PhotoGradientOverlay />
+            </BackgroundImage>
+          ) : (
+            <Box bg="var(--mantine-primary-color-light)" />
+          )}
+        </AspectRatio>
+        {label}
+      </UnstyledButton>
+    </TagHoverCard>
   )
 }

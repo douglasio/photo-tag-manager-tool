@@ -1,4 +1,4 @@
-import type { DefaultView, GallerySort } from '@shared/types'
+import type { DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
 
 import { getDb } from './database'
 
@@ -81,6 +81,26 @@ export function setTagsPanelGridView(value: boolean): void {
   setSetting('tagsPanelGridView', String(value))
 }
 
+export function getAiTagSuggestionsEnabled(): boolean {
+  return getSetting('aiTagSuggestionsEnabled') === 'true'
+}
+
+export function setAiTagSuggestionsEnabled(value: boolean): void {
+  setSetting('aiTagSuggestionsEnabled', String(value))
+}
+
+// Set while a scan is running and cleared when it finishes for any reason
+// while the app is still alive (success, error, or user cancel) — so if it's
+// still true on the next launch, the previous scan was cut off by a quit
+// rather than resolved, and is safe to silently resume.
+export function getAiScanInProgress(): boolean {
+  return getSetting('aiScanInProgress') === 'true'
+}
+
+export function setAiScanInProgress(value: boolean): void {
+  setSetting('aiScanInProgress', String(value))
+}
+
 // Defaults to Dashboard, same reasoning as getGalleryAnimationsEnabled above.
 export function getDefaultView(): DefaultView {
   return getSetting('defaultView') === 'gallery' ? 'gallery' : 'dashboard'
@@ -88,6 +108,14 @@ export function getDefaultView(): DefaultView {
 
 export function setDefaultView(value: DefaultView): void {
   setSetting('defaultView', value)
+}
+
+export function getGalleryViewMode(): GalleryViewMode {
+  return getSetting('galleryViewMode') === 'list' ? 'list' : 'grid'
+}
+
+export function setGalleryViewMode(value: GalleryViewMode): void {
+  setSetting('galleryViewMode', value)
 }
 
 export function getDetailsPanelCollapsed(): boolean {

@@ -1,6 +1,7 @@
 import type { PhotoRecord } from '@shared/types'
 
 import { getDb } from './database'
+import { deleteEmbedding, renameEmbedding } from './embeddingRepository'
 import { reconcileTagGroups } from './tagMetadataRepository'
 
 interface PhotoRow {
@@ -19,6 +20,7 @@ interface PhotoRow {
   thumbnailKey: string | null
   thumbnailStatus: string
   viewCount: number
+  firstSeenAt: number | null
 }
 
 function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
@@ -43,7 +45,8 @@ function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
     // Callers that actually hit the cache (see scanHandlers.ts's processFile)
     // override this to true; a DB row read on its own isn't "from cache."
     fromCache: false,
-    viewCount: row.viewCount
+    viewCount: row.viewCount,
+    firstSeenAt: row.firstSeenAt ?? undefined
   }
 }
 
@@ -61,10 +64,10 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
     .prepare(
       `INSERT INTO photos (
         path, fileName, mtimeMs, sizeBytes, tags, dateTaken, cameraMake, cameraModel,
-        widthPx, heightPx, format, comment, thumbnailKey, thumbnailStatus, lastScannedAt
+        widthPx, heightPx, format, comment, thumbnailKey, thumbnailStatus, lastScannedAt, firstSeenAt
       ) VALUES (
         @path, @fileName, @mtimeMs, @sizeBytes, @tags, @dateTaken, @cameraMake, @cameraModel,
-        @widthPx, @heightPx, @format, @comment, @thumbnailKey, @thumbnailStatus, @lastScannedAt
+        @widthPx, @heightPx, @format, @comment, @thumbnailKey, @thumbnailStatus, @lastScannedAt, @firstSeenAt
       )
       ON CONFLICT(path) DO UPDATE SET
         fileName = excluded.fileName,
@@ -97,7 +100,9 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
       comment: record.metadata.comment,
       thumbnailKey: record.thumbnailKey,
       thumbnailStatus: record.thumbnailStatus,
-      lastScannedAt: Date.now()
+      lastScannedAt: Date.now(),
+      // Only takes effect on a true INSERT — absent from ON CONFLICT SET above.
+      firstSeenAt: Date.now()
     })
 }
 
@@ -108,6 +113,83 @@ export function incrementViewCount(filePath: string): void {
   getDb().prepare('UPDATE photos SET viewCount = viewCount + 1 WHERE path = ?').run(filePath)
 }
 
+/** Up to `limit` ready-thumbnail photos carrying `tag` — used to build a tag's
+ * exemplar embedding set. `tags` is stored as a JSON array string, so this
+ * pre-filters with a cheap substring search, then confirms with a real parse. */
+export function findPhotoPathsWithTag(
+  tag: string,
+  limit: number
+): { filePath: string; thumbnailKey: string }[] {
+  const matches: { filePath: string; thumbnailKey: string }[] = []
+  const rows = getDb()
+    .prepare(
+      `SELECT path, tags, thumbnailKey FROM photos
+       WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL AND instr(tags, ?) > 0`
+    )
+    .iterate(`"${tag}"`) as IterableIterator<{
+    path: string
+    tags: string
+    thumbnailKey: string
+  }>
+
+  for (const row of rows) {
+    if (matches.length >= limit) break
+    try {
+      if ((JSON.parse(row.tags) as string[]).includes(tag)) {
+        matches.push({ filePath: row.path, thumbnailKey: row.thumbnailKey })
+      }
+    } catch {
+      // Malformed tags JSON on this row — skip it.
+    }
+  }
+
+  return matches
+}
+
+/** Every thumbnail-ready photo — used to build the duplicate-detection
+ * embedding set (unlike findPhotoPathsWithTag, no filtering needed here). */
+export function findAllReadyPhotos(): { filePath: string; thumbnailKey: string }[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT path, thumbnailKey FROM photos WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL`
+    )
+    .all() as { path: string; thumbnailKey: string }[]
+  return rows.map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
+}
+
+/** Every thumbnail-ready photo with a known dateTaken — used to group
+ * photos by year for the Throwback widget. */
+export function findAllReadyPhotosWithDate(): {
+  filePath: string
+  thumbnailKey: string
+  dateTaken: string
+}[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT path, thumbnailKey, dateTaken FROM photos
+       WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL AND dateTaken IS NOT NULL`
+    )
+    .all() as { path: string; thumbnailKey: string; dateTaken: string }[]
+  return rows.map((row) => ({
+    filePath: row.path,
+    thumbnailKey: row.thumbnailKey,
+    dateTaken: row.dateTaken
+  }))
+}
+
+/** Reverse lookup for the thumbnail protocol handler's regenerate-on-miss
+ * fallback — the request only carries the thumbnailKey, not the photo's
+ * actual filePath. */
+export function findByThumbnailKey(thumbnailKey: string): { filePath: string } | null {
+  const row = getDb()
+    .prepare('SELECT path FROM photos WHERE thumbnailKey = ?')
+    .get(thumbnailKey) as { path: string } | undefined
+  return row ? { filePath: row.path } : null
+}
+
+// A regenerated thumbnail (e.g. after rotate) means the pixels underneath
+// any cached embedding changed too, so that embedding is stale — deleting it
+// here lets it recompute lazily next time something needs it.
 export function updateThumbnail(
   filePath: string,
   thumbnailKey: string,
@@ -116,6 +198,7 @@ export function updateThumbnail(
   getDb()
     .prepare('UPDATE photos SET thumbnailKey = ?, thumbnailStatus = ? WHERE path = ?')
     .run(thumbnailKey, status, filePath)
+  deleteEmbedding(filePath)
 }
 
 /** Deletes a single photo row (used by the folder watcher on file removal). Returns its thumbnailKey, if any, so the caller can clean up the thumbnail file. */
@@ -127,6 +210,7 @@ export function removePhoto(filePath: string): string | null {
 
   db.prepare('DELETE FROM photos WHERE path = ?').run(filePath)
   reconcileTagGroups()
+  deleteEmbedding(filePath)
   return row.thumbnailKey
 }
 
@@ -137,6 +221,7 @@ export function renamePhotoPath(oldPath: string, newPath: string, fileName: stri
   getDb()
     .prepare('UPDATE photos SET path = @newPath, fileName = @fileName WHERE path = @oldPath')
     .run({ oldPath, newPath, fileName })
+  renameEmbedding(oldPath, newPath)
 }
 
 function isPathUnderFolder(path: string, folder: string): boolean {
@@ -168,6 +253,7 @@ export function renamePhotoPathPrefix(oldFolder: string, newFolder: string): voi
     for (const pair of pairs) update.run(pair)
   })
   updateMany(affected)
+  for (const { oldPath, newPath } of affected) renameEmbedding(oldPath, newPath)
 }
 
 export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[] {
@@ -185,6 +271,7 @@ export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[]
   })
   deleteMany(stale.map((row) => row.path))
   reconcileTagGroups()
+  for (const row of stale) deleteEmbedding(row.path)
 
   return stale.map((row) => row.thumbnailKey).filter((key): key is string => Boolean(key))
 }

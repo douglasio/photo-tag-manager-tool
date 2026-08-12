@@ -4,15 +4,11 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
-- Gallery preview zoom is not very smooth and doesn't zoom in enough
-
 # Features
 
 To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Shell
-
-1. [Tags/Folders vertical split done, persisted] The details pane and the left folder/tag panel (the sidebar's overall width, not the Tags/Folders split within it) should still be resizable using Mantine Splitter with the no handle setting, persisted. Blocked on reconciling Splitter's own flex-pane sizing with AppShell's Navbar/Aside, which currently own width + collapse-animation via their own `width`/`collapsed` config rather than a Splitter pane.
 
 2. Implement MenuBar?
 
@@ -20,9 +16,15 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Corrupt photo finder
 
-5. Untagged photo view (linked from dashboard widgets about photo tagging)
+5. I want a global way to "ignore" a folder from appearing in the various features, including AI features. Ex. If there's a folder called "test", I should be able to right click it in the folder tree and say "Exclude from features" or something like that. In that case, it should not show up basically anywhere except if the folder is navigated to directly., All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab.
 
-6. I want to be able to ignore tags in certain folders, like archive folders and backups. I want to be able to right-click on a folder in the tree and say "ignore tags" which would add a little icon on the folder to indicate that it's ignored. Same right-click menu option should reverse the action. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab called Tags
+## AI
+
+- Face detection?
+
+- Disabling AI should actually uninstall the models, not just hide the features from the UI.
+
+- There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
 
 ## Navigation
 
@@ -30,29 +32,39 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Dashboard
 
+### Throwback Widget
+
+1. Let's ramp up the similarity threshold a bit on the Throwback widget timeline -- getting some really odd choices in there. There should be logic to skip a year if no images are found that are similar enough.
+
 ## Gallery View
 
 1. Select tag thumbnail photo
 
 2. Cursor multi-select
 
+3. The next view should be...
+
+4. Contact sheet?
+
 ## Tools
 
 2. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.
 
-3. Suggested tags?
+3. Reset view counts
 
-4. Reset view counts
+4. Export database
 
-5. Export database
+5. Removing folders should not delete photo data
 
-6. Removing folders should not delete photo data
+6. Collage?
 
-## Details Panel
+7. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
 
-1. When multiple photos are selected, we should replace the simple photo count view with options for multi-photo select. I want to see two sections - one that's a button to Compare (same functionality and icon as the one that appears at the top of the gallery). The second should display a list of all the tags in all the photos selected. It should utilize the same TagList format as other areas. From here, you should be able to batch add or batch delete any of the tags from the selected photos.
+## Tags
 
-2. Add a button next to the Tags header called "Quick Tag" that switches the details panel to a view where all the available tags are listed as Mantine Chips. Tags that have already been added should appear as selected. From here, I want to be able to just quickly check off as many tags as I want, and it will instantly add them to the selected photo. I should be able to remain in this view until I manually close the "quick tag" window, at which point it returns to the normal details panel.
+1. Hovering over tags anywhere in the app should show a Popover Card with the full tag name and description (if available), after a short delay. Make sure this is shared functionality (hook or wrapper component), do not duplicate the Popover layout in multiple places.
+
+2. Selecting multiple photos from the gallery should open the taglist to batch add or remove tags to the entire selection.
 
 ## Photo view
 
@@ -68,11 +80,21 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 2. Refine visualizations...
 
+3. Add "Art Gallery" and "movie theater" visualizations
+
 ## Settings
 
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
+2. Clean up AI enable flag UX
+
+3. Export db, clear db
+
 ## Optimization
+
+## Duplicates View
+
+1. Add actions like delete, merge, show in folder, etc.
 
 ## Codebase
 

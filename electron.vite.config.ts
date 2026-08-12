@@ -10,6 +10,19 @@ export default defineConfig({
         { find: '@main', replacement: resolve('src/main') }
       ]
     },
+    // Extra entry so the worker_thread (spawned at runtime via a plain file
+    // path, not an import) gets emitted as its own out/main/*.js alongside
+    // the default index entry.
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          tagSuggestionWorker: resolve('src/main/workers/tagSuggestionWorker.ts'),
+          duplicateClusterWorker: resolve('src/main/workers/duplicateClusterWorker.ts'),
+          throwbackSimilarityWorker: resolve('src/main/workers/throwbackSimilarityWorker.ts')
+        }
+      }
+    },
     plugins: [externalizeDepsPlugin()]
   },
   preload: {

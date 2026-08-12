@@ -16,6 +16,9 @@ export const theme = createTheme({
   primaryColor: 'indigo',
   defaultRadius: 'md',
   defaultGradient: { from: 'violet', to: 'cyan', deg: 90 },
+  // colors: {
+  //   indigo: [...rest, '#2c3052', '#2e3156', '#252846']
+  // },
   fontFamily:
     'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
   // Merges with (doesn't replace) Mantine's default xs/sm/md/lg/xl scale, so

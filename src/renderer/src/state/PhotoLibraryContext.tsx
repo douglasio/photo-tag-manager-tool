@@ -13,8 +13,19 @@ import {
 
 import { notifications } from '@mantine/notifications'
 
-import { MoveProgressToast } from '@components'
-import type { DefaultView, PhotoRecord, RotateDirection } from '@shared/types'
+import { AiScanProgressToast, MoveProgressToast } from '@components'
+import type {
+  AiScanProgress,
+  AiScanResult,
+  DefaultView,
+  GalleryViewMode,
+  PhotoRecord,
+  RotateDirection,
+  SimilarPhoto,
+  TagSuggestion,
+  ThrowbackEntry,
+  ThrowbackYearSample
+} from '@shared/types'
 import { basename, isPhotoInFolder, shuffle } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
@@ -38,6 +49,10 @@ export interface DisplayPhotoRecord extends Omit<PhotoRecord, 'metadata'> {
 // batch into a single toast, so a bulk copy/delete doesn't spam a toast per file.
 const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
 
+// Stable (not per-call) id — only one AI scan can be in flight app-wide at a
+// time, so re-triggering updates the same toast instead of stacking a new one.
+const AI_SCAN_NOTIFICATION_ID = 'ai-scan'
+
 // Which arrow key drove a photo-to-photo navigation — 'right' means the
 // photo being navigated to should visually enter from the right (the user
 // stepped forward), 'left' means it enters from the left (stepped back).
@@ -56,6 +71,7 @@ export type PhotoVisualization = 'none' | 'magazine' | 'newspaper' | 'dvd'
 export type OpenTabEntry =
   | { kind: 'photo'; id: string; photo: PhotoRecord }
   | { kind: 'compare'; id: string; photos: PhotoRecord[] }
+  | { kind: 'duplicates'; id: string }
 
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
@@ -69,6 +85,8 @@ interface PhotoLibraryContextValue {
   allTags: string[]
   tagCounts: Map<string, number>
   tagCoverPhotos: Map<string, PhotoRecord>
+  tagViewCounts: Map<string, number>
+  untaggedCount: number
   folderTags: string[]
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
@@ -87,10 +105,28 @@ interface PhotoLibraryContextValue {
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
+  setUntaggedFilter: (active: boolean) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
   setTagsPanelGridView: (value: boolean) => void
+  setGalleryViewMode: (value: GalleryViewMode) => void
+  setAiTagSuggestionsEnabled: (value: boolean) => void
+  suggestTags: (filePath: string, candidateLabels: string[]) => Promise<TagSuggestion[]>
+  findSimilarPhotos: (filePath: string, limit: number) => Promise<SimilarPhoto[]>
+  openDuplicatesTab: () => void
+  getThrowbackSimilarity: () => Promise<ThrowbackEntry[] | null>
+  getThrowbackYearSample: () => Promise<ThrowbackYearSample | null>
+  getThrowbackPreview: () => Promise<ThrowbackEntry[] | null>
+  // Downloads the model (if needed), enables the AI features flag, then runs
+  // the shared scan (embedding + duplicate clustering) that warms tag
+  // suggestions, duplicate detection, and Time Warp all at once. Drives its
+  // own progress/"ready" toast directly, so it works regardless of which
+  // component calls it.
+  enableAiFeatures: () => Promise<AiScanResult>
+  // Re-runs the shared scan without the model-download step (AI already on).
+  rescanAiFeatures: () => Promise<AiScanResult>
+  cancelAiScan: () => void
   setNavbarSplitSizes: (sizes: [number, number]) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -312,6 +348,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getTagsPanelGridView().then((value) => {
       dispatch({ type: 'SET_TAGS_PANEL_GRID_VIEW', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getGalleryViewMode().then((value) => {
+      dispatch({ type: 'SET_GALLERY_VIEW_MODE', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getAiTagSuggestionsEnabled().then((value) => {
+      dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value })
     })
   }, [])
 
@@ -618,6 +666,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const setFolderTagFilter = useCallback((tag: string | null) => {
     dispatch({ type: 'SET_FOLDER_TAG_FILTER', tag })
+  }, [])
+
+  const setUntaggedFilter = useCallback((active: boolean) => {
+    dispatch({ type: 'SET_UNTAGGED_FILTER', active })
   }, [])
 
   const setTagDescription = useCallback(
@@ -934,6 +986,132 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setTagsPanelGridView(value)
   }, [])
 
+  const setGalleryViewMode = useCallback((value: GalleryViewMode) => {
+    dispatch({ type: 'SET_GALLERY_VIEW_MODE', value })
+    void window.api.setGalleryViewMode(value)
+  }, [])
+
+  const setAiTagSuggestionsEnabled = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value })
+    void window.api.setAiTagSuggestionsEnabled(value)
+  }, [])
+
+  const suggestTags = useCallback(
+    (filePath: string, candidateLabels: string[]) =>
+      window.api.suggestTags(filePath, candidateLabels),
+    []
+  )
+
+  const findSimilarPhotos = useCallback(
+    (filePath: string, limit: number) => window.api.findSimilarPhotos(filePath, limit),
+    []
+  )
+
+  const openDuplicatesTab = useCallback(() => {
+    dispatch({ type: 'OPEN_DUPLICATES_TAB' })
+  }, [])
+
+  const getThrowbackSimilarity = useCallback(
+    (): Promise<ThrowbackEntry[] | null> => window.api.getThrowbackSimilarity(),
+    []
+  )
+
+  const getThrowbackYearSample = useCallback(
+    (): Promise<ThrowbackYearSample | null> => window.api.getThrowbackYearSample(),
+    []
+  )
+
+  const getThrowbackPreview = useCallback(
+    (): Promise<ThrowbackEntry[] | null> => window.api.getThrowbackPreview(),
+    []
+  )
+
+  // Shared by enableAiFeatures/rescanAiFeatures below — drives the progress
+  // toast directly from the action itself (same pattern movePhotosToFolder
+  // uses above), rather than a mounted component's effect, which is what
+  // makes it work "regardless of where the scan is kicked off."
+  const runAiScan = useCallback(
+    async (invoke: () => Promise<AiScanResult>): Promise<AiScanResult> => {
+      const handleCancel = (): void => void window.api.cancelAiScan()
+      const initialProgress: AiScanProgress = { phase: 'downloading', done: 0, total: 100 }
+      dispatch({ type: 'SET_AI_SCAN_PROGRESS', progress: initialProgress })
+      notifications.show({
+        id: AI_SCAN_NOTIFICATION_ID,
+        autoClose: false,
+        withCloseButton: true,
+        onClose: handleCancel,
+        message: <AiScanProgressToast progress={initialProgress} onCancel={handleCancel} />
+      })
+      const unsubscribe = window.api.onAiScanProgress((progress) => {
+        dispatch({ type: 'SET_AI_SCAN_PROGRESS', progress })
+        // The backend only flips the setting once the model download
+        // finishes and the scan itself starts (see enableAiFeaturesAndScan)
+        // — mirrored here, rather than optimistically enabling on click, so
+        // a cancel during download correctly leaves it off. The reducer
+        // guards this action, so the repeat dispatches on later ticks are
+        // cheap no-ops.
+        if (progress.phase === 'embedding') {
+          dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value: true })
+        }
+        notifications.update({
+          id: AI_SCAN_NOTIFICATION_ID,
+          message: <AiScanProgressToast progress={progress} onCancel={handleCancel} />
+        })
+      })
+      try {
+        const result = await invoke()
+        notifications.update({
+          id: AI_SCAN_NOTIFICATION_ID,
+          color: result.canceled ? 'yellow' : 'teal',
+          autoClose: 4000,
+          message: result.canceled
+            ? 'AI scan canceled.'
+            : result.photosScanned === 0
+              ? 'AI features enabled — add some photos to get suggestions and duplicate detection.'
+              : 'AI features ready.'
+        })
+        return result
+      } catch (err) {
+        notifications.update({
+          id: AI_SCAN_NOTIFICATION_ID,
+          color: 'red',
+          autoClose: 4000,
+          message: 'Something went wrong scanning your library.'
+        })
+        throw err
+      } finally {
+        unsubscribe()
+        dispatch({ type: 'SET_AI_SCAN_PROGRESS', progress: null })
+      }
+    },
+    []
+  )
+
+  const enableAiFeatures = useCallback(
+    () => runAiScan(() => window.api.enableAiFeaturesAndScan()),
+    [runAiScan]
+  )
+
+  const rescanAiFeatures = useCallback(
+    () => runAiScan(() => window.api.rescanAiFeatures()),
+    [runAiScan]
+  )
+
+  const cancelAiScan = useCallback(() => {
+    void window.api.cancelAiScan()
+  }, [])
+
+  // A scan still marked "in progress" on launch means the app quit before it
+  // finished, not that it was resolved/canceled — resume it silently (the
+  // toast reappears via rescanAiFeatures/runAiScan) rather than leaving it
+  // stuck forever. Cheap even for a full library since embeddings already
+  // computed are cached in the DB.
+  useEffect(() => {
+    window.api.wasAiScanInterrupted().then((interrupted) => {
+      if (interrupted) void rescanAiFeatures()
+    })
+  }, [rescanAiFeatures])
+
   const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     void window.api.setNavbarSplitSizes(sizes)
@@ -996,6 +1174,9 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
   // current folder instead of replacing it with a folder-agnostic tag view.
   const visiblePhotos = useMemo(() => {
+    if (state.untaggedFilterActive) {
+      return photos.filter((photo) => photo.tags.length === 0)
+    }
     let result = photos
     if (state.selectedFolder) {
       result = result.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
@@ -1004,7 +1185,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       result = result.filter((photo) => photo.tags.includes(state.selectedTag!))
     }
     return result
-  }, [photos, state.selectedFolder, state.selectedTag])
+  }, [photos, state.selectedFolder, state.selectedTag, state.untaggedFilterActive])
 
   // Shift+click range-select, anchored at the current selectedPath (the
   // last-engaged photo) through targetPath, within the currently visible
@@ -1046,13 +1227,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // gallery's own sort order/direction — otherwise switching gallery sort
   // would make tag thumbnails jump around. Iterates state.photosByPath
   // directly (not the sorted `photos`) since order doesn't matter here.
-  const { tagCounts, tagCoverPhotos } = useMemo(() => {
+  const { tagCounts, tagCoverPhotos, tagViewCounts } = useMemo(() => {
     const counts = new Map<string, number>()
     const covers = new Map<string, PhotoRecord>()
+    const viewCounts = new Map<string, number>()
     for (const photo of state.photosByPath.values()) {
       const photoTime = photo.metadata.dateTaken ? Date.parse(photo.metadata.dateTaken) : null
       for (const tag of photo.tags) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
+        viewCounts.set(tag, (viewCounts.get(tag) ?? 0) + photo.viewCount)
         const current = covers.get(tag)
         if (!current) {
           covers.set(tag, photo)
@@ -1073,7 +1256,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         if (photoWins) covers.set(tag, photo)
       }
     }
-    return { tagCounts: counts, tagCoverPhotos: covers }
+    return { tagCounts: counts, tagCoverPhotos: covers, tagViewCounts: viewCounts }
+  }, [state.photosByPath])
+
+  const untaggedCount = useMemo(() => {
+    let count = 0
+    for (const photo of state.photosByPath.values()) {
+      if (photo.tags.length === 0) count++
+    }
+    return count
   }, [state.photosByPath])
 
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
@@ -1097,6 +1288,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     () =>
       state.openTabs
         .map((id): OpenTabEntry | null => {
+          if (id === 'duplicates') return { kind: 'duplicates', id }
           const paths = state.compareTabs.get(id)
           if (paths) {
             const photos = paths
@@ -1119,6 +1311,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     allTags,
     tagCounts,
     tagCoverPhotos,
+    tagViewCounts,
+    untaggedCount,
     folderTags,
     addFolder,
     removeFolder,
@@ -1137,10 +1331,22 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,
+    setUntaggedFilter,
     setSort,
     setDefaultView,
     setShowEmptyFolders,
     setTagsPanelGridView,
+    setGalleryViewMode,
+    setAiTagSuggestionsEnabled,
+    suggestTags,
+    findSimilarPhotos,
+    openDuplicatesTab,
+    getThrowbackSimilarity,
+    getThrowbackYearSample,
+    getThrowbackPreview,
+    enableAiFeatures,
+    rescanAiFeatures,
+    cancelAiScan,
     setNavbarSplitSizes,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,

@@ -4,6 +4,7 @@ import { dirname, join } from 'path'
 
 import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
+  getAiTagSuggestionsEnabled,
   getDefaultView,
   getDetailsPanelCollapsed,
   getDvdStudioName,
@@ -12,6 +13,7 @@ import {
   getGalleryAnimationsEnabled,
   getGalleryCellWidth,
   getGallerySort,
+  getGalleryViewMode,
   getMagazineTitle,
   getNavbarSplitSizes,
   getNewspaperTitle,
@@ -19,6 +21,7 @@ import {
   getShowFilenames,
   getShowViewCounts,
   getTagsPanelGridView,
+  setAiTagSuggestionsEnabled,
   setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
@@ -27,6 +30,7 @@ import {
   setGalleryAnimationsEnabled,
   setGalleryCellWidth,
   setGallerySort,
+  setGalleryViewMode,
   setMagazineTitle,
   setNavbarSplitSizes,
   setNewspaperTitle,
@@ -35,9 +39,13 @@ import {
   setShowViewCounts,
   setTagsPanelGridView
 } from '@main/db/settingsRepository'
+import { cancelAiScan } from '@main/services/aiScanService'
+import { disposeDuplicateClusterWorker } from '@main/services/duplicatePhotoService'
+import { disposeTagSuggestionWorker } from '@main/services/tagSuggestionService'
+import { disposeThrowbackSimilarityWorker } from '@main/services/throwbackService'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
-import type { DefaultView, GallerySort } from '@shared/types'
+import type { DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
 
 // Conservative cross-platform block list — matches photoHandlers.ts's file
 // rename validation, since folder names share the same filesystem constraints.
@@ -81,6 +89,33 @@ export function registerSettingsHandlers(): void {
   ipcMain.handle('settings:setTagsPanelGridView', (_event, value: boolean): void => {
     setTagsPanelGridView(value)
   })
+
+  ipcMain.handle('settings:getGalleryViewMode', (): GalleryViewMode => getGalleryViewMode())
+
+  ipcMain.handle('settings:setGalleryViewMode', (_event, value: GalleryViewMode): void => {
+    setGalleryViewMode(value)
+  })
+
+  ipcMain.handle('settings:getAiTagSuggestionsEnabled', (): boolean => getAiTagSuggestionsEnabled())
+
+  // Turning it off also frees all three workers' memory (model
+  // weights/session, and the clustering/similarity workers) rather than
+  // leaving them loaded for a feature the user just disabled, and cancels
+  // any scan still running.
+  ipcMain.handle(
+    'settings:setAiTagSuggestionsEnabled',
+    async (_event, value: boolean): Promise<void> => {
+      setAiTagSuggestionsEnabled(value)
+      if (!value) {
+        cancelAiScan()
+        await Promise.all([
+          disposeTagSuggestionWorker(),
+          disposeDuplicateClusterWorker(),
+          disposeThrowbackSimilarityWorker()
+        ])
+      }
+    }
+  )
 
   ipcMain.handle('settings:getDetailsPanelCollapsed', (): boolean => getDetailsPanelCollapsed())
 

@@ -5,6 +5,7 @@ import { Center, Stack, Text } from '@mantine/core'
 import { usePhotoLibrary } from '@state'
 
 import { DetailPanelComment } from './DetailPanelComment'
+import { DetailPanelDuplicates } from './DetailPanelDuplicates'
 import { DetailPanelHeader } from './DetailPanelHeader'
 import { DetailPanelMetadata } from './DetailPanelMetadata'
 import { DetailPanelMultiSelect } from './DetailPanelMultiSelect'
@@ -51,6 +52,7 @@ export function DetailPanel(): ReactElement {
       <DetailPanelHeader photo={selectedPhoto} />
       <DetailPanelComment photo={selectedPhoto} />
       <DetailPanelTags photo={selectedPhoto} onOpenQuickTag={() => setQuickTagOpen(true)} />
+      {state.aiTagSuggestionsEnabled && <DetailPanelDuplicates photo={selectedPhoto} />}
       <DetailPanelMetadata photo={selectedPhoto} />
     </Stack>
   )

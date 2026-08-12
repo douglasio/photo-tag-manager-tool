@@ -39,6 +39,22 @@ if (typeof window !== 'undefined' && !window.ResizeObserver) {
   } as unknown as typeof ResizeObserver
 }
 
+// jsdom doesn't implement IntersectionObserver — @mantine/carousel's
+// embla-carousel dependency uses it to track which slides are in view.
+if (typeof window !== 'undefined' && !window.IntersectionObserver) {
+  window.IntersectionObserver = class {
+    observe(): void {
+      // no-op: jsdom never fires intersection entries in tests
+    }
+    unobserve(): void {
+      // no-op
+    }
+    disconnect(): void {
+      // no-op
+    }
+  } as unknown as typeof IntersectionObserver
+}
+
 // jsdom doesn't implement matchMedia — Mantine's color-scheme detection and
 // useReducedMotion both read it, so any component test using MantineProvider
 // (or a hook that calls useReducedMotion) needs this stub.

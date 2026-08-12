@@ -14,15 +14,22 @@ import {
   Group,
   Loader,
   Pill,
+  RollingNumber,
   Scroller,
   Slider,
   Text,
   Title,
   Tooltip
 } from '@mantine/core'
-import { useReducedMotion } from '@mantine/hooks'
-import { IconColumns2, IconPhoto, IconX } from '@tabler/icons-react'
-import { motion } from 'motion/react'
+import {
+  IconColumns2,
+  IconEye,
+  IconLayoutGrid,
+  IconLayoutList,
+  IconPhoto,
+  IconStack2,
+  IconX
+} from '@tabler/icons-react'
 import { Grid } from 'react-window'
 
 import { TagDeleteButton, TagDescriptionField } from '@components'
@@ -34,6 +41,7 @@ import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '@state'
 import { basename, buildFolderChildrenMap, collectFolderSectionOrder, dirname } from '@utils'
 
 import { GalleryFolderSections } from './GalleryFolderSections'
+import { GalleryListView } from './GalleryListView'
 import { type GalleryCellProps, GalleryPhotoCell } from './GalleryPhotoCell'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
@@ -49,10 +57,13 @@ export function GalleryGrid(): ReactElement {
     setTagDescription,
     deleteTag,
     tagCounts,
+    tagViewCounts,
     folderTags,
     setFolderTagFilter,
     renameFile,
-    openCompareTab
+    openCompareTab,
+    openDuplicatesTab,
+    setGalleryViewMode
   } = usePhotoLibrary()
 
   // Only set once the selected folder actually has subfolders — a leaf
@@ -91,16 +102,13 @@ export function GalleryGrid(): ReactElement {
     rowCount,
     setCellWidth,
     setCellWidthPersisted,
-    stepToMark,
-    isSettling
+    stepToMark
   } = useGalleryGridLayout({
     photoCount: photos.length,
     showFilenames: state.showFilenames,
     showViewCounts: state.showViewCounts
   })
   const { previewTriggerHeld, previewScale } = useGalleryPreviewZoom(containerRef)
-  const prefersReducedMotion = useReducedMotion()
-  const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
   // Lifted here (not into GalleryPhotoCell) — react-window recycles cell
   // instances, so per-cell state would leak "is renaming" onto the wrong photo.
@@ -161,13 +169,15 @@ export function GalleryGrid(): ReactElement {
   // instead, since the tag there is just a filter.
   const isPureTagView = state.selectedTag !== null && state.selectedFolder === null
 
-  const galleryTitle = isPureTagView
-    ? `#${state.selectedTag}`
-    : state.selectedFolder
-      ? basename(state.selectedFolder)
-      : state.folders.length > 0
-        ? 'All Photos'
-        : null
+  const galleryTitle = state.untaggedFilterActive
+    ? 'Untagged'
+    : isPureTagView
+      ? `#${state.selectedTag}`
+      : state.selectedFolder
+        ? basename(state.selectedFolder)
+        : state.folders.length > 0
+          ? 'All Photos'
+          : null
 
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
@@ -190,6 +200,12 @@ export function GalleryGrid(): ReactElement {
                 {galleryTitle}
               </Title>
               {isPureTagView && (
+                <Group gap={4} c="dimmed" wrap="nowrap" style={{ flexShrink: 0 }}>
+                  <IconEye size={16} />
+                  <RollingNumber value={tagViewCounts.get(state.selectedTag!) ?? 0} fz="sm" />
+                </Group>
+              )}
+              {isPureTagView && (
                 <TagDeleteButton
                   tag={state.selectedTag!}
                   count={tagCounts.get(state.selectedTag!) ?? 0}
@@ -206,12 +222,7 @@ export function GalleryGrid(): ReactElement {
                   <Tooltip label="Clear selection">
                     <ActionIcon
                       variant="subtle"
-                      onClick={(event) => {
-                        // Same orphaned-tooltip issue as above — this button
-                        // disappears once the selection is cleared.
-                        event.currentTarget.blur()
-                        clearSelection()
-                      }}
+                      onClick={() => clearSelection()}
                       aria-label="Clear selection"
                     >
                       <IconX size={16} />
@@ -221,15 +232,10 @@ export function GalleryGrid(): ReactElement {
                     state.selectedPaths.size <= MAX_COMPARE_PHOTOS && (
                       <Tooltip label="Compare photos">
                         <ActionIcon
-                          variant="subtle"
+                          variant="default"
+                          ml="xs"
                           aria-label="Compare photos"
-                          onClick={(event) => {
-                            // Blurs before the tab switch below unmounts this
-                            // button, so the tooltip closes instead of being
-                            // orphaned open.
-                            event.currentTarget.blur()
-                            openCompareTab(Array.from(state.selectedPaths))
-                          }}
+                          onClick={() => openCompareTab(Array.from(state.selectedPaths))}
                         >
                           <IconColumns2 size={16} />
                         </ActionIcon>
@@ -237,8 +243,37 @@ export function GalleryGrid(): ReactElement {
                     )}
                 </>
               )}
+              <Tooltip label="Show duplicate photos">
+                <ActionIcon
+                  variant="default"
+                  aria-label="Show duplicate photos"
+                  onClick={openDuplicatesTab}
+                >
+                  <IconStack2 size={16} />
+                </ActionIcon>
+              </Tooltip>
               <GallerySortMenu />
               <GallerySettingsMenu />
+              <ActionIcon.Group>
+                <Tooltip label="Grid view">
+                  <ActionIcon
+                    variant={state.galleryViewMode === 'grid' ? 'filled' : 'default'}
+                    aria-label="Grid view"
+                    onClick={() => setGalleryViewMode('grid')}
+                  >
+                    <IconLayoutGrid size={16} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="List view">
+                  <ActionIcon
+                    variant={state.galleryViewMode === 'list' ? 'filled' : 'default'}
+                    aria-label="List view"
+                    onClick={() => setGalleryViewMode('list')}
+                  >
+                    <IconLayoutList size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </ActionIcon.Group>
             </Group>
           </Group>
           {isPureTagView && (
@@ -295,6 +330,8 @@ export function GalleryGrid(): ReactElement {
               <Text c="dimmed">No photos yet. Add a folder to begin.</Text>
             )}
           </Center>
+        ) : state.galleryViewMode === 'list' ? (
+          <GalleryListView photos={photos} />
         ) : folderSections && photosBySection ? (
           <GalleryFolderSections
             {...cellProps}
@@ -303,20 +340,11 @@ export function GalleryGrid(): ReactElement {
             photosBySection={photosBySection}
           />
         ) : (
-          // Hidden while a resize is settling — the grid below is still
-          // rendering at its stale column count/size at that point, so this
-          // avoids showing that reflow live, fading the corrected layout in
-          // instead once useGalleryGridLayout's debounce catches up.
-          <motion.div
-            style={{
-              width: '100%',
-              height: '100%',
-              pointerEvents: isSettling ? 'none' : undefined
-            }}
-            initial={false}
-            animate={{ opacity: isSettling ? 0 : 1 }}
-            transition={{ duration: motionEnabled ? 0.25 : 0 }}
-          >
+          // Pinned to the debounced size (not 100%) — react-window's Grid
+          // measures this wrapper on every frame, so a fluid width would
+          // otherwise track the AppShell panel's live CSS transition frame
+          // by frame regardless of useGalleryGridLayout's own debounce.
+          <Box style={{ width: size.width, height: size.height }}>
             <Grid<GalleryCellProps>
               cellComponent={GalleryPhotoCell}
               cellProps={cellProps}
@@ -328,10 +356,10 @@ export function GalleryGrid(): ReactElement {
               defaultHeight={size.height}
               style={{ overflowX: 'hidden' }}
             />
-          </motion.div>
+          </Box>
         )}
       </Box>
-      {photos.length > 0 && (
+      {photos.length > 0 && state.galleryViewMode === 'grid' && (
         <Group gap="xs" wrap="nowrap" justify="flex-end" px="md" py="xs" style={{ flexShrink: 0 }}>
           <ActionIcon onClick={() => stepToMark(-1)} aria-label="Decrease thumbnail size">
             <IconPhoto size={12} />

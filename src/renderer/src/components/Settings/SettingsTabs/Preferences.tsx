@@ -1,7 +1,8 @@
 import { type ReactElement, useState } from 'react'
 
-import { Kbd, Stack, Switch, Text, TextInput } from '@mantine/core'
+import { Group, Kbd, Radio, Stack, Switch, Text, TextInput } from '@mantine/core'
 
+import type { DefaultView } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 
 import SettingsTabSection from './SettingsTabSection'
@@ -71,13 +72,18 @@ function GeneralSection(): ReactElement {
   const { state, setDefaultView, setGalleryAnimationsEnabled } = usePhotoLibrary()
 
   return (
-    <Stack gap="xs">
-      <Switch
-        label="Open to Dashboard on launch"
-        description="When off, the app opens to Gallery instead."
-        checked={state.defaultView === 'dashboard'}
-        onChange={(event) => setDefaultView(event.currentTarget.checked ? 'dashboard' : 'gallery')}
-      />
+    <Stack>
+      <Radio.Group
+        label="Start tab:"
+        value={state.defaultView}
+        onChange={(value) => setDefaultView(value as DefaultView)}
+        styles={{ label: { paddingBottom: 'var(--mantine-spacing-sm)' } }}
+      >
+        <Group>
+          <Radio value="dashboard" label="Dashboard" />
+          <Radio value="gallery" label="Gallery" />
+        </Group>
+      </Radio.Group>
 
       <Switch
         label="Enable animations"
@@ -141,9 +147,49 @@ function VisualizationsSection(): ReactElement {
   )
 }
 
+function TagsSection(): ReactElement {
+  const { state, setAiTagSuggestionsEnabled, enableAiFeatures } = usePhotoLibrary()
+  const [error, setError] = useState<string | null>(null)
+  const scanning = state.aiScanProgress !== null
+
+  const handleToggle = async (checked: boolean): Promise<void> => {
+    setError(null)
+    if (!checked) {
+      setAiTagSuggestionsEnabled(false)
+      return
+    }
+    try {
+      // enableAiFeatures drives its own progress/"ready" toast, tracked
+      // regardless of which tab you're on — no separate feedback needed here.
+      await enableAiFeatures()
+    } catch (err) {
+      console.error('failed to enable AI features', err)
+      setError('Failed to download the AI model. Check your connection and try again.')
+    }
+  }
+
+  return (
+    <Stack gap="xs">
+      <Switch
+        label="Enable AI tag suggestions"
+        description="Downloads a small on-device model (~50-90MB) the first time you turn this on, then scans your library for tag suggestions, duplicate detection, and Time Warp — tracked in a progress toast. Runs fully offline afterward."
+        checked={state.aiTagSuggestionsEnabled}
+        disabled={scanning}
+        onChange={(event) => void handleToggle(event.currentTarget.checked)}
+      />
+      {error && (
+        <Text size="xs" c="red">
+          {error}
+        </Text>
+      )}
+    </Stack>
+  )
+}
+
 const sections = [
   { label: 'General', component: <GeneralSection /> },
   { label: 'Gallery', component: <GallerySection /> },
+  { label: 'Tags', component: <TagsSection /> },
   { label: 'Visualizations', component: <VisualizationsSection /> }
 ]
 

@@ -5,12 +5,15 @@ import { join } from 'path'
 // eslint-disable-next-line no-restricted-imports -- resources/ lives outside src/, so no alias covers it
 import icon from '../../resources/icon.png?asset'
 import { getFolders } from './db/settingsRepository'
+import { registerAiHandlers } from './ipc/aiHandlers'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
+import { registerLibraryDataHandlers } from './ipc/libraryDataHandlers'
 import { registerPhotoHandlers } from './ipc/photoHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
 import { registerShellHandlers } from './ipc/shellHandlers'
 import { registerTagHandlers } from './ipc/tagHandlers'
+import { registerThrowbackHandlers } from './ipc/throwbackHandlers'
 import { registerFileProtocolHandler, registerFileProtocolScheme } from './protocols/fileProtocol'
 import {
   registerThumbProtocolHandler,
@@ -94,6 +97,9 @@ if (!app.requestSingleInstanceLock()) {
     registerScanHandlers()
     registerSettingsHandlers()
     registerTagHandlers()
+    registerAiHandlers()
+    registerThrowbackHandlers()
+    registerLibraryDataHandlers()
 
     createWindow()
 
@@ -114,6 +120,13 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.on('before-quit', () => {
+    // Deliberately NOT canceling/disposing an in-flight AI scan here: doing
+    // so used to synchronously reject the scan's in-flight worker request,
+    // which tripped runFullAiScan's `finally` and cleared the persisted
+    // "scan in progress" flag before the process actually exited — silently
+    // undoing resume-on-launch. Letting the process die untouched leaves
+    // that flag exactly as it was, so the next launch resumes correctly;
+    // the OS reclaims the worker threads on process exit regardless.
     void shutdownExifTool()
     void unwatchAllFolders()
   })

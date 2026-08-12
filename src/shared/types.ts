@@ -2,6 +2,8 @@ import type { ReactElement } from 'react'
 
 export type DefaultView = 'dashboard' | 'gallery'
 
+export type GalleryViewMode = 'grid' | 'list'
+
 export type SupportedFormat = 'JPEG' | 'PNG' | 'TIFF'
 
 // Lossless EXIF-orientation-flip rotation — only meaningful for formats
@@ -38,6 +40,12 @@ export interface PhotoRecord {
   // in the local DB, never written back to the file (same reasoning as
   // thumbnailKey/thumbnailStatus above).
   viewCount: number
+  // Epoch ms this photo first entered the library — set once and never
+  // updated by a rescan (unlike lastScannedAt, which isn't otherwise
+  // exposed to the renderer). Optional so the many existing test fixtures
+  // that build a PhotoRecord by hand don't all need updating; genuine
+  // records from the DB always have it.
+  firstSeenAt?: number
 }
 
 export interface ScanStartResult {
@@ -115,8 +123,57 @@ export interface TagGroup {
 export interface Widget {
   id: string
   title: string
+  description?: string
   component: ReactElement
   // How many of the dashboard grid's columns this widget's cell should span.
   // Omitted (or 1) is the default single-column width.
   colSpan?: number
+}
+
+export interface TagSuggestion {
+  tag: string
+  score: number
+}
+
+export interface DuplicateGroup {
+  filePaths: string[]
+  // Average pairwise cosine similarity across the group's members.
+  similarity: number
+}
+
+export interface SimilarPhoto {
+  filePath: string
+  score: number
+}
+
+// One year's representative photo — used by the Throwback widget for both
+// its real cross-year similarity result and its random "preview" mode
+// (same shape, different selection method).
+export interface ThrowbackEntry {
+  year: number
+  filePath: string
+}
+
+export interface ThrowbackYearSample {
+  year: number
+  filePaths: string[]
+}
+
+// Spans the whole "enable AI features" flow: model download, then warming
+// the shared embedding cache, then clustering duplicates. 'clustering's
+// done/total are a normalized 0-100 percentage, never the raw n*(n-1)/2
+// pair count — that number is huge even for modest libraries and reads as
+// alarming/broken if shown directly.
+export type AiScanPhase = 'downloading' | 'embedding' | 'clustering'
+
+export interface AiScanProgress {
+  phase: AiScanPhase
+  done: number
+  total: number
+}
+
+export interface AiScanResult {
+  duplicateGroups: DuplicateGroup[]
+  photosScanned: number
+  canceled: boolean
 }

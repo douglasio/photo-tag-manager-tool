@@ -1,13 +1,12 @@
 import { type ReactElement, useMemo, useState } from 'react'
 
+import { Carousel } from '@mantine/carousel'
 import {
   Anchor,
   Badge,
-  Box,
   Button,
   Group,
   Image,
-  SimpleGrid,
   Stack,
   Text,
   Timeline,
@@ -23,9 +22,12 @@ import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { pickRandom, PREVIEW_TRIGGER_KEY, shuffle } from '@utils'
 
+import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
+
 // A tag needs at least this many photos before it's eligible to be featured.
 const FEATURED_TAG_MIN_PHOTOS = 3
-const COLLAGE_PHOTO_COUNT = 4
+const COLLAGE_PHOTO_COUNT = 9
+const CAROUSEL_SLIDES_VISIBLE = 3
 
 // `action` names which handler (below, in the component) the step's link
 // should call — steps with no action render as plain text.
@@ -74,24 +76,23 @@ function pickSelection(
 }
 
 // Each tile gets its own hover-preview session (mirrors gallery thumbnails)
-// rather than sharing one at the widget level, since a SimpleGrid of
-// independent buttons has no shared "currently hovered photo" state to hang
+// rather than sharing one at the widget level, since a Carousel of
+// independent slides has no shared "currently hovered photo" state to hang
 // a single preview off of.
 function CollageTile({
   photo,
-  spanTwoColumns,
   previewTriggerHeld,
   motionEnabled,
   onOpen
 }: {
   photo: PhotoRecord
-  spanTwoColumns: boolean
   previewTriggerHeld: boolean
   motionEnabled: boolean
   onOpen: () => void
 }): ReactElement {
   const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+  const previewScale = useDashboardPreviewScale()
 
   return (
     <>
@@ -106,11 +107,7 @@ function CollageTile({
         h="100%"
         w="100%"
         display="block"
-        style={{
-          minHeight: 0,
-          cursor: canPreview ? 'zoom-in' : undefined,
-          ...(spanTwoColumns && { gridColumn: 'span 2' })
-        }}
+        style={{ minHeight: 0, cursor: canPreview ? 'zoom-in' : undefined }}
       >
         <Image
           src={toThumbProtocolUrl(photo.thumbnailKey!)}
@@ -118,14 +115,14 @@ function CollageTile({
           fit="cover"
           h="100%"
           w="100%"
-          bdrs={0}
+          bdrs={RADIUS_SIZE}
         />
         <PhotoGradientOverlay />
       </UnstyledButton>
       <GalleryHoverPreview
         photo={photo}
         position={canPreview ? position : null}
-        scale={1}
+        scale={previewScale}
         motionEnabled={motionEnabled}
       />
     </>
@@ -175,49 +172,50 @@ export function FeaturedTagWidget(): ReactElement {
 
   if (selectedTag) {
     return (
-      <Stack bg="dark" p="md" gap="xs" bdrs={RADIUS_SIZE} h="100%" style={{ minHeight: 0 }}>
-        <Group justify="space-between" w="100%" style={{ flexShrink: 0 }}>
-          <Anchor size="xl" fw="bold" onClick={() => goToTag(selectedTag)} variant="gradient">
-            #{selectedTag}
-          </Anchor>
-          <Box>
-            {state.tagDescriptions.get(selectedTag) && (
-              <Text c="dimmed" fs="italic" size="sm">
-                {state.tagDescriptions.get(selectedTag)}
-              </Text>
-            )}
-          </Box>
-          <Badge
-            component="button"
-            variant="gradient"
-            size="md"
-            style={{ cursor: 'pointer' }}
-            onClick={() => {
-              goToTag(selectedTag)
-            }}
-          >
-            {tagCounts.get(selectedTag) ?? 0} photos
-          </Badge>
-        </Group>
+      <Stack gap="xs" h="100%" style={{ minHeight: 0 }}>
+        <Stack gap={4} style={{ flexShrink: 0 }}>
+          <Group justify="space-between" w="100%">
+            <Anchor size="xl" fw="bold" onClick={() => goToTag(selectedTag)} variant="gradient">
+              #{selectedTag}
+            </Anchor>
+            <Badge
+              component="button"
+              variant="gradient"
+              size="md"
+              style={{ cursor: 'pointer' }}
+              onClick={() => {
+                goToTag(selectedTag)
+              }}
+            >
+              {tagCounts.get(selectedTag) ?? 0} photos
+            </Badge>
+          </Group>
+          {state.tagDescriptions.get(selectedTag) && (
+            <Text c="dimmed" fs="italic" size="sm">
+              {state.tagDescriptions.get(selectedTag)}
+            </Text>
+          )}
+        </Stack>
 
-        <SimpleGrid cols={2} spacing="5" autoRows="1fr" style={{ flex: 1, minHeight: 0 }}>
-          {collagePhotos.map((photo, index) => {
-            // A lone leftover tile in an odd-count collage spans both
-            // columns instead of sitting half-width next to an empty cell.
-            const isLastOfOddRow =
-              collagePhotos.length % 2 === 1 && index === collagePhotos.length - 1
-            return (
+        <Carousel
+          slideSize={`${100 / CAROUSEL_SLIDES_VISIBLE}%`}
+          slideGap="xs"
+          height="100%"
+          style={{ flex: 1, minHeight: 0 }}
+          withControls={collagePhotos.length > CAROUSEL_SLIDES_VISIBLE}
+          emblaOptions={{ loop: true }}
+        >
+          {collagePhotos.map((photo) => (
+            <Carousel.Slide key={photo.id} h="100%">
               <CollageTile
-                key={photo.id}
                 photo={photo}
-                spanTwoColumns={isLastOfOddRow}
                 previewTriggerHeld={previewTriggerHeld}
                 motionEnabled={motionEnabled}
                 onOpen={() => openPhotoTab(photo.filePath)}
               />
-            )
-          })}
-        </SimpleGrid>
+            </Carousel.Slide>
+          ))}
+        </Carousel>
       </Stack>
     )
   }

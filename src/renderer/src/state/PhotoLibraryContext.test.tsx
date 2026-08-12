@@ -66,6 +66,24 @@ function createMockApi(): {
     setShowEmptyFolders: vi.fn().mockResolvedValue(undefined),
     getTagsPanelGridView: vi.fn().mockResolvedValue(false),
     setTagsPanelGridView: vi.fn().mockResolvedValue(undefined),
+    getGalleryViewMode: vi.fn().mockResolvedValue('grid'),
+    setGalleryViewMode: vi.fn().mockResolvedValue(undefined),
+    getAiTagSuggestionsEnabled: vi.fn().mockResolvedValue(false),
+    setAiTagSuggestionsEnabled: vi.fn().mockResolvedValue(undefined),
+    enableAiFeaturesAndScan: vi.fn().mockResolvedValue({
+      duplicateGroups: [],
+      photosScanned: 0,
+      canceled: false
+    }),
+    rescanAiFeatures: vi.fn().mockResolvedValue({
+      duplicateGroups: [],
+      photosScanned: 0,
+      canceled: false
+    }),
+    cancelAiScan: vi.fn().mockResolvedValue(undefined),
+    wasAiScanInterrupted: vi.fn().mockResolvedValue(false),
+    onAiScanProgress: onMethod('onAiScanProgress'),
+    suggestTags: vi.fn().mockResolvedValue([]),
     getDetailsPanelCollapsed: vi.fn().mockResolvedValue(false),
     setDetailsPanelCollapsed: vi.fn().mockResolvedValue(undefined),
     getNavbarSplitSizes: vi.fn().mockResolvedValue(null),
@@ -193,6 +211,56 @@ describe('PhotoLibraryContext', () => {
     const { result } = setup()
 
     await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+  })
+
+  describe('AI scan resume-on-launch', () => {
+    it('silently resumes a scan left in progress by a prior quit', async () => {
+      mockApi.wasAiScanInterrupted.mockResolvedValue(true)
+      setup()
+
+      await waitFor(() => expect(mockApi.rescanAiFeatures).toHaveBeenCalled())
+    })
+
+    it('does not rescan when no scan was left in progress', async () => {
+      mockApi.wasAiScanInterrupted.mockResolvedValue(false)
+      setup()
+
+      await waitFor(() => expect(mockApi.wasAiScanInterrupted).toHaveBeenCalled())
+      expect(mockApi.rescanAiFeatures).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('enableAiFeatures', () => {
+    it('does not enable aiTagSuggestionsEnabled until progress reaches the embedding phase', async () => {
+      mockApi.enableAiFeaturesAndScan.mockReturnValue(new Promise(() => undefined))
+      const { result } = setup()
+
+      act(() => {
+        void result.current.enableAiFeatures()
+      })
+      expect(result.current.state.aiTagSuggestionsEnabled).toBe(false)
+
+      act(() => {
+        subscriptions.onAiScanProgress({ phase: 'embedding', done: 0, total: 1 })
+      })
+
+      await waitFor(() => expect(result.current.state.aiTagSuggestionsEnabled).toBe(true))
+    })
+
+    it('leaves aiTagSuggestionsEnabled false when the download is canceled before scanning starts', async () => {
+      mockApi.enableAiFeaturesAndScan.mockResolvedValue({
+        duplicateGroups: [],
+        photosScanned: 0,
+        canceled: true
+      })
+      const { result } = setup()
+
+      await act(async () => {
+        await result.current.enableAiFeatures()
+      })
+
+      expect(result.current.state.aiTagSuggestionsEnabled).toBe(false)
+    })
   })
 
   describe('selection', () => {
@@ -420,6 +488,23 @@ describe('PhotoLibraryContext', () => {
       expect(result.current.tagCounts.get('beach')).toBe(2)
       expect(result.current.tagCounts.get('sunset')).toBe(1)
       expect(result.current.allTags).toEqual(['beach', 'sunset'])
+    })
+
+    it('sums view counts per tag across all its photos', async () => {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const { result } = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [
+            makePhoto('/root/b.jpg', { tags: ['beach'], viewCount: 3 }),
+            makePhoto('/root/a.jpg', { tags: ['beach', 'sunset'], viewCount: 5 })
+          ]
+        })
+      })
+      expect(result.current.tagViewCounts.get('beach')).toBe(8)
+      expect(result.current.tagViewCounts.get('sunset')).toBe(5)
     })
 
     it('visiblePhotos narrows by the selected tag', async () => {

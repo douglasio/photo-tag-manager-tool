@@ -39,6 +39,7 @@ import {
   IconLayoutSidebarRightExpand,
   IconLibraryPhoto,
   IconPhoto,
+  IconStack2,
   IconX
 } from '@tabler/icons-react'
 
@@ -49,6 +50,7 @@ import {
   CompareView,
   DashboardView,
   DetailPanel,
+  DuplicatesView,
   FolderTree,
   GalleryGrid,
   PhotoView,
@@ -63,6 +65,7 @@ import { RADIUS_SIZE } from '@renderer/theme'
 import { ACTION_ICONS } from '@renderer/utils'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
+import { PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
 
@@ -71,6 +74,28 @@ import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryConte
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+// Roles/elements that natively activate on a Space keypress — space must
+// keep its default behavior there instead of being swallowed globally below.
+const SPACE_ACTIVATABLE_ROLES = new Set([
+  'button',
+  'checkbox',
+  'radio',
+  'switch',
+  'tab',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option'
+])
+
+function isSpaceActivatable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (isEditableTarget(target)) return true
+  if (['BUTTON', 'A', 'SUMMARY'].includes(target.tagName)) return true
+  const role = target.getAttribute('role')
+  return role !== null && SPACE_ACTIVATABLE_ROLES.has(role)
 }
 
 // const TITLE_BAR_HEIGHT = 52
@@ -182,6 +207,29 @@ function AppLayout(): React.JSX.Element {
   const isCompareTabActive = state.compareTabs.has(state.activeTab)
   // Dashboard is full-screen — no details panel either.
   const isDashboardTabActive = state.activeTab === 'dashboard'
+  // Duplicates tab browses across many photos at once — no single photo for
+  // the details panel to describe.
+  const isDuplicatesTabActive = state.activeTab === 'duplicates'
+
+  // Mantine's Tooltip only closes on a real mouseleave (it's built on
+  // floating-ui's useHover) — clicking a tooltip's own trigger doesn't
+  // dismiss it, so if that click's handler navigates away (e.g. opens a
+  // different tab) while the mouse never actually left the button, the
+  // tooltip has no event left to close it and stays floating over whatever
+  // renders next. floating-ui supports exactly this case via useDismiss's
+  // referencePress option, but Mantine's Tooltip doesn't expose it. This
+  // reproduces the same effect globally: every Mantine floating element
+  // (Tooltip, Popover, Menu, ...) closes on a real Escape keydown via its
+  // own built-in dismiss handling, so dispatching one on every pointerdown
+  // — before the target's own click handler runs — closes whatever's
+  // currently open first, regardless of what that click goes on to do.
+  useEffect(() => {
+    const handlePointerDown = (): void => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
 
   // Universal "jump to gallery" / "jump to dashboard" shortcuts
   useEffect(() => {
@@ -211,6 +259,19 @@ function AppLayout(): React.JSX.Element {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.openTabs, state.activeTab, setActiveTab])
+
+  // Space bar's default action is page-down scrolling, which fights with
+  // its other job as the hover/photo preview trigger — suppressed globally
+  // except where a focused control natively needs Space (buttons, inputs...).
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== PREVIEW_TRIGGER_KEY) return
+      if (isSpaceActivatable(event.target)) return
+      event.preventDefault()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Two independent drag domains share this one DndContext (tags can't move
   // to a second, nested context scoped to the tag panel without shadowing
@@ -312,8 +373,16 @@ function AppLayout(): React.JSX.Element {
             width: 320,
             breakpoint: 0,
             collapsed: {
-              desktop: state.detailsPanelCollapsed || isCompareTabActive || isDashboardTabActive,
-              mobile: state.detailsPanelCollapsed || isCompareTabActive || isDashboardTabActive
+              desktop:
+                state.detailsPanelCollapsed ||
+                isCompareTabActive ||
+                isDashboardTabActive ||
+                isDuplicatesTabActive,
+              mobile:
+                state.detailsPanelCollapsed ||
+                isCompareTabActive ||
+                isDashboardTabActive ||
+                isDuplicatesTabActive
             }
           }}
           padding={0}
@@ -369,6 +438,8 @@ function AppLayout(): React.JSX.Element {
                           leftSection={
                             entry.kind === 'compare' ? (
                               <IconColumns2 size={ACTION_ICONS.ICON_SIZE} />
+                            ) : entry.kind === 'duplicates' ? (
+                              <IconStack2 size={ACTION_ICONS.ICON_SIZE} />
                             ) : undefined
                           }
                           rightSection={
@@ -390,6 +461,8 @@ function AppLayout(): React.JSX.Element {
                             <CompareTabLabel
                               fileNames={entry.photos.map((photo) => photo.fileName)}
                             />
+                          ) : entry.kind === 'duplicates' ? (
+                            'Duplicates'
                           ) : (
                             <TabLabel fileName={entry.photo.fileName} />
                           )}
@@ -413,7 +486,7 @@ function AppLayout(): React.JSX.Element {
                   </Tooltip>
                 )}
                 <ScanProgressBar />
-                {!(isCompareTabActive || isDashboardTabActive) && (
+                {!(isCompareTabActive || isDashboardTabActive || isDuplicatesTabActive) && (
                   <Tooltip
                     label={
                       state.detailsPanelCollapsed ? 'Show details panel' : 'Hide details panel'
@@ -488,6 +561,8 @@ function AppLayout(): React.JSX.Element {
                 >
                   {entry.kind === 'compare' ? (
                     <CompareView id={entry.id} photos={entry.photos} />
+                  ) : entry.kind === 'duplicates' ? (
+                    <DuplicatesView />
                   ) : (
                     <PhotoView photo={entry.photo} />
                   )}

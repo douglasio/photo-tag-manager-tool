@@ -56,15 +56,50 @@ button {
 .dashboard-photo-frame {
   position: relative;
   overflow: hidden;
+  border-radius: var(--mantine-radius-md);
 }
 
 .dashboard-photo-gradient {
-  opacity: 1;
+  opacity: 0.4;
   transition: opacity 200ms ease;
 }
 
 .dashboard-photo-frame:hover .dashboard-photo-gradient {
-  opacity: 0.75;
+  opacity: 0;
+}
+
+.dashboard-photo-frame text {
+  mix-blend-mode: overlay;
+  font-weight: 800;
+}
+
+/* Top Tags widget: lighten a bar's fill on hover, same idea as the photo
+   frame gradient above but for a plain colored bar. */
+.top-tags-bar-rect {
+  transition: fill 120ms ease;
+}
+
+.top-tags-bar:hover .top-tags-bar-rect {
+  fill: var(--mantine-color-indigo-4);
+}
+
+.top-tags-bar image {
+  transition: opacity 120ms ease;
+}
+
+.top-tags-bar:hover image {
+  opacity: 0.85;
+}
+
+/* Photos From Year widget: nostalgic black-and-white by default, fading
+   back to color on hover. */
+.photos-from-year-tile img {
+  filter: grayscale(100%);
+  transition: filter 300ms ease;
+}
+
+.photos-from-year-tile:hover img {
+  filter: grayscale(0%);
 }
 
 /* UnstyledButton doesn't reset the browser's native :focus-visible outline.
@@ -108,4 +143,12 @@ button {
 
 .settings-save-message {
   animation: settings-save-fade 5400ms ease forwards;
+}
+
+/* Lets a flex child grow to fill its parent while still allowing its own
+   content to scroll/shrink instead of overflowing — a flex item's default
+   min-height is `auto`, which otherwise forces it to grow to fit content. */
+.flex-fill {
+  flex: 1;
+  min-height: 0;
 }

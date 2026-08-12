@@ -3,6 +3,8 @@ import { useHover } from '@mantine/hooks'
 import { IconX } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
+import { TagHoverCard } from '@components'
+
 interface DetailPanelTagChipProps {
   tag: string
   // Parent already computes this for the Chip.Group's value — passed in
@@ -18,16 +20,18 @@ export function DetailPanelTagChip({ tag, checked }: DetailPanelTagChipProps): R
   const showRemove = checked && hovered
 
   return (
-    <Chip
-      value={tag}
-      // Redundant with Chip.Group's own context-derived checked state (both
-      // read the same data), but keeps this correct standalone too.
-      checked={checked}
-      rootRef={ref}
-      color={showRemove ? 'red' : undefined}
-      icon={showRemove ? <IconX size={12} /> : undefined}
-    >
-      {tag}
-    </Chip>
+    <TagHoverCard tag={tag}>
+      <Chip
+        value={tag}
+        // Redundant with Chip.Group's own context-derived checked state (both
+        // read the same data), but keeps this correct standalone too.
+        checked={checked}
+        rootRef={ref}
+        color={showRemove ? 'red' : undefined}
+        icon={showRemove ? <IconX size={12} /> : undefined}
+      >
+        {tag}
+      </Chip>
+    </TagHoverCard>
   )
 }

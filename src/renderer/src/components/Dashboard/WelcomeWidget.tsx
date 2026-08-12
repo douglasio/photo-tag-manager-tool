@@ -16,7 +16,7 @@ export function WelcomeWidget(): ReactElement {
   const greeting = getGreeting()
 
   return (
-    <Stack justify="space-between">
+    <Stack justify="space-between" align="flex-start">
       <Group gap="xs" align="center">
         {GREETING_ICONS[greeting]}
         <Title order={1}>{greeting}</Title>

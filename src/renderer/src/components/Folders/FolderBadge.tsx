@@ -10,7 +10,7 @@ export function FolderBadge({
 }): ReactElement {
   return (
     <Badge
-      size="sm"
+      size="md"
       variant={isActive ? 'filled' : 'light'}
       color={isActive ? undefined : 'gray.8'}
     >

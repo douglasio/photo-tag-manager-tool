@@ -233,6 +233,20 @@ describe('photoLibraryReducer', () => {
       expect(state.selectedFolder).toBe('/root')
       expect(state.selectedTag).toBe('vacation')
     })
+
+    it('untagged filter clears folder and tag filters, and vice versa', () => {
+      let state = photoLibraryReducer(initialState, { type: 'SET_UNTAGGED_FILTER', active: true })
+      expect(state.untaggedFilterActive).toBe(true)
+
+      state = photoLibraryReducer(state, { type: 'SET_TAG_FILTER', tag: 'vacation' })
+      expect(state.untaggedFilterActive).toBe(false)
+
+      state = photoLibraryReducer(state, { type: 'SET_UNTAGGED_FILTER', active: true })
+      expect(state.selectedTag).toBeNull()
+
+      state = photoLibraryReducer(state, { type: 'SET_FOLDER_FILTER', folder: '/root' })
+      expect(state.untaggedFilterActive).toBe(false)
+    })
   })
 
   describe('settings toggles', () => {
@@ -250,12 +264,36 @@ describe('photoLibraryReducer', () => {
       expect(flipped[key]).toBe(false)
     })
 
+    it('SET_AI_TAG_SUGGESTIONS_ENABLED flips the flag but returns the same state when unchanged', () => {
+      const enabled = photoLibraryReducer(initialState, {
+        type: 'SET_AI_TAG_SUGGESTIONS_ENABLED',
+        value: true
+      })
+      expect(enabled.aiTagSuggestionsEnabled).toBe(true)
+
+      // Guarded (unlike the toggles above) since runAiScan dispatches this
+      // repeatedly on every throttled progress tick once embedding starts.
+      const repeated = photoLibraryReducer(enabled, {
+        type: 'SET_AI_TAG_SUGGESTIONS_ENABLED',
+        value: true
+      })
+      expect(repeated).toBe(enabled)
+    })
+
     it('sets the default view', () => {
       const state = photoLibraryReducer(initialState, {
         type: 'SET_DEFAULT_VIEW',
         value: 'dashboard'
       })
       expect(state.defaultView).toBe('dashboard')
+    })
+
+    it('sets the gallery view mode', () => {
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_GALLERY_VIEW_MODE',
+        value: 'list'
+      })
+      expect(state.galleryViewMode).toBe('list')
     })
 
     it('sets the sort order', () => {

@@ -4,11 +4,14 @@ import { join } from 'path'
 
 let db: Database.Database | null = null
 
+export function getDbPath(): string {
+  return join(app.getPath('userData'), 'photag.db')
+}
+
 export function getDb(): Database.Database {
   if (db) return db
 
-  const dbPath = join(app.getPath('userData'), 'photag.db')
-  db = new Database(dbPath)
+  db = new Database(getDbPath())
   db.pragma('journal_mode = WAL')
 
   db.exec(`
@@ -59,12 +62,28 @@ export function getDb(): Database.Database {
     )
   `)
 
+  // CLIP image embeddings, cached per photo once computed (see
+  // tagExemplarService) — lets "photos visually similar to this tag's
+  // existing examples" suggestions reuse work across requests.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS photo_embeddings (
+      path TEXT PRIMARY KEY,
+      embedding BLOB NOT NULL
+    )
+  `)
+
   const photoColumns = db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]
   if (!photoColumns.some((column) => column.name === 'comment')) {
     db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')
   }
   if (!photoColumns.some((column) => column.name === 'viewCount')) {
     db.exec('ALTER TABLE photos ADD COLUMN viewCount INTEGER NOT NULL DEFAULT 0')
+  }
+  // Set once on true INSERT only (unlike lastScannedAt) — a durable
+  // "recently added" signal. Existing rows get lastScannedAt as a one-time approximation.
+  if (!photoColumns.some((column) => column.name === 'firstSeenAt')) {
+    db.exec('ALTER TABLE photos ADD COLUMN firstSeenAt INTEGER')
+    db.exec('UPDATE photos SET firstSeenAt = lastScannedAt WHERE firstSeenAt IS NULL')
   }
 
   // group_id is used now (tag groups); position/hidden/coverPhotoPath are
@@ -108,7 +127,12 @@ export function getDb(): Database.Database {
   // Bumped to 3: generateThumbnail now auto-orients via EXIF before resizing,
   // so previously-cached thumbnails for rotated photos were baked in the
   // wrong orientation and need to be regenerated once.
-  const THUMBNAIL_GENERATION = '3'
+  // Bumped to 4: generateThumbnail now normalizes to sRGB, since a
+  // grayscale/CMYK/unusual-ICC-profile source otherwise carried an ambiguous
+  // colourspace into the thumbnail, crashing the AI embedding pipeline's
+  // raw-buffer resize with a libvips "colourspace: parameter space not set"
+  // error on some photos.
+  const THUMBNAIL_GENERATION = '4'
   const storedGeneration = db
     .prepare("SELECT value FROM settings WHERE key = 'thumbnailGeneration'")
     .get() as { value: string } | undefined
@@ -121,4 +145,12 @@ export function getDb(): Database.Database {
   }
 
   return db
+}
+
+// Closes the live connection so its file can be safely deleted or replaced
+// out from under it (importing/clearing the library) — the next getDb()
+// call transparently reopens (and re-migrates, if needed) from disk.
+export function closeDb(): void {
+  db?.close()
+  db = null
 }

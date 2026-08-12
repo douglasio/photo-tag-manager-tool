@@ -2,8 +2,11 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 
 import type {
+  AiScanProgress,
+  AiScanResult,
   DefaultView,
   GallerySort,
+  GalleryViewMode,
   MetadataBatchEvent,
   MoveProgressEvent,
   PhotoRecord,
@@ -11,7 +14,11 @@ import type {
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
+  SimilarPhoto,
   TagGroup,
+  TagSuggestion,
+  ThrowbackEntry,
+  ThrowbackYearSample,
   WatchFolderAddedEvent,
   WatchFolderRemovedEvent,
   WatchPhotoRemovedEvent,
@@ -61,6 +68,30 @@ const api = {
   getTagsPanelGridView: (): Promise<boolean> => ipcRenderer.invoke('settings:getTagsPanelGridView'),
   setTagsPanelGridView: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setTagsPanelGridView', value),
+  getGalleryViewMode: (): Promise<GalleryViewMode> =>
+    ipcRenderer.invoke('settings:getGalleryViewMode'),
+  setGalleryViewMode: (value: GalleryViewMode): Promise<void> =>
+    ipcRenderer.invoke('settings:setGalleryViewMode', value),
+  getAiTagSuggestionsEnabled: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:getAiTagSuggestionsEnabled'),
+  setAiTagSuggestionsEnabled: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setAiTagSuggestionsEnabled', value),
+  suggestTags: (filePath: string, candidateLabels: string[]): Promise<TagSuggestion[]> =>
+    ipcRenderer.invoke('ai:suggestTags', filePath, candidateLabels),
+  enableAiFeaturesAndScan: (): Promise<AiScanResult> => ipcRenderer.invoke('ai:enableAndScan'),
+  rescanAiFeatures: (): Promise<AiScanResult> => ipcRenderer.invoke('ai:rescan'),
+  cancelAiScan: (): Promise<void> => ipcRenderer.invoke('ai:cancelScan'),
+  wasAiScanInterrupted: (): Promise<boolean> => ipcRenderer.invoke('ai:wasScanInterrupted'),
+  onAiScanProgress: (callback: (progress: AiScanProgress) => void): (() => void) =>
+    subscribe('ai:scanProgress', callback),
+  findSimilarPhotos: (filePath: string, limit: number): Promise<SimilarPhoto[]> =>
+    ipcRenderer.invoke('ai:findSimilarPhotos', filePath, limit),
+  getThrowbackSimilarity: (): Promise<ThrowbackEntry[] | null> =>
+    ipcRenderer.invoke('throwback:getSimilarity'),
+  getThrowbackYearSample: (): Promise<ThrowbackYearSample | null> =>
+    ipcRenderer.invoke('throwback:getYearSample'),
+  getThrowbackPreview: (): Promise<ThrowbackEntry[] | null> =>
+    ipcRenderer.invoke('throwback:getPreview'),
   getDetailsPanelCollapsed: (): Promise<boolean> =>
     ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
   setDetailsPanelCollapsed: (value: boolean): Promise<void> =>
@@ -96,6 +127,9 @@ const api = {
     ipcRenderer.invoke('settings:removeFolder', folder),
   renameFolder: (folder: string, newBaseName: string): Promise<string> =>
     ipcRenderer.invoke('settings:renameFolder', folder, newBaseName),
+  exportDatabase: (): Promise<boolean> => ipcRenderer.invoke('library:exportDatabase'),
+  importDatabase: (): Promise<void> => ipcRenderer.invoke('library:importDatabase'),
+  clearLibrary: (): Promise<void> => ipcRenderer.invoke('library:clearLibrary'),
   startScan: (rootPath: string): Promise<ScanStartResult> =>
     ipcRenderer.invoke('scan:start', rootPath),
   startScanAll: (rootPaths: string[]): Promise<ScanStartResult> =>

@@ -1,4 +1,11 @@
-import type { DefaultView, PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
+import type {
+  AiScanProgress,
+  DefaultView,
+  GalleryViewMode,
+  PhotoRecord,
+  ScanCompleteEvent,
+  TagGroup
+} from '@shared/types'
 import {
   addPhotoToFolderTree,
   findRootFolder,
@@ -38,6 +45,10 @@ export interface PhotoLibraryState {
   selectedPaths: Set<string>
   selectedFolder: string | null
   selectedTag: string | null
+  // Pseudo-filter for photos with no tags — mutually exclusive with
+  // selectedTag/selectedFolder rather than a sentinel value on selectedTag,
+  // since a real tag could otherwise collide with it.
+  untaggedFilterActive: boolean
   sortBy: GallerySortBy
   sortOrder: GallerySortOrder
   folderCounts: Map<string, number>
@@ -50,6 +61,14 @@ export interface PhotoLibraryState {
   defaultView: DefaultView
   showEmptyFolders: boolean
   tagsPanelGridView: boolean
+  galleryViewMode: GalleryViewMode
+  aiTagSuggestionsEnabled: boolean
+  // Session-only — null when no AI scan is in flight. Spans the whole
+  // "enable AI features" flow (model download, then embedding, then
+  // duplicate clustering), driven from PhotoLibraryContext's
+  // enableAiFeatures/rescanAiFeatures regardless of which component
+  // triggered it.
+  aiScanProgress: AiScanProgress | null
   // Session-only (not persisted) — whether the Settings modal is open, so
   // other components (e.g. the dashboard's onboarding checklist) can open it
   // without needing a ref/portal into SettingsModal's own local state.
@@ -97,6 +116,7 @@ export const initialState: PhotoLibraryState = {
   selectedPaths: new Set(),
   selectedFolder: null,
   selectedTag: null,
+  untaggedFilterActive: false,
   sortBy: 'name',
   sortOrder: 'asc',
   folderCounts: new Map(),
@@ -105,6 +125,9 @@ export const initialState: PhotoLibraryState = {
   defaultView: 'dashboard',
   showEmptyFolders: false,
   tagsPanelGridView: false,
+  galleryViewMode: 'grid',
+  aiTagSuggestionsEnabled: false,
+  aiScanProgress: null,
   settingsModalOpened: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
@@ -141,10 +164,14 @@ export type PhotoLibraryAction =
   | { type: 'SET_FOLDER_FILTER'; folder: string | null }
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
+  | { type: 'SET_UNTAGGED_FILTER'; active: boolean }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_TAGS_PANEL_GRID_VIEW'; value: boolean }
+  | { type: 'SET_GALLERY_VIEW_MODE'; value: GalleryViewMode }
+  | { type: 'SET_AI_TAG_SUGGESTIONS_ENABLED'; value: boolean }
+  | { type: 'SET_AI_SCAN_PROGRESS'; progress: AiScanProgress | null }
   | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
@@ -182,6 +209,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_ACTIVE_TAB'; tab: string }
   | { type: 'RENAME_PHOTO_TAB'; oldPath: string; newPath: string }
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
+  | { type: 'OPEN_DUPLICATES_TAB' }
 
 // Shared by CLOSE_PHOTO_TAB and REMOVE_FROM_COMPARE_TAB (which closes its
 // whole tab once too few photos remain) — falls back to the tab immediately
@@ -426,13 +454,30 @@ export function photoLibraryReducer(
       return { ...state, photosByPath }
     }
     case 'SET_FOLDER_FILTER':
-      return { ...state, selectedFolder: action.folder, selectedTag: null }
+      return {
+        ...state,
+        selectedFolder: action.folder,
+        selectedTag: null,
+        untaggedFilterActive: false
+      }
     case 'SET_TAG_FILTER':
-      return { ...state, selectedTag: action.tag, selectedFolder: null }
+      return {
+        ...state,
+        selectedTag: action.tag,
+        selectedFolder: null,
+        untaggedFilterActive: false
+      }
     // Unlike SET_TAG_FILTER, keeps selectedFolder intact — for the
     // per-folder tag pills that narrow within a folder rather than replace it.
     case 'SET_FOLDER_TAG_FILTER':
-      return { ...state, selectedTag: action.tag }
+      return { ...state, selectedTag: action.tag, untaggedFilterActive: false }
+    case 'SET_UNTAGGED_FILTER':
+      return {
+        ...state,
+        untaggedFilterActive: action.active,
+        selectedTag: null,
+        selectedFolder: null
+      }
     case 'SET_SORT':
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'SET_DEFAULT_VIEW':
@@ -441,6 +486,16 @@ export function photoLibraryReducer(
       return { ...state, showEmptyFolders: action.value }
     case 'SET_TAGS_PANEL_GRID_VIEW':
       return { ...state, tagsPanelGridView: action.value }
+    case 'SET_GALLERY_VIEW_MODE':
+      return { ...state, galleryViewMode: action.value }
+    case 'SET_AI_TAG_SUGGESTIONS_ENABLED':
+      // Guarded (unlike most setters here) because runAiScan dispatches this
+      // on every throttled progress tick once embedding starts, not just once.
+      return state.aiTagSuggestionsEnabled === action.value
+        ? state
+        : { ...state, aiTagSuggestionsEnabled: action.value }
+    case 'SET_AI_SCAN_PROGRESS':
+      return { ...state, aiScanProgress: action.progress }
     case 'SET_SETTINGS_MODAL_OPENED':
       return { ...state, settingsModalOpened: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':
@@ -659,6 +714,14 @@ export function photoLibraryReducer(
         compareTabs.delete(action.filePath)
       }
       return { ...state, openTabs, activeTab, compareTabs }
+    }
+    // Singleton tab — reactivates the existing one instead of opening a
+    // second "Duplicates" tab if it's already open.
+    case 'OPEN_DUPLICATES_TAB': {
+      const openTabs = state.openTabs.includes('duplicates')
+        ? state.openTabs
+        : [...state.openTabs, 'duplicates']
+      return { ...state, openTabs, activeTab: 'duplicates' }
     }
     case 'CLOSE_ALL_TABS':
       return { ...state, openTabs: [], compareTabs: new Map(), activeTab: 'gallery' }

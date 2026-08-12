@@ -1,12 +1,16 @@
 import { MantineProvider } from '@mantine/core'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { PhotoRecord } from '@shared/types'
 
+// TagHoverCard's own hover/description behavior has its own test coverage —
+// a plain passthrough here keeps these tests focused on the tile itself.
 vi.mock('@components', () => ({
-  PhotoGradientOverlay: () => null
+  PhotoGradientOverlay: () => null,
+  TagHoverCard: ({ children }: { children: ReactNode }) => children
 }))
 
 import { TagGridTile } from './TagGridTile'

@@ -87,4 +87,17 @@ describe('TaggingProgressWidget', () => {
     ])
     expect(screen.getByText('1 of 3 tagged')).toBeInTheDocument()
   })
+
+  it('keeps the chart size within its clamped range regardless of measured height', () => {
+    setLibrary([makePhoto('/a.jpg', { tags: ['vacation'] })])
+    renderWidget()
+
+    const { size, thickness } = mockDonutChart.mock.calls[0][0] as {
+      size: number
+      thickness: number
+    }
+    expect(size).toBeGreaterThanOrEqual(90)
+    expect(size).toBeLessThanOrEqual(200)
+    expect(thickness).toBeCloseTo(size / 4)
+  })
 })
