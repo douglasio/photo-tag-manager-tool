@@ -20,6 +20,8 @@ import type { PhotoRecord, ThrowbackYearSample } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
+import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
+
 // A 2x2 grid whose tiles stretch to fill the widget's full height (not
 // aspect-ratio-square, since this section can grow tall alongside Time
 // Warp's timeline) — matches RecentlyAddedWidget's tile-fill approach.
@@ -43,6 +45,7 @@ function YearTile({
 }: YearTileProps): ReactElement {
   const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+  const previewScale = useDashboardPreviewScale()
 
   return (
     <>
@@ -72,7 +75,7 @@ function YearTile({
       <GalleryHoverPreview
         photo={photo}
         position={canPreview ? position : null}
-        scale={1}
+        scale={previewScale}
         motionEnabled={motionEnabled}
       />
     </>
@@ -92,8 +95,11 @@ export function PhotosFromYearWidget(): ReactElement {
   const hasLoadedOnceRef = useRef(false)
 
   useEffect(() => {
+    // A Dashboard tab revisit re-runs this effect without anything actually
+    // changing — skip once already loaded, per the "once per session" ask.
+    if (hasLoadedOnceRef.current) return
     let cancelled = false
-    if (!hasLoadedOnceRef.current) setLoading(true)
+    setLoading(true)
     getThrowbackYearSample()
       .then((result) => {
         if (!cancelled) setYearSample(result)

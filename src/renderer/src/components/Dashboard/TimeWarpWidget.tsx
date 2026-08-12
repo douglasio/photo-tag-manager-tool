@@ -21,6 +21,8 @@ import type { PhotoRecord, ThrowbackEntry } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
+import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
+
 const PREVIEW_ENTRY_COUNT = 3
 // Caps how tall the (real, vertical) Timeline can grow — a library spanning
 // many years would otherwise make the widget grow to match.
@@ -48,6 +50,7 @@ function TimelinePhotoTile({
 }: TimelinePhotoTileProps): ReactElement {
   const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+  const previewScale = useDashboardPreviewScale()
 
   return (
     <>
@@ -65,7 +68,7 @@ function TimelinePhotoTile({
       <GalleryHoverPreview
         photo={photo}
         position={canPreview ? position : null}
-        scale={1}
+        scale={previewScale}
         motionEnabled={motionEnabled}
       />
     </>
@@ -121,6 +124,10 @@ export function TimeWarpWidget(): ReactElement {
   const [enableAiOpened, setEnableAiOpened] = useState(false)
   const hasLoadedOnceRef = useRef(false)
   const scanning = state.aiScanProgress !== null
+  // Tracks the `scanning` value as of the last actual fetch, so a Dashboard
+  // tab revisit (which re-runs this effect without `scanning` truly
+  // changing) can be told apart from a genuine scan start/finish.
+  const lastFetchedScanningRef = useRef(scanning)
   const hasRealTimeline = state.aiTagSuggestionsEnabled && !!similarity && similarity.length > 0
 
   // Skips the query entirely while AI is disabled — the expensive half of
@@ -129,6 +136,11 @@ export function TimeWarpWidget(): ReactElement {
   // `similarity` left over from AI being on earlier is never actually shown.
   useEffect(() => {
     if (!state.aiTagSuggestionsEnabled) return
+    // Once loaded, only refetch on a real scanning-state transition (a scan
+    // starting/finishing) — not on every tab revisit — per the "once per
+    // session" ask.
+    if (hasLoadedOnceRef.current && scanning === lastFetchedScanningRef.current) return
+    lastFetchedScanningRef.current = scanning
     let cancelled = false
     if (!hasLoadedOnceRef.current) setLoading(true)
     getThrowbackSimilarity()

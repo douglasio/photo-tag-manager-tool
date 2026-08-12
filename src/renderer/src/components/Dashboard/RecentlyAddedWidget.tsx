@@ -10,6 +10,8 @@ import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
+import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
+
 // A small contained 2x2 grid, not one row spanning the widget's full width.
 const RECENT_COUNT = 4
 const GRID_COLS = 2
@@ -32,6 +34,7 @@ function RecentTile({
 }: RecentTileProps): ReactElement {
   const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+  const previewScale = useDashboardPreviewScale()
 
   return (
     <>
@@ -60,7 +63,7 @@ function RecentTile({
       <GalleryHoverPreview
         photo={photo}
         position={canPreview ? position : null}
-        scale={1}
+        scale={previewScale}
         motionEnabled={motionEnabled}
       />
     </>

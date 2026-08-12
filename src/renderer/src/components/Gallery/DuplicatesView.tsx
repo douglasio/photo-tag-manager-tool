@@ -26,6 +26,12 @@ import { aiScanStepLabel } from '@utils'
 
 const THUMB_SIZE = 120
 
+// Caches the last scan result at module scope (outside the component) so
+// reopening this tab within the same app session reuses it instead of
+// re-running the scan and re-showing the "AI features ready" toast every
+// time — reset only by an explicit "Scan again" or a full app restart.
+let cachedResult: { groups: DuplicateGroup[]; canceled: boolean } | null = null
+
 // Opened via the Gallery's "Show duplicates" button (see GalleryGrid) as its
 // own tab — runs the shared AI scan on mount/recompute (via rescanAiFeatures,
 // which also warms tag suggestions and Time Warp) and renders each resulting
@@ -33,9 +39,9 @@ const THUMB_SIZE = 120
 export function DuplicatesView(): ReactElement {
   const { state, rescanAiFeatures, enableAiFeatures, cancelAiScan, openPhotoTab } =
     usePhotoLibrary()
-  const [groups, setGroups] = useState<DuplicateGroup[] | null>(null)
+  const [groups, setGroups] = useState<DuplicateGroup[] | null>(cachedResult?.groups ?? null)
   const [error, setError] = useState<string | null>(null)
-  const [canceled, setCanceled] = useState(false)
+  const [canceled, setCanceled] = useState(cachedResult?.canceled ?? false)
   const [scanCount, setScanCount] = useState(0)
   // Duplicate detection rides the same AI model/embeddings as tag
   // suggestions and Time Warp — gated the same way, rather than silently
@@ -55,12 +61,17 @@ export function DuplicatesView(): ReactElement {
 
   useEffect(() => {
     if (!state.aiTagSuggestionsEnabled) return
+    // scanCount === 0 means this run is the initial mount rather than an
+    // explicit "Scan again" — if a cached result already exists, reuse it
+    // instead of re-running the scan (and re-showing its toast).
+    if (scanCount === 0 && cachedResult) return
     let cancelled = false
     rescanAiFeatures()
       .then((result) => {
         if (cancelled) return
         setGroups(result.duplicateGroups)
         setCanceled(result.canceled)
+        cachedResult = { groups: result.duplicateGroups, canceled: result.canceled }
       })
       .catch((err: unknown) => {
         console.error('failed to scan for duplicate photos', err)

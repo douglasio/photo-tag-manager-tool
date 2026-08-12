@@ -4,21 +4,17 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
-1. The Throwback widget still has a loading state even with AI features disabled. It's just supposed to be displaying 5 random images from previous years, what's taking so long? Also, if I navigate to the Dashboard while this loading state is active, the app lock up until it resolves. (Don't revert my changes to the widget / dashboard heights, these were intentional)
-
 2. Gallery preview zoom is not very smooth and doesn't zoom in enough
 
-3. The cancel button on the AI initialization popup isn't working as expected. It seems like it may eventually stop the process, but it signals that it's completed, not stopped. So when you go to view the duplicate photos again, it still has some scanning to do. This is obviously misleading, the cancel button should actually cancel and dismiss the toast immediately and turn the AI feature flag back off.
+3. The duplicates tab keeps showing the "AI features ready" toast every time you open it, well after AI features have been enabled.
 
-4. The duplicates tab should not re-scan for duplicates if you toggle back and forth. This is an extremely expensive calculation on larger libraries and should only app on the initial AI
+4. Duplicate scan still freezes up the app. If we can't get the app to run smoothly independent of these background jobs, there should be a full end-to-end process when AI features are enabled that takes over the window so the user is prevented from trying to keep working while everything is slow and janky.
 
-5. Duplicate scan still freezes up the app. If we can't get the app to run smoothly independent of these background jobs, there should be a full end-to-end process when AI features are enabled that takes over the window so the user is prevented from trying to keep working while everything is slow and janky.
+5. We need to globally disable "space bar to page down" as it interferes with the spacebar preview.
 
-6. We need to globally disable "space bar to page down" as it interferes with the spacebar preview.
+6. Double check if this is the case but the throwback widget should not re-calculate every time the tab is opened. Once per session.
 
-7. The throwback widget should not re-calculate every time the tab is opened. Once per session.
-
-8. Clicking a suggested tag from the photo view brings you back to the gallery and doesn't apply the tag
+7. Clicking a suggested tag from the photo view brings you back to the gallery and doesn't apply the tag
 
 # Features
 

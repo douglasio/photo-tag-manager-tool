@@ -65,6 +65,7 @@ import { RADIUS_SIZE } from '@renderer/theme'
 import { ACTION_ICONS } from '@renderer/utils'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
+import { PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
 
@@ -73,6 +74,28 @@ import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryConte
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+// Roles/elements that natively activate on a Space keypress — space must
+// keep its default behavior there instead of being swallowed globally below.
+const SPACE_ACTIVATABLE_ROLES = new Set([
+  'button',
+  'checkbox',
+  'radio',
+  'switch',
+  'tab',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option'
+])
+
+function isSpaceActivatable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (isEditableTarget(target)) return true
+  if (['BUTTON', 'A', 'SUMMARY'].includes(target.tagName)) return true
+  const role = target.getAttribute('role')
+  return role !== null && SPACE_ACTIVATABLE_ROLES.has(role)
 }
 
 // const TITLE_BAR_HEIGHT = 52
@@ -236,6 +259,19 @@ function AppLayout(): React.JSX.Element {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.openTabs, state.activeTab, setActiveTab])
+
+  // Space bar's default action is page-down scrolling, which fights with
+  // its other job as the hover/photo preview trigger — suppressed globally
+  // except where a focused control natively needs Space (buttons, inputs...).
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== PREVIEW_TRIGGER_KEY) return
+      if (isSpaceActivatable(event.target)) return
+      event.preventDefault()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Two independent drag domains share this one DndContext (tags can't move
   // to a second, nested context scoped to the tag panel without shadowing

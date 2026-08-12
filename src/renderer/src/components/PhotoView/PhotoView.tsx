@@ -253,6 +253,11 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (!isActiveRef.current) return
       if (event.key === 'Escape') {
+        // App.tsx dispatches a synthetic (untrusted) Escape on every
+        // pointerdown to dismiss floating Mantine elements (tooltips,
+        // dropdowns) — without this check, clicking a suggested tag badge
+        // would close the whole tab before its own click handler ever fires.
+        if (!event.isTrusted) return
         if (isEditableElement(document.activeElement)) return
         closePhotoTab(photo.filePath)
         return

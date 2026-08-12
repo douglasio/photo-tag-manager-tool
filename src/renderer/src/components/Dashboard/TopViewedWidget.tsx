@@ -11,6 +11,8 @@ import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
+import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
+
 const TOP_COUNT = 5
 
 export interface TopViewedDatum {
@@ -134,6 +136,7 @@ export function TopViewedWidget(): ReactElement {
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
   const [hover, setHover] = useState<HoverState | null>(null)
+  const previewScale = useDashboardPreviewScale()
   // Mirrors the latest hovered bar/position on every mouse move regardless
   // of whether the trigger key is held — a ref write alone doesn't
   // re-render, so this is already up to date the instant the trigger flips
@@ -235,7 +238,7 @@ export function TopViewedWidget(): ReactElement {
           key={photo.id}
           photo={photo}
           position={previewTriggerHeld && hover?.id === photo.id ? hover.position : null}
-          scale={1}
+          scale={previewScale}
           motionEnabled={motionEnabled}
         />
       ))}

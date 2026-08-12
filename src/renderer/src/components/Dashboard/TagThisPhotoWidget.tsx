@@ -12,6 +12,8 @@ import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { pickRandom, PREVIEW_TRIGGER_KEY } from '@utils'
 
+import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
+
 const TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
 
 // Picks a random untagged, thumbnail-ready photo — excludePath keeps
@@ -47,6 +49,7 @@ export function TagThisPhotoWidget(): ReactElement {
   const currentPhoto = currentPath ? (state.photosByPath.get(currentPath) ?? null) : null
   const canPreview = previewTriggerHeld && currentPhoto?.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+  const previewScale = useDashboardPreviewScale()
   const { suggestions, loading: loadingSuggestions } = useTagSuggestions(
     currentPhoto?.filePath ?? '',
     currentPhoto?.tags ?? [],
@@ -96,7 +99,7 @@ export function TagThisPhotoWidget(): ReactElement {
             <GalleryHoverPreview
               photo={currentPhoto}
               position={canPreview ? position : null}
-              scale={1}
+              scale={previewScale}
               motionEnabled={motionEnabled}
             />
             <Stack h="100%" gap="md">

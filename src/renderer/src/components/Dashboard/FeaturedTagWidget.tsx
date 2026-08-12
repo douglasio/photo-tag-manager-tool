@@ -22,6 +22,8 @@ import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { pickRandom, PREVIEW_TRIGGER_KEY, shuffle } from '@utils'
 
+import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
+
 // A tag needs at least this many photos before it's eligible to be featured.
 const FEATURED_TAG_MIN_PHOTOS = 3
 const COLLAGE_PHOTO_COUNT = 9
@@ -90,6 +92,7 @@ function CollageTile({
 }): ReactElement {
   const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
+  const previewScale = useDashboardPreviewScale()
 
   return (
     <>
@@ -119,7 +122,7 @@ function CollageTile({
       <GalleryHoverPreview
         photo={photo}
         position={canPreview ? position : null}
-        scale={1}
+        scale={previewScale}
         motionEnabled={motionEnabled}
       />
     </>
