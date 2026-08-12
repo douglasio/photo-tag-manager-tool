@@ -19,7 +19,10 @@ vi.mock('@state', () => ({
       aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled,
       tagDescriptions: new Map()
     },
-    suggestTags: mockSuggestTags
+    suggestTags: mockSuggestTags,
+    tagCounts: new Map(),
+    tagCoverPhotos: new Map(),
+    tagViewCounts: new Map()
   })
 }))
 

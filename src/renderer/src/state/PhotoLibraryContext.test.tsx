@@ -490,6 +490,23 @@ describe('PhotoLibraryContext', () => {
       expect(result.current.allTags).toEqual(['beach', 'sunset'])
     })
 
+    it('sums view counts per tag across all its photos', async () => {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const { result } = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [
+            makePhoto('/root/b.jpg', { tags: ['beach'], viewCount: 3 }),
+            makePhoto('/root/a.jpg', { tags: ['beach', 'sunset'], viewCount: 5 })
+          ]
+        })
+      })
+      expect(result.current.tagViewCounts.get('beach')).toBe(8)
+      expect(result.current.tagViewCounts.get('sunset')).toBe(5)
+    })
+
     it('visiblePhotos narrows by the selected tag', async () => {
       const { result } = await seedPhotos()
       act(() => result.current.setTagFilter('sunset'))

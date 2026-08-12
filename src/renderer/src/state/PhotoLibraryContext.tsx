@@ -85,6 +85,7 @@ interface PhotoLibraryContextValue {
   allTags: string[]
   tagCounts: Map<string, number>
   tagCoverPhotos: Map<string, PhotoRecord>
+  tagViewCounts: Map<string, number>
   untaggedCount: number
   folderTags: string[]
   addFolder: () => Promise<void>
@@ -1226,13 +1227,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // gallery's own sort order/direction — otherwise switching gallery sort
   // would make tag thumbnails jump around. Iterates state.photosByPath
   // directly (not the sorted `photos`) since order doesn't matter here.
-  const { tagCounts, tagCoverPhotos } = useMemo(() => {
+  const { tagCounts, tagCoverPhotos, tagViewCounts } = useMemo(() => {
     const counts = new Map<string, number>()
     const covers = new Map<string, PhotoRecord>()
+    const viewCounts = new Map<string, number>()
     for (const photo of state.photosByPath.values()) {
       const photoTime = photo.metadata.dateTaken ? Date.parse(photo.metadata.dateTaken) : null
       for (const tag of photo.tags) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
+        viewCounts.set(tag, (viewCounts.get(tag) ?? 0) + photo.viewCount)
         const current = covers.get(tag)
         if (!current) {
           covers.set(tag, photo)
@@ -1253,7 +1256,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         if (photoWins) covers.set(tag, photo)
       }
     }
-    return { tagCounts: counts, tagCoverPhotos: covers }
+    return { tagCounts: counts, tagCoverPhotos: covers, tagViewCounts: viewCounts }
   }, [state.photosByPath])
 
   const untaggedCount = useMemo(() => {
@@ -1308,6 +1311,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     allTags,
     tagCounts,
     tagCoverPhotos,
+    tagViewCounts,
     untaggedCount,
     folderTags,
     addFolder,

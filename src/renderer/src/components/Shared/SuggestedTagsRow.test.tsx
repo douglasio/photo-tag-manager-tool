@@ -5,7 +5,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 // TagHoverCard (wrapping each suggestion badge) needs a tagDescriptions map.
 vi.mock('@state', () => ({
-  usePhotoLibrary: () => ({ state: { tagDescriptions: new Map() } })
+  usePhotoLibrary: () => ({
+    state: { tagDescriptions: new Map() },
+    tagCounts: new Map(),
+    tagCoverPhotos: new Map(),
+    tagViewCounts: new Map()
+  })
 }))
 
 import { SuggestedTagsRow } from './SuggestedTagsRow'

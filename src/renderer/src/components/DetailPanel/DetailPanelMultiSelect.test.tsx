@@ -22,7 +22,10 @@ vi.mock('@state', () => ({
     allTags: mockAllTags,
     openCompareTab: mockOpenCompareTab,
     addTagsToSelection: mockAddTagsToSelection,
-    removeTagsFromSelection: mockRemoveTagsFromSelection
+    removeTagsFromSelection: mockRemoveTagsFromSelection,
+    tagCounts: new Map(),
+    tagCoverPhotos: new Map(),
+    tagViewCounts: new Map()
   }),
   MIN_COMPARE_PHOTOS: 2,
   MAX_COMPARE_PHOTOS: 4

@@ -13,14 +13,50 @@ function advanceTimers(ms: number): void {
 }
 
 let mockTagDescriptions: Map<string, string>
+let mockTagCounts: Map<string, number>
+let mockTagCoverPhotos: Map<
+  string,
+  { fileName: string; thumbnailStatus: string; thumbnailKey: string | null }
+>
+let mockTagViewCounts: Map<string, number>
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { tagDescriptions: mockTagDescriptions }
+    state: { tagDescriptions: mockTagDescriptions },
+    tagCounts: mockTagCounts,
+    tagCoverPhotos: mockTagCoverPhotos,
+    tagViewCounts: mockTagViewCounts
   })
 }))
 
-import { TagHoverCard, TagHoverCardContent } from './TagHoverCard'
+import type { PhotoRecord } from '@shared/types'
+
+import { TagHoverCard, TagHoverCardBody, TagHoverCardContent } from './TagHoverCard'
+
+function makePhoto(overrides: Partial<PhotoRecord> = {}): PhotoRecord {
+  return {
+    id: 'beach.jpg',
+    filePath: '/root/beach.jpg',
+    fileName: 'beach.jpg',
+    tags: ['vacation'],
+    metadata: {
+      dateTaken: null,
+      cameraMake: null,
+      cameraModel: null,
+      widthPx: null,
+      heightPx: null,
+      fileSizeBytes: 0,
+      format: 'JPEG',
+      comment: null
+    },
+    thumbnailStatus: 'ready',
+    thumbnailKey: 'thumb-1',
+    scanError: null,
+    fromCache: false,
+    viewCount: 0,
+    ...overrides
+  }
+}
 
 function renderCard(tag: string): { hoverTarget: Element } {
   const { container } = render(
@@ -40,6 +76,9 @@ function renderCard(tag: string): { hoverTarget: Element } {
 describe('TagHoverCard', () => {
   beforeEach(() => {
     mockTagDescriptions = new Map()
+    mockTagCounts = new Map()
+    mockTagCoverPhotos = new Map()
+    mockTagViewCounts = new Map()
     vi.useFakeTimers()
   })
 
@@ -130,5 +169,60 @@ describe('TagHoverCardContent', () => {
 
     expect(screen.getByText('#vacation')).toBeInTheDocument()
     expect(screen.getByText('Photos from trips')).toBeInTheDocument()
+  })
+})
+
+describe('TagHoverCardBody', () => {
+  it('shows the tag name, description, and photo/view counts', () => {
+    render(
+      <MantineProvider>
+        <TagHoverCardBody
+          tag="vacation"
+          description="Photos from trips"
+          photoCount={12}
+          viewCount={47}
+        />
+      </MantineProvider>
+    )
+
+    expect(screen.getByText('#vacation')).toBeInTheDocument()
+    expect(screen.getByText('Photos from trips')).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText('47')).toBeInTheDocument()
+  })
+
+  it('renders the cover photo when it has a ready thumbnail', () => {
+    render(
+      <MantineProvider>
+        <TagHoverCardBody tag="vacation" coverPhoto={makePhoto()} photoCount={1} viewCount={0} />
+      </MantineProvider>
+    )
+
+    expect(screen.getByRole('img', { name: 'beach.jpg' })).toBeInTheDocument()
+  })
+
+  it('does not render a cover image when the photo has no ready thumbnail', () => {
+    render(
+      <MantineProvider>
+        <TagHoverCardBody
+          tag="vacation"
+          coverPhoto={makePhoto({ thumbnailStatus: 'pending', thumbnailKey: null })}
+          photoCount={1}
+          viewCount={0}
+        />
+      </MantineProvider>
+    )
+
+    expect(screen.queryByRole('img', { name: 'beach.jpg' })).not.toBeInTheDocument()
+  })
+
+  it('does not render a cover image when there is no cover photo at all', () => {
+    render(
+      <MantineProvider>
+        <TagHoverCardBody tag="vacation" photoCount={0} viewCount={0} />
+      </MantineProvider>
+    )
+
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 })

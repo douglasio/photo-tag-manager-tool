@@ -14,6 +14,7 @@ import {
   Group,
   Loader,
   Pill,
+  RollingNumber,
   Scroller,
   Slider,
   Text,
@@ -22,6 +23,7 @@ import {
 } from '@mantine/core'
 import {
   IconColumns2,
+  IconEye,
   IconLayoutGrid,
   IconLayoutList,
   IconPhoto,
@@ -55,6 +57,7 @@ export function GalleryGrid(): ReactElement {
     setTagDescription,
     deleteTag,
     tagCounts,
+    tagViewCounts,
     folderTags,
     setFolderTagFilter,
     renameFile,
@@ -196,6 +199,12 @@ export function GalleryGrid(): ReactElement {
               >
                 {galleryTitle}
               </Title>
+              {isPureTagView && (
+                <Group gap={4} c="dimmed" wrap="nowrap" style={{ flexShrink: 0 }}>
+                  <IconEye size={16} />
+                  <RollingNumber value={tagViewCounts.get(state.selectedTag!) ?? 0} fz="sm" />
+                </Group>
+              )}
               {isPureTagView && (
                 <TagDeleteButton
                   tag={state.selectedTag!}

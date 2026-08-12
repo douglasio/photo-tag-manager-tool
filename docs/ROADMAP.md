@@ -4,18 +4,6 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
-2. Gallery preview zoom is not very smooth and doesn't zoom in enough
-
-3. The duplicates tab keeps showing the "AI features ready" toast every time you open it, well after AI features have been enabled.
-
-4. Duplicate scan still freezes up the app. If we can't get the app to run smoothly independent of these background jobs, there should be a full end-to-end process when AI features are enabled that takes over the window so the user is prevented from trying to keep working while everything is slow and janky.
-
-5. We need to globally disable "space bar to page down" as it interferes with the spacebar preview.
-
-6. Double check if this is the case but the throwback widget should not re-calculate every time the tab is opened. Once per session.
-
-7. Clicking a suggested tag from the photo view brings you back to the gallery and doesn't apply the tag
-
 # Features
 
 To-dos, tasks, and features loosely grouped by feature segment.
@@ -43,12 +31,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 1. Truncate photo filenames in the tabs so more can fit. Hovering over the tab should reveal the full filename as a tooltip.
 
 ## Dashboard
-
-2. I can't see the Time Warp timeline preview at all now.
-
-3. The blacked-out photo in the bar chart issue isn't resolved. And we lost the space bar preview and clickable bars. There should be unit tests for all of this so it's less likely to regress.
-
-4. The Aspect Ratio on the Tag This Photo didn't work, again.
 
 ### Throwback Widget
 
