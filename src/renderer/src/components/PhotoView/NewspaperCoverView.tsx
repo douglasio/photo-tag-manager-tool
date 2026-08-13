@@ -15,22 +15,52 @@ interface NewspaperCoverViewProps {
   mastheadTitle: string
 }
 
-// Playfair Display (self-hosted via @fontsource/playfair-display, imported
-// once in main.tsx) is the bold editorial serif real newspaper mastheads and
-// headlines use — Mantine's theme sans doesn't have anything like it.
+// UnifrakturMaguntia (self-hosted via @fontsource/unifrakturmaguntia,
+// imported once in main.tsx) is a genuine blackletter face — real broadsheet
+// nameplates (the NYT, WSJ, and countless small-town papers) lean on this
+// same Old English lettering tradition; Playfair Display alone read as
+// "elegant magazine," not "newspaper."
+const MASTHEAD_FONT = "'UnifrakturMaguntia', serif"
+// Playfair Display carries the headline/byline/caption — a real front page
+// pairs a blackletter nameplate with an ordinary (if bold) body/headline serif.
 const SERIF_FONT = "'Playfair Display', serif"
-const PAPER_COLOR = '#f4f1ea'
+const PAPER_COLOR = '#ece6d6'
 const INK_COLOR = '#1a1a1a'
 // The photo itself goes grayscale to match the newsprint concept; contrast
 // is nudged up slightly since straight grayscale alone tends to look flat.
 const NEWSPRINT_FILTER = 'grayscale(1) contrast(1.15) brightness(0.97)'
 // Taller than the magazine's 3:4 — closer to a folded broadsheet/tabloid.
 const COVER_ASPECT_RATIO = '5 / 7'
+// A faint halftone dot-grid, the way cheap newsprint stock actually looks
+// under close inspection — subtle enough to read as texture, not noise.
+const PAPER_TEXTURE = {
+  backgroundImage: 'radial-gradient(rgba(0, 0, 0, 0.05) 0.5px, transparent 0.5px)',
+  backgroundSize: '3px 3px'
+}
+// Simulates fine-print body-text columns without real copy — a common
+// print-mockup technique (stacked hairlines standing in for lines of type)
+// that reads as "there's more paper here" at a glance, the way a real front
+// page is dense with jump-heads and column text around the lead story.
+const GREEKED_TEXT_LINES = {
+  backgroundImage: `repeating-linear-gradient(
+    to bottom,
+    ${INK_COLOR} 0,
+    ${INK_COLOR} 1.5px,
+    transparent 1.5px,
+    transparent 7px
+  )`,
+  opacity: 0.35
+}
 
-// Renders the photo as a black-and-white newspaper front page — masthead,
-// dateline, photo "box," and a headline/caption below it (rather than
-// overlaid on the image, like a real front-page cutline) — reusing
-// PannableZoomableImage for the drag-to-pan + wheel-to-zoom photo.
+function ColumnFiller({ lines }: { lines: number }): ReactElement {
+  return <Box h={lines * 7} style={GREEKED_TEXT_LINES} />
+}
+
+// Renders the photo as an authentic-feeling black-and-white broadsheet front
+// page — blackletter nameplate, rule lines, dateline bar, headline above the
+// lead photo, a cutline caption, and greeked column filler to suggest the
+// rest of the page — reusing PannableZoomableImage for the drag-to-pan +
+// wheel-to-zoom photo.
 export function NewspaperCoverView({
   photo,
   zoom,
@@ -62,16 +92,37 @@ export function NewspaperCoverView({
           maxHeight: '100%',
           boxShadow: '0 12px 48px rgba(0, 0, 0, 0.5)',
           outline: '1px solid rgba(0, 0, 0, 0.15)',
-          outlineOffset: -1
+          outlineOffset: -1,
+          overflow: 'hidden',
+          ...PAPER_TEXTURE
         }}
       >
-        {/* Masthead */}
+        {/* Dateline bar — sits above the nameplate on a real front page. */}
+        <Box
+          display="flex"
+          px="sm"
+          pt={6}
+          pb={4}
+          style={{ justifyContent: 'space-between', flexShrink: 0 }}
+        >
+          <Text c={INK_COLOR} fz={9} tt="uppercase" fw={600} style={{ letterSpacing: 0.5 }}>
+            {dateDisplay ?? 'Undated'} · Late Edition
+          </Text>
+          <Text c={INK_COLOR} fz={9} tt="uppercase" fw={600} style={{ letterSpacing: 0.5 }}>
+            Vol. I . . . No. 1
+          </Text>
+          <Text c={INK_COLOR} fz={9} fw={600} style={{ letterSpacing: 0.5 }}>
+            50¢
+          </Text>
+        </Box>
+
+        {/* Nameplate */}
         <Box
           px="md"
-          pt="sm"
-          pb={4}
+          pb={2}
           style={{
             textAlign: 'center',
+            borderTop: `3px double ${INK_COLOR}`,
             borderBottom: `3px double ${INK_COLOR}`,
             flexShrink: 0
           }}
@@ -79,41 +130,66 @@ export function NewspaperCoverView({
           <Text
             c={INK_COLOR}
             style={{
-              fontFamily: SERIF_FONT,
-              fontWeight: 900,
-              fontSize: '2.25rem',
-              lineHeight: 1.05
+              fontFamily: MASTHEAD_FONT,
+              fontSize: '3.1rem',
+              lineHeight: 1.15,
+              padding: '4px 0'
             }}
           >
             {mastheadTitle}
           </Text>
-          <Box
-            display="flex"
-            mt={4}
-            pt={2}
-            style={{ justifyContent: 'space-between', borderTop: `1px solid ${INK_COLOR}` }}
-          >
-            <Text c={INK_COLOR} fz={10} tt="uppercase" fw={600} style={{ letterSpacing: 1 }}>
-              {dateDisplay ?? 'Undated'}
-            </Text>
-            <Text
-              c={INK_COLOR}
-              fz={10}
-              tt="uppercase"
-              fw={600}
-              fs="italic"
-              style={{ letterSpacing: 1 }}
-            >
-              Photo Edition
-            </Text>
-            <Text c={INK_COLOR} fz={10} tt="uppercase" fw={600} style={{ letterSpacing: 1 }}>
-              Vol. I
-            </Text>
-          </Box>
+        </Box>
+        <Box
+          display="flex"
+          px="sm"
+          pt={2}
+          pb={4}
+          style={{ justifyContent: 'space-between', borderBottom: `1px solid ${INK_COLOR}` }}
+        >
+          <Text c={INK_COLOR} fz={8} tt="uppercase" fw={600} style={{ letterSpacing: 1.5 }}>
+            All the Photos Fit to Print
+          </Text>
+          <Text c={INK_COLOR} fz={8} tt="uppercase" fw={600} fs="italic" style={{ opacity: 0.8 }}>
+            Photo Edition
+          </Text>
         </Box>
 
-        {/* Photo (grayscale) */}
-        <Box pos="relative" flex={1} mih={0} m="sm" style={{ border: `1px solid ${INK_COLOR}` }}>
+        {/* Headline, above the lead photo like a real front page. */}
+        <Box px="sm" pt={6} style={{ flexShrink: 0 }}>
+          <Text
+            c={INK_COLOR}
+            style={{
+              fontFamily: SERIF_FONT,
+              fontWeight: 900,
+              fontSize: '1.6rem',
+              lineHeight: 1.02,
+              wordBreak: 'break-word'
+            }}
+          >
+            {title}
+          </Text>
+          <Text
+            c={INK_COLOR}
+            fz={9}
+            tt="uppercase"
+            fw={600}
+            fs="italic"
+            mt={2}
+            style={{ letterSpacing: 0.5, opacity: 0.75 }}
+          >
+            By Our Photography Staff
+          </Text>
+        </Box>
+
+        {/* Lead photo (grayscale) with a cutline caption below it. */}
+        <Box
+          pos="relative"
+          flex={1}
+          mih={0}
+          mx="sm"
+          mt={6}
+          style={{ border: `1px solid ${INK_COLOR}` }}
+        >
           <PannableZoomableImage
             photo={photo}
             zoom={zoom}
@@ -121,26 +197,37 @@ export function NewspaperCoverView({
             imageFilter={NEWSPRINT_FILTER}
           />
         </Box>
-
-        {/* Headline / caption */}
-        <Box px="md" pb="md" pt={4} style={{ flexShrink: 0, borderTop: `1px solid ${INK_COLOR}` }}>
-          <Text
-            c={INK_COLOR}
-            tt="uppercase"
-            style={{
-              fontFamily: SERIF_FONT,
-              fontWeight: 900,
-              fontSize: '1.75rem',
-              lineHeight: 1.05
-            }}
-          >
-            {title}
-          </Text>
-          {photo.metadata.comment && (
-            <Text c={INK_COLOR} fz="sm" fs="italic" mt={4} style={{ fontFamily: SERIF_FONT }}>
+        <Box px="sm" pt={4} pb={2} style={{ flexShrink: 0 }}>
+          {photo.metadata.comment ? (
+            <Text c={INK_COLOR} fz={10} fs="italic" style={{ fontFamily: SERIF_FONT }}>
               {photo.metadata.comment}
             </Text>
+          ) : (
+            <Text
+              c={INK_COLOR}
+              fz={10}
+              fs="italic"
+              style={{ fontFamily: SERIF_FONT, opacity: 0.7 }}
+            >
+              Staff photo, above — see page A1 for the full story.
+            </Text>
           )}
+        </Box>
+
+        {/* Column filler — implies the rest of a dense front page below the fold. */}
+        <Box
+          px="sm"
+          pb="sm"
+          pt={4}
+          display="flex"
+          style={{ gap: 10, borderTop: `1px solid ${INK_COLOR}`, flexShrink: 0 }}
+        >
+          <Box flex={1}>
+            <ColumnFiller lines={3} />
+          </Box>
+          <Box flex={1} style={{ borderLeft: `1px solid ${INK_COLOR}`, paddingLeft: 10 }}>
+            <ColumnFiller lines={3} />
+          </Box>
         </Box>
       </Box>
     </Box>

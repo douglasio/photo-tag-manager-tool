@@ -121,6 +121,9 @@ const api = {
   getDvdStudioName: (): Promise<string> => ipcRenderer.invoke('settings:getDvdStudioName'),
   setDvdStudioName: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setDvdStudioName', value),
+  getArtGalleryName: (): Promise<string> => ipcRenderer.invoke('settings:getArtGalleryName'),
+  setArtGalleryName: (value: string): Promise<void> =>
+    ipcRenderer.invoke('settings:setArtGalleryName', value),
   getNavbarSplitSizes: (): Promise<[number, number] | null> =>
     ipcRenderer.invoke('settings:getNavbarSplitSizes'),
   setNavbarSplitSizes: (sizes: [number, number]): Promise<void> =>

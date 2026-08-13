@@ -102,6 +102,8 @@ function createMockApi(): {
     setNewspaperTitle: vi.fn().mockResolvedValue(undefined),
     getDvdStudioName: vi.fn().mockResolvedValue('TAG ME PICTURES'),
     setDvdStudioName: vi.fn().mockResolvedValue(undefined),
+    getArtGalleryName: vi.fn().mockResolvedValue('The Tag Me Gallery'),
+    setArtGalleryName: vi.fn().mockResolvedValue(undefined),
     getExcludePatterns: vi.fn().mockResolvedValue([]),
     setExcludePatterns: vi.fn().mockResolvedValue(undefined),
     getExcludedFolders: vi.fn().mockResolvedValue([]),

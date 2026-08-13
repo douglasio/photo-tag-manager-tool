@@ -120,13 +120,14 @@ function GallerySection(): ReactElement {
 }
 
 function VisualizationsSection(): ReactElement {
-  const { state, setMagazineTitle, setNewspaperTitle, setDvdStudioName } = usePhotoLibrary()
+  const { state, setMagazineTitle, setNewspaperTitle, setDvdStudioName, setArtGalleryName } =
+    usePhotoLibrary()
 
   return (
     <Stack gap="xs">
       <Text c="dimmed" size="sm">
-        Masthead/studio text shown on the Photo view&apos;s magazine, newspaper, and DVD cover
-        visualizations.
+        Masthead/studio/gallery text shown on the Photo view&apos;s magazine, newspaper, DVD cover,
+        and art gallery visualizations.
       </Text>
       <AutoSaveTextInput
         label="Magazine title"
@@ -142,6 +143,11 @@ function VisualizationsSection(): ReactElement {
         label="DVD production studio"
         value={state.dvdStudioName}
         onSave={setDvdStudioName}
+      />
+      <AutoSaveTextInput
+        label="Art gallery name"
+        value={state.artGalleryName}
+        onSave={setArtGalleryName}
       />
     </Stack>
   )

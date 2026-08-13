@@ -84,8 +84,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Duplicates View
 
-1. We need the Duplicates view to be more actionable. I need to be able to see at a glance the full filepath of each photo, filename, and date modified. I should be able to take actions -- delete one of the photos, dismiss the duplicate (some duplicates are okay), or show the photo in explorer/finder. And I should be able to spacebar-preview the thumbnails.
-
 ## Codebase
 
 1. Storybook or env config? Need a way to preview things without affecting data.

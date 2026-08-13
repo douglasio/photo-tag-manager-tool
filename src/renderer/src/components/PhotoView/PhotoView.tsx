@@ -1,9 +1,12 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react'
 
-import { ActionIcon, Box, Container, Flex, Group, Image, Portal, Tooltip } from '@mantine/core'
+import type { UsePannableZoomResult } from '@hooks'
+import { ActionIcon, Box, Container, Flex, Group, Image, Tooltip } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import {
+  IconArmchair,
   IconArticle,
+  IconFrame,
   IconMovie,
   IconNews,
   IconRotate,
@@ -20,8 +23,10 @@ import { toFileProtocolUrl } from '@shared/protocolUrls'
 import { type PhotoRecord, ROTATABLE_FORMATS, type RotateDirection } from '@shared/types'
 import { type PhotoVisualization, usePhotoLibrary } from '@state'
 
+import { ArtGalleryView } from './ArtGalleryView'
 import { DvdCoverView } from './DvdCoverView'
 import { MagazineCoverView } from './MagazineCoverView'
+import { MovieTheaterView } from './MovieTheaterView'
 import { NewspaperCoverView } from './NewspaperCoverView'
 
 // 0.5 (not 1) so zooming out can go beyond the fitted size, matching
@@ -78,29 +83,21 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   const magazineZoom = usePannableZoom(photo, { defaultFit: 'cover' })
   const newspaperZoom = usePannableZoom(photo, { defaultFit: 'cover' })
   const dvdZoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  const artGalleryZoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  const movieTheaterZoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  // One lookup instead of a growing ternary chain for the ZoomToolbar below
+  // — every non-'none' visualization shares the exact same zoom shape.
+  const visualizationZooms: Record<Exclude<PhotoVisualization, 'none'>, UsePannableZoomResult> = {
+    magazine: magazineZoom,
+    newspaper: newspaperZoom,
+    dvd: dvdZoom,
+    artGallery: artGalleryZoom,
+    movieTheater: movieTheaterZoom
+  }
   // Read once at mount via lazy initializer — this instance is fresh per photo.
   const [enterDirection] = useState(() => consumeNavDirection(photo.filePath))
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
-  // Tracks the whole PhotoView pane's own box (tabs above, details panel to
-  // the right already excluded by AppShell's layout) so the Portal-rendered
-  // exit button below can be pinned to ITS actual top-right corner rather
-  // than a guessed viewport offset.
-  const paneRef = useRef<HTMLDivElement>(null)
-  const [paneCorner, setPaneCorner] = useState<{ top: number; right: number } | null>(null)
-  useEffect(() => {
-    if (visualization === 'none') return
-    const el = paneRef.current
-    if (!el) return
-    const updateCorner = (): void => {
-      const rect = el.getBoundingClientRect()
-      setPaneCorner({ top: rect.top, right: window.innerWidth - rect.right })
-    }
-    updateCorner()
-    const observer = new ResizeObserver(updateCorner)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [visualization])
   const canRotate = ROTATABLE_FORMATS.includes(photo.metadata.format)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -313,53 +310,31 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   ])
 
   return (
-    <Container ref={paneRef} fluid pos="relative" flex={1} mih={0} miw={0} h="100%">
+    <Container fluid pos="relative" flex={1} mih={0} miw={0} h="100%">
       {visualization !== 'none' ? (
-        <>
-          {visualization === 'magazine' ? (
-            <MagazineCoverView
-              photo={photo}
-              zoom={magazineZoom}
-              mastheadTitle={state.magazineTitle}
-            />
-          ) : visualization === 'newspaper' ? (
-            <NewspaperCoverView
-              photo={photo}
-              zoom={newspaperZoom}
-              mastheadTitle={state.newspaperTitle}
-            />
-          ) : (
-            <DvdCoverView photo={photo} zoom={dvdZoom} studioName={state.dvdStudioName} />
-          )}
-          {/* AppShell's Header/Navbar/Aside are all position:fixed with
-              their own z-index tier, which can sit above ordinary absolutely
-              positioned content in Main regardless of DOM order — a Portal
-              (rendered straight to document.body, same as the drag preview
-              in App.tsx and the trigger+hover preview in PhotoThumbnail.tsx)
-              plus the app's own "definitely on top" z-index token sidesteps
-              that entirely instead of trying to out-stack it locally.
-              Positioned from paneCorner (this pane's own measured
-              top-right), so it lands exactly where the tab row and details
-              panel edge intersect rather than a guessed offset. */}
-          {paneCorner && (
-            <Portal>
-              <Tooltip label="Standard view">
-                <ActionIcon
-                  variant="filled"
-                  size="lg"
-                  pos="fixed"
-                  top={paneCorner.top + 8}
-                  right={paneCorner.right + 8}
-                  style={{ zIndex: 'var(--mantine-z-index-max)' }}
-                  aria-label="Exit visualization view"
-                  onClick={() => setVisualization('none')}
-                >
-                  <IconX size={20} />
-                </ActionIcon>
-              </Tooltip>
-            </Portal>
-          )}
-        </>
+        visualization === 'magazine' ? (
+          <MagazineCoverView
+            photo={photo}
+            zoom={magazineZoom}
+            mastheadTitle={state.magazineTitle}
+          />
+        ) : visualization === 'newspaper' ? (
+          <NewspaperCoverView
+            photo={photo}
+            zoom={newspaperZoom}
+            mastheadTitle={state.newspaperTitle}
+          />
+        ) : visualization === 'dvd' ? (
+          <DvdCoverView photo={photo} zoom={dvdZoom} studioName={state.dvdStudioName} />
+        ) : visualization === 'artGallery' ? (
+          <ArtGalleryView photo={photo} zoom={artGalleryZoom} galleryName={state.artGalleryName} />
+        ) : (
+          <MovieTheaterView
+            photo={photo}
+            zoom={movieTheaterZoom}
+            studioName={state.dvdStudioName}
+          />
+        )
       ) : (
         <Container
           ref={containerRef}
@@ -500,41 +475,38 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
               <IconMovie size={18} />
             </ActionIcon>
           </Tooltip>
+          <Tooltip label="Art gallery">
+            <ActionIcon
+              variant={visualization === 'artGallery' ? 'filled' : 'default'}
+              aria-label="Art gallery visualization"
+              onClick={() => setVisualization('artGallery')}
+            >
+              <IconFrame size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Movie theater">
+            <ActionIcon
+              variant={visualization === 'movieTheater' ? 'filled' : 'default'}
+              aria-label="Movie theater visualization"
+              onClick={() => setVisualization('movieTheater')}
+            >
+              <IconArmchair size={18} />
+            </ActionIcon>
+          </Tooltip>
+          {visualization !== 'none' && (
+            <Tooltip label="Standard view">
+              <ActionIcon
+                variant="filled"
+                color="red"
+                aria-label="Exit visualization view"
+                onClick={() => setVisualization('none')}
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Tooltip>
+          )}
         </Group>
-        {visualization === 'magazine' ? (
-          <ZoomToolbar
-            scale={magazineZoom.scale}
-            onScaleChange={magazineZoom.setScale}
-            onZoomToFit={magazineZoom.zoomToFit}
-            onZoomToNativeSize={magazineZoom.zoomToNativeSize}
-            onZoomOut={magazineZoom.zoomOut}
-            onZoomIn={magazineZoom.zoomIn}
-            min={magazineZoom.min}
-            max={magazineZoom.max}
-          />
-        ) : visualization === 'newspaper' ? (
-          <ZoomToolbar
-            scale={newspaperZoom.scale}
-            onScaleChange={newspaperZoom.setScale}
-            onZoomToFit={newspaperZoom.zoomToFit}
-            onZoomToNativeSize={newspaperZoom.zoomToNativeSize}
-            onZoomOut={newspaperZoom.zoomOut}
-            onZoomIn={newspaperZoom.zoomIn}
-            min={newspaperZoom.min}
-            max={newspaperZoom.max}
-          />
-        ) : visualization === 'dvd' ? (
-          <ZoomToolbar
-            scale={dvdZoom.scale}
-            onScaleChange={dvdZoom.setScale}
-            onZoomToFit={dvdZoom.zoomToFit}
-            onZoomToNativeSize={dvdZoom.zoomToNativeSize}
-            onZoomOut={dvdZoom.zoomOut}
-            onZoomIn={dvdZoom.zoomIn}
-            min={dvdZoom.min}
-            max={dvdZoom.max}
-          />
-        ) : (
+        {visualization === 'none' ? (
           <ZoomToolbar
             scale={scale}
             onScaleChange={setScale}
@@ -544,6 +516,17 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
             onZoomIn={() => setScale((prev) => clampScale(prev + SCALE_STEP))}
             min={MIN_SCALE}
             max={MAX_SCALE}
+          />
+        ) : (
+          <ZoomToolbar
+            scale={visualizationZooms[visualization].scale}
+            onScaleChange={visualizationZooms[visualization].setScale}
+            onZoomToFit={visualizationZooms[visualization].zoomToFit}
+            onZoomToNativeSize={visualizationZooms[visualization].zoomToNativeSize}
+            onZoomOut={visualizationZooms[visualization].zoomOut}
+            onZoomIn={visualizationZooms[visualization].zoomIn}
+            min={visualizationZooms[visualization].min}
+            max={visualizationZooms[visualization].max}
           />
         )}
       </Flex>

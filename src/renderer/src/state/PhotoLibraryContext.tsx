@@ -62,7 +62,8 @@ export type NavigationDirection = 'left' | 'right'
 // PhotoView's visualization mode ('none' = standard view). Lives here (not
 // just as PhotoView-local state) so it can be threaded across arrow-key
 // navigation below, which remounts a fresh PhotoView per photo.
-export type PhotoVisualization = 'none' | 'magazine' | 'newspaper' | 'dvd'
+export type PhotoVisualization =
+  'none' | 'magazine' | 'newspaper' | 'dvd' | 'artGallery' | 'movieTheater'
 
 // One entry per open tab in display order — either a single photo or a
 // compare set (2-4 photos), resolved from state.openTabs/compareTabs against
@@ -148,6 +149,7 @@ interface PhotoLibraryContextValue {
   setMagazineTitle: (value: string) => void
   setNewspaperTitle: (value: string) => void
   setDvdStudioName: (value: string) => void
+  setArtGalleryName: (value: string) => void
   setExcludePatterns: (patterns: string[]) => Promise<void>
   updateTags: (filePath: string, tags: string[]) => Promise<void>
   setTagDescription: (tag: string, description: string) => Promise<void>
@@ -432,6 +434,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getDvdStudioName().then((value) => {
       dispatch({ type: 'SET_DVD_STUDIO_NAME', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getArtGalleryName().then((value) => {
+      dispatch({ type: 'SET_ART_GALLERY_NAME', value })
     })
   }, [])
 
@@ -1203,6 +1211,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setDvdStudioName(value)
   }, [])
 
+  const setArtGalleryName = useCallback((value: string) => {
+    dispatch({ type: 'SET_ART_GALLERY_NAME', value })
+    void window.api.setArtGalleryName(value)
+  }, [])
+
   // Persists the patterns, then rescans every folder so the library itself
   // (not just future filesystem events) reflects the change — files/folders
   // newly matched get pruned out, anything un-excluded gets picked back up.
@@ -1480,6 +1493,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setMagazineTitle,
     setNewspaperTitle,
     setDvdStudioName,
+    setArtGalleryName,
     setExcludePatterns,
     updateTags,
     setTagDescription,

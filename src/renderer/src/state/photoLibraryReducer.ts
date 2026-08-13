@@ -84,6 +84,7 @@ export interface PhotoLibraryState {
   magazineTitle: string
   newspaperTitle: string
   dvdStudioName: string
+  artGalleryName: string
   excludePatterns: string[]
   // Folders (and their subfolders) excluded from tags, AI features,
   // duplicate detection, Time Warp, and dashboard widgets — still fully
@@ -141,6 +142,7 @@ export const initialState: PhotoLibraryState = {
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
   dvdStudioName: 'TAG ME PICTURES',
+  artGalleryName: 'The Tag Me Gallery',
   excludePatterns: [],
   excludedFolders: [],
   tagDescriptions: new Map(),
@@ -187,6 +189,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
   | { type: 'SET_DVD_STUDIO_NAME'; value: string }
+  | { type: 'SET_ART_GALLERY_NAME'; value: string }
   | { type: 'TAGS_ASSIGNED'; tags: string[] }
   | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
   | { type: 'SET_EXCLUDED_FOLDERS'; folders: string[] }
@@ -526,6 +529,8 @@ export function photoLibraryReducer(
       return { ...state, newspaperTitle: action.value }
     case 'SET_DVD_STUDIO_NAME':
       return { ...state, dvdStudioName: action.value }
+    case 'SET_ART_GALLERY_NAME':
+      return { ...state, artGalleryName: action.value }
     // Newest-first, deduped, capped — an already-listed tag moves to the
     // front instead of duplicating.
     case 'TAGS_ASSIGNED': {

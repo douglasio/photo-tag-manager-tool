@@ -5,6 +5,7 @@ import { dirname, join } from 'path'
 import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
   getAiTagSuggestionsEnabled,
+  getArtGalleryName,
   getDefaultView,
   getDetailsPanelCollapsed,
   getDvdStudioName,
@@ -23,6 +24,7 @@ import {
   getShowViewCounts,
   getTagsPanelGridView,
   setAiTagSuggestionsEnabled,
+  setArtGalleryName,
   setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
@@ -161,6 +163,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setDvdStudioName', (_event, value: string): void => {
     setDvdStudioName(value)
+  })
+
+  ipcMain.handle('settings:getArtGalleryName', (): string => getArtGalleryName())
+
+  ipcMain.handle('settings:setArtGalleryName', (_event, value: string): void => {
+    setArtGalleryName(value)
   })
 
   ipcMain.handle('settings:getNavbarSplitSizes', (): [number, number] | null =>

@@ -9,6 +9,7 @@ import '@fontsource/playfair-display/400-italic.css'
 import '@fontsource/playfair-display/700.css'
 import '@fontsource/playfair-display/900.css'
 import '@fontsource/anton'
+import '@fontsource/unifrakturmaguntia'
 import './assets/main.css'
 
 import { StrictMode } from 'react'

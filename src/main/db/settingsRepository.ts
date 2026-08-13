@@ -194,6 +194,7 @@ export function setExcludedFolders(folders: string[]): void {
 const DEFAULT_MAGAZINE_TITLE = 'TAG ME'
 const DEFAULT_NEWSPAPER_TITLE = 'The Tag Me Times'
 const DEFAULT_DVD_STUDIO_NAME = 'TAG ME PICTURES'
+const DEFAULT_ART_GALLERY_NAME = 'The Tag Me Gallery'
 
 export function getMagazineTitle(): string {
   return getSetting('magazineTitle') ?? DEFAULT_MAGAZINE_TITLE
@@ -217,6 +218,14 @@ export function getDvdStudioName(): string {
 
 export function setDvdStudioName(value: string): void {
   setSetting('dvdStudioName', value)
+}
+
+export function getArtGalleryName(): string {
+  return getSetting('artGalleryName') ?? DEFAULT_ART_GALLERY_NAME
+}
+
+export function setArtGalleryName(value: string): void {
+  setSetting('artGalleryName', value)
 }
 
 export function getNavbarSplitSizes(): [number, number] | null {
