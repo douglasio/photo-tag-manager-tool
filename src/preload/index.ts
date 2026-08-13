@@ -52,6 +52,10 @@ const api = {
     ipcRenderer.invoke('photo:moveToFolder', filePaths, destFolder),
   onMoveProgress: (callback: (payload: MoveProgressEvent) => void): (() => void) =>
     subscribe('photo:moveProgress', callback),
+  // Resolves with only the paths actually deleted — a partial batch failure
+  // isn't thrown, since the caller still needs to know which ones landed.
+  deletePhotos: (filePaths: string[]): Promise<string[]> =>
+    ipcRenderer.invoke('photo:delete', filePaths),
   getGalleryCellWidth: (): Promise<number | null> =>
     ipcRenderer.invoke('settings:getGalleryCellWidth'),
   setGalleryCellWidth: (width: number): Promise<void> =>

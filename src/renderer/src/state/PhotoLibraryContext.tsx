@@ -111,6 +111,7 @@ interface PhotoLibraryContextValue {
   removeTagsFromSelection: (tags: string[]) => Promise<void>
   removeTagsFromPhotos: (tags: string[], filePaths: string[]) => Promise<void>
   movePhotosToFolder: (filePaths: string[], destFolder: string) => Promise<void>
+  deletePhotos: (filePaths: string[]) => Promise<void>
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
@@ -635,6 +636,24 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     },
     [state.selectedPath, state.selectedPaths]
   )
+
+  // Moves each file to the OS trash (main process) then reuses PHOTO_REMOVED
+  // for cleanup — same reducer case the watcher's own unlink detection
+  // dispatches, so selection/open-tab/folder-count bookkeeping isn't
+  // duplicated here.
+  const deletePhotos = useCallback(async (filePaths: string[]) => {
+    if (filePaths.length === 0) return
+    const deleted = await window.api.deletePhotos(filePaths)
+    for (const filePath of deleted) {
+      dispatch({ type: 'PHOTO_REMOVED', filePath })
+    }
+    if (deleted.length < filePaths.length) {
+      notifications.show({
+        color: 'red',
+        message: `Failed to delete ${pluralize(filePaths.length - deleted.length, 'photo')}`
+      })
+    }
+  }, [])
 
   const updateTags = useCallback(
     async (filePath: string, tags: string[]) => {
@@ -1424,6 +1443,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     removeTagsFromSelection,
     removeTagsFromPhotos,
     movePhotosToFolder,
+    deletePhotos,
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,

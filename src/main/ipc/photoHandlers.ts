@@ -1,10 +1,16 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { copyFile, rename, stat, unlink } from 'fs/promises'
 import { basename, dirname, extname, join } from 'path'
 
-import { findByPath, incrementViewCount, renamePhotoPath } from '@main/db/photoRepository'
+import {
+  findByPath,
+  incrementViewCount,
+  removePhoto,
+  renamePhotoPath
+} from '@main/db/photoRepository'
 import { rotatePhoto, writeComment, writeDateTaken } from '@main/services/metadataService'
 import { ingestFile } from '@main/services/photoIngest'
+import { deleteThumbnail } from '@main/services/thumbnailService'
 import { suppressNextEvent } from '@main/services/watchManager'
 import type { MoveProgressEvent, PhotoRecord, RotateDirection } from '@shared/types'
 
@@ -144,4 +150,26 @@ export function registerPhotoHandlers(): void {
       return { moved, skipped }
     }
   )
+
+  // Moves each file to the OS trash (recoverable, unlike a hard unlink) —
+  // suppressed the same way rename/move are, so the deletion is handled
+  // here rather than round-tripping through the watcher's unlink event.
+  // Continues past a single failure so one bad path doesn't block the rest
+  // of a multi-select delete.
+  ipcMain.handle('photo:delete', async (_event, filePaths: string[]): Promise<string[]> => {
+    const deleted: string[] = []
+    for (const filePath of filePaths) {
+      suppressNextEvent(filePath)
+      try {
+        await shell.trashItem(filePath)
+      } catch (err) {
+        console.error(`failed to delete ${filePath}`, err)
+        continue
+      }
+      const thumbnailKey = removePhoto(filePath)
+      if (thumbnailKey) await deleteThumbnail(thumbnailKey)
+      deleted.push(filePath)
+    }
+    return deleted
+  })
 }

@@ -56,6 +56,7 @@ function createMockApi(): {
     incrementPhotoView: vi.fn(),
     movePhotosToFolder: vi.fn(),
     onMoveProgress: onMethod('onMoveProgress'),
+    deletePhotos: vi.fn().mockResolvedValue([]),
     getGalleryCellWidth: vi.fn().mockResolvedValue(null),
     setGalleryCellWidth: vi.fn().mockResolvedValue(undefined),
     getGallerySort: vi.fn().mockResolvedValue(null),
@@ -684,6 +685,46 @@ describe('PhotoLibraryContext', () => {
       await act(() => result.current.rotatePhoto('/a.jpg', 'right'))
       expect(mockApi.rotatePhoto).toHaveBeenCalledWith('/a.jpg', 'right')
       expect(result.current.photos.some((p) => p.filePath === '/a.jpg')).toBe(true)
+    })
+  })
+
+  describe('deletePhotos', () => {
+    async function seedTwoPhotos(): Promise<ReturnType<typeof setup>> {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const hook = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [makePhoto('/root/a.jpg'), makePhoto('/root/b.jpg')]
+        })
+      })
+      return hook
+    }
+
+    it('removes every deleted photo from state', async () => {
+      mockApi.deletePhotos.mockResolvedValue(['/root/a.jpg', '/root/b.jpg'])
+      const { result } = await seedTwoPhotos()
+
+      await act(() => result.current.deletePhotos(['/root/a.jpg', '/root/b.jpg']))
+
+      expect(mockApi.deletePhotos).toHaveBeenCalledWith(['/root/a.jpg', '/root/b.jpg'])
+      expect(result.current.photos).toEqual([])
+    })
+
+    it('only removes the paths the main process actually deleted', async () => {
+      mockApi.deletePhotos.mockResolvedValue(['/root/a.jpg'])
+      const { result } = await seedTwoPhotos()
+
+      await act(() => result.current.deletePhotos(['/root/a.jpg', '/root/b.jpg']))
+
+      expect(result.current.photos.map((p) => p.filePath)).toEqual(['/root/b.jpg'])
+    })
+
+    it('does nothing for an empty selection', async () => {
+      const { result } = setup()
+      await act(() => result.current.deletePhotos([]))
+      expect(mockApi.deletePhotos).not.toHaveBeenCalled()
     })
   })
 })

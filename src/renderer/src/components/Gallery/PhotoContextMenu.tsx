@@ -1,15 +1,17 @@
 import { type ReactElement, type ReactNode, useState } from 'react'
 
-import { Box, Menu, MultiSelect } from '@mantine/core'
+import { Box, Menu, MultiSelect, Text } from '@mantine/core'
 import {
   IconEdit,
   IconExternalLink,
   IconFolderOpen,
   IconRotate,
   IconRotateClockwise,
-  IconTag
+  IconTag,
+  IconTrash
 } from '@tabler/icons-react'
 
+import { ConfirmDialog } from '@components'
 import { type PhotoRecord, ROTATABLE_FORMATS } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { isMac } from '@utils'
@@ -25,10 +27,20 @@ export function PhotoContextMenu({
   onRename,
   children
 }: PhotoContextMenuProps): ReactElement {
-  const { openPhotoTab, allTags, updateTags, selectPhoto, addTagsToSelection, rotatePhoto, state } =
-    usePhotoLibrary()
+  const {
+    openPhotoTab,
+    allTags,
+    updateTags,
+    selectPhoto,
+    addTagsToSelection,
+    rotatePhoto,
+    deletePhotos,
+    state
+  } = usePhotoLibrary()
   const [opened, setOpened] = useState(false)
   const [addingTag, setAddingTag] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const canRotate = ROTATABLE_FORMATS.includes(photo.metadata.format)
 
   // Right-clicking a photo that's part of the active multi-selection (2+
@@ -44,6 +56,18 @@ export function PhotoContextMenu({
       return
     }
     if (!state.selectedPaths.has(photo.filePath)) selectPhoto(photo.filePath)
+  }
+
+  const deleteTargets = isBatch ? Array.from(state.selectedPaths) : [photo.filePath]
+
+  const handleDeleteConfirm = async (): Promise<void> => {
+    setDeleting(true)
+    try {
+      await deletePhotos(deleteTargets)
+      setConfirmingDelete(false)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -123,9 +147,35 @@ export function PhotoContextMenu({
                 </Menu.Item>
               </>
             )}
+            <Menu.Divider />
+            <Menu.Item
+              color="red"
+              leftSection={<IconTrash size={14} />}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              {isBatch ? `Delete ${state.selectedPaths.size} Photos` : 'Delete'}
+            </Menu.Item>
           </>
         )}
       </Menu.Dropdown>
+      <ConfirmDialog
+        title={isBatch ? `Delete ${deleteTargets.length} photos?` : 'Delete photo?'}
+        opened={confirmingDelete}
+        saving={deleting}
+        confirmLabel="Delete"
+        confirmColor="red"
+        onConfirm={() => void handleDeleteConfirm()}
+        onCancel={() => setConfirmingDelete(false)}
+      >
+        <Text>
+          {isBatch
+            ? `This moves ${deleteTargets.length} photos to the trash.`
+            : `This moves "${photo.fileName}" to the trash.`}
+        </Text>
+        <Text c="dimmed" mt="xs">
+          You can restore {isBatch ? 'them' : 'it'} from your system&apos;s trash if needed.
+        </Text>
+      </ConfirmDialog>
     </Menu>
   )
 }
