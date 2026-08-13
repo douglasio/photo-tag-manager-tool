@@ -283,41 +283,6 @@ function TagListItem({
   )
 }
 
-interface UntaggedRowProps {
-  count: number
-  isActive: boolean
-  onSelect: () => void
-}
-
-// Pseudo-tag entry for photos with no tags at all — deliberately simpler
-// than TagListItem (no rename, drag, or cover photo; nothing to drag a tag
-// into, and no cover thumbnail makes sense for a set that spans every photo
-// without a tag).
-function UntaggedRow({ count, isActive, onSelect }: UntaggedRowProps): ReactElement {
-  const { hovered, ref } = useHover<HTMLButtonElement>()
-  return (
-    <Button
-      ref={ref}
-      onClick={onSelect}
-      fullWidth
-      h="auto"
-      ml={-3}
-      py="xs"
-      justify="space-between"
-      variant="transparent"
-      bg={activeHoverBackground(isActive, hovered)}
-      // leftSection={<IconTagOff size={16} />}
-      rightSection={
-        <Badge size="md" variant={isActive ? 'filled' : 'light'}>
-          {count}
-        </Badge>
-      }
-    >
-      <Text>Untagged</Text>
-    </Button>
-  )
-}
-
 interface TagGroupSectionProps {
   // null renders the synthetic "Other Tags" section — no rename/delete,
   // never removed itself, just whatever isn't in a real group.
@@ -447,32 +412,11 @@ function TagGroupSection({
 }
 
 export function TagPanel(): ReactElement {
-  const {
-    allTags,
-    tagCounts,
-    tagCoverPhotos,
-    untaggedCount,
-    state,
-    setTagFilter,
-    setUntaggedFilter,
-    renameTag
-  } = usePhotoLibrary()
+  const { allTags, tagCounts, tagCoverPhotos, state, setTagFilter, renameTag } = usePhotoLibrary()
   const [editingTag, setEditingTag] = useState<string | null>(null)
 
-  const untaggedEntry = untaggedCount > 0 && (
-    <UntaggedRow
-      count={untaggedCount}
-      isActive={state.untaggedFilterActive}
-      onSelect={() => setUntaggedFilter(!state.untaggedFilterActive)}
-    />
-  )
-
   if (allTags.length === 0) {
-    return untaggedEntry ? (
-      <Stack gap={0}>{untaggedEntry}</Stack>
-    ) : (
-      <Text c="dimmed">No tags yet.</Text>
-    )
+    return <Text c="dimmed">No tags yet.</Text>
   }
 
   const renderTagRow = (tag: string): ReactElement => {
@@ -529,7 +473,6 @@ export function TagPanel(): ReactElement {
   if (state.tagGroups.length === 0) {
     return (
       <PanelSection title="Tags" headerAction={headerAction}>
-        {untaggedEntry}
         {renderTags(allTags)}
       </PanelSection>
     )
@@ -540,7 +483,6 @@ export function TagPanel(): ReactElement {
 
   return (
     <PanelSection title="Tags" headerAction={headerAction}>
-      {untaggedEntry}
       <Accordion multiple defaultValue={[...state.tagGroups.map((group) => group.id), '__other__']}>
         {state.tagGroups.map((group) => (
           <TagGroupSection

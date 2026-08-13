@@ -15,7 +15,7 @@ export function AllPhotosRow(): ReactElement {
     state.selectedFolder === null && state.selectedTag === null && !state.untaggedFilterActive
 
   return (
-    <Box p="md" style={{ flexShrink: 0 }}>
+    <Box px="md" py="xs" style={{ flexShrink: 0 }}>
       <Button
         ref={ref}
         onClick={() => setFolderFilter(null)}

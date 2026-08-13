@@ -59,7 +59,8 @@ import {
   SortableTab,
   StartupLoadingScreen,
   TabLabel,
-  TagPanel
+  TagPanel,
+  UntaggedRow
 } from '@components'
 import { RADIUS_SIZE } from '@renderer/theme'
 import { ACTION_ICONS } from '@renderer/utils'
@@ -511,6 +512,7 @@ function AppLayout(): React.JSX.Element {
           </AppShell.Header>
           <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
             <AppShell.Section component={AllPhotosRow} />
+            <AppShell.Section component={UntaggedRow} />
             <Divider />
             <AppShell.Section grow mih={0} display="flex" style={{ flexDirection: 'column' }}>
               <Splitter
