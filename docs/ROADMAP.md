@@ -16,19 +16,17 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Corrupt photo finder
 
-5. I want a global way to "ignore" a folder from appearing in the various features, including AI features. Ex. If there's a folder called "test", I should be able to right click it in the folder tree and say "Exclude from features" or something like that. In that case, it should not show up basically anywhere except if the folder is navigated to directly., All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab.
+5. I want a global way to "ignore" a folder from appearing in the various features, including AI features. Ex. If there's a folder called "test", I should be able to right click it in the folder tree and say "Exclude from features" or something like that. Let's nail down the exact wording that would make sense to users. If they mark a folder as ignored, it should not show up basically anywhere except in the folder tree. Photos within it should not show up in tags, be factored into tag suggestions, timeline, featured widgets, duplicates, etc. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab where they can be un-ignored.
+
+6. Search -- implement spotlight search. searchable fields should include tags, filename, comments. As a future enhancement, maybe an AI-based search that can match to photo contents or faces.
 
 ## AI
 
-- Face detection?
+1. Face detection?
 
-- Disabling AI should actually uninstall the models, not just hide the features from the UI.
+2. Disabling AI should actually uninstall the models, not just hide the features from the UI.
 
-- There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
-
-## Navigation
-
-1. Truncate photo filenames in the tabs so more can fit. Hovering over the tab should reveal the full filename as a tooltip.
+3. There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
 
 ## Dashboard
 
@@ -46,19 +44,19 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Contact sheet?
 
+5. Untagged view within folders - as the first item in the tags list at the top of each folder view in the gallery, can you add an "Untagged" filter -- a higher-contrast color than the other tags.
+
 ## Tools
 
 2. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.
 
 3. Reset view counts
 
-4. Export database
+4. Removing folders should not delete photo data
 
-5. Removing folders should not delete photo data
+5. Collage?
 
-6. Collage?
-
-7. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
+6. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
 
 ## Tags
 
@@ -86,15 +84,11 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
-2. Clean up AI enable flag UX
-
-3. Export db, clear db
-
 ## Optimization
 
 ## Duplicates View
 
-1. Add actions like delete, merge, show in folder, etc.
+1. We need the Duplicates view to be more actionable. I need to be able to see at a glance the full filepath of each photo, filename, and date modified. I should be able to take actions -- delete one of the photos, dismiss the duplicate (some duplicates are okay), or show the photo in explorer/finder. And I should be able to spacebar-preview the thumbnails.
 
 ## Codebase
 

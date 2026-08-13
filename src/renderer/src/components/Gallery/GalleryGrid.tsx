@@ -312,7 +312,7 @@ export function GalleryGrid(): ReactElement {
         ref={containerRef}
         flex={1}
         miw={0}
-        style={{ overflow: folderSections ? 'auto' : 'hidden' }}
+        style={{ overflow: 'hidden' }}
         onClick={(event) => {
           // Only clears on a direct click here (not bubbled from a
           // thumbnail) — the usual "click empty space to deselect" convention.
@@ -338,6 +338,9 @@ export function GalleryGrid(): ReactElement {
             rootFolder={state.selectedFolder!}
             sections={folderSections}
             photosBySection={photosBySection}
+            cellHeight={cellHeight}
+            width={size.width}
+            height={size.height}
           />
         ) : (
           // Pinned to the debounced size (not 100%) — react-window's Grid

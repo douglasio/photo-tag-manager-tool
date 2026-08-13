@@ -63,6 +63,9 @@ function renderSections(sections: string[], photosBySection: Map<string, PhotoRe
         sections={sections}
         photosBySection={photosBySection}
         columnCount={4}
+        cellHeight={200}
+        width={800}
+        height={2000}
         {...thumbnailProps}
       />
     </MantineProvider>
@@ -103,9 +106,10 @@ describe('GalleryFolderSections', () => {
   })
 
   it('smooth-scrolls to the target section when an ancestor crumb is clicked', async () => {
-    // jsdom doesn't implement scrollIntoView.
-    const scrollIntoView = vi.fn()
-    Element.prototype.scrollIntoView = scrollIntoView
+    // react-window's List scrolls its own outer scrollable element via
+    // scrollTo (jsdom stubs it as a no-op) rather than scrollIntoView.
+    const scrollTo = vi.fn()
+    Element.prototype.scrollTo = scrollTo
 
     const user = userEvent.setup()
     renderSections(
@@ -122,7 +126,9 @@ describe('GalleryFolderSections', () => {
     const rootCrumb = screen.getAllByText('root').find((el) => el.tagName === 'A')
     await user.click(rootCrumb!)
 
-    expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({ behavior: 'smooth', block: 'start' })
+    // "/root" is the first section, so scrolling to its header row (index 0,
+    // align "start") lands at a top offset of 0 regardless of row heights.
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith({ behavior: 'smooth', top: 0 })
   })
 
   it('separates sections with a divider, but not before the first one', () => {
@@ -135,5 +141,31 @@ describe('GalleryFolderSections', () => {
     )
 
     expect(document.querySelectorAll('[role="separator"]')).toHaveLength(1)
+  })
+
+  it('only mounts thumbnails near the viewport, not every photo in the subtree', () => {
+    // A single section with far more photos than a small viewport could ever
+    // show at once — the whole point of virtualizing this view instead of
+    // mounting every PhotoThumbnail (with its own dnd-kit/hover/library-state
+    // subscriptions) up front regardless of scroll position.
+    const photos = Array.from({ length: 500 }, (_, i) => makePhoto(`/root/${i}.jpg`))
+    render(
+      <MantineProvider>
+        <GalleryFolderSections
+          rootFolder="/root"
+          sections={['/root']}
+          photosBySection={new Map([['/root', photos]])}
+          columnCount={4}
+          cellHeight={200}
+          width={800}
+          height={300}
+          {...thumbnailProps}
+        />
+      </MantineProvider>
+    )
+
+    const mounted = screen.getAllByTestId('thumbnail').length
+    expect(mounted).toBeGreaterThan(0)
+    expect(mounted).toBeLessThan(photos.length)
   })
 })
