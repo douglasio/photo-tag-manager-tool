@@ -46,6 +46,10 @@ export interface PhotoRecord {
   // that build a PhotoRecord by hand don't all need updating; genuine
   // records from the DB always have it.
   firstSeenAt?: number
+  // The file's filesystem last-modified time (epoch ms) — used by the
+  // Duplicates view's "date modified" column. Optional for the same reason
+  // as firstSeenAt above.
+  mtimeMs?: number
 }
 
 export interface ScanStartResult {

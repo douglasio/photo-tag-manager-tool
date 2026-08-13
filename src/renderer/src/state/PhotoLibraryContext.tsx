@@ -125,6 +125,7 @@ interface PhotoLibraryContextValue {
   setAiTagSuggestionsEnabled: (value: boolean) => void
   suggestTags: (filePath: string, candidateLabels: string[]) => Promise<TagSuggestion[]>
   findSimilarPhotos: (filePath: string, limit: number) => Promise<SimilarPhoto[]>
+  dismissDuplicateGroup: (filePaths: string[]) => Promise<void>
   openDuplicatesTab: () => void
   getThrowbackSimilarity: () => Promise<ThrowbackEntry[] | null>
   getThrowbackYearSample: () => Promise<ThrowbackYearSample | null>
@@ -1046,6 +1047,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     []
   )
 
+  const dismissDuplicateGroup = useCallback(
+    (filePaths: string[]) => window.api.dismissDuplicateGroup(filePaths),
+    []
+  )
+
   const openDuplicatesTab = useCallback(() => {
     dispatch({ type: 'OPEN_DUPLICATES_TAB' })
   }, [])
@@ -1457,6 +1463,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setAiTagSuggestionsEnabled,
     suggestTags,
     findSimilarPhotos,
+    dismissDuplicateGroup,
     openDuplicatesTab,
     getThrowbackSimilarity,
     getThrowbackYearSample,

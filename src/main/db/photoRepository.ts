@@ -48,7 +48,8 @@ function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
     // override this to true; a DB row read on its own isn't "from cache."
     fromCache: false,
     viewCount: row.viewCount,
-    firstSeenAt: row.firstSeenAt ?? undefined
+    firstSeenAt: row.firstSeenAt ?? undefined,
+    mtimeMs: row.mtimeMs
   }
 }
 

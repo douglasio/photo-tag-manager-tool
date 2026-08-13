@@ -57,6 +57,7 @@ function createMockApi(): {
     movePhotosToFolder: vi.fn(),
     onMoveProgress: onMethod('onMoveProgress'),
     deletePhotos: vi.fn().mockResolvedValue([]),
+    dismissDuplicateGroup: vi.fn().mockResolvedValue(undefined),
     getGalleryCellWidth: vi.fn().mockResolvedValue(null),
     setGalleryCellWidth: vi.fn().mockResolvedValue(undefined),
     getGallerySort: vi.fn().mockResolvedValue(null),
@@ -725,6 +726,14 @@ describe('PhotoLibraryContext', () => {
       const { result } = setup()
       await act(() => result.current.deletePhotos([]))
       expect(mockApi.deletePhotos).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('dismissDuplicateGroup', () => {
+    it('persists the dismissal via window.api', async () => {
+      const { result } = setup()
+      await act(() => result.current.dismissDuplicateGroup(['/root/a.jpg', '/root/b.jpg']))
+      expect(mockApi.dismissDuplicateGroup).toHaveBeenCalledWith(['/root/a.jpg', '/root/b.jpg'])
     })
   })
 })

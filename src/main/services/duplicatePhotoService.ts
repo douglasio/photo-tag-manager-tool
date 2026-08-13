@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 
+import { getDismissedDuplicateSignatures } from '@main/db/duplicateRepository'
 import { getAllEmbeddings } from '@main/db/embeddingRepository'
 import type {
   ClusterInputPhoto,
@@ -8,6 +9,7 @@ import type {
   WorkerResponse
 } from '@main/workers/duplicateClusterProtocol'
 import { rejectAllPending } from '@main/workers/pendingRequests'
+import { computeDuplicateGroupSignature } from '@shared/duplicateGroupSignature'
 import type { DuplicateGroup, SimilarPhoto } from '@shared/types'
 
 import { cosineSimilarity } from './embeddingSimilarity'
@@ -87,7 +89,17 @@ export async function clusterDuplicates(
   }
 
   try {
-    return await resultPromise
+    const result = await resultPromise
+    // Filtered here (the single point every clusterDuplicates caller flows
+    // through) rather than in each caller — a dismissed group stays hidden
+    // regardless of who requests a scan.
+    const dismissed = getDismissedDuplicateSignatures()
+    return {
+      ...result,
+      groups: result.groups.filter(
+        (group) => !dismissed.has(computeDuplicateGroupSignature(group.filePaths))
+      )
+    }
   } finally {
     if (cancelTimer) clearInterval(cancelTimer)
   }

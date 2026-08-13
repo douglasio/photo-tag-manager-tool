@@ -72,6 +72,17 @@ export function getDb(): Database.Database {
     )
   `)
 
+  // A dismissed duplicate group ("these aren't actually duplicates") is
+  // keyed by its own sorted, joined file paths — groups have no other stable
+  // ID since clustering recomputes them fresh every scan — so a rescan or
+  // app restart still knows to hide it.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS dismissed_duplicate_groups (
+      signature TEXT PRIMARY KEY,
+      dismissedAt INTEGER NOT NULL
+    )
+  `)
+
   const photoColumns = db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]
   if (!photoColumns.some((column) => column.name === 'comment')) {
     db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')

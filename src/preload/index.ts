@@ -90,6 +90,8 @@ const api = {
     subscribe('ai:scanProgress', callback),
   findSimilarPhotos: (filePath: string, limit: number): Promise<SimilarPhoto[]> =>
     ipcRenderer.invoke('ai:findSimilarPhotos', filePath, limit),
+  dismissDuplicateGroup: (filePaths: string[]): Promise<void> =>
+    ipcRenderer.invoke('ai:dismissDuplicateGroup', filePaths),
   getThrowbackSimilarity: (): Promise<ThrowbackEntry[] | null> =>
     ipcRenderer.invoke('throwback:getSimilarity'),
   getThrowbackYearSample: (): Promise<ThrowbackYearSample | null> =>

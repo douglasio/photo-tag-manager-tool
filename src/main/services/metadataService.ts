@@ -148,6 +148,7 @@ export async function readPhotoRecord(filePath: string): Promise<PhotoRecord> {
     thumbnailKey: null,
     scanError: null,
     fromCache: false,
-    viewCount: 0
+    viewCount: 0,
+    mtimeMs: fileStat.mtimeMs
   }
 }

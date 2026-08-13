@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 
+import { dismissDuplicateGroup } from '@main/db/duplicateRepository'
 import { findByPath } from '@main/db/photoRepository'
 import {
   cancelAiScan,
@@ -11,6 +12,7 @@ import { findSimilarPhotos } from '@main/services/duplicatePhotoService'
 import { suggestTagsByExemplar } from '@main/services/tagExemplarService'
 import { suggestTags } from '@main/services/tagSuggestionService'
 import { thumbnailFilePath } from '@main/services/thumbnailService'
+import { computeDuplicateGroupSignature } from '@shared/duplicateGroupSignature'
 import type { AiScanResult, SimilarPhoto, TagSuggestion } from '@shared/types'
 
 export function registerAiHandlers(): void {
@@ -66,4 +68,10 @@ export function registerAiHandlers(): void {
       return findSimilarPhotos(filePath, found.record.thumbnailKey, limit)
     }
   )
+
+  // Persists so the group stays hidden across rescans/restarts — clusterDuplicates
+  // filters against this same signature every time it runs.
+  ipcMain.handle('ai:dismissDuplicateGroup', (_event, filePaths: string[]): void => {
+    dismissDuplicateGroup(computeDuplicateGroupSignature(filePaths))
+  })
 }

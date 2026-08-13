@@ -21,6 +21,9 @@ const { mockGetAllEmbeddings, mockGetOrComputeEmbedding, workerTracker } = vi.ho
 })
 
 vi.mock('@main/db/embeddingRepository', () => ({ getAllEmbeddings: mockGetAllEmbeddings }))
+vi.mock('@main/db/duplicateRepository', () => ({
+  getDismissedDuplicateSignatures: vi.fn().mockReturnValue(new Set())
+}))
 vi.mock('./photoEmbedding', () => ({ getOrComputeEmbedding: mockGetOrComputeEmbedding }))
 vi.mock('worker_threads', () => ({
   // A regular function, not an arrow function — vi.fn()'s mock
@@ -31,6 +34,9 @@ vi.mock('worker_threads', () => ({
     return worker
   })
 }))
+
+import { getDismissedDuplicateSignatures } from '@main/db/duplicateRepository'
+import { computeDuplicateGroupSignature } from '@shared/duplicateGroupSignature'
 
 import {
   clusterDuplicates,
@@ -138,6 +144,29 @@ describe('clusterDuplicates', () => {
     })
     await expect(promise).resolves.toEqual({ groups: [], canceled: true })
     vi.useRealTimers()
+  })
+
+  it('filters out groups whose signature has been dismissed', async () => {
+    const dismissedSignature = computeDuplicateGroupSignature(['/a.jpg', '/b.jpg'])
+    vi.mocked(getDismissedDuplicateSignatures).mockReturnValueOnce(new Set([dismissedSignature]))
+
+    const promise = clusterDuplicates(makeEmbedded([['/a.jpg', [1, 0]]]))
+    const clusterMessage = workerTracker.current!.posted.find((m) => m.type === 'cluster')
+
+    workerTracker.current!.emit('message', {
+      type: 'result',
+      requestId: clusterMessage!.requestId,
+      groups: [
+        { filePaths: ['/a.jpg', '/b.jpg'], similarity: 1 },
+        { filePaths: ['/c.jpg', '/d.jpg'], similarity: 1 }
+      ],
+      canceled: false
+    })
+
+    await expect(promise).resolves.toEqual({
+      groups: [{ filePaths: ['/c.jpg', '/d.jpg'], similarity: 1 }],
+      canceled: false
+    })
   })
 
   it('disposeDuplicateClusterWorker terminates the worker and rejects pending requests', async () => {
