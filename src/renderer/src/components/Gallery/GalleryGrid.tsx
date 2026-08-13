@@ -66,7 +66,9 @@ export function GalleryGrid(): ReactElement {
     tagCounts,
     tagViewCounts,
     folderTags,
+    folderHasUntagged,
     setFolderTagFilter,
+    setFolderUntaggedFilter,
     renameFile,
     openCompareTab,
     openDuplicatesTab,
@@ -185,7 +187,7 @@ export function GalleryGrid(): ReactElement {
   const isPureTagView = state.selectedTag !== null && state.selectedFolder === null
 
   const galleryTitle = state.untaggedFilterActive
-    ? 'Untagged'
+    ? 'untagged'
     : isPureTagView
       ? `#${state.selectedTag}`
       : state.selectedFolder
@@ -297,9 +299,23 @@ export function GalleryGrid(): ReactElement {
               onSave={(description) => void setTagDescription(state.selectedTag!, description)}
             />
           )}
-          {state.selectedFolder && folderTags.length > 0 && (
+          {state.selectedFolder && (folderTags.length > 0 || folderHasUntagged) && (
             <Scroller mt="xs">
               <Pill.Group style={{ flexWrap: 'nowrap' }}>
+                {folderHasUntagged && (
+                  <Pill
+                    onClick={() => setFolderUntaggedFilter(!state.untaggedFilterActive)}
+                    bg={
+                      state.untaggedFilterActive
+                        ? 'var(--mantine-color-red-filled)'
+                        : 'var(--mantine-color-red-light)'
+                    }
+                    c={state.untaggedFilterActive ? 'var(--mantine-color-white)' : undefined}
+                    style={{ cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    untagged
+                  </Pill>
+                )}
                 {folderTags.map((tag) => {
                   const isActive = state.selectedTag === tag
                   return (

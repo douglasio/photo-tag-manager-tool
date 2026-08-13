@@ -46,7 +46,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 5. Untagged view within folders - as the first item in the tags list at the top of each folder view in the gallery, can you add an "Untagged" filter -- a higher-contrast color than the other tags.
 
-6. Delete -- photos in the gallery should be in the context menu in the gallery view with appropriate icon and coloring.
+6. Move the "untagged" button in the Tags view up under All Photos, so it's clear that it will show all untagged photos
+
+7. Delete -- photos in the gallery should be in the context menu in the gallery view with appropriate icon and coloring.
 
 ## Tools
 

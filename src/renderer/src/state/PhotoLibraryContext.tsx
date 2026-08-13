@@ -94,6 +94,7 @@ interface PhotoLibraryContextValue {
   tagViewCounts: Map<string, number>
   untaggedCount: number
   folderTags: string[]
+  folderHasUntagged: boolean
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   renameFolder: (folder: string, newBaseName: string) => Promise<void>
@@ -114,6 +115,7 @@ interface PhotoLibraryContextValue {
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
   setUntaggedFilter: (active: boolean) => void
+  setFolderUntaggedFilter: (active: boolean) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
@@ -686,6 +688,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_UNTAGGED_FILTER', active })
   }, [])
 
+  const setFolderUntaggedFilter = useCallback((active: boolean) => {
+    dispatch({ type: 'SET_FOLDER_UNTAGGED_FILTER', active })
+  }, [])
+
   const setTagDescription = useCallback(
     async (tag: string, description: string) => {
       const previous = state.tagDescriptions.get(tag) ?? ''
@@ -1218,6 +1224,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // Folder and tag filters stack rather than being mutually exclusive, so a
   // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
   // current folder instead of replacing it with a folder-agnostic tag view.
+  // Folder narrowing is applied before untagged/tag so both the global
+  // untagged view (no selectedFolder — SET_UNTAGGED_FILTER clears it) and
+  // the folder pill row's own "Untagged" entry (selectedFolder stays set —
+  // SET_FOLDER_UNTAGGED_FILTER) fall out of the same code path.
   const visiblePhotos = useMemo(() => {
     let result = photos
     if (!isViewingExcludedFolderDirectly) {
@@ -1225,11 +1235,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         (photo) => !isUnderExcludedFolder(photo.filePath, state.excludedFolders)
       )
     }
-    if (state.untaggedFilterActive) {
-      return result.filter((photo) => photo.tags.length === 0)
-    }
     if (state.selectedFolder) {
       result = result.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
+    }
+    if (state.untaggedFilterActive) {
+      return result.filter((photo) => photo.tags.length === 0)
     }
     if (state.selectedTag) {
       result = result.filter((photo) => photo.tags.includes(state.selectedTag!))
@@ -1343,9 +1353,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   // Tags found among photos in the currently selected folder (independent of
   // any active tag filter), used to render the folder's tag pills.
-  const folderTags = useMemo(() => {
-    if (!state.selectedFolder) return []
+  const { folderTags, folderHasUntagged } = useMemo(() => {
+    if (!state.selectedFolder) return { folderTags: [], folderHasUntagged: false }
     const tags = new Set<string>()
+    let hasUntagged = false
     for (const photo of photos) {
       if (!isPhotoInFolder(photo.filePath, state.selectedFolder!)) continue
       // An excluded subfolder's tags shouldn't leak into an ancestor
@@ -1357,9 +1368,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       ) {
         continue
       }
+      if (photo.tags.length === 0) hasUntagged = true
       for (const tag of photo.tags) tags.add(tag)
     }
-    return Array.from(tags).sort()
+    return { folderTags: Array.from(tags).sort(), folderHasUntagged: hasUntagged }
   }, [photos, state.selectedFolder, state.excludedFolders, isViewingExcludedFolderDirectly])
 
   // Resolved in openTabs order (not sorted) so tabs stay in the order they
@@ -1395,6 +1407,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     tagViewCounts,
     untaggedCount,
     folderTags,
+    folderHasUntagged,
     addFolder,
     removeFolder,
     renameFolder,
@@ -1415,6 +1428,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setTagFilter,
     setFolderTagFilter,
     setUntaggedFilter,
+    setFolderUntaggedFilter,
     setSort,
     setDefaultView,
     setShowEmptyFolders,

@@ -170,6 +170,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_UNTAGGED_FILTER'; active: boolean }
+  | { type: 'SET_FOLDER_UNTAGGED_FILTER'; active: boolean }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
@@ -484,6 +485,11 @@ export function photoLibraryReducer(
         selectedTag: null,
         selectedFolder: null
       }
+    // Like SET_FOLDER_TAG_FILTER, keeps selectedFolder intact — the folder
+    // pill row's own "Untagged" entry narrows within the folder rather than
+    // replacing it with the global (folder-agnostic) untagged view.
+    case 'SET_FOLDER_UNTAGGED_FILTER':
+      return { ...state, untaggedFilterActive: action.active, selectedTag: null }
     case 'SET_SORT':
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'SET_DEFAULT_VIEW':

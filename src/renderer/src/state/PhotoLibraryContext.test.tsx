@@ -434,6 +434,54 @@ describe('PhotoLibraryContext', () => {
       expect(result.current.state.selectedFolder).toBe('/root')
       expect(result.current.state.selectedTag).toBe('vacation')
     })
+
+    it('setFolderUntaggedFilter narrows within the folder without clearing it', () => {
+      const { result } = setup()
+      act(() => result.current.setFolderFilter('/root'))
+      act(() => result.current.setFolderUntaggedFilter(true))
+      expect(result.current.state.selectedFolder).toBe('/root')
+      expect(result.current.state.untaggedFilterActive).toBe(true)
+    })
+
+    it('setFolderUntaggedFilter clears any active tag filter', () => {
+      const { result } = setup()
+      act(() => result.current.setFolderFilter('/root'))
+      act(() => result.current.setFolderTagFilter('vacation'))
+      act(() => result.current.setFolderUntaggedFilter(true))
+      expect(result.current.state.selectedTag).toBeNull()
+    })
+  })
+
+  describe('folder pill row (folderTags/folderHasUntagged)', () => {
+    async function seedMixedFolder(): Promise<ReturnType<typeof setup>> {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const hook = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [
+            makePhoto('/root/a.jpg', { tags: ['vacation'] }),
+            makePhoto('/root/b.jpg', { tags: [] })
+          ]
+        })
+      })
+      return hook
+    }
+
+    it('reports folderHasUntagged when the folder has at least one untagged photo', async () => {
+      const { result } = await seedMixedFolder()
+      act(() => result.current.setFolderFilter('/root'))
+      expect(result.current.folderHasUntagged).toBe(true)
+      expect(result.current.folderTags).toEqual(['vacation'])
+    })
+
+    it("narrows visiblePhotos to the folder's untagged photos only", async () => {
+      const { result } = await seedMixedFolder()
+      act(() => result.current.setFolderFilter('/root'))
+      act(() => result.current.setFolderUntaggedFilter(true))
+      expect(result.current.visiblePhotos.map((p) => p.filePath)).toEqual(['/root/b.jpg'])
+    })
   })
 
   describe('excluded folders', () => {
