@@ -132,6 +132,7 @@ function CollageTile({
 export function FeaturedTagWidget(): ReactElement {
   const {
     state,
+    activePhotosByPath,
     tagCounts,
     allTags,
     openPhotoTab,
@@ -147,10 +148,10 @@ export function FeaturedTagWidget(): ReactElement {
   // session — see FeaturedSelection above for why the collage is locked in
   // here too, not derived fresh each render.
   const [selection, setSelection] = useState<FeaturedSelection | null>(() =>
-    pickSelection(tagCounts, allTags, state.photosByPath)
+    pickSelection(tagCounts, allTags, activePhotosByPath)
   )
   if (selection === null) {
-    const picked = pickSelection(tagCounts, allTags, state.photosByPath)
+    const picked = pickSelection(tagCounts, allTags, activePhotosByPath)
     if (picked) setSelection(picked)
   }
   const selectedTag = selection?.tag ?? null
@@ -161,9 +162,9 @@ export function FeaturedTagWidget(): ReactElement {
   const collagePhotos = useMemo(() => {
     if (!selection) return []
     return selection.photoPaths
-      .map((path) => state.photosByPath.get(path))
+      .map((path) => activePhotosByPath.get(path))
       .filter((photo): photo is PhotoRecord => photo != null)
-  }, [selection, state.photosByPath])
+  }, [selection, activePhotosByPath])
 
   const goToTag = (tag: string): void => {
     setTagFilter(tag)
@@ -225,7 +226,7 @@ export function FeaturedTagWidget(): ReactElement {
   // actually reflects real progress.
   const closestTagCount = tagCounts.size > 0 ? Math.max(...tagCounts.values()) : 0
   const stepsDone = [
-    state.photosByPath.size > 0,
+    activePhotosByPath.size > 0,
     closestTagCount >= 1,
     closestTagCount >= 2,
     closestTagCount >= 3

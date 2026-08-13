@@ -1,7 +1,18 @@
 import React, { type ReactElement, useState } from 'react'
 
-import { Button, Divider, Group, Stack, Table, TagsInput, Text } from '@mantine/core'
+import {
+  ActionIcon,
+  Button,
+  Divider,
+  Group,
+  Stack,
+  Table,
+  TagsInput,
+  Text,
+  Tooltip
+} from '@mantine/core'
 import { notifications } from '@mantine/notifications'
+import { IconEyeUp } from '@tabler/icons-react'
 
 import { ConfirmDialog, FolderRemoveButton } from '@components'
 import { usePhotoLibrary } from '@state'
@@ -38,6 +49,49 @@ function FoldersSection(): ReactElement {
       <Button onClick={() => void addFolder()} style={{ alignSelf: 'flex-start' }}>
         Add Folder…
       </Button>
+    </Stack>
+  )
+}
+
+function ExcludedFoldersSection(): ReactElement {
+  const { state, includeFolder } = usePhotoLibrary()
+
+  return (
+    <Stack>
+      <Text c="dimmed" size="sm">
+        Photos in these folders (and their subfolders) are hidden from tags, AI suggestions,
+        duplicate detection, and dashboard widgets.
+      </Text>
+      {state.excludedFolders.length === 0 ? (
+        <Text c="dimmed" size="sm">
+          No excluded folders.
+        </Text>
+      ) : (
+        <Table striped highlightOnHover layout="fixed" verticalSpacing="xs">
+          <Table.Tbody>
+            {state.excludedFolders.map((folder) => (
+              <Table.Tr key={folder}>
+                <Table.Td>
+                  <Text truncate="end" miw={0} title={folder}>
+                    {folder}
+                  </Text>
+                </Table.Td>
+                <Table.Td w={44}>
+                  <Tooltip label="Include in features">
+                    <ActionIcon
+                      size="md"
+                      onClick={() => void includeFolder(folder)}
+                      aria-label={`Include ${folder} in features`}
+                    >
+                      <IconEyeUp size="70%" />
+                    </ActionIcon>
+                  </Tooltip>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
     </Stack>
   )
 }
@@ -180,6 +234,7 @@ export function DataSection(): ReactElement {
 
 const sections = [
   { label: 'Folders', component: <FoldersSection /> },
+  { label: 'Excluded Folders', component: <ExcludedFoldersSection /> },
   { label: 'Exclude Patterns', component: <ExcludePatternsSection /> },
   { label: 'Data', component: <DataSection /> }
 ]

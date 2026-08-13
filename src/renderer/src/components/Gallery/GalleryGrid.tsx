@@ -35,10 +35,17 @@ import { Grid } from 'react-window'
 import { TagDeleteButton, TagDescriptionField } from '@components'
 import { useGalleryGridLayout } from '@hooks'
 import { useGalleryPreviewZoom } from '@hooks'
+import { isUnderExcludedFolder } from '@shared/folderExclusion'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '@state'
-import { basename, buildFolderChildrenMap, collectFolderSectionOrder, dirname } from '@utils'
+import {
+  basename,
+  buildFolderChildrenMap,
+  collectFolderSectionOrder,
+  dirname,
+  isPathUnderOrEqual
+} from '@utils'
 
 import { GalleryFolderSections } from './GalleryFolderSections'
 import { GalleryListView } from './GalleryListView'
@@ -73,8 +80,16 @@ export function GalleryGrid(): ReactElement {
     const childrenOf = buildFolderChildrenMap(state.allFolderPaths)
     const hasSubfolders = (childrenOf.get(state.selectedFolder)?.size ?? 0) > 0
     if (!hasSubfolders) return null
-    return collectFolderSectionOrder(state.selectedFolder, childrenOf)
-  }, [state.selectedFolder, state.allFolderPaths])
+    const sections = collectFolderSectionOrder(state.selectedFolder, childrenOf)
+    // An excluded subfolder's section is skipped entirely when browsing an
+    // ancestor — unless selectedFolder is itself at/under an excluded
+    // folder, the "direct browse" exception (matches visiblePhotos below).
+    const isViewingExcludedFolderDirectly = state.excludedFolders.some((folder) =>
+      isPathUnderOrEqual(state.selectedFolder!, folder)
+    )
+    if (isViewingExcludedFolderDirectly) return sections
+    return sections.filter((folder) => !isUnderExcludedFolder(folder, state.excludedFolders))
+  }, [state.selectedFolder, state.allFolderPaths, state.excludedFolders])
 
   // Buckets the already folder+tag-filtered `photos` by which section folder
   // directly contains each one (not recursively) — sort order within each

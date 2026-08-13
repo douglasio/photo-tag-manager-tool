@@ -165,7 +165,7 @@ export function makeCountBarShape(onSelect: (tag: string) => void) {
 }
 
 export function TopTagsWidget(): ReactElement {
-  const { state, tagCounts, setTagFilter, setActiveTab } = usePhotoLibrary()
+  const { activePhotosByPath, tagCounts, setTagFilter, setActiveTab } = usePhotoLibrary()
 
   const topTags = Array.from(tagCounts.entries())
     .sort((a, b) => b[1] - a[1])
@@ -179,7 +179,7 @@ export function TopTagsWidget(): ReactElement {
   const missingTag = topTags.find((datum) => !photosByTag[datum.tag])
   if (missingTag) {
     const candidates = shuffle(
-      Array.from(state.photosByPath.values()).filter(
+      Array.from(activePhotosByPath.values()).filter(
         (photo) =>
           photo.tags.includes(missingTag.tag) &&
           photo.thumbnailStatus === 'ready' &&

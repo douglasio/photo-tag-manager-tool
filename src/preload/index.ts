@@ -122,6 +122,9 @@ const api = {
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),
+  getExcludedFolders: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludedFolders'),
+  setExcludedFolders: (folders: string[]): Promise<void> =>
+    ipcRenderer.invoke('settings:setExcludedFolders', folders),
   addFolder: (folder: string): Promise<void> => ipcRenderer.invoke('settings:addFolder', folder),
   removeFolder: (folder: string): Promise<void> =>
     ipcRenderer.invoke('settings:removeFolder', folder),

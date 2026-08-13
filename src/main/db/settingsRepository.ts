@@ -172,6 +172,25 @@ export function setExcludePatterns(patterns: string[]): void {
   setSetting('excludePatterns', JSON.stringify(patterns))
 }
 
+// Folders (and everything beneath them) excluded from tags, AI features,
+// duplicate detection, Time Warp, and dashboard widgets — the files remain
+// scanned/watched normally (unlike excludePatterns above) and are still
+// browsable by navigating directly to the folder itself.
+export function getExcludedFolders(): string[] {
+  const raw = getSetting('excludedFolders')
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+export function setExcludedFolders(folders: string[]): void {
+  setSetting('excludedFolders', JSON.stringify(folders))
+}
+
 const DEFAULT_MAGAZINE_TITLE = 'TAG ME'
 const DEFAULT_NEWSPAPER_TITLE = 'The Tag Me Times'
 const DEFAULT_DVD_STUDIO_NAME = 'TAG ME PICTURES'

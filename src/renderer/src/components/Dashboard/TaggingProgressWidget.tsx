@@ -15,14 +15,13 @@ const MIN_CHART_SIZE = 90
 const NON_CHART_CONTENT_HEIGHT = 70
 
 export function TaggingProgressWidget(): ReactElement {
-  const { state, setUntaggedFilter, setActiveTab } = usePhotoLibrary()
+  const { activePhotosByPath, untaggedCount, setUntaggedFilter, setActiveTab } = usePhotoLibrary()
   const { ref, height } = useElementSize()
 
-  const photos = Array.from(state.photosByPath.values())
-  const taggedCount = photos.filter((photo) => photo.tags.length > 0).length
-  const untaggedCount = photos.length - taggedCount
+  const totalCount = activePhotosByPath.size
+  const taggedCount = totalCount - untaggedCount
 
-  if (photos.length === 0) {
+  if (totalCount === 0) {
     return (
       <Text c="dimmed" size="sm">
         Add some photos to see your tagging progress.
@@ -47,7 +46,7 @@ export function TaggingProgressWidget(): ReactElement {
           { name: 'Tagged', value: taggedCount, color: 'indigo' },
           { name: 'Untagged', value: untaggedCount, color: 'gray' }
         ]}
-        chartLabel={String(photos.length)}
+        chartLabel={String(totalCount)}
         size={chartSize}
         thickness={chartSize / 4}
         withTooltip={false}
@@ -58,7 +57,7 @@ export function TaggingProgressWidget(): ReactElement {
         }
       />
       <Text size="xs" c="dimmed">
-        {taggedCount} of {photos.length} tagged
+        {taggedCount} of {totalCount} tagged
       </Text>
       {untaggedCount > 0 && (
         <Anchor size="xs" onClick={goToUntagged}>

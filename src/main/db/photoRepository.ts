@@ -1,7 +1,9 @@
+import { isUnderExcludedFolder } from '@shared/folderExclusion'
 import type { PhotoRecord } from '@shared/types'
 
 import { getDb } from './database'
 import { deleteEmbedding, renameEmbedding } from './embeddingRepository'
+import { getExcludedFolders } from './settingsRepository'
 import { reconcileTagGroups } from './tagMetadataRepository'
 
 interface PhotoRow {
@@ -120,6 +122,7 @@ export function findPhotoPathsWithTag(
   tag: string,
   limit: number
 ): { filePath: string; thumbnailKey: string }[] {
+  const excludedFolders = getExcludedFolders()
   const matches: { filePath: string; thumbnailKey: string }[] = []
   const rows = getDb()
     .prepare(
@@ -134,6 +137,7 @@ export function findPhotoPathsWithTag(
 
   for (const row of rows) {
     if (matches.length >= limit) break
+    if (isUnderExcludedFolder(row.path, excludedFolders)) continue
     try {
       if ((JSON.parse(row.tags) as string[]).includes(tag)) {
         matches.push({ filePath: row.path, thumbnailKey: row.thumbnailKey })
@@ -146,35 +150,41 @@ export function findPhotoPathsWithTag(
   return matches
 }
 
-/** Every thumbnail-ready photo — used to build the duplicate-detection
- * embedding set (unlike findPhotoPathsWithTag, no filtering needed here). */
+/** Every thumbnail-ready photo outside an excluded folder — used to build
+ * the duplicate-detection embedding set. */
 export function findAllReadyPhotos(): { filePath: string; thumbnailKey: string }[] {
+  const excludedFolders = getExcludedFolders()
   const rows = getDb()
     .prepare(
       `SELECT path, thumbnailKey FROM photos WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL`
     )
     .all() as { path: string; thumbnailKey: string }[]
-  return rows.map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
+  return rows
+    .filter((row) => !isUnderExcludedFolder(row.path, excludedFolders))
+    .map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
 }
 
-/** Every thumbnail-ready photo with a known dateTaken — used to group
- * photos by year for the Throwback widget. */
+/** Every thumbnail-ready photo with a known dateTaken, outside an excluded
+ * folder — used to group photos by year for the Throwback widget. */
 export function findAllReadyPhotosWithDate(): {
   filePath: string
   thumbnailKey: string
   dateTaken: string
 }[] {
+  const excludedFolders = getExcludedFolders()
   const rows = getDb()
     .prepare(
       `SELECT path, thumbnailKey, dateTaken FROM photos
        WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL AND dateTaken IS NOT NULL`
     )
     .all() as { path: string; thumbnailKey: string; dateTaken: string }[]
-  return rows.map((row) => ({
-    filePath: row.path,
-    thumbnailKey: row.thumbnailKey,
-    dateTaken: row.dateTaken
-  }))
+  return rows
+    .filter((row) => !isUnderExcludedFolder(row.path, excludedFolders))
+    .map((row) => ({
+      filePath: row.path,
+      thumbnailKey: row.thumbnailKey,
+      dateTaken: row.dateTaken
+    }))
 }
 
 /** Reverse lookup for the thumbnail protocol handler's regenerate-on-miss

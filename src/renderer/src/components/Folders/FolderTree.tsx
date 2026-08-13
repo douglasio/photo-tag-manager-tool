@@ -14,7 +14,7 @@ import {
   useTree
 } from '@mantine/core'
 import { useHover, useMergedRef } from '@mantine/hooks'
-import { IconChevronDown, IconChevronRight, IconPencil } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronRight, IconEyeOff, IconPencil } from '@tabler/icons-react'
 
 import { FolderSettingsMenu, PanelSection } from '@components'
 import { usePhotoLibrary } from '@state'
@@ -22,6 +22,7 @@ import {
   activeHoverBackground,
   foldersToTreeData,
   foldersToTreeDataWithEmpty,
+  isPathUnderOrEqual,
   PREVIEW_TRIGGER_KEY,
   splitFolderPath,
   validateFolderNameBase
@@ -85,6 +86,8 @@ function TreeRow({
   const ref = useMergedRef(hoverRef, setNodeRef)
   const { onClick, style } = elementProps
   const fileCount = (node.nodeProps as { fileCount?: number } | undefined)?.fileCount ?? 0
+  const { state } = usePhotoLibrary()
+  const isExcluded = state.excludedFolders.some((folder) => isPathUnderOrEqual(node.value, folder))
 
   const { base } = splitFolderPath(node.value)
   const [draft, setDraft] = useState(base)
@@ -155,6 +158,15 @@ function TreeRow({
         rightSection={
           !editing && (
             <>
+              {isExcluded && (
+                <Tooltip label="Excluded from features">
+                  <IconEyeOff
+                    size={14}
+                    style={{ flexShrink: 0 }}
+                    color="var(--mantine-color-dimmed)"
+                  />
+                </Tooltip>
+              )}
               <Tooltip label="Rename folder">
                 <ActionIcon
                   opacity={hovered ? 0.7 : 0}

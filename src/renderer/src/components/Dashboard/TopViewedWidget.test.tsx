@@ -10,6 +10,7 @@ const mockOpenPhotoTab = vi.fn()
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
     state: { photosByPath: mockPhotosByPath },
+    activePhotosByPath: mockPhotosByPath,
     openPhotoTab: mockOpenPhotoTab
   })
 }))

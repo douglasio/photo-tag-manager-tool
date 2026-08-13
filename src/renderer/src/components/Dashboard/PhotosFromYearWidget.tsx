@@ -86,7 +86,7 @@ function YearTile({
 // single past year, no embeddings involved — always available regardless of
 // whether AI features (and Time Warp's cross-year similarity) are enabled.
 export function PhotosFromYearWidget(): ReactElement {
-  const { state, getThrowbackYearSample, openPhotoTab } = usePhotoLibrary()
+  const { state, activePhotosByPath, getThrowbackYearSample, openPhotoTab } = usePhotoLibrary()
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -145,7 +145,7 @@ export function PhotosFromYearWidget(): ReactElement {
         style={{ flex: 1, minHeight: 0 }}
       >
         {yearSample.filePaths.map((filePath) => {
-          const photo = state.photosByPath.get(filePath)
+          const photo = activePhotosByPath.get(filePath)
           if (!photo?.thumbnailKey) return null
           return (
             <YearTile

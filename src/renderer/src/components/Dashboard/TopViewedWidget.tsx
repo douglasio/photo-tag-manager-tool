@@ -131,7 +131,7 @@ export function makeImageBarShape(
 }
 
 export function TopViewedWidget(): ReactElement {
-  const { state, openPhotoTab } = usePhotoLibrary()
+  const { state, activePhotosByPath, openPhotoTab } = usePhotoLibrary()
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -162,7 +162,7 @@ export function TopViewedWidget(): ReactElement {
     setHover(null)
   }
 
-  const viewedPhotos = Array.from(state.photosByPath.values())
+  const viewedPhotos = Array.from(activePhotosByPath.values())
     .filter(
       (photo) => photo.viewCount > 0 && photo.thumbnailStatus === 'ready' && photo.thumbnailKey
     )

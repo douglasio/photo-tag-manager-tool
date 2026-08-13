@@ -19,6 +19,7 @@ vi.mock('@state', () => ({
       aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled,
       aiScanProgress: mockAiScanProgress
     },
+    activePhotosByPath: mockPhotosByPath,
     getThrowbackSimilarity: mockGetThrowbackSimilarity,
     getThrowbackPreview: mockGetThrowbackPreview,
     enableAiFeatures: mockEnableAiFeatures,

@@ -85,6 +85,10 @@ export interface PhotoLibraryState {
   newspaperTitle: string
   dvdStudioName: string
   excludePatterns: string[]
+  // Folders (and their subfolders) excluded from tags, AI features,
+  // duplicate detection, Time Warp, and dashboard widgets — still fully
+  // ingested/browsable directly, just filtered out of every aggregate.
+  excludedFolders: string[]
   tagDescriptions: Map<string, string>
   // User-defined tag groups (TagPanel's accordion view) and each grouped
   // tag's membership (tag -> group id) — a tag not present here is ungrouped
@@ -138,6 +142,7 @@ export const initialState: PhotoLibraryState = {
   newspaperTitle: 'The Tag Me Times',
   dvdStudioName: 'TAG ME PICTURES',
   excludePatterns: [],
+  excludedFolders: [],
   tagDescriptions: new Map(),
   tagGroups: [],
   tagGroupAssignments: new Map(),
@@ -183,6 +188,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_DVD_STUDIO_NAME'; value: string }
   | { type: 'TAGS_ASSIGNED'; tags: string[] }
   | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
+  | { type: 'SET_EXCLUDED_FOLDERS'; folders: string[] }
   | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
   | { type: 'WATCH_FOLDER_REMOVED'; folderPath: string }
   | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
@@ -527,6 +533,8 @@ export function photoLibraryReducer(
     }
     case 'SET_EXCLUDE_PATTERNS':
       return { ...state, excludePatterns: action.patterns }
+    case 'SET_EXCLUDED_FOLDERS':
+      return { ...state, excludedFolders: action.folders }
     case 'WATCH_FOLDER_ADDED': {
       if (state.allFolderPaths.has(action.folderPath)) return state
       const allFolderPaths = new Set(state.allFolderPaths)

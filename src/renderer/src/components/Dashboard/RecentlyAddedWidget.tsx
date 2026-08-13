@@ -72,12 +72,12 @@ function RecentTile({
 
 // The RECENT_COUNT most recently added photos (by firstSeenAt), newest first.
 export function RecentlyAddedWidget(): ReactElement {
-  const { state, openPhotoTab } = usePhotoLibrary()
+  const { state, activePhotosByPath, openPhotoTab } = usePhotoLibrary()
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
-  const recentPhotos = Array.from(state.photosByPath.values())
+  const recentPhotos = Array.from(activePhotosByPath.values())
     .filter((photo) => photo.thumbnailStatus === 'ready' && photo.thumbnailKey && photo.firstSeenAt)
     .sort((a, b) => (b.firstSeenAt ?? 0) - (a.firstSeenAt ?? 0))
     .slice(0, RECENT_COUNT)

@@ -8,6 +8,7 @@ import {
   getDefaultView,
   getDetailsPanelCollapsed,
   getDvdStudioName,
+  getExcludedFolders,
   getExcludePatterns,
   getFolders,
   getGalleryAnimationsEnabled,
@@ -25,6 +26,7 @@ import {
   setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
+  setExcludedFolders,
   setExcludePatterns,
   setFolders,
   setGalleryAnimationsEnabled,
@@ -182,6 +184,15 @@ export function registerSettingsHandlers(): void {
       await restartAllWatchers(getFolders())
     }
   )
+
+  ipcMain.handle('settings:getExcludedFolders', (): string[] => getExcludedFolders())
+
+  // Unlike excludePatterns, this never touches scanning/watching — excluded
+  // photos stay fully ingested, just filtered out of AI/tag/dashboard
+  // aggregates at query time (photoRepository/embeddingRepository).
+  ipcMain.handle('settings:setExcludedFolders', (_event, folders: string[]): void => {
+    setExcludedFolders(folders)
+  })
 
   ipcMain.handle('settings:addFolder', (_event, folder: string) => {
     const folders = getFolders()

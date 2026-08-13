@@ -14,6 +14,7 @@ import {
 import { notifications } from '@mantine/notifications'
 
 import { AiScanProgressToast, MoveProgressToast } from '@components'
+import { isUnderExcludedFolder } from '@shared/folderExclusion'
 import type {
   AiScanProgress,
   AiScanResult,
@@ -26,7 +27,7 @@ import type {
   ThrowbackEntry,
   ThrowbackYearSample
 } from '@shared/types'
-import { basename, isPhotoInFolder, shuffle } from '@utils'
+import { basename, isPathUnderOrEqual, isPhotoInFolder, shuffle } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
 import {
@@ -81,6 +82,11 @@ interface PhotoLibraryContextValue {
   state: PhotoLibraryState
   photos: PhotoRecord[]
   visiblePhotos: PhotoRecord[]
+  // The library-wide "feature" photo set (excludes excluded-folder photos
+  // unconditionally) — the choke point tags/Dashboard widgets should read
+  // from instead of state.photosByPath, so exclusion isn't something each
+  // one has to remember to apply itself.
+  activePhotosByPath: Map<string, PhotoRecord>
   selectedPhoto: DisplayPhotoRecord | null
   allTags: string[]
   tagCounts: Map<string, number>
@@ -91,6 +97,8 @@ interface PhotoLibraryContextValue {
   addFolder: () => Promise<void>
   removeFolder: (folder: string) => Promise<void>
   renameFolder: (folder: string, newBaseName: string) => Promise<void>
+  excludeFolder: (folder: string) => Promise<void>
+  includeFolder: (folder: string) => Promise<void>
   cancelScan: () => Promise<void>
   rescanAll: () => Promise<void>
   selectPhoto: (path: string | null) => void
@@ -366,6 +374,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getExcludePatterns().then((patterns) => {
       dispatch({ type: 'SET_EXCLUDE_PATTERNS', patterns })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getExcludedFolders().then((folders) => {
+      dispatch({ type: 'SET_EXCLUDED_FOLDERS', folders })
     })
   }, [])
 
@@ -1170,14 +1184,50 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [rescanAll]
   )
 
+  // No rescan needed — unlike excludePatterns, this never touches
+  // scanning/watching, so the persisted change alone is enough; every
+  // consumer (tags, AI, dashboard) already re-derives from live state.
+  const excludeFolder = useCallback(
+    async (folder: string) => {
+      const folders = state.excludedFolders.includes(folder)
+        ? state.excludedFolders
+        : [...state.excludedFolders, folder]
+      dispatch({ type: 'SET_EXCLUDED_FOLDERS', folders })
+      await window.api.setExcludedFolders(folders)
+    },
+    [state.excludedFolders]
+  )
+
+  const includeFolder = useCallback(
+    async (folder: string) => {
+      const folders = state.excludedFolders.filter((f) => f !== folder)
+      dispatch({ type: 'SET_EXCLUDED_FOLDERS', folders })
+      await window.api.setExcludedFolders(folders)
+    },
+    [state.excludedFolders]
+  )
+
+  // True while the current folder view is scoped to (at or under) an
+  // excluded folder — the one deliberate way to still browse its photos,
+  // per the "except in the folder tree" carve-out.
+  const isViewingExcludedFolderDirectly = useMemo(() => {
+    if (!state.selectedFolder) return false
+    return state.excludedFolders.some((folder) => isPathUnderOrEqual(state.selectedFolder!, folder))
+  }, [state.selectedFolder, state.excludedFolders])
+
   // Folder and tag filters stack rather than being mutually exclusive, so a
   // folder-scoped tag pill (see GalleryGrid's header) can narrow within the
   // current folder instead of replacing it with a folder-agnostic tag view.
   const visiblePhotos = useMemo(() => {
-    if (state.untaggedFilterActive) {
-      return photos.filter((photo) => photo.tags.length === 0)
-    }
     let result = photos
+    if (!isViewingExcludedFolderDirectly) {
+      result = result.filter(
+        (photo) => !isUnderExcludedFolder(photo.filePath, state.excludedFolders)
+      )
+    }
+    if (state.untaggedFilterActive) {
+      return result.filter((photo) => photo.tags.length === 0)
+    }
     if (state.selectedFolder) {
       result = result.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
     }
@@ -1185,7 +1235,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       result = result.filter((photo) => photo.tags.includes(state.selectedTag!))
     }
     return result
-  }, [photos, state.selectedFolder, state.selectedTag, state.untaggedFilterActive])
+  }, [
+    photos,
+    state.selectedFolder,
+    state.selectedTag,
+    state.untaggedFilterActive,
+    state.excludedFolders,
+    isViewingExcludedFolderDirectly
+  ])
 
   // Shift+click range-select, anchored at the current selectedPath (the
   // last-engaged photo) through targetPath, within the currently visible
@@ -1223,15 +1280,30 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return raw ? { ...raw, metadata: toDisplayMetadata(raw.metadata) } : null
   }, [state.selectedPath, state.activeTab, state.photosByPath])
 
+  // The library-wide "feature" photo set — excludes photos under an excluded
+  // folder unconditionally (unlike visiblePhotos, this has no "direct
+  // browse" exception, since tags/dashboard widgets aren't folder-scoped
+  // navigation). Single choke point: tag aggregation and every Dashboard
+  // widget read from this instead of state.photosByPath directly, so a new
+  // feature written the normal way inherits the exclusion for free.
+  const activePhotosByPath = useMemo(() => {
+    if (state.excludedFolders.length === 0) return state.photosByPath
+    const filtered = new Map<string, PhotoRecord>()
+    for (const [filePath, photo] of state.photosByPath) {
+      if (!isUnderExcludedFolder(filePath, state.excludedFolders)) filtered.set(filePath, photo)
+    }
+    return filtered
+  }, [state.photosByPath, state.excludedFolders])
+
   // Tag covers always pick the most-recently-taken photo, independent of the
   // gallery's own sort order/direction — otherwise switching gallery sort
-  // would make tag thumbnails jump around. Iterates state.photosByPath
+  // would make tag thumbnails jump around. Iterates activePhotosByPath
   // directly (not the sorted `photos`) since order doesn't matter here.
   const { tagCounts, tagCoverPhotos, tagViewCounts } = useMemo(() => {
     const counts = new Map<string, number>()
     const covers = new Map<string, PhotoRecord>()
     const viewCounts = new Map<string, number>()
-    for (const photo of state.photosByPath.values()) {
+    for (const photo of activePhotosByPath.values()) {
       const photoTime = photo.metadata.dateTaken ? Date.parse(photo.metadata.dateTaken) : null
       for (const tag of photo.tags) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
@@ -1257,15 +1329,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       }
     }
     return { tagCounts: counts, tagCoverPhotos: covers, tagViewCounts: viewCounts }
-  }, [state.photosByPath])
+  }, [activePhotosByPath])
 
   const untaggedCount = useMemo(() => {
     let count = 0
-    for (const photo of state.photosByPath.values()) {
+    for (const photo of activePhotosByPath.values()) {
       if (photo.tags.length === 0) count++
     }
     return count
-  }, [state.photosByPath])
+  }, [activePhotosByPath])
 
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
 
@@ -1275,12 +1347,20 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     if (!state.selectedFolder) return []
     const tags = new Set<string>()
     for (const photo of photos) {
-      if (isPhotoInFolder(photo.filePath, state.selectedFolder!)) {
-        for (const tag of photo.tags) tags.add(tag)
+      if (!isPhotoInFolder(photo.filePath, state.selectedFolder!)) continue
+      // An excluded subfolder's tags shouldn't leak into an ancestor
+      // folder's pill row — unless selectedFolder is that excluded folder
+      // (or under it) itself, the direct-browse exception.
+      if (
+        !isViewingExcludedFolderDirectly &&
+        isUnderExcludedFolder(photo.filePath, state.excludedFolders)
+      ) {
+        continue
       }
+      for (const tag of photo.tags) tags.add(tag)
     }
     return Array.from(tags).sort()
-  }, [photos, state.selectedFolder])
+  }, [photos, state.selectedFolder, state.excludedFolders, isViewingExcludedFolderDirectly])
 
   // Resolved in openTabs order (not sorted) so tabs stay in the order they
   // were opened rather than jumping around as the user opens more.
@@ -1307,6 +1387,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     state,
     photos,
     visiblePhotos,
+    activePhotosByPath,
     selectedPhoto,
     allTags,
     tagCounts,
@@ -1317,6 +1398,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     addFolder,
     removeFolder,
     renameFolder,
+    excludeFolder,
+    includeFolder,
     cancelScan,
     rescanAll,
     selectPhoto,

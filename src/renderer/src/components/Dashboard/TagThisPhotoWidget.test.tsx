@@ -20,6 +20,7 @@ vi.mock('@state', () => ({
       recentTags: mockRecentTags,
       aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled
     },
+    activePhotosByPath: mockPhotosByPath,
     allTags: mockAllTags,
     updateTags: mockUpdateTags,
     suggestTags: mockSuggestTags

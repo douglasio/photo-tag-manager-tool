@@ -102,6 +102,8 @@ function createMockApi(): {
     setDvdStudioName: vi.fn().mockResolvedValue(undefined),
     getExcludePatterns: vi.fn().mockResolvedValue([]),
     setExcludePatterns: vi.fn().mockResolvedValue(undefined),
+    getExcludedFolders: vi.fn().mockResolvedValue([]),
+    setExcludedFolders: vi.fn().mockResolvedValue(undefined),
     addFolder: vi.fn().mockResolvedValue(undefined),
     removeFolder: vi.fn().mockResolvedValue(undefined),
     renameFolder: vi.fn(),
@@ -158,6 +160,7 @@ describe('PhotoLibraryContext', () => {
     mockApi.getGalleryAnimationsEnabled.mockResolvedValue(false)
     mockApi.getDetailsPanelCollapsed.mockResolvedValue(true)
     mockApi.getExcludePatterns.mockResolvedValue(['.trash'])
+    mockApi.getExcludedFolders.mockResolvedValue(['/root/test'])
     mockApi.getTagDescriptions.mockResolvedValue({ vacation: 'Beach trips' })
     mockApi.getMagazineTitle.mockResolvedValue('Custom Mag')
     mockApi.getNewspaperTitle.mockResolvedValue('Custom Paper')
@@ -170,6 +173,7 @@ describe('PhotoLibraryContext', () => {
     expect(result.current.state.galleryAnimationsEnabled).toBe(false)
     expect(result.current.state.detailsPanelCollapsed).toBe(true)
     expect(result.current.state.excludePatterns).toEqual(['.trash'])
+    await waitFor(() => expect(result.current.state.excludedFolders).toEqual(['/root/test']))
     expect(result.current.state.tagDescriptions.get('vacation')).toBe('Beach trips')
     await waitFor(() => expect(result.current.state.magazineTitle).toBe('Custom Mag'))
     expect(result.current.state.newspaperTitle).toBe('Custom Paper')
@@ -429,6 +433,71 @@ describe('PhotoLibraryContext', () => {
       act(() => result.current.setFolderTagFilter('vacation'))
       expect(result.current.state.selectedFolder).toBe('/root')
       expect(result.current.state.selectedTag).toBe('vacation')
+    })
+  })
+
+  describe('excluded folders', () => {
+    async function seedExcludableLibrary(): Promise<ReturnType<typeof setup>> {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const hook = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [
+            makePhoto('/root/a.jpg', { tags: ['beach'], viewCount: 2 }),
+            makePhoto('/root/test/b.jpg', { tags: ['beach', 'private'], viewCount: 5 })
+          ]
+        })
+      })
+      return hook
+    }
+
+    it('excludeFolder dispatches and persists the folder', async () => {
+      const { result } = setup()
+      // Waits for the mount-time hydration effects (which dispatch their own
+      // default SET_EXCLUDED_FOLDERS: []) to settle first — otherwise a
+      // hydration dispatch landing after excludeFolder's would stomp it back.
+      await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+      await act(() => result.current.excludeFolder('/root/test'))
+
+      expect(result.current.state.excludedFolders).toEqual(['/root/test'])
+      expect(mockApi.setExcludedFolders).toHaveBeenCalledWith(['/root/test'])
+    })
+
+    it('includeFolder removes a previously excluded folder', async () => {
+      const { result } = setup()
+      await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+      await act(() => result.current.excludeFolder('/root/test'))
+      await act(() => result.current.includeFolder('/root/test'))
+
+      expect(result.current.state.excludedFolders).toEqual([])
+      expect(mockApi.setExcludedFolders).toHaveBeenLastCalledWith([])
+    })
+
+    it('excludes photos under an excluded folder from tagCounts/activePhotosByPath', async () => {
+      const { result } = await seedExcludableLibrary()
+      await act(() => result.current.excludeFolder('/root/test'))
+
+      expect(result.current.activePhotosByPath.has('/root/test/b.jpg')).toBe(false)
+      expect(result.current.activePhotosByPath.has('/root/a.jpg')).toBe(true)
+      expect(result.current.tagCounts.get('beach')).toBe(1)
+      expect(result.current.tagCounts.get('private')).toBeUndefined()
+    })
+
+    it('excludes photos from visiblePhotos in All Photos mode', async () => {
+      const { result } = await seedExcludableLibrary()
+      await act(() => result.current.excludeFolder('/root/test'))
+
+      expect(result.current.visiblePhotos.map((p) => p.filePath)).toEqual(['/root/a.jpg'])
+    })
+
+    it("still shows the excluded folder's own photos when browsing directly into it", async () => {
+      const { result } = await seedExcludableLibrary()
+      await act(() => result.current.excludeFolder('/root/test'))
+      act(() => result.current.setFolderFilter('/root/test'))
+
+      expect(result.current.visiblePhotos.map((p) => p.filePath)).toEqual(['/root/test/b.jpg'])
     })
   })
 

@@ -78,7 +78,7 @@ function TimelinePhotoTile({
 // Confined to the widget's first column (see the 2-col SimpleGrid below) so
 // a vertical Timeline doesn't stretch oddly across the widget's full width.
 function ThrowbackTimeline({ entries }: ThrowbackTimelineProps): ReactElement {
-  const { state, openPhotoTab } = usePhotoLibrary()
+  const { state, activePhotosByPath, openPhotoTab } = usePhotoLibrary()
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -86,7 +86,7 @@ function ThrowbackTimeline({ entries }: ThrowbackTimelineProps): ReactElement {
   return (
     <Timeline active={entries.length} bulletSize={16} lineWidth={2}>
       {entries.map((entry) => {
-        const photo = state.photosByPath.get(entry.filePath)
+        const photo = activePhotosByPath.get(entry.filePath)
         return (
           <Timeline.Item
             key={entry.year}

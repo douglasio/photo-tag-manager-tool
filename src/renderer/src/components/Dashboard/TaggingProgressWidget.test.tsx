@@ -8,7 +8,9 @@ let mockPhotosByPath: Map<string, PhotoRecord>
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { photosByPath: mockPhotosByPath }
+    activePhotosByPath: mockPhotosByPath,
+    untaggedCount: Array.from(mockPhotosByPath.values()).filter((photo) => photo.tags.length === 0)
+      .length
   })
 }))
 

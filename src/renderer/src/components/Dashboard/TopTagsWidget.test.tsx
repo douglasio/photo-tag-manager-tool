@@ -11,7 +11,7 @@ const mockSetActiveTab = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { photosByPath: mockPhotosByPath },
+    activePhotosByPath: mockPhotosByPath,
     tagCounts: mockTagCounts,
     setTagFilter: mockSetTagFilter,
     setActiveTab: mockSetActiveTab

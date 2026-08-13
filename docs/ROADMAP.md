@@ -46,6 +46,8 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 5. Untagged view within folders - as the first item in the tags list at the top of each folder view in the gallery, can you add an "Untagged" filter -- a higher-contrast color than the other tags.
 
+6. Delete -- photos in the gallery should be in the context menu in the gallery view with appropriate icon and coloring.
+
 ## Tools
 
 2. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.
@@ -59,8 +61,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 6. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
 
 ## Tags
-
-1. Hovering over tags anywhere in the app should show a Popover Card with the full tag name and description (if available), after a short delay. Make sure this is shared functionality (hook or wrapper component), do not duplicate the Popover layout in multiple places.
 
 2. Selecting multiple photos from the gallery should open the taglist to batch add or remove tags to the entire selection.
 
@@ -76,7 +76,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. Move the "X" to be inline with the Visualization ActionIconGroup, make it red.
 
-2. Refine visualizations...
+2. Improve the existing visualizations. They look a little silly.
 
 3. Add "Art Gallery" and "movie theater" visualizations
 
@@ -97,3 +97,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 2. Enforce component export style
 
 3. Update all deps
+
+4. Centralize the repeated `photo.thumbnailStatus === 'ready' && photo.thumbnailKey` check (inline in ~13 places across Dashboard widgets, Gallery, and Tags) into a shared `isPhotoDisplayable(photo)`-style helper.
+
+5. Dashboard widgets each call `useKeyHeld(PREVIEW_TRIGGER_KEY)` independently (6 separate window keydown/keyup listener pairs for the same key). Fold `previewTriggerHeld` into the shared `DashboardPreviewZoomContext` (already built for per-widget preview zoom) so it's one listener instead of six.
