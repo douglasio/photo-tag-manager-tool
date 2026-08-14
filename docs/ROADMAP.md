@@ -29,6 +29,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 3. There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
 
 4. Face detection follow-ups (deferred out of the initial build):
+   - Download the YuNet/SFace models on demand (like the CLIP models already do via `@huggingface/transformers`, cached to `userData`) instead of bundling them in `resources/models/` — right now every install pays their ~37MB regardless of whether face detection is ever turned on, which is backwards for what's meant to be the more optional/heavier of the two AI features. Would need its own download/cache/checksum-verification path (no Hub-hosted `pipeline()`-compatible checkpoint to piggyback on) plus the corresponding "downloading" progress phase in the enable/scan flow.
    - Crop the People panel's cover thumbnail to the actual face region instead of showing the full photo — DetailPanelFaces already does this via a CSS crop, PeoplePanel's cover doesn't yet.
    - Filter the gallery by person, the same way tag filtering works today.
    - Centroid refinement: once a person has a few manually-confirmed faces, average their embeddings into a refined match target for future auto-clustering passes, instead of relying solely on the raw DBSCAN cluster centroid.
