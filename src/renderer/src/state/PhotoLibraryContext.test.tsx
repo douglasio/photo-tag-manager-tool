@@ -90,6 +90,7 @@ function createMockApi(): {
     setFaceDetectionEnabled: vi.fn().mockResolvedValue(undefined),
     getFacesForPhoto: vi.fn().mockResolvedValue([]),
     getPeople: vi.fn().mockResolvedValue([]),
+    getFacePhotoAssignments: vi.fn().mockResolvedValue([]),
     enableFaceDetectionAndScan: vi.fn().mockResolvedValue({
       facesDetected: 0,
       peopleCount: 0,

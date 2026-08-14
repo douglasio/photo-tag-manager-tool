@@ -83,6 +83,21 @@ function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
 }
 
+// Groups the flat (photo, person) rows from getFacePhotoAssignments by
+// personId, for the gallery's filter-by-person lookup — see
+// personPhotoAssignments on PhotoLibraryState.
+function toPersonPhotoAssignments(
+  rows: { photoPath: string; personId: string }[]
+): Map<string, Set<string>> {
+  const assignments = new Map<string, Set<string>>()
+  for (const row of rows) {
+    const paths = assignments.get(row.personId) ?? new Set<string>()
+    paths.add(row.photoPath)
+    assignments.set(row.personId, paths)
+  }
+  return assignments
+}
+
 interface PhotoLibraryContextValue {
   state: PhotoLibraryState
   photos: PhotoRecord[]
@@ -120,6 +135,7 @@ interface PhotoLibraryContextValue {
   setFolderFilter: (folder: string | null) => void
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
+  setPersonFilter: (personId: string | null) => void
   setUntaggedFilter: (active: boolean) => void
   setFolderUntaggedFilter: (active: boolean) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
@@ -399,7 +415,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getFaceDetectionEnabled().then((value) => {
       dispatch({ type: 'SET_FACE_DETECTION_ENABLED', value })
-      if (value) window.api.getPeople().then((people) => dispatch({ type: 'SET_PEOPLE', people }))
+      if (!value) return
+      window.api.getPeople().then((people) => dispatch({ type: 'SET_PEOPLE', people }))
+      window.api.getFacePhotoAssignments().then((rows) =>
+        dispatch({
+          type: 'SET_PERSON_PHOTO_ASSIGNMENTS',
+          assignments: toPersonPhotoAssignments(rows)
+        })
+      )
     })
   }, [])
 
@@ -736,6 +759,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const setFolderTagFilter = useCallback((tag: string | null) => {
     dispatch({ type: 'SET_FOLDER_TAG_FILTER', tag })
+  }, [])
+
+  const setPersonFilter = useCallback((personId: string | null) => {
+    dispatch({ type: 'SET_PERSON_FILTER', personId })
   }, [])
 
   const setUntaggedFilter = useCallback((active: boolean) => {
@@ -1075,9 +1102,19 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setFaceDetectionEnabled(value)
   }, [])
 
+  // Refreshes both the people list and the gallery's filter-by-person
+  // lookup together — a face reassignment changes both at once, so every
+  // caller of this needs both in sync rather than picking one.
   const refreshPeople = useCallback(async () => {
-    const people = await window.api.getPeople()
+    const [people, assignmentRows] = await Promise.all([
+      window.api.getPeople(),
+      window.api.getFacePhotoAssignments()
+    ])
     dispatch({ type: 'SET_PEOPLE', people })
+    dispatch({
+      type: 'SET_PERSON_PHOTO_ASSIGNMENTS',
+      assignments: toPersonPhotoAssignments(assignmentRows)
+    })
   }, [])
 
   const getFacesForPhoto = useCallback(
@@ -1266,7 +1303,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       })
       try {
         const result = await invoke()
-        dispatch({ type: 'SET_PEOPLE', people: await window.api.getPeople() })
+        await refreshPeople()
         notifications.update({
           id: FACE_SCAN_NOTIFICATION_ID,
           color: result.canceled ? 'yellow' : 'teal',
@@ -1291,7 +1328,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         dispatch({ type: 'SET_FACE_SCAN_PROGRESS', progress: null })
       }
     },
-    []
+    [refreshPeople]
   )
 
   const enableFaceDetection = useCallback(() => {
@@ -1437,11 +1474,19 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     if (state.selectedTag) {
       result = result.filter((photo) => photo.tags.includes(state.selectedTag!))
     }
+    // SET_PERSON_FILTER clears selectedTag/selectedFolder (see the reducer),
+    // so this never combines with them — same "one primary filter" model.
+    if (state.selectedPerson) {
+      const personPhotoPaths = state.personPhotoAssignments.get(state.selectedPerson)
+      result = result.filter((photo) => personPhotoPaths?.has(photo.filePath))
+    }
     return result
   }, [
     photos,
     state.selectedFolder,
     state.selectedTag,
+    state.selectedPerson,
+    state.personPhotoAssignments,
     state.untaggedFilterActive,
     state.excludedFolders,
     isViewingExcludedFolderDirectly
@@ -1621,6 +1666,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setFolderFilter,
     setTagFilter,
     setFolderTagFilter,
+    setPersonFilter,
     setUntaggedFilter,
     setFolderUntaggedFilter,
     setSort,

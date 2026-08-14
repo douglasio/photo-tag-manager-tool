@@ -32,6 +32,17 @@ export function getFacesForPhoto(photoPath: string): FaceRecord[] {
   return rows.map(toFaceRecord)
 }
 
+/** Every (photo, person) pairing — a photo can carry more than one row if it
+ * has faces belonging to different people. Used to build the gallery's
+ * filter-by-person lookup client-side, the same way tag filtering already
+ * reads directly off each photo's own tags. */
+export function getPersonPhotoAssignments(): { photoPath: string; personId: string }[] {
+  const rows = getDb()
+    .prepare('SELECT DISTINCT photo_path, person_id FROM photo_faces WHERE person_id IS NOT NULL')
+    .all() as { photo_path: string; person_id: string }[]
+  return rows.map((row) => ({ photoPath: row.photo_path, personId: row.person_id }))
+}
+
 // A photo with zero detected faces looks identical to a never-scanned one
 // (no rows either way) — this simplification means a face-less photo gets
 // re-run on every scan rather than skipped, unlike thumbnailStatus's

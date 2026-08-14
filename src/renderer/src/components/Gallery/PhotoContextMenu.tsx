@@ -8,7 +8,8 @@ import {
   IconRotate,
   IconRotateClockwise,
   IconTag,
-  IconTrash
+  IconTrash,
+  IconUserOff
 } from '@tabler/icons-react'
 
 import { ConfirmDialog } from '@components'
@@ -35,6 +36,8 @@ export function PhotoContextMenu({
     addTagsToSelection,
     rotatePhoto,
     deletePhotos,
+    getFacesForPhoto,
+    unassignFace,
     state
   } = usePhotoLibrary()
   const [opened, setOpened] = useState(false)
@@ -59,6 +62,24 @@ export function PhotoContextMenu({
   }
 
   const deleteTargets = isBatch ? Array.from(state.selectedPaths) : [photo.filePath]
+
+  // Only meaningful while browsing a specific person's photos (see
+  // PeoplePanel/GalleryGrid's filter) — "the person" wouldn't be well
+  // defined otherwise on a photo that could have several people in it.
+  const selectedPersonName = state.selectedPerson
+    ? (state.people.find((person) => person.id === state.selectedPerson)?.name ?? 'this person')
+    : null
+
+  const handleNotThisPerson = async (): Promise<void> => {
+    const personId = state.selectedPerson
+    if (!personId) return
+    for (const path of deleteTargets) {
+      const faces = await getFacesForPhoto(path)
+      for (const face of faces) {
+        if (face.personId === personId) await unassignFace(face.id)
+      }
+    }
+  }
 
   const handleDeleteConfirm = async (): Promise<void> => {
     setDeleting(true)
@@ -123,6 +144,16 @@ export function PhotoContextMenu({
             >
               {isBatch ? `Add Tag to ${state.selectedPaths.size} Photos` : 'Add Tag'}
             </Menu.Item>
+            {selectedPersonName && (
+              <Menu.Item
+                leftSection={<IconUserOff size={14} />}
+                onClick={() => void handleNotThisPerson()}
+              >
+                {isBatch
+                  ? `Not ${selectedPersonName} (${state.selectedPaths.size} Photos)`
+                  : `Not ${selectedPersonName}`}
+              </Menu.Item>
+            )}
             {!isBatch && (
               <Menu.Item
                 leftSection={<IconFolderOpen size={14} />}

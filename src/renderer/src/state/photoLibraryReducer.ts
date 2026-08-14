@@ -47,6 +47,12 @@ export interface PhotoLibraryState {
   selectedPaths: Set<string>
   selectedFolder: string | null
   selectedTag: string | null
+  selectedPerson: string | null
+  // Every (photo, person) pairing, keyed by personId — lets the gallery
+  // filter by person the same synchronous way it filters by tag (tags live
+  // directly on PhotoRecord; person assignment lives in photo_faces, so this
+  // is loaded once and refreshed alongside `people` instead).
+  personPhotoAssignments: Map<string, Set<string>>
   // Pseudo-filter for photos with no tags — mutually exclusive with
   // selectedTag/selectedFolder rather than a sentinel value on selectedTag,
   // since a real tag could otherwise collide with it.
@@ -130,6 +136,8 @@ export const initialState: PhotoLibraryState = {
   selectedPaths: new Set(),
   selectedFolder: null,
   selectedTag: null,
+  selectedPerson: null,
+  personPhotoAssignments: new Map(),
   untaggedFilterActive: false,
   sortBy: 'name',
   sortOrder: 'asc',
@@ -185,6 +193,8 @@ export type PhotoLibraryAction =
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_UNTAGGED_FILTER'; active: boolean }
   | { type: 'SET_FOLDER_UNTAGGED_FILTER'; active: boolean }
+  | { type: 'SET_PERSON_FILTER'; personId: string | null }
+  | { type: 'SET_PERSON_PHOTO_ASSIGNMENTS'; assignments: Map<string, Set<string>> }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
@@ -483,6 +493,7 @@ export function photoLibraryReducer(
         ...state,
         selectedFolder: action.folder,
         selectedTag: null,
+        selectedPerson: null,
         untaggedFilterActive: false
       }
     case 'SET_TAG_FILTER':
@@ -490,24 +501,49 @@ export function photoLibraryReducer(
         ...state,
         selectedTag: action.tag,
         selectedFolder: null,
+        selectedPerson: null,
         untaggedFilterActive: false
       }
     // Unlike SET_TAG_FILTER, keeps selectedFolder intact — for the
     // per-folder tag pills that narrow within a folder rather than replace it.
     case 'SET_FOLDER_TAG_FILTER':
-      return { ...state, selectedTag: action.tag, untaggedFilterActive: false }
+      return {
+        ...state,
+        selectedTag: action.tag,
+        selectedPerson: null,
+        untaggedFilterActive: false
+      }
     case 'SET_UNTAGGED_FILTER':
       return {
         ...state,
         untaggedFilterActive: action.active,
         selectedTag: null,
-        selectedFolder: null
+        selectedFolder: null,
+        selectedPerson: null
       }
     // Like SET_FOLDER_TAG_FILTER, keeps selectedFolder intact — the folder
     // pill row's own "Untagged" entry narrows within the folder rather than
     // replacing it with the global (folder-agnostic) untagged view.
     case 'SET_FOLDER_UNTAGGED_FILTER':
-      return { ...state, untaggedFilterActive: action.active, selectedTag: null }
+      return {
+        ...state,
+        untaggedFilterActive: action.active,
+        selectedTag: null,
+        selectedPerson: null
+      }
+    // Global (folder-agnostic), same as SET_TAG_FILTER — selecting a person
+    // in PeoplePanel replaces whatever other filter was active rather than
+    // stacking, keeping "one primary filter at a time" consistent with tags.
+    case 'SET_PERSON_FILTER':
+      return {
+        ...state,
+        selectedPerson: action.personId,
+        selectedFolder: null,
+        selectedTag: null,
+        untaggedFilterActive: false
+      }
+    case 'SET_PERSON_PHOTO_ASSIGNMENTS':
+      return { ...state, personPhotoAssignments: action.assignments }
     case 'SET_SORT':
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'SET_DEFAULT_VIEW':

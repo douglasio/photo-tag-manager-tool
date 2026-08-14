@@ -247,6 +247,30 @@ describe('photoLibraryReducer', () => {
       state = photoLibraryReducer(state, { type: 'SET_FOLDER_FILTER', folder: '/root' })
       expect(state.untaggedFilterActive).toBe(false)
     })
+
+    it('person filter clears folder/tag/untagged filters, and vice versa', () => {
+      let state = photoLibraryReducer(initialState, {
+        type: 'SET_PERSON_FILTER',
+        personId: 'p1'
+      })
+      expect(state.selectedPerson).toBe('p1')
+
+      state = photoLibraryReducer(state, { type: 'SET_TAG_FILTER', tag: 'vacation' })
+      expect(state.selectedPerson).toBeNull()
+
+      state = photoLibraryReducer(state, { type: 'SET_PERSON_FILTER', personId: 'p1' })
+      state = photoLibraryReducer(state, { type: 'SET_FOLDER_FILTER', folder: '/root' })
+      expect(state.selectedPerson).toBeNull()
+
+      state = photoLibraryReducer(state, { type: 'SET_PERSON_FILTER', personId: 'p1' })
+      state = photoLibraryReducer(state, { type: 'SET_UNTAGGED_FILTER', active: true })
+      expect(state.selectedPerson).toBeNull()
+
+      state = photoLibraryReducer(state, { type: 'SET_PERSON_FILTER', personId: 'p1' })
+      expect(state.untaggedFilterActive).toBe(false)
+      expect(state.selectedFolder).toBeNull()
+      expect(state.selectedTag).toBeNull()
+    })
   })
 
   describe('settings toggles', () => {
@@ -373,6 +397,15 @@ describe('photoLibraryReducer', () => {
       ]
       const state = photoLibraryReducer(initialState, { type: 'SET_PEOPLE', people })
       expect(state.people).toEqual(people)
+    })
+
+    it('replaces the person photo assignments map', () => {
+      const assignments = new Map([['p1', new Set(['/a.jpg', '/b.jpg'])]])
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_PERSON_PHOTO_ASSIGNMENTS',
+        assignments
+      })
+      expect(state.personPhotoAssignments).toBe(assignments)
     })
   })
 

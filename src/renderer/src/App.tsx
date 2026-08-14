@@ -54,6 +54,7 @@ import {
   FolderTree,
   GalleryGrid,
   PeoplePanel,
+  PersonMergeDialog,
   PhotoView,
   ScanProgressBar,
   SettingsModal,
@@ -207,6 +208,24 @@ function FaceDragPreview(): React.JSX.Element {
   )
 }
 
+// The DragOverlay ghost for a person being dragged onto another one to merge.
+function PersonDragPreview({ name }: { name: string | null }): React.JSX.Element {
+  return (
+    <Paper
+      withBorder
+      shadow="md"
+      px="sm"
+      py={4}
+      radius={RADIUS_SIZE}
+      style={{ cursor: 'grabbing' }}
+    >
+      <Text size="sm" fw={500}>
+        {name ?? 'Unnamed person'}
+      </Text>
+    </Paper>
+  )
+}
+
 // Split out from App so it can call usePhotoLibrary — a component can't read
 // a context it also renders the Provider for in the same function.
 function AppLayout(): React.JSX.Element {
@@ -222,6 +241,7 @@ function AppLayout(): React.JSX.Element {
     reorderPhotoTabs,
     assignTagToGroup,
     assignFaceToPerson,
+    mergePeople,
     setNavbarSplitSizes
   } = usePhotoLibrary()
   // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
@@ -296,18 +316,43 @@ function AppLayout(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Three independent drag domains share this one DndContext (tags can't
+  // Four independent drag domains share this one DndContext (tags can't
   // move to a second, nested context scoped to the tag panel without
   // shadowing their existing useDroppable — see the tag-drag branch below)
   // — 'photo' is the original dragged-thumbnail-onto-tag/folder flow, 'tag'
   // is a tag being dragged into a group, 'face' is a face (from
-  // DetailPanelFaces) being dragged onto a person.
+  // DetailPanelFaces) being dragged onto a person (assign), 'person' is a
+  // whole person row dragged onto another one (merge).
   const [activeDrag, setActiveDrag] = useState<
     | { kind: 'photo'; paths: string[] }
     | { kind: 'tag'; tag: string }
     | { kind: 'face'; faceId: string }
+    | { kind: 'person'; personId: string; personName: string | null }
     | null
   >(null)
+
+  // Dropping one person onto another stages a merge here rather than
+  // applying it immediately — unlike a single face assignment, a merge
+  // deletes a whole person row, so it gets an explicit confirm step.
+  const [pendingMerge, setPendingMerge] = useState<{
+    sourceId: string
+    sourceName: string
+    targetId: string
+    targetName: string
+  } | null>(null)
+  const [mergeSaving, setMergeSaving] = useState(false)
+
+  const handleConfirmMerge = async (): Promise<void> => {
+    if (!pendingMerge) return
+    setMergeSaving(true)
+    try {
+      await mergePeople(pendingMerge.sourceId, pendingMerge.targetId)
+      setPendingMerge(null)
+    } finally {
+      setMergeSaving(false)
+    }
+  }
+
   const sensors = useSensors(
     // Requires a small pointer move before a drag "starts," so an ordinary
     // click (select, rename, etc.) is never mistaken for a drag.
@@ -316,13 +361,28 @@ function AppLayout(): React.JSX.Element {
 
   const handleDragStart = (event: DragStartEvent): void => {
     const data = event.active.data.current as
-      { paths?: string[]; tag?: string; faceId?: string } | undefined
+      | {
+          paths?: string[]
+          tag?: string
+          faceId?: string
+          personId?: string
+          personName?: string | null
+        }
+      | undefined
     if (data?.tag) {
       setActiveDrag({ kind: 'tag', tag: data.tag })
       return
     }
     if (data?.faceId) {
       setActiveDrag({ kind: 'face', faceId: data.faceId })
+      return
+    }
+    if (data?.personId) {
+      setActiveDrag({
+        kind: 'person',
+        personId: data.personId,
+        personName: data.personName ?? null
+      })
       return
     }
     const paths = data?.paths
@@ -338,7 +398,14 @@ function AppLayout(): React.JSX.Element {
     if (!over) return
 
     const activeData = active.data.current as
-      { paths?: string[]; tag?: string; faceId?: string } | undefined
+      | {
+          paths?: string[]
+          tag?: string
+          faceId?: string
+          personId?: string
+          personName?: string | null
+        }
+      | undefined
     if (activeData?.tag) {
       const overData = over.data.current as { groupId?: string | null } | undefined
       if (overData && 'groupId' in overData) {
@@ -351,6 +418,20 @@ function AppLayout(): React.JSX.Element {
       const overData = over.data.current as { personId?: string } | undefined
       if (overData?.personId) {
         void assignFaceToPerson(activeData.faceId, overData.personId)
+      }
+      return
+    }
+
+    if (activeData?.personId) {
+      const overData = over.data.current as { personId?: string } | undefined
+      if (overData?.personId && overData.personId !== activeData.personId) {
+        const targetName = state.people.find((p) => p.id === overData.personId)?.name
+        setPendingMerge({
+          sourceId: activeData.personId,
+          sourceName: activeData.personName ?? 'Unnamed person',
+          targetId: overData.personId,
+          targetName: targetName ?? 'Unnamed person'
+        })
       }
       return
     }
@@ -637,7 +718,7 @@ function AppLayout(): React.JSX.Element {
       <DragOverlay
         modifiers={[snapCenterToCursor]}
         style={
-          activeDrag?.kind === 'tag' || activeDrag?.kind === 'face'
+          activeDrag?.kind === 'tag' || activeDrag?.kind === 'face' || activeDrag?.kind === 'person'
             ? undefined
             : { width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }
         }
@@ -646,6 +727,8 @@ function AppLayout(): React.JSX.Element {
           <TagDragPreview tag={activeDrag.tag} />
         ) : activeDrag?.kind === 'face' ? (
           <FaceDragPreview />
+        ) : activeDrag?.kind === 'person' ? (
+          <PersonDragPreview name={activeDrag.personName} />
         ) : (
           activeDragPhoto && (
             <DragPreview
@@ -655,6 +738,16 @@ function AppLayout(): React.JSX.Element {
           )
         )}
       </DragOverlay>
+      {pendingMerge && (
+        <PersonMergeDialog
+          sourceName={pendingMerge.sourceName}
+          targetName={pendingMerge.targetName}
+          opened
+          saving={mergeSaving}
+          onConfirm={() => void handleConfirmMerge()}
+          onCancel={() => setPendingMerge(null)}
+        />
+      )}
     </DndContext>
   )
 }

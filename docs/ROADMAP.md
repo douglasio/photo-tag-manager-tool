@@ -33,6 +33,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
    - Crop the People panel's cover thumbnail to the actual face region instead of showing the full photo — DetailPanelFaces already does this via a CSS crop, PeoplePanel's cover doesn't yet.
    - Filter the gallery by person, the same way tag filtering works today.
    - Centroid refinement: once a person has a few manually-confirmed faces, average their embeddings into a refined match target for future auto-clustering passes, instead of relying solely on the raw DBSCAN cluster centroid.
+   -
 
 ## Dashboard
 
@@ -49,6 +50,24 @@ To-dos, tasks, and features loosely grouped by feature segment.
 3. The next view should be...
 
 4. Contact sheet?
+
+5. For Tags and People, make it possible to select a "cover photo." Today we default to the most recent photo from the tag or person, we should be able to manually select one. I would imagine this will be under the right-click menu on gallery view items. Initially I thought it should only appear when a tag or person is selected and filtered (Make cover photo for [tag / person name]). But if the gallery isn't filtered, I think right-clicking a photo should show a Make Cover Photo for [ person in this photo ], and "Make Cover Photo for [ tag on this photo ] with a flyout showing other tags on the photo. That's a lot, so ask for clarification if anything is ambiguous.
+
+6. Full-tab views for each left panel section?
+
+### People
+
+1. Make People the middle panel, between Folders and Tags.
+
+2. Fix the side panel divider resizing -- now that there are two dividers, neither of them allow resizing and I assume both positions are not persisted.
+
+3. Make each panel (Tags, People, Folders) collapsible (accordion-style) and persist the settings.
+
+4. Allow for hiding People -- hide them from the UI and don't re-suggest that grouping of faces. Add all hidden people to a new section in the Settings modal so they can be un-hidden.
+
+5. Allow descriptions to be added to People, same pattern we used for Tags.
+
+6. Apply the 2-column tile alternate layout we used for the tags panel to the people panel, with the same persisted toggle and functionality.
 
 ## Tools
 

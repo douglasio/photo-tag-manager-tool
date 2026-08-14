@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from 'react'
+import { type ReactElement, useRef, useState } from 'react'
 
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core'
 import {
@@ -32,6 +32,7 @@ import { usePhotoLibrary } from '@state'
 import { activeHoverBackground, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { TagContextMenu } from './TagContextMenu'
+import { TagDeleteDialog } from './TagDeleteDialog'
 import { TagGroupContextMenu } from './TagGroupContextMenu'
 import { TagGroupDeleteDialog } from './TagGroupDeleteDialog'
 import { TagGroupNameDialog } from './TagGroupNameDialog'
@@ -53,6 +54,7 @@ interface TagListItemProps {
   onStartEdit: () => void
   onStopEdit: () => void
   onRename: (newTag: string) => Promise<void>
+  onDelete: () => Promise<void>
 }
 
 function TagListItem({
@@ -66,7 +68,8 @@ function TagListItem({
   onSelect,
   onStartEdit,
   onStopEdit,
-  onRename
+  onRename,
+  onDelete
 }: TagListItemProps): ReactElement {
   const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
   // Tags are drop targets for photos (dragging a photo onto one adds the
@@ -91,7 +94,14 @@ function TagListItem({
     data: { tag },
     disabled: !draggable || editing
   })
-  const ref = useMergedRef(hoverRef, setDropRef, setDragRef)
+  // Mantine's Tooltip only forwards a fixed prop whitelist (onClick,
+  // onMouseEnter, ...) onto a wrapped child — onContextMenu isn't in it, so
+  // Menu.ContextMenu's right-click handler never reached the button when
+  // Tooltip wrapped it as a parent. Using Tooltip's `target` prop instead
+  // (a plain ref to the button) decouples the two, so the description
+  // tooltip no longer swallows the button's own context-menu events.
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const ref = useMergedRef(hoverRef, setDropRef, setDragRef, buttonRef)
 
   const [draft, setDraft] = useState(tag)
   // Adjust-during-render reset (not a useEffect) for when editing is
@@ -105,6 +115,8 @@ function TagListItem({
 
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const trimmed = draft.trim()
   const canAttemptSave = trimmed.length > 0 && trimmed !== tag
@@ -147,129 +159,144 @@ function TagListItem({
     }
   }
 
+  const handleDeleteConfirm = async (): Promise<void> => {
+    setDeleting(true)
+    try {
+      await onDelete()
+      setConfirmingDelete(false)
+      notifications.show({
+        color: 'teal',
+        message: `Deleted tag "${tag}" from ${count} photo${count === 1 ? '' : 's'}`
+      })
+    } catch {
+      // onDelete already surfaces an error toast — leave the dialog open so
+      // the user can retry or cancel.
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <>
-      <TagContextMenu onRename={onStartEdit}>
+      <TagContextMenu onRename={onStartEdit} onDelete={() => setConfirmingDelete(true)}>
         {/* Edit mode reuses the exact same Button/leftSection/padding chrome
             as view mode, only swapping Text for a TextInput as the button's
             content — otherwise the differing padding/gap shifts the row's
             font size and horizontal position when toggling (same reasoning
             as FolderTree's rename row). */}
-        <Tooltip
-          position="right"
-          label={<TagHoverCardContent tag={tag} description={description || undefined} />}
-          disabled={editing}
-          openDelay={700}
-          multiline
-          maw={260}
+        <Button
+          ref={ref}
+          {...attributes}
+          {...listeners}
+          onClick={() => {
+            if (editing) return
+            onSelect()
+          }}
+          // Space is the gallery's preview-trigger key, not a click here —
+          // without this, a native space-triggers-click on this button (still
+          // focused from the click that selected it) would re-fire onSelect
+          // while previewing a thumbnail and toggle this tag's filter off.
+          onKeyDown={(event) => {
+            if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+          }}
+          opacity={isDragging ? 0.4 : undefined}
+          fullWidth
+          h="auto"
+          py={6}
+          justify="space-between"
+          variant="transparent"
+          bg={
+            isOver ? 'var(--mantine-primary-color-light)' : activeHoverBackground(isActive, hovered)
+          }
+          style={{
+            outline: isOver ? '2px dashed var(--mantine-primary-color-filled)' : undefined,
+            outlineOffset: -2
+          }}
+          styles={{
+            label: {
+              flex: 1,
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              justifyContent: 'center'
+            }
+          }}
+          leftSection={
+            coverPhoto?.thumbnailStatus === 'ready' &&
+            coverPhoto.thumbnailKey && (
+              <AspectRatio ratio={1 / 1}>
+                <Image
+                  src={toThumbProtocolUrl(coverPhoto.thumbnailKey)}
+                  w={COVER_SIZE}
+                  h={COVER_SIZE}
+                  fit="cover"
+                />
+              </AspectRatio>
+            )
+          }
+          rightSection={
+            <>
+              {!editing && (
+                <Tooltip label="Rename tag">
+                  <ActionIcon
+                    opacity={hovered ? 0.7 : 0}
+                    style={{ flexShrink: 0 }}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onStartEdit()
+                    }}
+                    aria-label={`Rename #${tag}`}
+                  >
+                    <IconPencil />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              <Badge size="md" variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
+                {count}
+              </Badge>
+            </>
+          }
         >
-          <Button
-            ref={ref}
-            {...attributes}
-            {...listeners}
-            onClick={() => {
-              if (editing) return
-              onSelect()
-            }}
-            // Space is the gallery's preview-trigger key, not a click here —
-            // without this, a native space-triggers-click on this button (still
-            // focused from the click that selected it) would re-fire onSelect
-            // while previewing a thumbnail and toggle this tag's filter off.
-            onKeyDown={(event) => {
-              if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
-            }}
-            opacity={isDragging ? 0.4 : undefined}
-            fullWidth
-            h="auto"
-            py={6}
-            justify="space-between"
-            variant="transparent"
-            bg={
-              isOver
-                ? 'var(--mantine-primary-color-light)'
-                : activeHoverBackground(isActive, hovered)
-            }
-            style={{
-              outline: isOver ? '2px dashed var(--mantine-primary-color-filled)' : undefined,
-              outlineOffset: -2
-            }}
-            styles={{
-              label: {
-                flex: 1,
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                justifyContent: 'center'
-              }
-            }}
-            leftSection={
-              coverPhoto?.thumbnailStatus === 'ready' &&
-              coverPhoto.thumbnailKey && (
-                <AspectRatio ratio={1 / 1}>
-                  <Image
-                    src={toThumbProtocolUrl(coverPhoto.thumbnailKey)}
-                    w={COVER_SIZE}
-                    h={COVER_SIZE}
-                    fit="cover"
-                  />
-                </AspectRatio>
-              )
-            }
-            rightSection={
-              <>
-                {!editing && (
-                  <Tooltip label="Rename tag">
-                    <ActionIcon
-                      opacity={hovered ? 0.7 : 0}
-                      style={{ flexShrink: 0 }}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onStartEdit()
-                      }}
-                      aria-label={`Rename #${tag}`}
-                    >
-                      <IconPencil />
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-                <Badge size="md" variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
-                  {count}
-                </Badge>
-              </>
-            }
-          >
-            {editing ? (
-              <TextInput
-                autoFocus
-                variant="unstyled"
-                value={draft}
-                w="100%"
-                onChange={(event) => setDraft(event.currentTarget.value)}
-                onBlur={attemptSave}
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => {
-                  event.stopPropagation()
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    attemptSave()
-                  } else if (event.key === 'Escape') {
-                    cancel()
-                  }
-                }}
-                styles={{ input: { padding: 0, height: 'auto', minHeight: 'auto' } }}
-              />
-            ) : (
-              <Text display="block" ta="left" truncate="end">
-                {tag}
-              </Text>
-            )}
-            {description && !editing && (
-              <Text display="block" truncate="end" size="xs" c="dimmed" lineClamp={1}>
-                {description}
-              </Text>
-            )}
-          </Button>
-        </Tooltip>
+          {editing ? (
+            <TextInput
+              autoFocus
+              variant="unstyled"
+              value={draft}
+              w="100%"
+              onChange={(event) => setDraft(event.currentTarget.value)}
+              onBlur={attemptSave}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                event.stopPropagation()
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  attemptSave()
+                } else if (event.key === 'Escape') {
+                  cancel()
+                }
+              }}
+              styles={{ input: { padding: 0, height: 'auto', minHeight: 'auto' } }}
+            />
+          ) : (
+            <Text display="block" ta="left" truncate="end">
+              {tag}
+            </Text>
+          )}
+          {description && !editing && (
+            <Text display="block" truncate="end" size="xs" c="dimmed" lineClamp={1}>
+              {description}
+            </Text>
+          )}
+        </Button>
       </TagContextMenu>
+      <Tooltip
+        target={buttonRef}
+        position="right"
+        label={<TagHoverCardContent tag={tag} description={description || undefined} />}
+        disabled={editing}
+        openDelay={700}
+        multiline
+        maw={260}
+      />
       <TagRenameDialog
         oldTag={tag}
         newTag={trimmed}
@@ -278,6 +305,14 @@ function TagListItem({
         saving={saving}
         onConfirm={() => void handleConfirm()}
         onCancel={handleCancelConfirm}
+      />
+      <TagDeleteDialog
+        tag={tag}
+        count={count}
+        opened={confirmingDelete}
+        saving={deleting}
+        onConfirm={() => void handleDeleteConfirm()}
+        onCancel={() => setConfirmingDelete(false)}
       />
     </>
   )
@@ -412,7 +447,8 @@ function TagGroupSection({
 }
 
 export function TagPanel(): ReactElement {
-  const { allTags, tagCounts, tagCoverPhotos, state, setTagFilter, renameTag } = usePhotoLibrary()
+  const { allTags, tagCounts, tagCoverPhotos, state, setTagFilter, renameTag, deleteTag } =
+    usePhotoLibrary()
   const [editingTag, setEditingTag] = useState<string | null>(null)
 
   if (allTags.length === 0) {
@@ -435,6 +471,7 @@ export function TagPanel(): ReactElement {
         onStartEdit={() => setEditingTag(tag)}
         onStopEdit={() => setEditingTag(null)}
         onRename={(newTag) => renameTag(tag, newTag)}
+        onDelete={() => deleteTag(tag)}
       />
     )
   }

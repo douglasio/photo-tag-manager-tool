@@ -69,6 +69,7 @@ export function GalleryGrid(): ReactElement {
     folderHasUntagged,
     setFolderTagFilter,
     setFolderUntaggedFilter,
+    setPersonFilter,
     renameFile,
     openCompareTab,
     openDuplicatesTab,
@@ -185,16 +186,24 @@ export function GalleryGrid(): ReactElement {
   // name/description UI; a folder view shows the folder as the title
   // instead, since the tag there is just a filter.
   const isPureTagView = state.selectedTag !== null && state.selectedFolder === null
+  // SET_PERSON_FILTER always clears selectedFolder (see the reducer), so
+  // this is never combined with a folder view.
+  const isPersonView = state.selectedPerson !== null
+  const selectedPersonName = isPersonView
+    ? (state.people.find((person) => person.id === state.selectedPerson)?.name ?? 'Unnamed person')
+    : null
 
   const galleryTitle = state.untaggedFilterActive
     ? 'untagged'
     : isPureTagView
       ? `#${state.selectedTag}`
-      : state.selectedFolder
-        ? basename(state.selectedFolder)
-        : state.folders.length > 0
-          ? 'All Photos'
-          : null
+      : isPersonView
+        ? selectedPersonName
+        : state.selectedFolder
+          ? basename(state.selectedFolder)
+          : state.folders.length > 0
+            ? 'All Photos'
+            : null
 
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
@@ -228,6 +237,18 @@ export function GalleryGrid(): ReactElement {
                   count={tagCounts.get(state.selectedTag!) ?? 0}
                   onDelete={() => deleteTag(state.selectedTag!)}
                 />
+              )}
+              {isPersonView && (
+                <Tooltip label="Clear person filter">
+                  <ActionIcon
+                    variant="subtle"
+                    onClick={() => setPersonFilter(null)}
+                    aria-label="Clear person filter"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <IconX size={16} />
+                  </ActionIcon>
+                </Tooltip>
               )}
             </Group>
             <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>

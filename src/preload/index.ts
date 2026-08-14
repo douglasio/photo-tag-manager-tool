@@ -103,6 +103,8 @@ const api = {
   getFacesForPhoto: (filePath: string): Promise<FaceRecord[]> =>
     ipcRenderer.invoke('faces:getForPhoto', filePath),
   getPeople: (): Promise<PersonRecord[]> => ipcRenderer.invoke('faces:getPeople'),
+  getFacePhotoAssignments: (): Promise<{ photoPath: string; personId: string }[]> =>
+    ipcRenderer.invoke('faces:getPhotoAssignments'),
   enableFaceDetectionAndScan: (): Promise<FaceScanResult> =>
     ipcRenderer.invoke('faces:enableAndScan'),
   rescanFaces: (): Promise<FaceScanResult> => ipcRenderer.invoke('faces:rescan'),

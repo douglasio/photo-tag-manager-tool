@@ -4,6 +4,7 @@ import {
   deletePerson,
   getFacesForPhoto,
   getPeople,
+  getPersonPhotoAssignments,
   mergePeople,
   renamePerson,
   setFacePersonAssignment,
@@ -23,6 +24,12 @@ export function registerFaceHandlers(): void {
   )
 
   ipcMain.handle('faces:getPeople', (): PersonRecord[] => getPeople())
+
+  // Feeds the gallery's filter-by-person lookup — see
+  // PhotoLibraryContext's personPhotoAssignments.
+  ipcMain.handle('faces:getPhotoAssignments', (): { photoPath: string; personId: string }[] =>
+    getPersonPhotoAssignments()
+  )
 
   // Enables the setting, then detects+clusters faces across the library —
   // triggerable from Settings, mirroring ai:enableAndScan.

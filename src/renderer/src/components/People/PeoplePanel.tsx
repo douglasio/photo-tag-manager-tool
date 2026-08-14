@@ -1,8 +1,19 @@
 import { type ReactElement, useState } from 'react'
 
-import { useDroppable } from '@dnd-kit/core'
-import { AspectRatio, Badge, Button, Image, Stack, Text } from '@mantine/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
+import {
+  ActionIcon,
+  AspectRatio,
+  Badge,
+  Button,
+  Image,
+  Stack,
+  Text,
+  TextInput,
+  Tooltip
+} from '@mantine/core'
 import { useHover, useMergedRef } from '@mantine/hooks'
+import { IconPencil } from '@tabler/icons-react'
 
 import { PanelSection } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
@@ -12,38 +23,80 @@ import { activeHoverBackground } from '@utils'
 
 import { PersonContextMenu } from './PersonContextMenu'
 import { PersonDeleteDialog } from './PersonDeleteDialog'
-import { PersonNameDialog } from './PersonNameDialog'
 
 const COVER_SIZE = 32
 
 interface PersonRowProps {
   person: PersonRecord
+  editing: boolean
+  onStartEdit: () => void
+  onStopEdit: () => void
 }
 
-function PersonRow({ person }: PersonRowProps): ReactElement {
-  const { state, renamePerson, deletePerson } = usePhotoLibrary()
+function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps): ReactElement {
+  const { state, renamePerson, deletePerson, setPersonFilter } = usePhotoLibrary()
+  const isActive = state.selectedPerson === person.id
   const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
-  // Drop target for a face dragged from DetailPanelFaces — see
-  // handleDragEnd's faceId/personId branch in App.tsx.
-  const { isOver, setNodeRef } = useDroppable({
+  // Drop target for a face dragged from DetailPanelFaces (assign) or another
+  // person row dragged from below (merge) — see handleDragEnd's
+  // faceId/personId branches in App.tsx.
+  const { isOver, setNodeRef: setDropRef } = useDroppable({
     id: `person:${person.id}`,
     data: { personId: person.id }
   })
-  const ref = useMergedRef(hoverRef, setNodeRef)
+  // Drag source for merging this person into another one — a different id
+  // than the droppable above (dnd-kit wants drag/drop ids distinct), same
+  // "-drag" suffix convention TagListItem uses for tag-into-group drags.
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging
+  } = useDraggable({
+    id: `person-drag:${person.id}`,
+    data: { personId: person.id, personName: person.name },
+    disabled: editing
+  })
+  const ref = useMergedRef(hoverRef, setDropRef, setDragRef)
 
-  const [renaming, setRenaming] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [saving, setSaving] = useState(false)
-
+  const displayName = person.name ?? 'Unnamed person'
   const coverThumbnailKey = person.coverPhotoPath
     ? state.photosByPath.get(person.coverPhotoPath)?.thumbnailKey
     : null
 
-  const handleRename = async (name: string): Promise<void> => {
+  // Inline rename, matching TagListItem's edit style (no confirm dialog —
+  // unlike a tag rename, this never touches photo files, just a DB row).
+  const [draft, setDraft] = useState(person.name ?? '')
+  // Adjust-during-render reset for when editing is triggered externally (the
+  // pencil icon) — same pattern TagListItem/FolderTree's rename rows use.
+  const [wasEditing, setWasEditing] = useState(editing)
+  if (editing !== wasEditing) {
+    setWasEditing(editing)
+    if (editing) setDraft(person.name ?? '')
+  }
+
+  const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  const cancel = (): void => {
+    setDraft(person.name ?? '')
+    onStopEdit()
+  }
+
+  const attemptSave = async (): Promise<void> => {
+    if (saving) return
+    const trimmed = draft.trim()
+    if (trimmed === (person.name ?? '')) {
+      onStopEdit()
+      return
+    }
     setSaving(true)
     try {
-      await renamePerson(person.id, name)
-      setRenaming(false)
+      await renamePerson(person.id, trimmed)
+      onStopEdit()
+    } catch (err) {
+      console.error(`failed to rename person ${person.id}`, err)
+      // Leave editing open so the user can retry or press Escape to cancel.
     } finally {
       setSaving(false)
     }
@@ -59,25 +112,42 @@ function PersonRow({ person }: PersonRowProps): ReactElement {
     }
   }
 
-  const displayName = person.name ?? 'Unnamed person'
-
   return (
     <>
-      <PersonContextMenu
-        onRename={() => setRenaming(true)}
-        onDelete={() => setConfirmingDelete(true)}
-      >
+      <PersonContextMenu onRename={onStartEdit} onDelete={() => setConfirmingDelete(true)}>
+        {/* Edit mode reuses the exact same Button/leftSection/padding chrome
+            as view mode, only swapping Text for a TextInput as the button's
+            content — otherwise the differing padding/gap shifts the row's
+            font size and horizontal position when toggling (same reasoning
+            as TagListItem/FolderTree's rename rows). */}
         <Button
           ref={ref}
+          {...attributes}
+          {...listeners}
           fullWidth
           h="auto"
           py={6}
           justify="space-between"
           variant="transparent"
-          bg={isOver ? 'var(--mantine-primary-color-light)' : activeHoverBackground(false, hovered)}
+          opacity={isDragging ? 0.4 : undefined}
+          onClick={() => {
+            if (editing) return
+            setPersonFilter(isActive ? null : person.id)
+          }}
+          bg={
+            isOver ? 'var(--mantine-primary-color-light)' : activeHoverBackground(isActive, hovered)
+          }
           style={{
             outline: isOver ? '2px dashed var(--mantine-primary-color-filled)' : undefined,
             outlineOffset: -2
+          }}
+          styles={{
+            label: {
+              flex: 1,
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              justifyContent: 'center'
+            }
           }}
           leftSection={
             coverThumbnailKey && (
@@ -93,23 +163,57 @@ function PersonRow({ person }: PersonRowProps): ReactElement {
             )
           }
           rightSection={
-            <Badge size="md" variant="light" style={{ flexShrink: 0 }}>
-              {person.faceCount}
-            </Badge>
+            <>
+              {!editing && (
+                <Tooltip label="Rename person">
+                  <ActionIcon
+                    opacity={hovered ? 0.7 : 0}
+                    style={{ flexShrink: 0 }}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onStartEdit()
+                    }}
+                    aria-label={`Rename ${displayName}`}
+                  >
+                    <IconPencil />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              <Badge size="md" variant="light" style={{ flexShrink: 0 }}>
+                {person.faceCount}
+              </Badge>
+            </>
           }
         >
-          <Text display="block" ta="left" truncate="end">
-            {displayName}
-          </Text>
+          {editing ? (
+            <TextInput
+              autoFocus
+              variant="unstyled"
+              value={draft}
+              w="100%"
+              disabled={saving}
+              placeholder="Unnamed person"
+              onChange={(event) => setDraft(event.currentTarget.value)}
+              onBlur={() => void attemptSave()}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                event.stopPropagation()
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void attemptSave()
+                } else if (event.key === 'Escape') {
+                  cancel()
+                }
+              }}
+              styles={{ input: { padding: 0, height: 'auto', minHeight: 'auto' } }}
+            />
+          ) : (
+            <Text display="block" ta="left" truncate="end">
+              {displayName}
+            </Text>
+          )}
         </Button>
       </PersonContextMenu>
-      <PersonNameDialog
-        opened={renaming}
-        saving={saving}
-        initialName={person.name ?? ''}
-        onConfirm={(name) => void handleRename(name)}
-        onCancel={() => setRenaming(false)}
-      />
       <PersonDeleteDialog
         name={displayName}
         opened={confirmingDelete}
@@ -127,6 +231,7 @@ function PersonRow({ person }: PersonRowProps): ReactElement {
 // group hierarchy would otherwise be for.
 export function PeoplePanel(): ReactElement {
   const { state } = usePhotoLibrary()
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null)
 
   if (state.people.length === 0) {
     return (
@@ -142,7 +247,13 @@ export function PeoplePanel(): ReactElement {
     <PanelSection title="People">
       <Stack gap={0}>
         {state.people.map((person) => (
-          <PersonRow key={person.id} person={person} />
+          <PersonRow
+            key={person.id}
+            person={person}
+            editing={editingPersonId === person.id}
+            onStartEdit={() => setEditingPersonId(person.id)}
+            onStopEdit={() => setEditingPersonId(null)}
+          />
         ))}
       </Stack>
     </PanelSection>
