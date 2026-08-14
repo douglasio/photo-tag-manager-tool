@@ -86,6 +86,32 @@ function createMockApi(): {
     wasAiScanInterrupted: vi.fn().mockResolvedValue(false),
     onAiScanProgress: onMethod('onAiScanProgress'),
     suggestTags: vi.fn().mockResolvedValue([]),
+    getFaceDetectionEnabled: vi.fn().mockResolvedValue(false),
+    setFaceDetectionEnabled: vi.fn().mockResolvedValue(undefined),
+    getFacesForPhoto: vi.fn().mockResolvedValue([]),
+    getPeople: vi.fn().mockResolvedValue([]),
+    enableFaceDetectionAndScan: vi.fn().mockResolvedValue({
+      facesDetected: 0,
+      peopleCount: 0,
+      photosScanned: 0,
+      canceled: false
+    }),
+    rescanFaces: vi.fn().mockResolvedValue({
+      facesDetected: 0,
+      peopleCount: 0,
+      photosScanned: 0,
+      canceled: false
+    }),
+    cancelFaceScan: vi.fn().mockResolvedValue(undefined),
+    onFaceScanProgress: onMethod('onFaceScanProgress'),
+    renamePerson: vi.fn().mockResolvedValue(undefined),
+    assignFaceToPerson: vi.fn().mockResolvedValue(undefined),
+    splitFaceAsNewPerson: vi
+      .fn()
+      .mockResolvedValue({ id: 'person-new', name: null, coverFaceId: null, faceCount: 1 }),
+    unassignFace: vi.fn().mockResolvedValue(undefined),
+    mergePeople: vi.fn().mockResolvedValue(undefined),
+    deletePerson: vi.fn().mockResolvedValue(undefined),
     getDetailsPanelCollapsed: vi.fn().mockResolvedValue(false),
     setDetailsPanelCollapsed: vi.fn().mockResolvedValue(undefined),
     getNavbarSplitSizes: vi.fn().mockResolvedValue(null),

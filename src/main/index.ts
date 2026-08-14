@@ -7,6 +7,7 @@ import icon from '../../resources/icon.png?asset'
 import { getFolders } from './db/settingsRepository'
 import { registerAiHandlers } from './ipc/aiHandlers'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
+import { registerFaceHandlers } from './ipc/faceHandlers'
 import { registerLibraryDataHandlers } from './ipc/libraryDataHandlers'
 import { registerPhotoHandlers } from './ipc/photoHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
@@ -98,6 +99,7 @@ if (!app.requestSingleInstanceLock()) {
     registerSettingsHandlers()
     registerTagHandlers()
     registerAiHandlers()
+    registerFaceHandlers()
     registerThrowbackHandlers()
     registerLibraryDataHandlers()
 

@@ -89,6 +89,17 @@ export function setAiTagSuggestionsEnabled(value: boolean): void {
   setSetting('aiTagSuggestionsEnabled', String(value))
 }
 
+// Its own toggle, separate from aiTagSuggestionsEnabled — face detection is
+// a heavier, more optional pass most users may not want even if they want
+// tag suggestions.
+export function getFaceDetectionEnabled(): boolean {
+  return getSetting('faceDetectionEnabled') === 'true'
+}
+
+export function setFaceDetectionEnabled(value: boolean): void {
+  setSetting('faceDetectionEnabled', String(value))
+}
+
 // Set while a scan is running and cleared when it finishes for any reason
 // while the app is still alive (success, error, or user cancel) — so if it's
 // still true on the next launch, the previous scan was cut off by a quit

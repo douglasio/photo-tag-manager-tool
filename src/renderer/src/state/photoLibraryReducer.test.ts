@@ -337,6 +337,43 @@ describe('photoLibraryReducer', () => {
       })
       expect(state.dvdStudioName).toBe('Custom Studio')
     })
+
+    it('SET_FACE_DETECTION_ENABLED flips the flag but returns the same state when unchanged', () => {
+      const enabled = photoLibraryReducer(initialState, {
+        type: 'SET_FACE_DETECTION_ENABLED',
+        value: true
+      })
+      expect(enabled.faceDetectionEnabled).toBe(true)
+
+      const repeated = photoLibraryReducer(enabled, {
+        type: 'SET_FACE_DETECTION_ENABLED',
+        value: true
+      })
+      expect(repeated).toBe(enabled)
+    })
+
+    it('sets the face scan progress', () => {
+      const progress = { phase: 'detecting' as const, done: 3, total: 10 }
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_FACE_SCAN_PROGRESS',
+        progress
+      })
+      expect(state.faceScanProgress).toEqual(progress)
+
+      const cleared = photoLibraryReducer(state, {
+        type: 'SET_FACE_SCAN_PROGRESS',
+        progress: null
+      })
+      expect(cleared.faceScanProgress).toBeNull()
+    })
+
+    it('replaces the people list', () => {
+      const people = [
+        { id: 'p1', name: 'Jamie', coverFaceId: 'f1', coverPhotoPath: '/a.jpg', faceCount: 2 }
+      ]
+      const state = photoLibraryReducer(initialState, { type: 'SET_PEOPLE', people })
+      expect(state.people).toEqual(people)
+    })
   })
 
   describe('recent tags', () => {

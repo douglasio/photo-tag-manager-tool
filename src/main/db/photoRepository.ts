@@ -3,6 +3,7 @@ import type { PhotoRecord } from '@shared/types'
 
 import { getDb } from './database'
 import { deleteEmbedding, renameEmbedding } from './embeddingRepository'
+import { deleteFacesForPhoto, renameFacesForPhoto } from './faceRepository'
 import { getExcludedFolders } from './settingsRepository'
 import { reconcileTagGroups } from './tagMetadataRepository'
 
@@ -222,6 +223,7 @@ export function removePhoto(filePath: string): string | null {
   db.prepare('DELETE FROM photos WHERE path = ?').run(filePath)
   reconcileTagGroups()
   deleteEmbedding(filePath)
+  deleteFacesForPhoto(filePath)
   return row.thumbnailKey
 }
 
@@ -233,6 +235,7 @@ export function renamePhotoPath(oldPath: string, newPath: string, fileName: stri
     .prepare('UPDATE photos SET path = @newPath, fileName = @fileName WHERE path = @oldPath')
     .run({ oldPath, newPath, fileName })
   renameEmbedding(oldPath, newPath)
+  renameFacesForPhoto(oldPath, newPath)
 }
 
 function isPathUnderFolder(path: string, folder: string): boolean {
@@ -264,7 +267,10 @@ export function renamePhotoPathPrefix(oldFolder: string, newFolder: string): voi
     for (const pair of pairs) update.run(pair)
   })
   updateMany(affected)
-  for (const { oldPath, newPath } of affected) renameEmbedding(oldPath, newPath)
+  for (const { oldPath, newPath } of affected) {
+    renameEmbedding(oldPath, newPath)
+    renameFacesForPhoto(oldPath, newPath)
+  }
 }
 
 export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[] {
@@ -282,7 +288,10 @@ export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[]
   })
   deleteMany(stale.map((row) => row.path))
   reconcileTagGroups()
-  for (const row of stale) deleteEmbedding(row.path)
+  for (const row of stale) {
+    deleteEmbedding(row.path)
+    deleteFacesForPhoto(row.path)
+  }
 
   return stale.map((row) => row.thumbnailKey).filter((key): key is string => Boolean(key))
 }

@@ -28,6 +28,11 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 3. There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
 
+4. Face detection follow-ups (deferred out of the initial build):
+   - Crop the People panel's cover thumbnail to the actual face region instead of showing the full photo — DetailPanelFaces already does this via a CSS crop, PeoplePanel's cover doesn't yet.
+   - Filter the gallery by person, the same way tag filtering works today.
+   - Centroid refinement: once a person has a few manually-confirmed faces, average their embeddings into a refined match target for future auto-clustering passes, instead of relying solely on the raw DBSCAN cluster centroid.
+
 ## Dashboard
 
 ### Throwback Widget

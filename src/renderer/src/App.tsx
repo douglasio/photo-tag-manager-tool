@@ -53,6 +53,7 @@ import {
   DuplicatesView,
   FolderTree,
   GalleryGrid,
+  PeoplePanel,
   PhotoView,
   ScanProgressBar,
   SettingsModal,
@@ -186,6 +187,26 @@ function TagDragPreview({ tag }: { tag: string }): React.JSX.Element {
   )
 }
 
+// The DragOverlay ghost for a face being dragged onto a person — same
+// lightweight shape as TagDragPreview above (no crop-thumbnail rendering,
+// just a name-less placeholder since a bare face has no label to show).
+function FaceDragPreview(): React.JSX.Element {
+  return (
+    <Paper
+      withBorder
+      shadow="md"
+      px="sm"
+      py={4}
+      radius={RADIUS_SIZE}
+      style={{ cursor: 'grabbing' }}
+    >
+      <Text size="sm" fw={500}>
+        Face
+      </Text>
+    </Paper>
+  )
+}
+
 // Split out from App so it can call usePhotoLibrary — a component can't read
 // a context it also renders the Provider for in the same function.
 function AppLayout(): React.JSX.Element {
@@ -200,6 +221,7 @@ function AppLayout(): React.JSX.Element {
     setDetailsPanelCollapsed,
     reorderPhotoTabs,
     assignTagToGroup,
+    assignFaceToPerson,
     setNavbarSplitSizes
   } = usePhotoLibrary()
   // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
@@ -274,13 +296,17 @@ function AppLayout(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Two independent drag domains share this one DndContext (tags can't move
-  // to a second, nested context scoped to the tag panel without shadowing
-  // their existing useDroppable — see the tag-drag branch below) — 'photo'
-  // is the original dragged-thumbnail-onto-tag/folder flow, 'tag' is a tag
-  // being dragged into a group.
+  // Three independent drag domains share this one DndContext (tags can't
+  // move to a second, nested context scoped to the tag panel without
+  // shadowing their existing useDroppable — see the tag-drag branch below)
+  // — 'photo' is the original dragged-thumbnail-onto-tag/folder flow, 'tag'
+  // is a tag being dragged into a group, 'face' is a face (from
+  // DetailPanelFaces) being dragged onto a person.
   const [activeDrag, setActiveDrag] = useState<
-    { kind: 'photo'; paths: string[] } | { kind: 'tag'; tag: string } | null
+    | { kind: 'photo'; paths: string[] }
+    | { kind: 'tag'; tag: string }
+    | { kind: 'face'; faceId: string }
+    | null
   >(null)
   const sensors = useSensors(
     // Requires a small pointer move before a drag "starts," so an ordinary
@@ -289,9 +315,14 @@ function AppLayout(): React.JSX.Element {
   )
 
   const handleDragStart = (event: DragStartEvent): void => {
-    const data = event.active.data.current as { paths?: string[]; tag?: string } | undefined
+    const data = event.active.data.current as
+      { paths?: string[]; tag?: string; faceId?: string } | undefined
     if (data?.tag) {
       setActiveDrag({ kind: 'tag', tag: data.tag })
+      return
+    }
+    if (data?.faceId) {
+      setActiveDrag({ kind: 'face', faceId: data.faceId })
       return
     }
     const paths = data?.paths
@@ -306,11 +337,20 @@ function AppLayout(): React.JSX.Element {
     const { active, over } = event
     if (!over) return
 
-    const activeData = active.data.current as { paths?: string[]; tag?: string } | undefined
+    const activeData = active.data.current as
+      { paths?: string[]; tag?: string; faceId?: string } | undefined
     if (activeData?.tag) {
       const overData = over.data.current as { groupId?: string | null } | undefined
       if (overData && 'groupId' in overData) {
         void assignTagToGroup(activeData.tag, overData.groupId ?? null)
+      }
+      return
+    }
+
+    if (activeData?.faceId) {
+      const overData = over.data.current as { personId?: string } | undefined
+      if (overData?.personId) {
+        void assignFaceToPerson(activeData.faceId, overData.personId)
       }
       return
     }
@@ -519,8 +559,15 @@ function AppLayout(): React.JSX.Element {
                 orientation="vertical"
                 withHandle={false}
                 handleColor="var(--mantine-color-default-border)"
-                sizes={state.navbarSplitSizes}
-                onSizeChange={(sizes) => setNavbarSplitSizes(sizes as [number, number])}
+                // People only gets a pane once enabled — its 3-way split
+                // isn't persisted (unlike the 2-pane Tags/Folders split
+                // above), so it's simplest to just fix a default here rather
+                // than growing navbarSplitSizes' persisted shape for a
+                // pane most users won't have on.
+                sizes={state.faceDetectionEnabled ? [34, 33, 33] : state.navbarSplitSizes}
+                onSizeChange={(sizes) => {
+                  if (!state.faceDetectionEnabled) setNavbarSplitSizes(sizes as [number, number])
+                }}
                 flex={1}
                 mih={0}
               >
@@ -540,6 +587,16 @@ function AppLayout(): React.JSX.Element {
                 >
                   <FolderTree />
                 </Splitter.Pane>
+                {state.faceDetectionEnabled && (
+                  <Splitter.Pane
+                    defaultSize={33}
+                    mih={0}
+                    display="flex"
+                    style={{ flexDirection: 'column', overflow: 'hidden' }}
+                  >
+                    <PeoplePanel />
+                  </Splitter.Pane>
+                )}
               </Splitter>
             </AppShell.Section>
           </AppShell.Navbar>
@@ -580,13 +637,15 @@ function AppLayout(): React.JSX.Element {
       <DragOverlay
         modifiers={[snapCenterToCursor]}
         style={
-          activeDrag?.kind === 'tag'
+          activeDrag?.kind === 'tag' || activeDrag?.kind === 'face'
             ? undefined
             : { width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }
         }
       >
         {activeDrag?.kind === 'tag' ? (
           <TagDragPreview tag={activeDrag.tag} />
+        ) : activeDrag?.kind === 'face' ? (
+          <FaceDragPreview />
         ) : (
           activeDragPhoto && (
             <DragPreview

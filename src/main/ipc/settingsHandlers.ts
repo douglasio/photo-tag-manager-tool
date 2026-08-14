@@ -11,6 +11,7 @@ import {
   getDvdStudioName,
   getExcludedFolders,
   getExcludePatterns,
+  getFaceDetectionEnabled,
   getFolders,
   getGalleryAnimationsEnabled,
   getGalleryCellWidth,
@@ -30,6 +31,7 @@ import {
   setDvdStudioName,
   setExcludedFolders,
   setExcludePatterns,
+  setFaceDetectionEnabled,
   setFolders,
   setGalleryAnimationsEnabled,
   setGalleryCellWidth,
@@ -45,6 +47,9 @@ import {
 } from '@main/db/settingsRepository'
 import { cancelAiScan } from '@main/services/aiScanService'
 import { disposeDuplicateClusterWorker } from '@main/services/duplicatePhotoService'
+import { disposeFaceClusterWorker } from '@main/services/faceClustering'
+import { disposeFaceDetectionWorker } from '@main/services/faceDetectionService'
+import { cancelFaceScan } from '@main/services/faceScanService'
 import { disposeTagSuggestionWorker } from '@main/services/tagSuggestionService'
 import { disposeThrowbackSimilarityWorker } from '@main/services/throwbackService'
 import { deleteThumbnail } from '@main/services/thumbnailService'
@@ -117,6 +122,22 @@ export function registerSettingsHandlers(): void {
           disposeDuplicateClusterWorker(),
           disposeThrowbackSimilarityWorker()
         ])
+      }
+    }
+  )
+
+  ipcMain.handle('settings:getFaceDetectionEnabled', (): boolean => getFaceDetectionEnabled())
+
+  // Turning it off also frees both face workers' memory (detection/ONNX
+  // sessions, clustering) rather than leaving them loaded for a feature the
+  // user just disabled, and cancels any scan still running.
+  ipcMain.handle(
+    'settings:setFaceDetectionEnabled',
+    async (_event, value: boolean): Promise<void> => {
+      setFaceDetectionEnabled(value)
+      if (!value) {
+        cancelFaceScan()
+        await Promise.all([disposeFaceDetectionWorker(), disposeFaceClusterWorker()])
       }
     }
   )

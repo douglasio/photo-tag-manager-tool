@@ -1,7 +1,9 @@
 import type {
   AiScanProgress,
   DefaultView,
+  FaceScanProgress,
   GalleryViewMode,
+  PersonRecord,
   PhotoRecord,
   ScanCompleteEvent,
   TagGroup
@@ -69,6 +71,13 @@ export interface PhotoLibraryState {
   // enableAiFeatures/rescanAiFeatures regardless of which component
   // triggered it.
   aiScanProgress: AiScanProgress | null
+  faceDetectionEnabled: boolean
+  // Session-only, same reasoning as aiScanProgress — spans the whole
+  // detect-then-cluster face scan regardless of which component triggered it.
+  faceScanProgress: FaceScanProgress | null
+  // People (labeled/unlabeled face clusters) — loaded once face detection is
+  // enabled and refreshed after any scan or manual assign/merge/split.
+  people: PersonRecord[]
   // Session-only (not persisted) — whether the Settings modal is open, so
   // other components (e.g. the dashboard's onboarding checklist) can open it
   // without needing a ref/portal into SettingsModal's own local state.
@@ -133,6 +142,9 @@ export const initialState: PhotoLibraryState = {
   galleryViewMode: 'grid',
   aiTagSuggestionsEnabled: false,
   aiScanProgress: null,
+  faceDetectionEnabled: false,
+  faceScanProgress: null,
+  people: [],
   settingsModalOpened: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
@@ -180,6 +192,9 @@ export type PhotoLibraryAction =
   | { type: 'SET_GALLERY_VIEW_MODE'; value: GalleryViewMode }
   | { type: 'SET_AI_TAG_SUGGESTIONS_ENABLED'; value: boolean }
   | { type: 'SET_AI_SCAN_PROGRESS'; progress: AiScanProgress | null }
+  | { type: 'SET_FACE_DETECTION_ENABLED'; value: boolean }
+  | { type: 'SET_FACE_SCAN_PROGRESS'; progress: FaceScanProgress | null }
+  | { type: 'SET_PEOPLE'; people: PersonRecord[] }
   | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
@@ -511,6 +526,15 @@ export function photoLibraryReducer(
         : { ...state, aiTagSuggestionsEnabled: action.value }
     case 'SET_AI_SCAN_PROGRESS':
       return { ...state, aiScanProgress: action.progress }
+    case 'SET_FACE_DETECTION_ENABLED':
+      // Guarded for the same reason as SET_AI_TAG_SUGGESTIONS_ENABLED above.
+      return state.faceDetectionEnabled === action.value
+        ? state
+        : { ...state, faceDetectionEnabled: action.value }
+    case 'SET_FACE_SCAN_PROGRESS':
+      return { ...state, faceScanProgress: action.progress }
+    case 'SET_PEOPLE':
+      return { ...state, people: action.people }
     case 'SET_SETTINGS_MODAL_OPENED':
       return { ...state, settingsModalOpened: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':

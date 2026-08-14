@@ -13,12 +13,15 @@ import {
 
 import { notifications } from '@mantine/notifications'
 
-import { AiScanProgressToast, MoveProgressToast } from '@components'
+import { AiScanProgressToast, FaceScanProgressToast, MoveProgressToast } from '@components'
 import { isUnderExcludedFolder } from '@shared/folderExclusion'
 import type {
   AiScanProgress,
   AiScanResult,
   DefaultView,
+  FaceRecord,
+  FaceScanProgress,
+  FaceScanResult,
   GalleryViewMode,
   PhotoRecord,
   RotateDirection,
@@ -53,6 +56,7 @@ const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
 // Stable (not per-call) id — only one AI scan can be in flight app-wide at a
 // time, so re-triggering updates the same toast instead of stacking a new one.
 const AI_SCAN_NOTIFICATION_ID = 'ai-scan'
+const FACE_SCAN_NOTIFICATION_ID = 'face-scan'
 
 // Which arrow key drove a photo-to-photo navigation — 'right' means the
 // photo being navigated to should visually enter from the right (the user
@@ -140,6 +144,21 @@ interface PhotoLibraryContextValue {
   // Re-runs the shared scan without the model-download step (AI already on).
   rescanAiFeatures: () => Promise<AiScanResult>
   cancelAiScan: () => void
+  setFaceDetectionEnabled: (value: boolean) => void
+  // Enables face detection, then detects+groups faces across the library —
+  // its own progress/"ready" toast, separate from enableAiFeatures since
+  // it's an independent, heavier opt-in pass.
+  enableFaceDetection: () => Promise<FaceScanResult>
+  rescanFaces: () => Promise<FaceScanResult>
+  cancelFaceScan: () => void
+  getFacesForPhoto: (filePath: string) => Promise<FaceRecord[]>
+  refreshPeople: () => Promise<void>
+  renamePerson: (id: string, name: string) => Promise<void>
+  assignFaceToPerson: (faceId: string, personId: string) => Promise<void>
+  splitFaceAsNewPerson: (faceId: string) => Promise<void>
+  unassignFace: (faceId: string) => Promise<void>
+  mergePeople: (sourcePersonId: string, targetPersonId: string) => Promise<void>
+  deletePerson: (id: string) => Promise<void>
   setNavbarSplitSizes: (sizes: [number, number]) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -374,6 +393,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getAiTagSuggestionsEnabled().then((value) => {
       dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getFaceDetectionEnabled().then((value) => {
+      dispatch({ type: 'SET_FACE_DETECTION_ENABLED', value })
+      if (value) window.api.getPeople().then((people) => dispatch({ type: 'SET_PEOPLE', people }))
     })
   }, [])
 
@@ -1044,6 +1070,69 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setAiTagSuggestionsEnabled(value)
   }, [])
 
+  const setFaceDetectionEnabled = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_FACE_DETECTION_ENABLED', value })
+    void window.api.setFaceDetectionEnabled(value)
+  }, [])
+
+  const refreshPeople = useCallback(async () => {
+    const people = await window.api.getPeople()
+    dispatch({ type: 'SET_PEOPLE', people })
+  }, [])
+
+  const getFacesForPhoto = useCallback(
+    (filePath: string) => window.api.getFacesForPhoto(filePath),
+    []
+  )
+
+  const renamePerson = useCallback(
+    async (id: string, name: string) => {
+      await window.api.renamePerson(id, name)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
+  const assignFaceToPerson = useCallback(
+    async (faceId: string, personId: string) => {
+      await window.api.assignFaceToPerson(faceId, personId)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
+  const splitFaceAsNewPerson = useCallback(
+    async (faceId: string) => {
+      await window.api.splitFaceAsNewPerson(faceId)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
+  const unassignFace = useCallback(
+    async (faceId: string) => {
+      await window.api.unassignFace(faceId)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
+  const mergePeople = useCallback(
+    async (sourcePersonId: string, targetPersonId: string) => {
+      await window.api.mergePeople(sourcePersonId, targetPersonId)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
+  const deletePerson = useCallback(
+    async (id: string) => {
+      await window.api.deletePerson(id)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
   const suggestTags = useCallback(
     (filePath: string, candidateLabels: string[]) =>
       window.api.suggestTags(filePath, candidateLabels),
@@ -1152,6 +1241,72 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const cancelAiScan = useCallback(() => {
     void window.api.cancelAiScan()
+  }, [])
+
+  // Mirrors runAiScan above — models are bundled (no download phase), so
+  // this starts directly at 'detecting'.
+  const runFaceScan = useCallback(
+    async (invoke: () => Promise<FaceScanResult>): Promise<FaceScanResult> => {
+      const handleCancel = (): void => void window.api.cancelFaceScan()
+      const initialProgress: FaceScanProgress = { phase: 'detecting', done: 0, total: 100 }
+      dispatch({ type: 'SET_FACE_SCAN_PROGRESS', progress: initialProgress })
+      notifications.show({
+        id: FACE_SCAN_NOTIFICATION_ID,
+        autoClose: false,
+        withCloseButton: true,
+        onClose: handleCancel,
+        message: <FaceScanProgressToast progress={initialProgress} onCancel={handleCancel} />
+      })
+      const unsubscribe = window.api.onFaceScanProgress((progress) => {
+        dispatch({ type: 'SET_FACE_SCAN_PROGRESS', progress })
+        notifications.update({
+          id: FACE_SCAN_NOTIFICATION_ID,
+          message: <FaceScanProgressToast progress={progress} onCancel={handleCancel} />
+        })
+      })
+      try {
+        const result = await invoke()
+        dispatch({ type: 'SET_PEOPLE', people: await window.api.getPeople() })
+        notifications.update({
+          id: FACE_SCAN_NOTIFICATION_ID,
+          color: result.canceled ? 'yellow' : 'teal',
+          autoClose: 4000,
+          message: result.canceled
+            ? 'Face scan canceled.'
+            : result.facesDetected === 0
+              ? 'Face detection enabled — no faces found yet.'
+              : 'Face grouping ready.'
+        })
+        return result
+      } catch (err) {
+        notifications.update({
+          id: FACE_SCAN_NOTIFICATION_ID,
+          color: 'red',
+          autoClose: 4000,
+          message: 'Something went wrong scanning your library for faces.'
+        })
+        throw err
+      } finally {
+        unsubscribe()
+        dispatch({ type: 'SET_FACE_SCAN_PROGRESS', progress: null })
+      }
+    },
+    []
+  )
+
+  const enableFaceDetection = useCallback(() => {
+    // Mirrors faceScanService.enableFaceDetectionAndScan, which flips the
+    // backend setting immediately (no download step to gate on, unlike AI's
+    // 'embedding'-phase dispatch) — without this, the People panel (gated on
+    // state.faceDetectionEnabled) wouldn't appear until the next reload.
+    dispatch({ type: 'SET_FACE_DETECTION_ENABLED', value: true })
+    return runFaceScan(() => window.api.enableFaceDetectionAndScan())
+  }, [runFaceScan])
+
+  const rescanFaces = useCallback(() => runFaceScan(() => window.api.rescanFaces()), [runFaceScan])
+
+  const cancelFaceScan = useCallback(() => {
+    void window.api.cancelFaceScan()
   }, [])
 
   // A scan still marked "in progress" on launch means the app quit before it
@@ -1484,6 +1639,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     enableAiFeatures,
     rescanAiFeatures,
     cancelAiScan,
+    setFaceDetectionEnabled,
+    enableFaceDetection,
+    rescanFaces,
+    cancelFaceScan,
+    getFacesForPhoto,
+    refreshPeople,
+    renamePerson,
+    assignFaceToPerson,
+    splitFaceAsNewPerson,
+    unassignFace,
+    mergePeople,
+    deletePerson,
     setNavbarSplitSizes,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,

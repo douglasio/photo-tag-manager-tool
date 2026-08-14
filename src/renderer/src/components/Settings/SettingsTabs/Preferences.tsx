@@ -192,10 +192,50 @@ function TagsSection(): ReactElement {
   )
 }
 
+function PeopleSection(): ReactElement {
+  const { state, setFaceDetectionEnabled, enableFaceDetection } = usePhotoLibrary()
+  const [error, setError] = useState<string | null>(null)
+  const scanning = state.faceScanProgress !== null
+
+  const handleToggle = async (checked: boolean): Promise<void> => {
+    setError(null)
+    if (!checked) {
+      setFaceDetectionEnabled(false)
+      return
+    }
+    try {
+      // enableFaceDetection drives its own progress/"ready" toast, tracked
+      // regardless of which tab you're on — no separate feedback needed here.
+      await enableFaceDetection()
+    } catch (err) {
+      console.error('failed to enable face detection', err)
+      setError('Failed to scan your library for faces.')
+    }
+  }
+
+  return (
+    <Stack gap="xs">
+      <Switch
+        label="Enable face detection"
+        description="Detects and groups faces across your library so you can label people — a separate, heavier pass from AI tag suggestions. Uses bundled on-device models, so there's nothing to download; runs fully offline."
+        checked={state.faceDetectionEnabled}
+        disabled={scanning}
+        onChange={(event) => void handleToggle(event.currentTarget.checked)}
+      />
+      {error && (
+        <Text size="xs" c="red">
+          {error}
+        </Text>
+      )}
+    </Stack>
+  )
+}
+
 const sections = [
   { label: 'General', component: <GeneralSection /> },
   { label: 'Gallery', component: <GallerySection /> },
   { label: 'Tags', component: <TagsSection /> },
+  { label: 'People', component: <PeopleSection /> },
   { label: 'Visualizations', component: <VisualizationsSection /> }
 ]
 

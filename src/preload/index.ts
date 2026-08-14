@@ -5,10 +5,14 @@ import type {
   AiScanProgress,
   AiScanResult,
   DefaultView,
+  FaceRecord,
+  FaceScanProgress,
+  FaceScanResult,
   GallerySort,
   GalleryViewMode,
   MetadataBatchEvent,
   MoveProgressEvent,
+  PersonRecord,
   PhotoRecord,
   RotateDirection,
   ScanCompleteEvent,
@@ -92,6 +96,29 @@ const api = {
     ipcRenderer.invoke('ai:findSimilarPhotos', filePath, limit),
   dismissDuplicateGroup: (filePaths: string[]): Promise<void> =>
     ipcRenderer.invoke('ai:dismissDuplicateGroup', filePaths),
+  getFaceDetectionEnabled: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:getFaceDetectionEnabled'),
+  setFaceDetectionEnabled: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setFaceDetectionEnabled', value),
+  getFacesForPhoto: (filePath: string): Promise<FaceRecord[]> =>
+    ipcRenderer.invoke('faces:getForPhoto', filePath),
+  getPeople: (): Promise<PersonRecord[]> => ipcRenderer.invoke('faces:getPeople'),
+  enableFaceDetectionAndScan: (): Promise<FaceScanResult> =>
+    ipcRenderer.invoke('faces:enableAndScan'),
+  rescanFaces: (): Promise<FaceScanResult> => ipcRenderer.invoke('faces:rescan'),
+  cancelFaceScan: (): Promise<void> => ipcRenderer.invoke('faces:cancelScan'),
+  onFaceScanProgress: (callback: (progress: FaceScanProgress) => void): (() => void) =>
+    subscribe('faces:scanProgress', callback),
+  renamePerson: (id: string, name: string): Promise<void> =>
+    ipcRenderer.invoke('faces:renamePerson', id, name),
+  assignFaceToPerson: (faceId: string, personId: string): Promise<void> =>
+    ipcRenderer.invoke('faces:assignFaceToPerson', faceId, personId),
+  splitFaceAsNewPerson: (faceId: string): Promise<PersonRecord> =>
+    ipcRenderer.invoke('faces:splitFaceAsNewPerson', faceId),
+  unassignFace: (faceId: string): Promise<void> => ipcRenderer.invoke('faces:unassignFace', faceId),
+  mergePeople: (sourcePersonId: string, targetPersonId: string): Promise<void> =>
+    ipcRenderer.invoke('faces:mergePeople', sourcePersonId, targetPersonId),
+  deletePerson: (id: string): Promise<void> => ipcRenderer.invoke('faces:deletePerson', id),
   getThrowbackSimilarity: (): Promise<ThrowbackEntry[] | null> =>
     ipcRenderer.invoke('throwback:getSimilarity'),
   getThrowbackYearSample: (): Promise<ThrowbackYearSample | null> =>
