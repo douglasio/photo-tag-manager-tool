@@ -20,6 +20,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 6. Search -- implement spotlight search. searchable fields should include tags, filename, comments. As a future enhancement, maybe an AI-based search that can match to photo contents or faces.
 
+7. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
+
+8. Make all 'Enable AI features' buttons use the gradient variant.
+
 ## AI
 
 1. Face detection?
@@ -36,9 +40,13 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Dashboard
 
-### Throwback Widget
+1. Tag This Photo widget shows "every photo is tagged" when there are actually no photos at all. It should show a different message if there are simply no photos.
 
-1. Let's ramp up the similarity threshold a bit on the Throwback widget timeline -- getting some really odd choices in there. There should be logic to skip a year if no images are found that are similar enough.
+2. Change the Tagging Progress widget to use a Progress Card style indicator for tagging progress: https://github.com/mantinedev/ui.mantine.dev/blob/master/lib/ProgressCard/ProgressCard.tsx
+
+3. Featured Tag onboarding progress should show toasts each time an action is taken that "ticks a box" until the entire task is completed, with a button to bring you back to the Dashboard view.
+
+4. Top Viewed photos should have an onboarding process similar to Featured Tag to guide users until they've view 5 photos.
 
 ## Gallery View
 

@@ -104,7 +104,7 @@ describe('validateDatabaseFile', () => {
   })
 
   it('returns false when the file cannot be opened as a database at all', () => {
-    databaseConstructor.mockImplementation(() => {
+    databaseConstructor.mockImplementation(function (this: unknown) {
       throw new Error('file is not a database')
     })
 
