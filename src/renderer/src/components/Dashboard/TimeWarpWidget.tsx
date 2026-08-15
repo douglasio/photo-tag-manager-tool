@@ -211,7 +211,9 @@ export function TimeWarpWidget(): ReactElement {
           : 'Enable AI features to see photos matched across the years by visual similarity.'}
       </Text>
       {!state.aiTagSuggestionsEnabled && (
-        <Button onClick={() => setEnableAiOpened(true)}>Enable AI Features</Button>
+        <Button variant="gradient" onClick={() => setEnableAiOpened(true)}>
+          Enable AI Features
+        </Button>
       )}
       {previewEntries && previewEntries.length > 0 && (
         <Box w="100%">

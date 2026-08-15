@@ -27,9 +27,15 @@ function formatFromExtension(filePath: string): SupportedFormat {
   return 'JPEG'
 }
 
-function toArray(value: string | string[] | undefined): string[] {
-  if (!value) return []
-  return Array.isArray(value) ? value : [value]
+// exiftool-vendored types Keywords/Subject as string | string[], but a
+// purely-numeric keyword (e.g. a photo tagged "2024") can come back from
+// exiftool itself as a raw JSON number — coerced here since a non-string
+// tag crashes TagsInput's rendering (draft.trim is not a function) far
+// downstream, at a point with no context to explain why.
+function toArray(value: unknown): string[] {
+  if (value == null) return []
+  const items = Array.isArray(value) ? value : [value]
+  return items.map((item) => String(item))
 }
 
 function mergeTags(tags: Tags): string[] {

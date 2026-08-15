@@ -1,6 +1,6 @@
 import { type ReactElement } from 'react'
 
-import { Box, Burger, Button, Group, Modal, Stack, Tabs, Title, Tooltip } from '@mantine/core'
+import { Box, Burger, Group, Modal, Stack, Tabs, Title, Tooltip } from '@mantine/core'
 import { IconKeyboard, IconLibraryPhoto, IconTool } from '@tabler/icons-react'
 
 import { usePhotoLibrary } from '@state'
@@ -39,7 +39,7 @@ export function SettingsModal(): ReactElement {
   return (
     <>
       <Group gap="sm" wrap="nowrap">
-        {state.folders.length === 0 && (
+        {/* {state.folders.length === 0 && (
           <Button
             variant="gradient"
             gradient={{ from: 'violet', to: 'cyan', deg: 90 }}
@@ -47,7 +47,7 @@ export function SettingsModal(): ReactElement {
           >
             Add a folder to get started
           </Button>
-        )}
+        )} */}
         <Tooltip label="Manage settings">
           <Burger opened={opened} onClick={open} size="sm" aria-label="Manage settings" />
         </Tooltip>

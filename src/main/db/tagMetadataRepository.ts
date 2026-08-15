@@ -100,8 +100,12 @@ export function setTagGroupAssignment(tag: string, groupId: string | null): void
 export function getUsedTags(): Set<string> {
   const rows = getDb()
     .prepare('SELECT DISTINCT je.value AS tag FROM photos, json_each(photos.tags) je')
-    .all() as { tag: string }[]
-  return new Set(rows.map((row) => row.tag))
+    .all() as { tag: unknown }[]
+  // json_each hands back a tag's raw JSON type — a row written before a
+  // numeric EXIF keyword (e.g. "2024") started being coerced to a string
+  // can still have a JSON number here, which crashes tag.toLowerCase() in
+  // reconcileTagGroups below if passed through as-is.
+  return new Set(rows.map((row) => String(row.tag)))
 }
 
 /** Keeps tag_metadata.group_id in sync with reality — two independent jobs

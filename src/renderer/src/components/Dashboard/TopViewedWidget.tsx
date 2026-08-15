@@ -1,7 +1,7 @@
 import { type ReactElement, useEffect, useRef, useState } from 'react'
 
 import { BarChart } from '@mantine/charts'
-import { Text } from '@mantine/core'
+import { Stack, Text } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 
 import { GalleryHoverPreview } from '@components'
@@ -194,14 +194,14 @@ export function TopViewedWidget(): ReactElement {
   })
 
   return (
-    <>
+    <Stack h="100%" gap={4}>
       {viewedPhotos.length === 0 ? (
         <Text c="dimmed" size="sm">
           Open some photos from the gallery to see them featured here.
         </Text>
       ) : (
         <BarChart
-          h="100%"
+          style={{ flex: 1, minHeight: 0 }}
           data={data}
           dataKey="fileName"
           orientation="horizontal"
@@ -233,6 +233,11 @@ export function TopViewedWidget(): ReactElement {
           gridAxis="none"
         />
       )}
+      {viewedPhotos.length > 0 && viewedPhotos.length < TOP_COUNT && (
+        <Text c="dimmed" size="xs" style={{ flexShrink: 0 }}>
+          {viewedPhotos.length} of {TOP_COUNT} photos viewed
+        </Text>
+      )}
       {viewedPhotos.map((photo) => (
         <GalleryHoverPreview
           key={photo.id}
@@ -242,6 +247,6 @@ export function TopViewedWidget(): ReactElement {
           motionEnabled={motionEnabled}
         />
       ))}
-    </>
+    </Stack>
   )
 }

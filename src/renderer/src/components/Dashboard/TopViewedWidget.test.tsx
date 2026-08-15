@@ -130,6 +130,27 @@ describe('TopViewedWidget', () => {
     expect(data).toHaveLength(5)
     expect(data.filter((d) => d.viewCount > 0)).toHaveLength(2)
   })
+
+  it('shows a progress caption while below the 5-viewed goal', () => {
+    setLibrary([makePhoto('/a.jpg', { viewCount: 5 }), makePhoto('/b.jpg', { viewCount: 2 })])
+    renderWidget()
+
+    expect(screen.getByText('2 of 5 photos viewed')).toBeInTheDocument()
+  })
+
+  it('hides the progress caption once the 5-viewed goal is reached', () => {
+    setLibrary(Array.from({ length: 5 }, (_, i) => makePhoto(`/p${i}.jpg`, { viewCount: i + 1 })))
+    renderWidget()
+
+    expect(screen.queryByText(/photos viewed/)).not.toBeInTheDocument()
+  })
+
+  it('does not show the progress caption when no photo has been viewed yet', () => {
+    setLibrary([makePhoto('/a.jpg', { viewCount: 0 })])
+    renderWidget()
+
+    expect(screen.queryByText(/photos viewed/)).not.toBeInTheDocument()
+  })
 })
 
 // This renders the actual shape function passed to Recharts (rather than

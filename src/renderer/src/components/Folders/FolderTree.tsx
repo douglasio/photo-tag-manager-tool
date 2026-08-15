@@ -3,6 +3,7 @@ import { type ReactElement, useMemo, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import {
   ActionIcon,
+  Box,
   Button,
   type RenderTreeNodePayload,
   Stack,
@@ -306,7 +307,11 @@ export function FolderTree({ collapsed, onToggleCollapse }: FolderTreeProps = {}
   const [editingFolder, setEditingFolder] = useState<string | null>(null)
 
   if (state.folders.length === 0) {
-    return <Text c="dimmed">Add a folder to see its structure.</Text>
+    return (
+      <Box p="lg">
+        <Text c="dimmed">No folders yet.</Text>
+      </Box>
+    )
   }
 
   return (

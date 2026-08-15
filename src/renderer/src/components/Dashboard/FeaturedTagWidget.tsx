@@ -1,4 +1,4 @@
-import { type ReactElement, useMemo, useState } from 'react'
+import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Carousel } from '@mantine/carousel'
 import {
@@ -13,6 +13,7 @@ import {
   UnstyledButton
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
+import { notifications } from '@mantine/notifications'
 
 import { GalleryHoverPreview, PhotoGradientOverlay } from '@components'
 import { useHoverPreview, useKeyHeld } from '@hooks'
@@ -171,6 +172,59 @@ export function FeaturedTagWidget(): ReactElement {
     setActiveTab('gallery')
   }
 
+  // Computed unconditionally (not just in the onboarding branch below) so
+  // the toast effect can watch it regardless of which view is showing.
+  const closestTagCount = tagCounts.size > 0 ? Math.max(...tagCounts.values()) : 0
+  const stepsDone = [
+    activePhotosByPath.size > 0,
+    closestTagCount >= 1,
+    closestTagCount >= 2,
+    closestTagCount >= 3
+  ]
+  const activeIndex = stepsDone.filter(Boolean).length
+
+  const lastActiveIndexRef = useRef(activeIndex)
+  const hasShownReadyToastRef = useRef(selectedTag !== null)
+
+  // Fires a toast the instant an onboarding step completes (a "tick a box"
+  // moment that often happens away from this widget, e.g. while tagging in
+  // the Gallery), plus a distinct one once a tag actually gets featured —
+  // both only on a genuine transition, never on mount at whatever step
+  // things already happen to be at.
+  useEffect(() => {
+    if (selectedTag) {
+      if (!hasShownReadyToastRef.current) {
+        hasShownReadyToastRef.current = true
+        notifications.show({
+          color: 'teal',
+          message: `#${selectedTag} now has enough photos to be featured on the Dashboard!`
+        })
+      }
+      return
+    }
+    if (activeIndex > lastActiveIndexRef.current) {
+      const completedStep = ONBOARDING_STEPS[activeIndex - 1]
+      notifications.show({
+        color: 'teal',
+        autoClose: 6000,
+        message: (
+          <Stack gap={4}>
+            <Text size="sm">Step complete: {completedStep.text}</Text>
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              onClick={() => setActiveTab('dashboard')}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              Back to Dashboard
+            </Button>
+          </Stack>
+        )
+      })
+    }
+    lastActiveIndexRef.current = activeIndex
+  }, [activeIndex, selectedTag, setActiveTab])
+
   if (selectedTag) {
     return (
       <Stack gap="xs" h="100%" style={{ minHeight: 0 }}>
@@ -224,15 +278,6 @@ export function FeaturedTagWidget(): ReactElement {
   // Onboarding — no tag has reached the threshold yet. Live-updates as the
   // user adds photos/tags rather than only checking once, so the active step
   // actually reflects real progress.
-  const closestTagCount = tagCounts.size > 0 ? Math.max(...tagCounts.values()) : 0
-  const stepsDone = [
-    activePhotosByPath.size > 0,
-    closestTagCount >= 1,
-    closestTagCount >= 2,
-    closestTagCount >= 3
-  ]
-  const activeIndex = stepsDone.filter(Boolean).length
-
   const runStepAction = (action?: 'settings' | 'gallery'): void => {
     if (action === 'settings') setSettingsModalOpened(true)
     else if (action === 'gallery') setActiveTab('gallery')

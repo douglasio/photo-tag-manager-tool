@@ -1,6 +1,21 @@
-import { MantineProvider } from '@mantine/core'
+import { type ReactElement, useRef } from 'react'
+
+import { MantineProvider, type TooltipProps } from '@mantine/core'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Tooltip's `target` mode never actually mounts its floating content into
+// the portal under jsdom (the same "floating-ui doesn't settle" limitation
+// as Popover below, but here it blocks rendering entirely rather than just
+// mispositioning it) — stubbed so TagHoverCardTarget's own hover-delay
+// logic is what's under test, not floating-ui's jsdom support.
+vi.mock('@mantine/core', async () => {
+  const actual = await vi.importActual<typeof import('@mantine/core')>('@mantine/core')
+  return {
+    ...actual,
+    Tooltip: ({ opened, label }: TooltipProps) => (opened ? <>{label}</> : null)
+  }
+})
 
 // The setTimeout callback that flips `opened` fires outside of any React
 // event handler, so vi.advanceTimersByTime alone won't flush that state
@@ -31,7 +46,7 @@ vi.mock('@state', () => ({
 
 import type { PhotoRecord } from '@shared/types'
 
-import { TagHoverCard, TagHoverCardBody, TagHoverCardContent } from './TagHoverCard'
+import { TagHoverCard, TagHoverCardBody, TagHoverCardTarget } from './TagHoverCard'
 
 function makePhoto(overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {
@@ -115,7 +130,7 @@ describe('TagHoverCard', () => {
     // whose positioning never fully settles under jsdom — aria-expanded is
     // what actually reflects our own opened state, so that's what's
     // asserted here; the dropdown's own content is covered separately by
-    // the TagHoverCardContent tests below.
+    // the TagHoverCardBody tests below.
     mockTagDescriptions = new Map()
     const { hoverTarget } = renderCard('vacation')
     expect(hoverTarget).toHaveAttribute('aria-expanded', 'false')
@@ -149,26 +164,55 @@ describe('TagHoverCard', () => {
   })
 })
 
-describe('TagHoverCardContent', () => {
-  it('renders just the tag name when there is no description', () => {
-    render(
-      <MantineProvider>
-        <TagHoverCardContent tag="vacation" />
-      </MantineProvider>
-    )
+function TargetHarness({ tag, disabled }: { tag: string; disabled?: boolean }): ReactElement {
+  const target = useRef<HTMLButtonElement>(null)
+  return (
+    <>
+      <button ref={target}>#{tag}</button>
+      <TagHoverCardTarget tag={tag} target={target} disabled={disabled} />
+    </>
+  )
+}
 
-    expect(screen.getByText('#vacation')).toBeInTheDocument()
+describe('TagHoverCardTarget', () => {
+  beforeEach(() => {
+    mockTagDescriptions = new Map()
+    mockTagCounts = new Map()
+    mockTagCoverPhotos = new Map()
+    mockTagViewCounts = new Map()
+    vi.useFakeTimers()
   })
 
-  it('renders the tag name and description together when one exists', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows the rich card after hovering the target past the delay', () => {
+    mockTagDescriptions = new Map([['vacation', 'Photos from trips']])
     render(
       <MantineProvider>
-        <TagHoverCardContent tag="vacation" description="Photos from trips" />
+        <TargetHarness tag="vacation" />
       </MantineProvider>
     )
 
-    expect(screen.getByText('#vacation')).toBeInTheDocument()
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '#vacation' }))
+    advanceTimers(700)
+
     expect(screen.getByText('Photos from trips')).toBeInTheDocument()
+  })
+
+  it('never opens while disabled', () => {
+    mockTagDescriptions = new Map([['vacation', 'Photos from trips']])
+    render(
+      <MantineProvider>
+        <TargetHarness tag="vacation" disabled />
+      </MantineProvider>
+    )
+
+    fireEvent.mouseEnter(screen.getByRole('button', { name: '#vacation' }))
+    advanceTimers(700)
+
+    expect(screen.queryByText('Photos from trips')).not.toBeInTheDocument()
   })
 })
 

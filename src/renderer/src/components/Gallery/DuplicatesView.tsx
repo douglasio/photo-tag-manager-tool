@@ -243,7 +243,9 @@ export function DuplicatesView(): ReactElement {
           <Text ta="center" c="dimmed">
             Duplicate detection requires AI features to be enabled.
           </Text>
-          <Button onClick={() => setEnableAiOpened(true)}>Enable AI features</Button>
+          <Button variant="gradient" onClick={() => setEnableAiOpened(true)}>
+            Enable AI features
+          </Button>
         </Stack>
         <EnableAiFeaturesDialog
           opened={enableAiOpened}

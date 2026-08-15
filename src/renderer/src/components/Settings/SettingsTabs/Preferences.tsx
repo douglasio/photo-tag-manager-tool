@@ -177,7 +177,7 @@ function TagsSection(): ReactElement {
   return (
     <Stack gap="xs">
       <Switch
-        label="Enable AI tag suggestions"
+        label="Enable AI features"
         description="Downloads a small on-device model (~50-90MB) the first time you turn this on, then scans your library for tag suggestions, duplicate detection, and Time Warp — tracked in a progress toast. Runs fully offline afterward."
         checked={state.aiTagSuggestionsEnabled}
         disabled={scanning}

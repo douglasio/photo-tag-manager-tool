@@ -11,6 +11,7 @@ vi.mock('@state', () => ({
     allTags: ['vacation'],
     tagCounts: new Map([['vacation', 2]]),
     tagCoverPhotos: new Map(),
+    tagViewCounts: new Map(),
     state: {
       selectedTag: null,
       tagDescriptions: new Map(),

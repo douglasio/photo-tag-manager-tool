@@ -24,15 +24,23 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 8. Make all 'Enable AI features' buttons use the gradient variant.
 
+9. Video support?
+
+## Onboarding
+
+1. Installation guide?
+
 ## AI
 
 1. Face detection?
 
 2. Disabling AI should actually uninstall the models, not just hide the features from the UI.
+3.
+4. Enabling AI features needs to be cleaned up -- inconsistent dialogs, nonfunctional cancel button behavior, app slowdown while installation is happening, etc.
 
-3. There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
+5. There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
 
-4. Face detection follow-ups (deferred out of the initial build):
+6. Face detection follow-ups (deferred out of the initial build):
    - Download the YuNet/SFace models on demand (like the CLIP models already do via `@huggingface/transformers`, cached to `userData`) instead of bundling them in `resources/models/` — right now every install pays their ~37MB regardless of whether face detection is ever turned on, which is backwards for what's meant to be the more optional/heavier of the two AI features. Would need its own download/cache/checksum-verification path (no Hub-hosted `pipeline()`-compatible checkpoint to piggyback on) plus the corresponding "downloading" progress phase in the enable/scan flow.
    - Crop the People panel's cover thumbnail to the actual face region instead of showing the full photo — DetailPanelFaces already does this via a CSS crop, PeoplePanel's cover doesn't yet.
    - Filter the gallery by person, the same way tag filtering works today.
@@ -62,6 +70,12 @@ To-dos, tasks, and features loosely grouped by feature segment.
 5. For Tags and People, make it possible to select a "cover photo." Today we default to the most recent photo from the tag or person, we should be able to manually select one. I would imagine this will be under the right-click menu on gallery view items. Initially I thought it should only appear when a tag or person is selected and filtered (Make cover photo for [tag / person name]). But if the gallery isn't filtered, I think right-clicking a photo should show a Make Cover Photo for [ person in this photo ], and "Make Cover Photo for [ tag on this photo ] with a flyout showing other tags on the photo. That's a lot, so ask for clarification if anything is ambiguous.
 
 6. Full-tab views for each left panel section?
+
+7. Resizing panels in the sidebar is very laggy
+
+8. Make the left sidebar wider by default.
+
+9. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated)
 
 ### People
 

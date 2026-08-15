@@ -107,6 +107,14 @@ describe('TagThisPhotoWidget', () => {
     expect(screen.getByText('Every photo is tagged — nice work!')).toBeInTheDocument()
   })
 
+  it('shows a different message when the library has no photos at all', () => {
+    setLibrary([])
+    renderWidget()
+
+    expect(screen.getByText('Add some photos to start tagging!')).toBeInTheDocument()
+    expect(screen.queryByText('Every photo is tagged — nice work!')).not.toBeInTheDocument()
+  })
+
   it('surfaces an untagged, thumbnail-ready photo with a Skip button', () => {
     setLibrary([makePhoto('/a.jpg', { tags: [] })])
     renderWidget()

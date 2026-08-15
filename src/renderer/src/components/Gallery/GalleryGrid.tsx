@@ -9,7 +9,9 @@ import {
 import {
   ActionIcon,
   Box,
+  Button,
   Center,
+  EmptyState,
   Flex,
   Group,
   Loader,
@@ -26,6 +28,7 @@ import {
   IconEye,
   IconLayoutGrid,
   IconLayoutList,
+  IconLibraryPhoto,
   IconPhoto,
   IconStack2,
   IconX
@@ -55,6 +58,7 @@ import { GallerySortMenu } from './GallerySortMenu'
 
 export function GalleryGrid(): ReactElement {
   const {
+    addFolder,
     visiblePhotos: photos,
     state,
     selectPhoto,
@@ -390,7 +394,25 @@ export function GalleryGrid(): ReactElement {
                 <Text c="dimmed">Scanning for photos…</Text>
               </Group>
             ) : (
-              <Text c="dimmed">No photos yet. Add a folder to begin.</Text>
+              <Box
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <EmptyState
+                  icon={<IconLibraryPhoto size={32} />}
+                  title="No photos yet"
+                  description="Add a folder to start building your library."
+                >
+                  <EmptyState.Actions>
+                    <Button onClick={() => void addFolder()}>Add Folder</Button>
+                  </EmptyState.Actions>
+                </EmptyState>
+              </Box>
             )}
           </Center>
         ) : state.galleryViewMode === 'list' ? (

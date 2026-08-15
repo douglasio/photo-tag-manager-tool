@@ -136,7 +136,9 @@ export function TagThisPhotoWidget(): ReactElement {
       ) : (
         <motion.div key="empty" style={{ width: '100%' }}>
           <Text c="dimmed" size="sm">
-            Every photo is tagged — nice work!
+            {activePhotosByPath.size === 0
+              ? 'Add some photos to start tagging!'
+              : 'Every photo is tagged — nice work!'}
           </Text>
         </motion.div>
       )}

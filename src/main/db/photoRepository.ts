@@ -26,12 +26,21 @@ interface PhotoRow {
   firstSeenAt: number | null
 }
 
+// Coerces every element to a string — a row written before metadataService's
+// own toArray() started doing this can still have a non-string tag (e.g. a
+// number from a purely-numeric EXIF keyword) sitting in the DB, which
+// crashes TagsInput's rendering downstream if passed through as-is.
+function parsePhotoTags(raw: string): string[] {
+  const parsed: unknown = JSON.parse(raw)
+  return Array.isArray(parsed) ? parsed.map((tag) => String(tag)) : []
+}
+
 function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
   return {
     id: row.path,
     filePath: row.path,
     fileName: row.fileName,
-    tags: JSON.parse(row.tags),
+    tags: parsePhotoTags(row.tags),
     metadata: {
       dateTaken: row.dateTaken,
       cameraMake: row.cameraMake,
@@ -94,7 +103,10 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
       fileName: record.fileName,
       mtimeMs,
       sizeBytes,
-      tags: JSON.stringify(record.tags),
+      // Coerced defensively (not just trusted as already string[]) — this is
+      // the one place anything ever writes to photos.tags, so guaranteeing
+      // the invariant here closes off every downstream read path at once.
+      tags: JSON.stringify(record.tags.map(String)),
       dateTaken: record.metadata.dateTaken,
       cameraMake: record.metadata.cameraMake,
       cameraModel: record.metadata.cameraModel,
@@ -141,7 +153,7 @@ export function findPhotoPathsWithTag(
     if (matches.length >= limit) break
     if (isUnderExcludedFolder(row.path, excludedFolders)) continue
     try {
-      if ((JSON.parse(row.tags) as string[]).includes(tag)) {
+      if (parsePhotoTags(row.tags).includes(tag)) {
         matches.push({ filePath: row.path, thumbnailKey: row.thumbnailKey })
       }
     } catch {

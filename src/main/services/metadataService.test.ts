@@ -176,5 +176,17 @@ describe('metadataService', () => {
       const record = await readPhotoRecord('/root/a.jpg')
       expect(record.tags).toEqual(['solo'])
     })
+
+    it('coerces a purely-numeric keyword to a string instead of leaving it a number', async () => {
+      // exiftool-vendored types Keywords/Subject as string | string[], but a
+      // keyword that's just digits (e.g. "2024") can come back from exiftool
+      // itself as a raw JSON number — a non-string tag crashes TagsInput
+      // downstream, far from any context explaining why.
+      mockStat.mockResolvedValue({ size: 1 } as never)
+      mockRead.mockResolvedValue({ Keywords: [2024, 'vacation'] as unknown as string[] })
+      const record = await readPhotoRecord('/root/a.jpg')
+      expect(record.tags.sort()).toEqual(['2024', 'vacation'])
+      expect(record.tags.every((tag) => typeof tag === 'string')).toBe(true)
+    })
   })
 })

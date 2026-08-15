@@ -1,5 +1,5 @@
-import { Box, Divider, Group, SimpleGrid, Stack, Title } from '@mantine/core'
-import { IconHistory, IconHome2, IconTags } from '@tabler/icons-react'
+import { Box, Button, Divider, EmptyState, Group, SimpleGrid, Stack, Title } from '@mantine/core'
+import { IconHistory, IconHome2, IconLibraryPhoto, IconTags } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
 import {
@@ -15,6 +15,7 @@ import {
 } from '@components'
 import DashboardWidget from '@renderer/components/Dashboard/DashboardWidget'
 import { Widget } from '@shared/types'
+import { usePhotoLibrary } from '@state'
 
 // minmax (not 1fr) — rows match by default, but can grow for tall content
 // (e.g. Throwback's Timeline), with the page scrolling instead of clipping.
@@ -59,6 +60,8 @@ function DashboardSection({
 }
 
 export function DashboardView(): React.JSX.Element {
+  const { activePhotosByPath, addFolder } = usePhotoLibrary()
+
   const sections: DashboardSectionData[] = [
     {
       id: 'home',
@@ -98,6 +101,30 @@ export function DashboardView(): React.JSX.Element {
       ]
     }
   ]
+
+  if (activePhotosByPath.size === 0) {
+    return (
+      <Box
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <EmptyState
+          icon={<IconLibraryPhoto size={32} />}
+          title="No photos yet"
+          description="Add a folder to start building your library."
+        >
+          <EmptyState.Actions>
+            <Button onClick={() => void addFolder()}>Add Folder</Button>
+          </EmptyState.Actions>
+        </EmptyState>
+      </Box>
+    )
+  }
 
   return (
     <Box p="md" pb="xl" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>

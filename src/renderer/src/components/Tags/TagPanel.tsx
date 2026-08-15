@@ -6,6 +6,7 @@ import {
   ActionIcon,
   AspectRatio,
   Badge,
+  Box,
   Button,
   Group,
   Image,
@@ -23,7 +24,7 @@ import {
   PanelSection,
   TagGridTile,
   TagGroupCreateButton,
-  TagHoverCardContent,
+  TagHoverCardTarget,
   TagsSettingsMenu
 } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
@@ -288,15 +289,7 @@ function TagListItem({
           )}
         </Button>
       </TagContextMenu>
-      <Tooltip
-        target={buttonRef}
-        position="right"
-        label={<TagHoverCardContent tag={tag} description={description || undefined} />}
-        disabled={editing}
-        openDelay={700}
-        multiline
-        maw={260}
-      />
+      <TagHoverCardTarget tag={tag} target={buttonRef} disabled={editing} />
       <TagRenameDialog
         oldTag={tag}
         newTag={trimmed}
@@ -457,7 +450,11 @@ export function TagPanel({ collapsed, onToggleCollapse }: TagPanelProps = {}): R
   const [editingTag, setEditingTag] = useState<string | null>(null)
 
   if (allTags.length === 0) {
-    return <Text c="dimmed">No tags yet.</Text>
+    return (
+      <Box p="lg">
+        <Text c="dimmed">No tags yet.</Text>
+      </Box>
+    )
   }
 
   const renderTagRow = (tag: string): ReactElement => {
