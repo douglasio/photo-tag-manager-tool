@@ -446,7 +446,12 @@ function TagGroupSection({
   )
 }
 
-export function TagPanel(): ReactElement {
+interface TagPanelProps {
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+}
+
+export function TagPanel({ collapsed, onToggleCollapse }: TagPanelProps = {}): ReactElement {
   const { allTags, tagCounts, tagCoverPhotos, state, setTagFilter, renameTag, deleteTag } =
     usePhotoLibrary()
   const [editingTag, setEditingTag] = useState<string | null>(null)
@@ -509,7 +514,12 @@ export function TagPanel(): ReactElement {
 
   if (state.tagGroups.length === 0) {
     return (
-      <PanelSection title="Tags" headerAction={headerAction}>
+      <PanelSection
+        title="Tags"
+        headerAction={headerAction}
+        collapsed={collapsed}
+        onToggleCollapse={onToggleCollapse}
+      >
         {renderTags(allTags)}
       </PanelSection>
     )
@@ -519,7 +529,12 @@ export function TagPanel(): ReactElement {
   const existingGroupNames = state.tagGroups.map((group) => group.name)
 
   return (
-    <PanelSection title="Tags" headerAction={headerAction}>
+    <PanelSection
+      title="Tags"
+      headerAction={headerAction}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    >
       <Accordion multiple defaultValue={[...state.tagGroups.map((group) => group.id), '__other__']}>
         {state.tagGroups.map((group) => (
           <TagGroupSection

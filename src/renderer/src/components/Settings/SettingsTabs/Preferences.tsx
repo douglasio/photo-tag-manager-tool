@@ -1,8 +1,8 @@
-import { type ReactElement, useState } from 'react'
+import { type ReactElement, useCallback, useEffect, useState } from 'react'
 
-import { Group, Kbd, Radio, Stack, Switch, Text, TextInput } from '@mantine/core'
+import { Button, Group, Kbd, Radio, Stack, Switch, Text, TextInput } from '@mantine/core'
 
-import type { DefaultView } from '@shared/types'
+import type { DefaultView, PersonRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 
 import SettingsTabSection from './SettingsTabSection'
@@ -192,6 +192,63 @@ function TagsSection(): ReactElement {
   )
 }
 
+// People hidden via the People panel's context menu — still grouped/pinned
+// underneath, just filtered out of the UI until un-hidden here. Fetched
+// on-demand (not part of global state) the same way DetailPanelFaces fetches
+// per-photo faces, since this only matters while Settings is open.
+function HiddenPeopleList(): ReactElement | null {
+  const { getHiddenPeople, unhidePerson } = usePhotoLibrary()
+  const [hiddenPeople, setHiddenPeople] = useState<PersonRecord[] | null>(null)
+  const [unhidingId, setUnhidingId] = useState<string | null>(null)
+
+  const refresh = useCallback(() => getHiddenPeople().then(setHiddenPeople), [getHiddenPeople])
+
+  useEffect(() => {
+    let cancelled = false
+    getHiddenPeople().then((people) => {
+      if (!cancelled) setHiddenPeople(people)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [getHiddenPeople])
+
+  const handleUnhide = async (id: string): Promise<void> => {
+    setUnhidingId(id)
+    try {
+      await unhidePerson(id)
+      await refresh()
+    } finally {
+      setUnhidingId(null)
+    }
+  }
+
+  if (!hiddenPeople || hiddenPeople.length === 0) return null
+
+  return (
+    <Stack gap="xs" mt="xs">
+      <Text size="sm" fw={600}>
+        Hidden people
+      </Text>
+      {hiddenPeople.map((person) => (
+        <Group key={person.id} justify="space-between" wrap="nowrap">
+          <Text size="sm" truncate="end">
+            {person.name ?? 'Unnamed person'}
+          </Text>
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            loading={unhidingId === person.id}
+            onClick={() => void handleUnhide(person.id)}
+          >
+            Unhide
+          </Button>
+        </Group>
+      ))}
+    </Stack>
+  )
+}
+
 function PeopleSection(): ReactElement {
   const { state, setFaceDetectionEnabled, enableFaceDetection } = usePhotoLibrary()
   const [error, setError] = useState<string | null>(null)
@@ -227,6 +284,7 @@ function PeopleSection(): ReactElement {
           {error}
         </Text>
       )}
+      {state.faceDetectionEnabled && <HiddenPeopleList />}
     </Stack>
   )
 }

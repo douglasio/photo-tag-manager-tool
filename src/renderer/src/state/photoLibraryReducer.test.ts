@@ -277,6 +277,7 @@ describe('photoLibraryReducer', () => {
     it.each([
       ['SET_SHOW_EMPTY_FOLDERS', 'showEmptyFolders'],
       ['SET_TAGS_PANEL_GRID_VIEW', 'tagsPanelGridView'],
+      ['SET_PEOPLE_PANEL_GRID_VIEW', 'peoplePanelGridView'],
       ['SET_DETAILS_PANEL_COLLAPSED', 'detailsPanelCollapsed'],
       ['SET_GALLERY_ANIMATIONS_ENABLED', 'galleryAnimationsEnabled'],
       ['SET_SHOW_FILENAMES', 'showFilenames'],
@@ -393,7 +394,14 @@ describe('photoLibraryReducer', () => {
 
     it('replaces the people list', () => {
       const people = [
-        { id: 'p1', name: 'Jamie', coverFaceId: 'f1', coverPhotoPath: '/a.jpg', faceCount: 2 }
+        {
+          id: 'p1',
+          name: 'Jamie',
+          coverFaceId: 'f1',
+          coverPhotoPath: '/a.jpg',
+          faceCount: 2,
+          description: null
+        }
       ]
       const state = photoLibraryReducer(initialState, { type: 'SET_PEOPLE', people })
       expect(state.people).toEqual(people)
@@ -406,6 +414,15 @@ describe('photoLibraryReducer', () => {
         assignments
       })
       expect(state.personPhotoAssignments).toBe(assignments)
+    })
+
+    it('replaces the navbar collapsed-panels record', () => {
+      const panels = { tags: true, people: false }
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_NAVBAR_COLLAPSED_PANELS',
+        panels
+      })
+      expect(state.navbarCollapsedPanels).toBe(panels)
     })
   })
 

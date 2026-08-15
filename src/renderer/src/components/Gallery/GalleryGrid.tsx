@@ -32,7 +32,7 @@ import {
 } from '@tabler/icons-react'
 import { Grid } from 'react-window'
 
-import { TagDeleteButton, TagDescriptionField } from '@components'
+import { PersonDescriptionField, TagDeleteButton, TagDescriptionField } from '@components'
 import { useGalleryGridLayout } from '@hooks'
 import { useGalleryPreviewZoom } from '@hooks'
 import { isUnderExcludedFolder } from '@shared/folderExclusion'
@@ -70,6 +70,7 @@ export function GalleryGrid(): ReactElement {
     setFolderTagFilter,
     setFolderUntaggedFilter,
     setPersonFilter,
+    setPersonDescription,
     renameFile,
     openCompareTab,
     openDuplicatesTab,
@@ -189,9 +190,11 @@ export function GalleryGrid(): ReactElement {
   // SET_PERSON_FILTER always clears selectedFolder (see the reducer), so
   // this is never combined with a folder view.
   const isPersonView = state.selectedPerson !== null
-  const selectedPersonName = isPersonView
-    ? (state.people.find((person) => person.id === state.selectedPerson)?.name ?? 'Unnamed person')
-    : null
+  const selectedPerson = isPersonView
+    ? state.people.find((person) => person.id === state.selectedPerson)
+    : undefined
+  const selectedPersonName = isPersonView ? (selectedPerson?.name ?? 'Unnamed person') : null
+  const personDescription = isPersonView ? (selectedPerson?.description ?? '') : ''
 
   const galleryTitle = state.untaggedFilterActive
     ? 'untagged'
@@ -318,6 +321,14 @@ export function GalleryGrid(): ReactElement {
             <TagDescriptionField
               description={tagDescription}
               onSave={(description) => void setTagDescription(state.selectedTag!, description)}
+            />
+          )}
+          {isPersonView && (
+            <PersonDescriptionField
+              description={personDescription}
+              onSave={(description) =>
+                void setPersonDescription(state.selectedPerson!, description)
+              }
             />
           )}
           {state.selectedFolder && (folderTags.length > 0 || folderHasUntagged) && (

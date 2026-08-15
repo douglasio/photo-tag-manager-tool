@@ -81,6 +81,14 @@ export function setTagsPanelGridView(value: boolean): void {
   setSetting('tagsPanelGridView', String(value))
 }
 
+export function getPeoplePanelGridView(): boolean {
+  return getSetting('peoplePanelGridView') === 'true'
+}
+
+export function setPeoplePanelGridView(value: boolean): void {
+  setSetting('peoplePanelGridView', String(value))
+}
+
 export function getAiTagSuggestionsEnabled(): boolean {
   return getSetting('aiTagSuggestionsEnabled') === 'true'
 }
@@ -239,17 +247,19 @@ export function setArtGalleryName(value: string): void {
   setSetting('artGalleryName', value)
 }
 
-export function getNavbarSplitSizes(): [number, number] | null {
+// Variable length rather than a fixed tuple — the navbar's Splitter gains a
+// People pane (3 panes) once face detection is enabled, or drops back to 2
+// when it's off, so the persisted array's length tracks whichever pane count
+// was actually being resized. A length mismatch (e.g. stored 2 values but
+// People is now shown) is handled by the caller falling back to a default
+// for the current pane count, not here.
+export function getNavbarSplitSizes(): number[] | null {
   const raw = getSetting('navbarSplitSizes')
   if (!raw) return null
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (
-      Array.isArray(parsed) &&
-      parsed.length === 2 &&
-      parsed.every((n) => typeof n === 'number')
-    ) {
-      return parsed as [number, number]
+    if (Array.isArray(parsed) && parsed.every((n) => typeof n === 'number')) {
+      return parsed as number[]
     }
     return null
   } catch {
@@ -257,6 +267,24 @@ export function getNavbarSplitSizes(): [number, number] | null {
   }
 }
 
-export function setNavbarSplitSizes(sizes: [number, number]): void {
+export function setNavbarSplitSizes(sizes: number[]): void {
   setSetting('navbarSplitSizes', JSON.stringify(sizes))
+}
+
+// Keyed by a stable panel id ('tags' | 'people' | 'folders'), not pane
+// index — index would silently mean something different if the panes are
+// ever reordered again. Missing key means expanded (the default).
+export function getNavbarCollapsedPanels(): Record<string, boolean> {
+  const raw = getSetting('navbarCollapsedPanels')
+  if (!raw) return {}
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function setNavbarCollapsedPanels(value: Record<string, boolean>): void {
+  setSetting('navbarCollapsedPanels', JSON.stringify(value))
 }

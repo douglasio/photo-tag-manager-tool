@@ -116,6 +116,18 @@ export function getDb(): Database.Database {
   db.exec('CREATE INDEX IF NOT EXISTS idx_photo_faces_photo_path ON photo_faces(photo_path)')
   db.exec('CREATE INDEX IF NOT EXISTS idx_photo_faces_person_id ON photo_faces(person_id)')
 
+  // hidden: set by the "Hide" person action — filtered out of the People
+  // panel/gallery filter, but the person row (and its pinned faces) stay in
+  // the DB so it can be un-hidden from Settings. description: same free-text
+  // pattern as tag_metadata.description.
+  const peopleColumns = db.prepare('PRAGMA table_info(people)').all() as { name: string }[]
+  if (!peopleColumns.some((column) => column.name === 'hidden')) {
+    db.exec('ALTER TABLE people ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!peopleColumns.some((column) => column.name === 'description')) {
+    db.exec('ALTER TABLE people ADD COLUMN description TEXT')
+  }
+
   const photoColumns = db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]
   if (!photoColumns.some((column) => column.name === 'comment')) {
     db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')

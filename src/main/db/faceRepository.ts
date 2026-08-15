@@ -134,19 +134,20 @@ export function applyAutoClusterAssignment(faceId: string, personId: string | nu
 /** Self-healing cover face: falls back to the person's earliest-detected
  * face if cover_face_id is unset or no longer belongs to this person,
  * rather than requiring every mutation to keep it perfectly in sync. */
-export function getPeople(): PersonRecord[] {
+function getPeopleWhere(hidden: 0 | 1): PersonRecord[] {
   const rows = getDb()
     .prepare(
-      `SELECT p.id, p.name,
+      `SELECT p.id, p.name, p.description,
          COALESCE(
            (SELECT id FROM photo_faces WHERE id = p.cover_face_id AND person_id = p.id),
            (SELECT id FROM photo_faces WHERE person_id = p.id ORDER BY detected_at LIMIT 1)
          ) AS coverFaceId,
          (SELECT COUNT(*) FROM photo_faces WHERE person_id = p.id) AS faceCount
        FROM people p
+       WHERE p.hidden = ?
        ORDER BY p.created_at`
     )
-    .all() as Omit<PersonRecord, 'coverPhotoPath'>[]
+    .all(hidden) as Omit<PersonRecord, 'coverPhotoPath'>[]
 
   return rows.map((row) => {
     const coverPhotoPath = row.coverFaceId
@@ -160,6 +161,16 @@ export function getPeople(): PersonRecord[] {
   })
 }
 
+export function getPeople(): PersonRecord[] {
+  return getPeopleWhere(0)
+}
+
+/** People hidden via hidePerson() — surfaced only in Settings, so they can
+ * be un-hidden. */
+export function getHiddenPeople(): PersonRecord[] {
+  return getPeopleWhere(1)
+}
+
 export function createPerson(coverFaceId: string | null = null): PersonRecord {
   const id = crypto.randomUUID()
   getDb()
@@ -171,13 +182,41 @@ export function createPerson(coverFaceId: string | null = null): PersonRecord {
           { photo_path: string } | undefined
       )?.photo_path ?? null)
     : null
-  return { id, name: null, coverFaceId, coverPhotoPath, faceCount: coverFaceId ? 1 : 0 }
+  return {
+    id,
+    name: null,
+    coverFaceId,
+    coverPhotoPath,
+    faceCount: coverFaceId ? 1 : 0,
+    description: null
+  }
 }
 
 export function renamePerson(id: string, name: string): void {
   getDb()
     .prepare('UPDATE people SET name = ? WHERE id = ?')
     .run(name.trim() || null, id)
+}
+
+export function setPersonDescription(id: string, description: string): void {
+  getDb()
+    .prepare('UPDATE people SET description = ? WHERE id = ?')
+    .run(description.trim() || null, id)
+}
+
+/** Hides a person (filtered out of the People panel/gallery, but not
+ * deleted) — pins every face currently assigned to them first, so this
+ * exact grouping is frozen and a future rescan can never re-form it as a
+ * new visible person. Distinct from deletePerson, which un-pins its faces
+ * so they're free to be re-clustered. */
+export function hidePerson(id: string): void {
+  const db = getDb()
+  db.prepare('UPDATE photo_faces SET person_id_pinned = 1 WHERE person_id = ?').run(id)
+  db.prepare('UPDATE people SET hidden = 1 WHERE id = ?').run(id)
+}
+
+export function unhidePerson(id: string): void {
+  getDb().prepare('UPDATE people SET hidden = 0 WHERE id = ?').run(id)
 }
 
 /** Assigns (and pins) a face to a person — the explicit "assign this photo

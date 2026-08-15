@@ -23,6 +23,7 @@ import type {
   FaceScanProgress,
   FaceScanResult,
   GalleryViewMode,
+  PersonRecord,
   PhotoRecord,
   RotateDirection,
   SimilarPhoto,
@@ -142,6 +143,7 @@ interface PhotoLibraryContextValue {
   setDefaultView: (value: DefaultView) => void
   setShowEmptyFolders: (value: boolean) => void
   setTagsPanelGridView: (value: boolean) => void
+  setPeoplePanelGridView: (value: boolean) => void
   setGalleryViewMode: (value: GalleryViewMode) => void
   setAiTagSuggestionsEnabled: (value: boolean) => void
   suggestTags: (filePath: string, candidateLabels: string[]) => Promise<TagSuggestion[]>
@@ -175,7 +177,12 @@ interface PhotoLibraryContextValue {
   unassignFace: (faceId: string) => Promise<void>
   mergePeople: (sourcePersonId: string, targetPersonId: string) => Promise<void>
   deletePerson: (id: string) => Promise<void>
-  setNavbarSplitSizes: (sizes: [number, number]) => void
+  setPersonDescription: (id: string, description: string) => Promise<void>
+  hidePerson: (id: string) => Promise<void>
+  unhidePerson: (id: string) => Promise<void>
+  getHiddenPeople: () => Promise<PersonRecord[]>
+  setNavbarSplitSizes: (sizes: number[]) => void
+  setNavbarCollapsedPanels: (panels: Record<string, boolean>) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
   setGalleryAnimationsEnabled: (value: boolean) => void
@@ -401,6 +408,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   }, [])
 
   useEffect(() => {
+    window.api.getPeoplePanelGridView().then((value) => {
+      dispatch({ type: 'SET_PEOPLE_PANEL_GRID_VIEW', value })
+    })
+  }, [])
+
+  useEffect(() => {
     window.api.getGalleryViewMode().then((value) => {
       dispatch({ type: 'SET_GALLERY_VIEW_MODE', value })
     })
@@ -447,6 +460,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     window.api.getNavbarSplitSizes().then((sizes) => {
       if (sizes) dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
+    })
+  }, [])
+
+  useEffect(() => {
+    window.api.getNavbarCollapsedPanels().then((panels) => {
+      dispatch({ type: 'SET_NAVBAR_COLLAPSED_PANELS', panels })
     })
   }, [])
 
@@ -1087,6 +1106,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setTagsPanelGridView(value)
   }, [])
 
+  const setPeoplePanelGridView = useCallback((value: boolean) => {
+    dispatch({ type: 'SET_PEOPLE_PANEL_GRID_VIEW', value })
+    void window.api.setPeoplePanelGridView(value)
+  }, [])
+
   const setGalleryViewMode = useCallback((value: GalleryViewMode) => {
     dispatch({ type: 'SET_GALLERY_VIEW_MODE', value })
     void window.api.setGalleryViewMode(value)
@@ -1169,6 +1193,32 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     },
     [refreshPeople]
   )
+
+  const setPersonDescription = useCallback(
+    async (id: string, description: string) => {
+      await window.api.setPersonDescription(id, description)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
+  const hidePerson = useCallback(
+    async (id: string) => {
+      await window.api.hidePerson(id)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
+  const unhidePerson = useCallback(
+    async (id: string) => {
+      await window.api.unhidePerson(id)
+      await refreshPeople()
+    },
+    [refreshPeople]
+  )
+
+  const getHiddenPeople = useCallback(() => window.api.getHiddenPeople(), [])
 
   const suggestTags = useCallback(
     (filePath: string, candidateLabels: string[]) =>
@@ -1357,9 +1407,14 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     })
   }, [rescanAiFeatures])
 
-  const setNavbarSplitSizes = useCallback((sizes: [number, number]) => {
+  const setNavbarSplitSizes = useCallback((sizes: number[]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     void window.api.setNavbarSplitSizes(sizes)
+  }, [])
+
+  const setNavbarCollapsedPanels = useCallback((panels: Record<string, boolean>) => {
+    dispatch({ type: 'SET_NAVBAR_COLLAPSED_PANELS', panels })
+    void window.api.setNavbarCollapsedPanels(panels)
   }, [])
 
   // Session-only UI state — no window.api persistence, unlike the settings
@@ -1673,6 +1728,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     setDefaultView,
     setShowEmptyFolders,
     setTagsPanelGridView,
+    setPeoplePanelGridView,
     setGalleryViewMode,
     setAiTagSuggestionsEnabled,
     suggestTags,
@@ -1697,7 +1753,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     unassignFace,
     mergePeople,
     deletePerson,
+    setPersonDescription,
+    hidePerson,
+    unhidePerson,
+    getHiddenPeople,
     setNavbarSplitSizes,
+    setNavbarCollapsedPanels,
     setSettingsModalOpened,
     setDetailsPanelCollapsed,
     setGalleryAnimationsEnabled,

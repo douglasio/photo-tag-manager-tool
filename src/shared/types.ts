@@ -213,6 +213,8 @@ export interface PersonRecord {
   // render a representative thumbnail.
   coverPhotoPath: string | null
   faceCount: number
+  // Same free-text pattern as tag_metadata.description.
+  description: string | null
 }
 
 export type FaceScanPhase = 'detecting' | 'clustering'

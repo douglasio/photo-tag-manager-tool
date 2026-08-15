@@ -3,13 +3,17 @@ import { ipcMain } from 'electron'
 import {
   deletePerson,
   getFacesForPhoto,
+  getHiddenPeople,
   getPeople,
   getPersonPhotoAssignments,
+  hidePerson,
   mergePeople,
   renamePerson,
   setFacePersonAssignment,
+  setPersonDescription,
   splitFaceAsNewPerson,
-  unassignFace
+  unassignFace,
+  unhidePerson
 } from '@main/db/faceRepository'
 import {
   cancelFaceScan,
@@ -78,4 +82,21 @@ export function registerFaceHandlers(): void {
   ipcMain.handle('faces:deletePerson', (_event, id: string): void => {
     deletePerson(id)
   })
+
+  ipcMain.handle('faces:setDescription', (_event, id: string, description: string): void => {
+    setPersonDescription(id, description)
+  })
+
+  // Distinct from delete — pins the person's faces (frozen grouping) and
+  // filters them from the People panel/gallery, but keeps the person row
+  // around so it can be un-hidden from Settings.
+  ipcMain.handle('faces:hidePerson', (_event, id: string): void => {
+    hidePerson(id)
+  })
+
+  ipcMain.handle('faces:unhidePerson', (_event, id: string): void => {
+    unhidePerson(id)
+  })
+
+  ipcMain.handle('faces:getHiddenPeople', (): PersonRecord[] => getHiddenPeople())
 }

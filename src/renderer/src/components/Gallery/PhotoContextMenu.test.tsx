@@ -200,7 +200,14 @@ describe('PhotoContextMenu person filter', () => {
   it("shows the person's name and unassigns only faces belonging to them", async () => {
     mockSelectedPerson = 'p1'
     mockPeople = [
-      { id: 'p1', name: 'Jamie', coverFaceId: null, coverPhotoPath: null, faceCount: 1 }
+      {
+        id: 'p1',
+        name: 'Jamie',
+        coverFaceId: null,
+        coverPhotoPath: null,
+        faceCount: 1,
+        description: null
+      }
     ]
     mockGetFacesForPhoto.mockResolvedValue([
       makeFace({ id: 'face-1', personId: 'p1' }),
@@ -219,7 +226,16 @@ describe('PhotoContextMenu person filter', () => {
 
   it('falls back to "this person" for an unnamed person', async () => {
     mockSelectedPerson = 'p1'
-    mockPeople = [{ id: 'p1', name: null, coverFaceId: null, coverPhotoPath: null, faceCount: 1 }]
+    mockPeople = [
+      {
+        id: 'p1',
+        name: null,
+        coverFaceId: null,
+        coverPhotoPath: null,
+        faceCount: 1,
+        description: null
+      }
+    ]
     const photo = makePhoto('/root/a.jpg')
     renderMenu(photo)
 
@@ -232,7 +248,14 @@ describe('PhotoContextMenu person filter', () => {
     mockSelectedPaths = new Set(['/root/a.jpg', '/root/b.jpg'])
     mockSelectedPerson = 'p1'
     mockPeople = [
-      { id: 'p1', name: 'Jamie', coverFaceId: null, coverPhotoPath: null, faceCount: 2 }
+      {
+        id: 'p1',
+        name: 'Jamie',
+        coverFaceId: null,
+        coverPhotoPath: null,
+        faceCount: 2,
+        description: null
+      }
     ]
     mockGetFacesForPhoto.mockResolvedValue([makeFace({ id: 'face-1', personId: 'p1' })])
     const user = userEvent.setup()

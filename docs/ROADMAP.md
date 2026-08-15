@@ -63,7 +63,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 3. Make each panel (Tags, People, Folders) collapsible (accordion-style) and persist the settings.
 
-4. Allow for hiding People -- hide them from the UI and don't re-suggest that grouping of faces. Add all hidden people to a new section in the Settings modal so they can be un-hidden.
+4. Allow for hiding People -- a new context menu item when right-clicking an item in the People panel - hide them from the UI and don't re-suggest that grouping of faces. Add all hidden people to the People section in the Settings modal so they can be un-hidden. This is different from "delete" which just ungroups that selection of faces until the next scan. Confirm dialogs should be updated to explain this.
 
 5. Allow descriptions to be added to People, same pattern we used for Tags.
 
@@ -87,7 +87,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Photo view
 
-1. Adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
+1. Refactor Compare view to use Mantine Compare plugin instead of Splitter. I'm okay if this means removing the ability to compare >2 images for now.
+
+2. Adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
    - `onSave` returns base64/canvas, not a file — original EXIF (GPS, date-taken, camera info) is lost on re-encode unless explicitly restored. Plan: base64 → IPC → decode → copy original tags via exiftool-vendored → write via sharp → same `ingestFile`/thumbnail-regen path the current rotate handler uses.
    - No Mantine integration — it's a standalone widget with its own `theme` object (reskinnable to match), dropped in a Mantine `Modal`. Pulls in `react-konva` + `styled-components` as new deps.
    - No plugin API for custom tools/tabs — can only show/hide/reorder the built-in tool set (adjust, filters, rotate, crop, resize, watermark, shapes, text). The DVD/magazine/newspaper visualizations would stay separate, not foldable into its toolbar.

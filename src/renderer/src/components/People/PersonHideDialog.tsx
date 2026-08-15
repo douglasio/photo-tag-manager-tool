@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 
 import { ConfirmDialog } from '@components'
 
-interface PersonDeleteDialogProps {
+interface PersonHideDialogProps {
   name: string
   opened: boolean
   saving: boolean
@@ -11,38 +11,32 @@ interface PersonDeleteDialogProps {
   onCancel: () => void
 }
 
-export function PersonDeleteDialog({
+export function PersonHideDialog({
   name,
   opened,
   saving,
   onConfirm,
   onCancel
-}: PersonDeleteDialogProps): ReactElement {
+}: PersonHideDialogProps): ReactElement {
   return (
     <ConfirmDialog
-      title="Delete person"
+      title="Hide person"
       opened={opened}
       saving={saving}
-      confirmLabel="Delete"
-      confirmColor="red"
+      confirmLabel="Hide"
       onConfirm={onConfirm}
       onCancel={onCancel}
     >
       <Text size="sm">
-        Delete{' '}
+        Hide{' '}
         <Text span fw={700}>
           {name}
         </Text>
         ?
       </Text>
       <Text c="dimmed" size="sm" mt="xs">
-        Its faces become unassigned and eligible to be grouped again on the next scan — this
-        doesn&apos;t delete any photos. If you just want it out of the way without letting future
-        scans re-suggest the same grouping, use{' '}
-        <Text span fw={600}>
-          Hide
-        </Text>{' '}
-        instead.
+        Their photo matches stay grouped together just hidden. Un-hide this person in Settings →
+        People.
       </Text>
     </ConfirmDialog>
   )

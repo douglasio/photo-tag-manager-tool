@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from 'react'
+import { type ReactElement, useRef, useState } from 'react'
 
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Image,
+  SimpleGrid,
   Stack,
   Text,
   TextInput,
@@ -21,8 +22,11 @@ import type { PersonRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { activeHoverBackground } from '@utils'
 
+import { PeopleSettingsMenu } from './PeopleSettingsMenu'
 import { PersonContextMenu } from './PersonContextMenu'
 import { PersonDeleteDialog } from './PersonDeleteDialog'
+import { PersonGridTile } from './PersonGridTile'
+import { PersonHideDialog } from './PersonHideDialog'
 
 const COVER_SIZE = 32
 
@@ -34,7 +38,7 @@ interface PersonRowProps {
 }
 
 function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps): ReactElement {
-  const { state, renamePerson, deletePerson, setPersonFilter } = usePhotoLibrary()
+  const { state, renamePerson, hidePerson, deletePerson, setPersonFilter } = usePhotoLibrary()
   const isActive = state.selectedPerson === person.id
   const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
   // Drop target for a face dragged from DetailPanelFaces (assign) or another
@@ -57,7 +61,13 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
     data: { personId: person.id, personName: person.name },
     disabled: editing
   })
-  const ref = useMergedRef(hoverRef, setDropRef, setDragRef)
+  // Separate plain ref for the description Tooltip's `target` — Mantine's
+  // Tooltip only forwards a fixed prop whitelist onto a wrapped child, which
+  // silently drops Menu.ContextMenu's onContextMenu handler if the Tooltip
+  // wraps the button as a parent (see TagPanel.tsx's own fix for the same
+  // issue). Using `target` instead of wrapping avoids it entirely.
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const ref = useMergedRef(hoverRef, setDropRef, setDragRef, buttonRef)
 
   const displayName = person.name ?? 'Unnamed person'
   const coverThumbnailKey = person.coverPhotoPath
@@ -76,6 +86,7 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
   }
 
   const [saving, setSaving] = useState(false)
+  const [confirmingHide, setConfirmingHide] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const cancel = (): void => {
@@ -102,6 +113,16 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
     }
   }
 
+  const handleHide = async (): Promise<void> => {
+    setSaving(true)
+    try {
+      await hidePerson(person.id)
+      setConfirmingHide(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleDelete = async (): Promise<void> => {
     setSaving(true)
     try {
@@ -114,7 +135,11 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
 
   return (
     <>
-      <PersonContextMenu onRename={onStartEdit} onDelete={() => setConfirmingDelete(true)}>
+      <PersonContextMenu
+        onRename={onStartEdit}
+        onHide={() => setConfirmingHide(true)}
+        onDelete={() => setConfirmingDelete(true)}
+      >
         {/* Edit mode reuses the exact same Button/leftSection/padding chrome
             as view mode, only swapping Text for a TextInput as the button's
             content — otherwise the differing padding/gap shifts the row's
@@ -214,6 +239,27 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
           )}
         </Button>
       </PersonContextMenu>
+      {person.description && (
+        <Tooltip
+          target={buttonRef}
+          position="right"
+          label={
+            <Text size="xs" maw={220}>
+              {person.description}
+            </Text>
+          }
+          disabled={editing}
+          openDelay={700}
+          multiline
+        />
+      )}
+      <PersonHideDialog
+        name={displayName}
+        opened={confirmingHide}
+        saving={saving}
+        onConfirm={() => void handleHide()}
+        onCancel={() => setConfirmingHide(false)}
+      />
       <PersonDeleteDialog
         name={displayName}
         opened={confirmingDelete}
@@ -229,13 +275,18 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
 // nested in groups the way tags are — a flat list, since merging one person
 // into another (via drag-and-drop) already covers the "combine" case a
 // group hierarchy would otherwise be for.
-export function PeoplePanel(): ReactElement {
-  const { state } = usePhotoLibrary()
+interface PeoplePanelProps {
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+}
+
+export function PeoplePanel({ collapsed, onToggleCollapse }: PeoplePanelProps = {}): ReactElement {
+  const { state, setPersonFilter } = usePhotoLibrary()
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null)
 
   if (state.people.length === 0) {
     return (
-      <PanelSection title="People">
+      <PanelSection title="People" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
         <Text c="dimmed" p="xs">
           No people yet — run a face scan from Settings to get started.
         </Text>
@@ -244,18 +295,45 @@ export function PeoplePanel(): ReactElement {
   }
 
   return (
-    <PanelSection title="People">
-      <Stack gap={0}>
-        {state.people.map((person) => (
-          <PersonRow
-            key={person.id}
-            person={person}
-            editing={editingPersonId === person.id}
-            onStartEdit={() => setEditingPersonId(person.id)}
-            onStopEdit={() => setEditingPersonId(null)}
-          />
-        ))}
-      </Stack>
+    <PanelSection
+      title="People"
+      headerAction={<PeopleSettingsMenu />}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    >
+      {state.peoplePanelGridView ? (
+        <SimpleGrid cols={2} spacing="xs" p="xs">
+          {state.people.map((person) => {
+            const isActive = state.selectedPerson === person.id
+            return (
+              <PersonGridTile
+                key={person.id}
+                name={person.name ?? 'Unnamed person'}
+                faceCount={person.faceCount}
+                coverThumbnailKey={
+                  person.coverPhotoPath
+                    ? state.photosByPath.get(person.coverPhotoPath)?.thumbnailKey
+                    : null
+                }
+                isActive={isActive}
+                onSelect={() => setPersonFilter(isActive ? null : person.id)}
+              />
+            )
+          })}
+        </SimpleGrid>
+      ) : (
+        <Stack gap={0}>
+          {state.people.map((person) => (
+            <PersonRow
+              key={person.id}
+              person={person}
+              editing={editingPersonId === person.id}
+              onStartEdit={() => setEditingPersonId(person.id)}
+              onStopEdit={() => setEditingPersonId(null)}
+            />
+          ))}
+        </Stack>
+      )}
     </PanelSection>
   )
 }

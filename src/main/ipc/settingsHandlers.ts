@@ -18,8 +18,10 @@ import {
   getGallerySort,
   getGalleryViewMode,
   getMagazineTitle,
+  getNavbarCollapsedPanels,
   getNavbarSplitSizes,
   getNewspaperTitle,
+  getPeoplePanelGridView,
   getShowEmptyFolders,
   getShowFilenames,
   getShowViewCounts,
@@ -38,8 +40,10 @@ import {
   setGallerySort,
   setGalleryViewMode,
   setMagazineTitle,
+  setNavbarCollapsedPanels,
   setNavbarSplitSizes,
   setNewspaperTitle,
+  setPeoplePanelGridView,
   setShowEmptyFolders,
   setShowFilenames,
   setShowViewCounts,
@@ -97,6 +101,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setTagsPanelGridView', (_event, value: boolean): void => {
     setTagsPanelGridView(value)
+  })
+
+  ipcMain.handle('settings:getPeoplePanelGridView', (): boolean => getPeoplePanelGridView())
+
+  ipcMain.handle('settings:setPeoplePanelGridView', (_event, value: boolean): void => {
+    setPeoplePanelGridView(value)
   })
 
   ipcMain.handle('settings:getGalleryViewMode', (): GalleryViewMode => getGalleryViewMode())
@@ -192,13 +202,22 @@ export function registerSettingsHandlers(): void {
     setArtGalleryName(value)
   })
 
-  ipcMain.handle('settings:getNavbarSplitSizes', (): [number, number] | null =>
-    getNavbarSplitSizes()
-  )
+  ipcMain.handle('settings:getNavbarSplitSizes', (): number[] | null => getNavbarSplitSizes())
 
-  ipcMain.handle('settings:setNavbarSplitSizes', (_event, sizes: [number, number]): void => {
+  ipcMain.handle('settings:setNavbarSplitSizes', (_event, sizes: number[]): void => {
     setNavbarSplitSizes(sizes)
   })
+
+  ipcMain.handle('settings:getNavbarCollapsedPanels', (): Record<string, boolean> =>
+    getNavbarCollapsedPanels()
+  )
+
+  ipcMain.handle(
+    'settings:setNavbarCollapsedPanels',
+    (_event, value: Record<string, boolean>): void => {
+      setNavbarCollapsedPanels(value)
+    }
+  )
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())
 

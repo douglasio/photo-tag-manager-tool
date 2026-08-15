@@ -76,6 +76,10 @@ const api = {
   getTagsPanelGridView: (): Promise<boolean> => ipcRenderer.invoke('settings:getTagsPanelGridView'),
   setTagsPanelGridView: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setTagsPanelGridView', value),
+  getPeoplePanelGridView: (): Promise<boolean> =>
+    ipcRenderer.invoke('settings:getPeoplePanelGridView'),
+  setPeoplePanelGridView: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('settings:setPeoplePanelGridView', value),
   getGalleryViewMode: (): Promise<GalleryViewMode> =>
     ipcRenderer.invoke('settings:getGalleryViewMode'),
   setGalleryViewMode: (value: GalleryViewMode): Promise<void> =>
@@ -121,6 +125,11 @@ const api = {
   mergePeople: (sourcePersonId: string, targetPersonId: string): Promise<void> =>
     ipcRenderer.invoke('faces:mergePeople', sourcePersonId, targetPersonId),
   deletePerson: (id: string): Promise<void> => ipcRenderer.invoke('faces:deletePerson', id),
+  setPersonDescription: (id: string, description: string): Promise<void> =>
+    ipcRenderer.invoke('faces:setDescription', id, description),
+  hidePerson: (id: string): Promise<void> => ipcRenderer.invoke('faces:hidePerson', id),
+  unhidePerson: (id: string): Promise<void> => ipcRenderer.invoke('faces:unhidePerson', id),
+  getHiddenPeople: (): Promise<PersonRecord[]> => ipcRenderer.invoke('faces:getHiddenPeople'),
   getThrowbackSimilarity: (): Promise<ThrowbackEntry[] | null> =>
     ipcRenderer.invoke('throwback:getSimilarity'),
   getThrowbackYearSample: (): Promise<ThrowbackYearSample | null> =>
@@ -153,10 +162,14 @@ const api = {
   getArtGalleryName: (): Promise<string> => ipcRenderer.invoke('settings:getArtGalleryName'),
   setArtGalleryName: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setArtGalleryName', value),
-  getNavbarSplitSizes: (): Promise<[number, number] | null> =>
+  getNavbarSplitSizes: (): Promise<number[] | null> =>
     ipcRenderer.invoke('settings:getNavbarSplitSizes'),
-  setNavbarSplitSizes: (sizes: [number, number]): Promise<void> =>
+  setNavbarSplitSizes: (sizes: number[]): Promise<void> =>
     ipcRenderer.invoke('settings:setNavbarSplitSizes', sizes),
+  getNavbarCollapsedPanels: (): Promise<Record<string, boolean>> =>
+    ipcRenderer.invoke('settings:getNavbarCollapsedPanels'),
+  setNavbarCollapsedPanels: (value: Record<string, boolean>): Promise<void> =>
+    ipcRenderer.invoke('settings:setNavbarCollapsedPanels', value),
   getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),

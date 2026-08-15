@@ -53,6 +53,7 @@ import {
   DuplicatesView,
   FolderTree,
   GalleryGrid,
+  PANEL_HEADER_HEIGHT,
   PeoplePanel,
   PersonMergeDialog,
   PhotoView,
@@ -242,7 +243,8 @@ function AppLayout(): React.JSX.Element {
     assignTagToGroup,
     assignFaceToPerson,
     mergePeople,
-    setNavbarSplitSizes
+    setNavbarSplitSizes,
+    setNavbarCollapsedPanels
   } = usePhotoLibrary()
   // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
   const isPhotoTabActive = state.activeTab !== 'gallery'
@@ -253,6 +255,54 @@ function AppLayout(): React.JSX.Element {
   // Duplicates tab browses across many photos at once — no single photo for
   // the details panel to describe.
   const isDuplicatesTabActive = state.activeTab === 'duplicates'
+
+  // Default even split for the navbar Splitter's current pane count (Tags,
+  // People, Folders — People only present once face detection is enabled).
+  const navbarPaneSizes = state.faceDetectionEnabled ? [34, 33, 33] : [50, 50]
+  // Stable ids for the same panes, in render order — used to key the
+  // id-keyed navbarCollapsedPanels record (index alone would silently mean
+  // a different panel once People's pane appears/disappears).
+  const navbarPaneIds = state.faceDetectionEnabled
+    ? ['tags', 'people', 'folders']
+    : ['tags', 'folders']
+
+  // Collapse is driven entirely through Splitter's `sizes` prop (a fixed-px
+  // entry for a collapsed pane, its normal flexible size otherwise) rather
+  // than Splitter's own collapsible/collapse() API — that API always snaps a
+  // pane to literal 0 (verified against @mantine/hooks' source), which would
+  // hide its header too and leave no way to re-expand it. This way a
+  // "collapsed" pane still reserves exactly PanelSection's header height.
+  // Self-healing against a specific pre-existing corruption: the old
+  // collapse-to-zero behavior (before this fix) persisted a literal 0 into
+  // navbarSplitSizes for whichever pane was collapsed at the time, since
+  // Splitter's native collapse() reports the panel's size as 0 through
+  // onSizeChange. A stored 0 is never a size a user actually wants "expanded"
+  // to, so fall back to the even-split default for that one slot instead of
+  // trusting it forever.
+  const defaultPaneSizes = (
+    state.navbarSplitSizes.length === navbarPaneSizes.length
+      ? state.navbarSplitSizes
+      : navbarPaneSizes
+  ).map((size, index) => (size > 0 ? size : navbarPaneSizes[index]))
+  const navbarSizes = navbarPaneIds.map((id, index) =>
+    state.navbarCollapsedPanels[id] ? `${PANEL_HEADER_HEIGHT}px` : defaultPaneSizes[index]
+  )
+  const toggleNavbarPanel = (id: string): void => {
+    setNavbarCollapsedPanels({
+      ...state.navbarCollapsedPanels,
+      [id]: !state.navbarCollapsedPanels[id]
+    })
+  }
+
+  // Sizing is plain flex-basis/flex-grow under the hood (verified against
+  // @mantine/core's Splitter source), so a CSS transition animates collapse/
+  // expand for free — but only when the size change comes from the toggle
+  // button, not from an active drag, where a transition would lag a frame
+  // behind the cursor instead of tracking it 1:1.
+  const [isResizingNavbar, setIsResizingNavbar] = useState(false)
+  const navbarPaneTransition = isResizingNavbar
+    ? undefined
+    : 'flex-basis 200ms ease, flex-grow 200ms ease'
 
   // Mantine's Tooltip only closes on a real mouseleave (it's built on
   // floating-ui's useHover) — clicking a tooltip's own trigger doesn't
@@ -640,44 +690,72 @@ function AppLayout(): React.JSX.Element {
                 orientation="vertical"
                 withHandle={false}
                 handleColor="var(--mantine-color-default-border)"
-                // People only gets a pane once enabled — its 3-way split
-                // isn't persisted (unlike the 2-pane Tags/Folders split
-                // above), so it's simplest to just fix a default here rather
-                // than growing navbarSplitSizes' persisted shape for a
-                // pane most users won't have on.
-                sizes={state.faceDetectionEnabled ? [34, 33, 33] : state.navbarSplitSizes}
+                sizes={navbarSizes}
+                onResizeStart={() => setIsResizingNavbar(true)}
+                onResizeEnd={() => setIsResizingNavbar(false)}
                 onSizeChange={(sizes) => {
-                  if (!state.faceDetectionEnabled) setNavbarSplitSizes(sizes as [number, number])
+                  // Never persist a collapsed pane's fixed header-height
+                  // entry as its "real" size — keep whatever was there
+                  // before, so un-collapsing restores a sensible split
+                  // instead of reopening at header height.
+                  const merged = navbarPaneIds.map((id, index) =>
+                    state.navbarCollapsedPanels[id] ? defaultPaneSizes[index] : sizes[index]
+                  )
+                  setNavbarSplitSizes(merged as number[])
                 }}
                 flex={1}
                 mih={0}
               >
                 <Splitter.Pane
-                  defaultSize={50}
+                  defaultSize={navbarPaneSizes[0]}
+                  min={`${PANEL_HEADER_HEIGHT}px`}
                   mih={0}
                   display="flex"
-                  style={{ flexDirection: 'column', overflow: 'hidden' }}
+                  style={{
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    transition: navbarPaneTransition
+                  }}
                 >
-                  <TagPanel />
-                </Splitter.Pane>
-                <Splitter.Pane
-                  defaultSize={50}
-                  mih={0}
-                  display="flex"
-                  style={{ flexDirection: 'column', overflow: 'hidden' }}
-                >
-                  <FolderTree />
+                  <TagPanel
+                    collapsed={Boolean(state.navbarCollapsedPanels.tags)}
+                    onToggleCollapse={() => toggleNavbarPanel('tags')}
+                  />
                 </Splitter.Pane>
                 {state.faceDetectionEnabled && (
                   <Splitter.Pane
-                    defaultSize={33}
+                    defaultSize={navbarPaneSizes[1]}
+                    min={`${PANEL_HEADER_HEIGHT}px`}
                     mih={0}
                     display="flex"
-                    style={{ flexDirection: 'column', overflow: 'hidden' }}
+                    style={{
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                      transition: navbarPaneTransition
+                    }}
                   >
-                    <PeoplePanel />
+                    <PeoplePanel
+                      collapsed={Boolean(state.navbarCollapsedPanels.people)}
+                      onToggleCollapse={() => toggleNavbarPanel('people')}
+                    />
                   </Splitter.Pane>
                 )}
+                <Splitter.Pane
+                  defaultSize={navbarPaneSizes[navbarPaneSizes.length - 1]}
+                  min={`${PANEL_HEADER_HEIGHT}px`}
+                  mih={0}
+                  display="flex"
+                  style={{
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    transition: navbarPaneTransition
+                  }}
+                >
+                  <FolderTree
+                    collapsed={Boolean(state.navbarCollapsedPanels.folders)}
+                    onToggleCollapse={() => toggleNavbarPanel('folders')}
+                  />
+                </Splitter.Pane>
               </Splitter>
             </AppShell.Section>
           </AppShell.Navbar>

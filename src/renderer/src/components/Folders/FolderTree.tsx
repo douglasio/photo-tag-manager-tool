@@ -296,7 +296,12 @@ function FolderTreeInner({
   )
 }
 
-export function FolderTree(): ReactElement {
+interface FolderTreeProps {
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+}
+
+export function FolderTree({ collapsed, onToggleCollapse }: FolderTreeProps = {}): ReactElement {
   const { state, setFolderFilter, renameFolder } = usePhotoLibrary()
   const [editingFolder, setEditingFolder] = useState<string | null>(null)
 
@@ -305,7 +310,12 @@ export function FolderTree(): ReactElement {
   }
 
   return (
-    <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
+    <PanelSection
+      title="Folders"
+      headerAction={<FolderSettingsMenu />}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    >
       <Stack gap="md">
         {state.folders.map((folder) => (
           <FolderTreeInner

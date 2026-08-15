@@ -69,6 +69,7 @@ export interface PhotoLibraryState {
   defaultView: DefaultView
   showEmptyFolders: boolean
   tagsPanelGridView: boolean
+  peoplePanelGridView: boolean
   galleryViewMode: GalleryViewMode
   aiTagSuggestionsEnabled: boolean
   // Session-only — null when no AI scan is in flight. Spans the whole
@@ -92,8 +93,16 @@ export interface PhotoLibraryState {
   galleryAnimationsEnabled: boolean
   showFilenames: boolean
   showViewCounts: boolean
-  // Percentage split [tags, folders] of the navbar's Tags/Folders Splitter.
-  navbarSplitSizes: [number, number]
+  // Percentage split of the navbar's Splitter panes — [tags, people, folders]
+  // when People is shown (faceDetectionEnabled), [tags, folders] otherwise.
+  // Variable length rather than a fixed tuple since the pane count itself
+  // changes; App.tsx falls back to a sensible default when the persisted
+  // length doesn't match the current pane count.
+  navbarSplitSizes: number[]
+  // Accordion-style collapse for the same Splitter panes, keyed by a stable
+  // panel id ('tags' | 'people' | 'folders') rather than pane index —
+  // missing key means expanded.
+  navbarCollapsedPanels: Record<string, boolean>
   // Global masthead/studio text for PhotoView's magazine/newspaper/DVD
   // visualizations, editable from Settings.
   magazineTitle: string
@@ -147,6 +156,7 @@ export const initialState: PhotoLibraryState = {
   defaultView: 'dashboard',
   showEmptyFolders: false,
   tagsPanelGridView: false,
+  peoplePanelGridView: false,
   galleryViewMode: 'grid',
   aiTagSuggestionsEnabled: false,
   aiScanProgress: null,
@@ -159,6 +169,7 @@ export const initialState: PhotoLibraryState = {
   showFilenames: true,
   showViewCounts: false,
   navbarSplitSizes: [50, 50],
+  navbarCollapsedPanels: {},
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
   dvdStudioName: 'TAG ME PICTURES',
@@ -199,6 +210,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_TAGS_PANEL_GRID_VIEW'; value: boolean }
+  | { type: 'SET_PEOPLE_PANEL_GRID_VIEW'; value: boolean }
   | { type: 'SET_GALLERY_VIEW_MODE'; value: GalleryViewMode }
   | { type: 'SET_AI_TAG_SUGGESTIONS_ENABLED'; value: boolean }
   | { type: 'SET_AI_SCAN_PROGRESS'; progress: AiScanProgress | null }
@@ -210,7 +222,8 @@ export type PhotoLibraryAction =
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
   | { type: 'SET_SHOW_FILENAMES'; value: boolean }
   | { type: 'SET_SHOW_VIEW_COUNTS'; value: boolean }
-  | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: [number, number] }
+  | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: number[] }
+  | { type: 'SET_NAVBAR_COLLAPSED_PANELS'; panels: Record<string, boolean> }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
   | { type: 'SET_DVD_STUDIO_NAME'; value: string }
@@ -552,6 +565,8 @@ export function photoLibraryReducer(
       return { ...state, showEmptyFolders: action.value }
     case 'SET_TAGS_PANEL_GRID_VIEW':
       return { ...state, tagsPanelGridView: action.value }
+    case 'SET_PEOPLE_PANEL_GRID_VIEW':
+      return { ...state, peoplePanelGridView: action.value }
     case 'SET_GALLERY_VIEW_MODE':
       return { ...state, galleryViewMode: action.value }
     case 'SET_AI_TAG_SUGGESTIONS_ENABLED':
@@ -583,6 +598,8 @@ export function photoLibraryReducer(
       return { ...state, showViewCounts: action.value }
     case 'SET_NAVBAR_SPLIT_SIZES':
       return { ...state, navbarSplitSizes: action.sizes }
+    case 'SET_NAVBAR_COLLAPSED_PANELS':
+      return { ...state, navbarCollapsedPanels: action.panels }
     case 'SET_MAGAZINE_TITLE':
       return { ...state, magazineTitle: action.value }
     case 'SET_NEWSPAPER_TITLE':
