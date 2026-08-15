@@ -11,10 +11,11 @@ import type {
 } from '@main/workers/throwbackSimilarityProtocol'
 import type { ThrowbackEntry, ThrowbackYearSample } from '@shared/types'
 
-// "Kinda similar, not a match" — much looser than duplicate detection's
-// 0.97, since these are meant to be the same general subject/scene across
-// different years, not near-identical shots.
-const THROWBACK_SIMILARITY_THRESHOLD = 0.7
+// "Kinda similar, not a match" — looser than duplicate detection's 0.97,
+// since these are meant to be the same general subject/scene across
+// different years, not near-identical shots. Raised from 0.7, which let in
+// pairs that didn't actually look alike.
+const THROWBACK_SIMILARITY_THRESHOLD = 0.82
 
 const MIN_YEAR_SAMPLE_PHOTOS = 4
 const YEAR_SAMPLE_SIZE = 4

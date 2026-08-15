@@ -1,6 +1,6 @@
 import { type ReactElement } from 'react'
 
-import { Burger, Button, Group, Modal, Stack, Tabs, Title, Tooltip } from '@mantine/core'
+import { Box, Burger, Button, Group, Modal, Stack, Tabs, Title, Tooltip } from '@mantine/core'
 import { IconKeyboard, IconLibraryPhoto, IconTool } from '@tabler/icons-react'
 
 import { usePhotoLibrary } from '@state'
@@ -56,10 +56,18 @@ export function SettingsModal(): ReactElement {
       <Modal
         opened={opened}
         onClose={close}
+        // Plain text styled to match Title size="h2", not an actual heading
+        // — Mantine's Modal already renders its own title prop as an <h2>,
+        // so nesting another heading element inside it is invalid HTML.
         title={
-          <Title order={1} size="h2">
+          <Box
+            component="span"
+            fz="var(--mantine-h2-font-size)"
+            fw="var(--mantine-h2-font-weight)"
+            lh="var(--mantine-h2-line-height)"
+          >
             Settings
-          </Title>
+          </Box>
         }
         size="xl"
       >

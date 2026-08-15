@@ -1,4 +1,4 @@
-import { Button, Group, Modal, Title } from '@mantine/core'
+import { Box, Button, Group, Modal } from '@mantine/core'
 import type { ReactElement, ReactNode } from 'react'
 
 interface ConfirmDialogProps {
@@ -28,7 +28,24 @@ export function ConfirmDialog({
   children
 }: ConfirmDialogProps): ReactElement {
   return (
-    <Modal opened={opened} onClose={onCancel} title={<Title order={3}>{title}</Title>} centered>
+    <Modal
+      opened={opened}
+      onClose={onCancel}
+      // Plain text styled to match Title order={3}, not an actual heading —
+      // Mantine's Modal already renders its own title prop as an <h2>, so
+      // nesting another heading element inside it is invalid HTML.
+      title={
+        <Box
+          component="span"
+          fz="var(--mantine-h3-font-size)"
+          fw="var(--mantine-h3-font-weight)"
+          lh="var(--mantine-h3-line-height)"
+        >
+          {title}
+        </Box>
+      }
+      centered
+    >
       {children}
       <Group justify="flex-end" mt="lg">
         <Button variant="default" onClick={onCancel} disabled={saving}>

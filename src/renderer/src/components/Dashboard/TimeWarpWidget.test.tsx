@@ -7,6 +7,7 @@ import type { AiScanProgress, PhotoRecord, ThrowbackEntry } from '@shared/types'
 let mockPhotosByPath: Map<string, PhotoRecord>
 let mockAiTagSuggestionsEnabled: boolean
 let mockAiScanProgress: AiScanProgress | null
+let mockExcludedFolders: string[]
 const mockGetThrowbackSimilarity = vi.fn()
 const mockGetThrowbackPreview = vi.fn()
 const mockEnableAiFeatures = vi.fn()
@@ -17,7 +18,8 @@ vi.mock('@state', () => ({
     state: {
       photosByPath: mockPhotosByPath,
       aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled,
-      aiScanProgress: mockAiScanProgress
+      aiScanProgress: mockAiScanProgress,
+      excludedFolders: mockExcludedFolders
     },
     activePhotosByPath: mockPhotosByPath,
     getThrowbackSimilarity: mockGetThrowbackSimilarity,
@@ -42,6 +44,7 @@ describe('TimeWarpWidget', () => {
     mockPhotosByPath = new Map()
     mockAiTagSuggestionsEnabled = false
     mockAiScanProgress = null
+    mockExcludedFolders = []
     mockGetThrowbackSimilarity.mockReset().mockResolvedValue(null)
     mockGetThrowbackPreview.mockReset().mockResolvedValue(null)
     mockEnableAiFeatures.mockReset()
@@ -178,5 +181,29 @@ describe('TimeWarpWidget', () => {
     )
 
     expect(await screen.findByText('2020')).toBeInTheDocument()
+  })
+
+  it('recalculates (not just re-filters) once a folder is excluded from features', async () => {
+    mockAiTagSuggestionsEnabled = true
+    mockGetThrowbackSimilarity.mockResolvedValueOnce([
+      { year: 2020, filePath: '/excluded/a.jpg' },
+      { year: 2021, filePath: '/b.jpg' }
+    ])
+    const { rerender } = renderWidget()
+
+    await screen.findByText('2020')
+
+    // Excluding /excluded no longer qualifies a cross-year match at all —
+    // the whole cluster gets recalculated, not just filtered to one entry.
+    mockGetThrowbackSimilarity.mockResolvedValueOnce(null)
+    mockExcludedFolders = ['/excluded']
+    rerender(
+      <MantineProvider>
+        <TimeWarpWidget />
+      </MantineProvider>
+    )
+
+    expect(mockGetThrowbackSimilarity).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('No cross-year matches found yet.')).toBeInTheDocument()
   })
 })

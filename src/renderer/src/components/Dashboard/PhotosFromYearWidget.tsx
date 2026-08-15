@@ -93,13 +93,19 @@ export function PhotosFromYearWidget(): ReactElement {
   const [loading, setLoading] = useState(true)
   const [yearSample, setYearSample] = useState<ThrowbackYearSample | null>(null)
   const hasLoadedOnceRef = useRef(false)
+  const lastFetchedExcludedFoldersRef = useRef(state.excludedFolders)
 
   useEffect(() => {
+    const excludedFoldersChanged = state.excludedFolders !== lastFetchedExcludedFoldersRef.current
     // A Dashboard tab revisit re-runs this effect without anything actually
-    // changing — skip once already loaded, per the "once per session" ask.
-    if (hasLoadedOnceRef.current) return
+    // changing — skip once already loaded, per the "once per session" ask,
+    // unless a folder's excluded-from-features status just flipped: the
+    // sample needs a genuine recalculation then, not just activePhotosByPath
+    // hiding an excluded tile from an otherwise-stale sample.
+    if (hasLoadedOnceRef.current && !excludedFoldersChanged) return
+    lastFetchedExcludedFoldersRef.current = state.excludedFolders
     let cancelled = false
-    setLoading(true)
+    if (!hasLoadedOnceRef.current) setLoading(true)
     getThrowbackYearSample()
       .then((result) => {
         if (!cancelled) setYearSample(result)
@@ -113,7 +119,7 @@ export function PhotosFromYearWidget(): ReactElement {
     return () => {
       cancelled = true
     }
-  }, [getThrowbackYearSample])
+  }, [getThrowbackYearSample, state.excludedFolders])
 
   if (loading) {
     return (
