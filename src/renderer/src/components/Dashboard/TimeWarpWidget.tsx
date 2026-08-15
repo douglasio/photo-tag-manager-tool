@@ -124,10 +124,12 @@ export function TimeWarpWidget(): ReactElement {
   const [enableAiOpened, setEnableAiOpened] = useState(false)
   const hasLoadedOnceRef = useRef(false)
   const scanning = state.aiScanProgress !== null
-  // Tracks the `scanning` value as of the last actual fetch, so a Dashboard
-  // tab revisit (which re-runs this effect without `scanning` truly
-  // changing) can be told apart from a genuine scan start/finish.
+  // Tracks the `scanning` value and excludedFolders reference as of the
+  // last actual fetch, so a Dashboard tab revisit (which re-runs this
+  // effect without either truly changing) can be told apart from a genuine
+  // scan start/finish or a folder's excluded-from-features status flipping.
   const lastFetchedScanningRef = useRef(scanning)
+  const lastFetchedExcludedFoldersRef = useRef(state.excludedFolders)
   const hasRealTimeline = state.aiTagSuggestionsEnabled && !!similarity && similarity.length > 0
 
   // Skips the query entirely while AI is disabled — the expensive half of
@@ -136,11 +138,20 @@ export function TimeWarpWidget(): ReactElement {
   // `similarity` left over from AI being on earlier is never actually shown.
   useEffect(() => {
     if (!state.aiTagSuggestionsEnabled) return
-    // Once loaded, only refetch on a real scanning-state transition (a scan
-    // starting/finishing) — not on every tab revisit — per the "once per
-    // session" ask.
-    if (hasLoadedOnceRef.current && scanning === lastFetchedScanningRef.current) return
+    const excludedFoldersChanged = state.excludedFolders !== lastFetchedExcludedFoldersRef.current
+    // Once loaded, only refetch on a real scanning transition or an
+    // excluded-folders change — not on every tab revisit. This must be a
+    // genuine recalculation, not just activePhotosByPath's render-time
+    // filter, since excluding a photo can change which cluster is best.
+    if (
+      hasLoadedOnceRef.current &&
+      scanning === lastFetchedScanningRef.current &&
+      !excludedFoldersChanged
+    ) {
+      return
+    }
     lastFetchedScanningRef.current = scanning
+    lastFetchedExcludedFoldersRef.current = state.excludedFolders
     let cancelled = false
     if (!hasLoadedOnceRef.current) setLoading(true)
     getThrowbackSimilarity()
@@ -156,7 +167,7 @@ export function TimeWarpWidget(): ReactElement {
     return () => {
       cancelled = true
     }
-  }, [getThrowbackSimilarity, scanning, state.aiTagSuggestionsEnabled])
+  }, [getThrowbackSimilarity, scanning, state.aiTagSuggestionsEnabled, state.excludedFolders])
 
   // Loads automatically (no button) whenever there's no real timeline to
   // show instead — whether that's because AI is off, or because AI is on
