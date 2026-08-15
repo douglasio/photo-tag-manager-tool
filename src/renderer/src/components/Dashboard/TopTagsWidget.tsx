@@ -110,8 +110,8 @@ export function makeCountBarShape(onSelect: (tag: string) => void) {
         {numBlocks > 0 ? (
           <>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="40%" stopColor="black" stopOpacity={0.92} />
-              <stop offset="100%" stopColor="black" stopOpacity={0.8} />
+              <stop offset="40%" stopColor="black" stopOpacity={1} />
+              <stop offset="100%" stopColor="black" stopOpacity={0.9} />
             </linearGradient>
             <g clipPath={`url(#${clipId})`}>
               {Array.from({ length: numBlocks }, (_, index) => {

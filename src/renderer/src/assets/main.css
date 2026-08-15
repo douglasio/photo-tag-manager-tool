@@ -69,7 +69,8 @@ button {
 }
 
 .dashboard-photo-frame text {
-  mix-blend-mode: overlay;
+  mix-blend-mode: lighten;
+  opacity: 0.6;
   font-weight: 800;
 }
 

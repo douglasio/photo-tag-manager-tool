@@ -57,6 +57,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Top Viewed photos should have an onboarding process similar to Featured Tag to guide users until they've view 5 photos.
 
+5. Featured Person widget -- roughly the same as the Featured Tag widget except with a person's face and other stats like
+
+6. The top
+
 ## Gallery View
 
 1. Select tag thumbnail photo
@@ -76,6 +80,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 8. Make the left sidebar wider by default.
 
 9. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated)
+
+10. Make the breadcrumb section headers sticky so it's easier to tell what section you're in
+
+11. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
 
 ### People
 

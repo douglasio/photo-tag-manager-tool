@@ -147,8 +147,8 @@ export function PhotosFromYearWidget(): ReactElement {
         cols={GRID_COLS}
         spacing="xs"
         autoRows="1fr"
-        h="100%"
-        style={{ flex: 1, minHeight: 0 }}
+        mih={0}
+        // style={{ flex: 1, minHeight: 0 }}
       >
         {yearSample.filePaths.map((filePath) => {
           const photo = activePhotosByPath.get(filePath)

@@ -10,7 +10,8 @@ import {
   SimpleGrid,
   Stack,
   Text,
-  Timeline
+  Timeline,
+  Title
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 
@@ -84,7 +85,7 @@ function ThrowbackTimeline({ entries }: ThrowbackTimelineProps): ReactElement {
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
   return (
-    <Timeline active={entries.length} bulletSize={16} lineWidth={2}>
+    <Timeline active={entries.length} bulletSize={16} lineWidth={2} w="50%">
       {entries.map((entry) => {
         const photo = activePhotosByPath.get(entry.filePath)
         return (
@@ -190,16 +191,19 @@ export function TimeWarpWidget(): ReactElement {
     return (
       <Group>
         <Loader size="sm" />
-        <Text>Loading...</Text>
+        <Text>Creating timeline...</Text>
       </Group>
     )
   }
 
   if (hasRealTimeline) {
     return (
-      <SimpleGrid cols={2}>
+      <Stack gap="md">
+        <Title order={3} c="dimmed">
+          Here are some similar photos taken over time.
+        </Title>
         <ThrowbackTimeline entries={similarity!.slice(0, MAX_TIMELINE_ENTRIES)} />
-      </SimpleGrid>
+      </Stack>
     )
   }
 

@@ -94,8 +94,8 @@ export function makeImageBarShape(
           <rect x={x} y={y} width={barWidth} height={height} rx={6} />
         </clipPath>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="40%" stopColor="black" stopOpacity={0.65} />
-          <stop offset="100%" stopColor="black" stopOpacity={0.45} />
+          <stop offset="40%" stopColor="black" stopOpacity={0.85} />
+          <stop offset="100%" stopColor="black" stopOpacity={0.7} />
         </linearGradient>
         <image
           href={payload.thumbnailUrl}
