@@ -1,9 +1,10 @@
+import { type ReactElement, useLayoutEffect } from 'react'
+
 import type { UsePannableZoomResult } from '@hooks'
 import { Box, Text } from '@mantine/core'
-import type { ReactElement } from 'react'
 
 import { PannableZoomableImage } from '@components'
-import { useLazyFonts } from '@hooks'
+import { useLazyFonts, usePannableZoom } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
 import { formatDateTaken } from '@utils'
 
@@ -11,9 +12,9 @@ import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface NewspaperCoverViewProps {
   photo: PhotoRecord
-  // Owned by PhotoView so it can render the matching ZoomToolbar in its own
-  // footer bar instead of a separate floating one here.
-  zoom: UsePannableZoomResult
+  // Owns its zoom locally (see usePannableZoom below) and reports it here so
+  // PhotoView's single footer ZoomToolbar can render from the same instance.
+  onZoomReady: (zoom: UsePannableZoomResult) => void
   // Global masthead text, editable in Settings.
   mastheadTitle: string
 }
@@ -63,7 +64,7 @@ function ColumnFiller({ lines }: { lines: number }): ReactElement {
 // wheel-to-zoom photo.
 export function NewspaperCoverView({
   photo,
-  zoom,
+  onZoomReady,
   mastheadTitle
 }: NewspaperCoverViewProps): ReactElement {
   const fontsLoaded = useLazyFonts([
@@ -73,6 +74,8 @@ export function NewspaperCoverView({
     () => import('@fontsource/playfair-display/700.css'),
     () => import('@fontsource/playfair-display/900.css')
   ])
+  const zoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  useLayoutEffect(() => onZoomReady(zoom), [zoom, onZoomReady])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken
     ? formatDateTaken(photo.metadata.dateTaken, 'dateOnly')

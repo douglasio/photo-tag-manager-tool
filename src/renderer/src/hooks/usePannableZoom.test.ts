@@ -154,6 +154,18 @@ describe('usePannableZoom', () => {
     expect(result.current.scale).toBe(0.5)
   })
 
+  it('returns a referentially stable object across a re-render where nothing changed', () => {
+    const { result, rerender } = renderHook(({ photo }) => usePannableZoom(photo), {
+      initialProps: { photo: makePhoto('/a.jpg') }
+    })
+    const first = result.current
+    // A new photo object with the same filePath doesn't trip resetKey — a
+    // caller reporting this object up to a parent (e.g. PhotoView) relies on
+    // this identity staying stable to avoid looping.
+    rerender({ photo: makePhoto('/a.jpg') })
+    expect(result.current).toBe(first)
+  })
+
   it('resets scale/pan/baseSize/anchor when the photo prop changes', () => {
     const { result, rerender } = renderHook(({ photo }) => usePannableZoom(photo), {
       initialProps: { photo: makePhoto('/a.jpg') }

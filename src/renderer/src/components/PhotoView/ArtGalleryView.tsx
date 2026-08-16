@@ -1,9 +1,10 @@
+import { type ReactElement, type ReactNode, useLayoutEffect } from 'react'
+
 import type { UsePannableZoomResult } from '@hooks'
 import { Box, Image, Text } from '@mantine/core'
-import type { ReactElement, ReactNode } from 'react'
 
 import { PannableZoomableImage } from '@components'
-import { useLazyFonts } from '@hooks'
+import { useLazyFonts, usePannableZoom } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
@@ -13,9 +14,9 @@ import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface ArtGalleryViewProps {
   photo: PhotoRecord
-  // Owned by PhotoView so it can render the matching ZoomToolbar in its own
-  // footer bar instead of a separate floating one here.
-  zoom: UsePannableZoomResult
+  // Owns its zoom locally (see usePannableZoom below) and reports it here so
+  // PhotoView's single footer ZoomToolbar can render from the same instance.
+  onZoomReady: (zoom: UsePannableZoomResult) => void
   // Global gallery name text, editable in Settings — shown on the placard's
   // credit line, the same role mastheadTitle/studioName play elsewhere.
   galleryName: string
@@ -114,13 +115,19 @@ function SidePiece({ photo }: { photo: PhotoRecord }): ReactElement | null {
 // curated wall — dark wall, soft overhead spotlight, a museum-style placard
 // under the main piece — reusing PannableZoomableImage for the drag-to-pan +
 // wheel-to-zoom main print itself.
-export function ArtGalleryView({ photo, zoom, galleryName }: ArtGalleryViewProps): ReactElement {
+export function ArtGalleryView({
+  photo,
+  onZoomReady,
+  galleryName
+}: ArtGalleryViewProps): ReactElement {
   const fontsLoaded = useLazyFonts([
     () => import('@fontsource/playfair-display/400.css'),
     () => import('@fontsource/playfair-display/400-italic.css'),
     () => import('@fontsource/playfair-display/700.css'),
     () => import('@fontsource/playfair-display/900.css')
   ])
+  const zoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  useLayoutEffect(() => onZoomReady(zoom), [zoom, onZoomReady])
   const { visiblePhotos } = usePhotoLibrary()
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken ? formatDateTaken(photo.metadata.dateTaken) : null

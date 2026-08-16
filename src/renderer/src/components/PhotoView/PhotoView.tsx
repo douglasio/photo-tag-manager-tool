@@ -18,7 +18,6 @@ import { motion } from 'motion/react'
 import { ZoomToolbar } from '@components'
 import { usePhotoEntranceExit } from '@hooks'
 import { usePhotoHoverEffects } from '@hooks'
-import { usePannableZoom } from '@hooks'
 import { toFileProtocolUrl } from '@shared/protocolUrls'
 import { type PhotoRecord, ROTATABLE_FORMATS, type RotateDirection } from '@shared/types'
 import { type PhotoVisualization, usePhotoLibrary } from '@state'
@@ -77,23 +76,11 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
   const [visualization, setVisualization] = useState<PhotoVisualization>(
     () => consumeVisualization(photo.filePath) ?? 'none'
   )
-  // Always called (not just while a given mode is active) so these stay the
-  // single source of truth for each view's zoom — PhotoView renders its
-  // ZoomToolbar from them directly, rather than each owning a disconnected copy.
-  const magazineZoom = usePannableZoom(photo, { defaultFit: 'cover' })
-  const newspaperZoom = usePannableZoom(photo, { defaultFit: 'cover' })
-  const dvdZoom = usePannableZoom(photo, { defaultFit: 'cover' })
-  const artGalleryZoom = usePannableZoom(photo, { defaultFit: 'cover' })
-  const movieTheaterZoom = usePannableZoom(photo, { defaultFit: 'cover' })
-  // One lookup instead of a growing ternary chain for the ZoomToolbar below
-  // — every non-'none' visualization shares the exact same zoom shape.
-  const visualizationZooms: Record<Exclude<PhotoVisualization, 'none'>, UsePannableZoomResult> = {
-    magazine: magazineZoom,
-    newspaper: newspaperZoom,
-    dvd: dvdZoom,
-    artGallery: artGalleryZoom,
-    movieTheater: movieTheaterZoom
-  }
+  // Each theme view owns its own usePannableZoom call (only the active one is
+  // ever mounted) and reports it here via onZoomReady, so PhotoView's single
+  // footer ZoomToolbar still renders from the same instance the view uses —
+  // not a disconnected copy — without instantiating all 5 up front.
+  const [activeZoom, setActiveZoom] = useState<UsePannableZoomResult | null>(null)
   // Read once at mount via lazy initializer — this instance is fresh per photo.
   const [enterDirection] = useState(() => consumeNavDirection(photo.filePath))
   const containerRef = useRef<HTMLDivElement>(null)
@@ -315,23 +302,31 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
         visualization === 'magazine' ? (
           <MagazineCoverView
             photo={photo}
-            zoom={magazineZoom}
+            onZoomReady={setActiveZoom}
             mastheadTitle={state.magazineTitle}
           />
         ) : visualization === 'newspaper' ? (
           <NewspaperCoverView
             photo={photo}
-            zoom={newspaperZoom}
+            onZoomReady={setActiveZoom}
             mastheadTitle={state.newspaperTitle}
           />
         ) : visualization === 'dvd' ? (
-          <DvdCoverView photo={photo} zoom={dvdZoom} studioName={state.dvdStudioName} />
+          <DvdCoverView
+            photo={photo}
+            onZoomReady={setActiveZoom}
+            studioName={state.dvdStudioName}
+          />
         ) : visualization === 'artGallery' ? (
-          <ArtGalleryView photo={photo} zoom={artGalleryZoom} galleryName={state.artGalleryName} />
+          <ArtGalleryView
+            photo={photo}
+            onZoomReady={setActiveZoom}
+            galleryName={state.artGalleryName}
+          />
         ) : (
           <MovieTheaterView
             photo={photo}
-            zoom={movieTheaterZoom}
+            onZoomReady={setActiveZoom}
             studioName={state.dvdStudioName}
           />
         )
@@ -518,16 +513,20 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
             max={MAX_SCALE}
           />
         ) : (
-          <ZoomToolbar
-            scale={visualizationZooms[visualization].scale}
-            onScaleChange={visualizationZooms[visualization].setScale}
-            onZoomToFit={visualizationZooms[visualization].zoomToFit}
-            onZoomToNativeSize={visualizationZooms[visualization].zoomToNativeSize}
-            onZoomOut={visualizationZooms[visualization].zoomOut}
-            onZoomIn={visualizationZooms[visualization].zoomIn}
-            min={visualizationZooms[visualization].min}
-            max={visualizationZooms[visualization].max}
-          />
+          // activeZoom is set synchronously (useLayoutEffect, in each theme
+          // view) before this ever paints, so it's only null for one commit.
+          activeZoom && (
+            <ZoomToolbar
+              scale={activeZoom.scale}
+              onScaleChange={activeZoom.setScale}
+              onZoomToFit={activeZoom.zoomToFit}
+              onZoomToNativeSize={activeZoom.zoomToNativeSize}
+              onZoomOut={activeZoom.zoomOut}
+              onZoomIn={activeZoom.zoomIn}
+              min={activeZoom.min}
+              max={activeZoom.max}
+            />
+          )
         )}
       </Flex>
     </Container>

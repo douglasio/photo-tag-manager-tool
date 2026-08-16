@@ -1,9 +1,10 @@
+import { type ReactElement, useLayoutEffect } from 'react'
+
 import type { UsePannableZoomResult } from '@hooks'
 import { Box, Text } from '@mantine/core'
-import type { ReactElement } from 'react'
 
 import { CoverBarcode, PannableZoomableImage } from '@components'
-import { useLazyFonts } from '@hooks'
+import { useLazyFonts, usePannableZoom } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
 import { toDisplayMetadata } from '@utils'
 
@@ -11,9 +12,9 @@ import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface DvdCoverViewProps {
   photo: PhotoRecord
-  // Owned by PhotoView so it can render the matching ZoomToolbar in its own
-  // footer bar instead of a separate floating one here.
-  zoom: UsePannableZoomResult
+  // Owns its zoom locally (see usePannableZoom below) and reports it here so
+  // PhotoView's single footer ZoomToolbar can render from the same instance.
+  onZoomReady: (zoom: UsePannableZoomResult) => void
   // Global "production studio" text, editable in Settings.
   studioName: string
 }
@@ -52,8 +53,10 @@ function TechSpecs({ photo }: { photo: PhotoRecord }): ReactElement {
 // photo's own tags), technical specs strip and barcode — reusing
 // PannableZoomableImage for the drag-to-pan + wheel-to-zoom photo, scoped to
 // the front panel only.
-export function DvdCoverView({ photo, zoom, studioName }: DvdCoverViewProps): ReactElement {
+export function DvdCoverView({ photo, onZoomReady, studioName }: DvdCoverViewProps): ReactElement {
   const fontsLoaded = useLazyFonts([() => import('@fontsource/anton')])
+  const zoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  useLayoutEffect(() => onZoomReady(zoom), [zoom, onZoomReady])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
 
   if (!fontsLoaded) return <CoverLoadingPlaceholder />

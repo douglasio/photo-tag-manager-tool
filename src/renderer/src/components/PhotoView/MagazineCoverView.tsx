@@ -1,9 +1,10 @@
+import { type ReactElement, useLayoutEffect } from 'react'
+
 import type { UsePannableZoomResult } from '@hooks'
 import { Box, Text } from '@mantine/core'
-import type { ReactElement } from 'react'
 
 import { CoverBarcode, PannableZoomableImage } from '@components'
-import { useLazyFonts } from '@hooks'
+import { useLazyFonts, usePannableZoom } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
 import { formatDateTaken } from '@utils'
 
@@ -11,9 +12,9 @@ import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface MagazineCoverViewProps {
   photo: PhotoRecord
-  // Owned by PhotoView so it can render the matching ZoomToolbar in its own
-  // footer bar instead of a separate floating one here.
-  zoom: UsePannableZoomResult
+  // Owns its zoom locally (see usePannableZoom below) and reports it here so
+  // PhotoView's single footer ZoomToolbar can render from the same instance.
+  onZoomReady: (zoom: UsePannableZoomResult) => void
   // Global masthead text, editable in Settings.
   mastheadTitle: string
 }
@@ -70,10 +71,12 @@ function CoverLines({ tags }: { tags: string[] }): ReactElement | null {
 // background, scoped to the frame rather than the whole PhotoView area.
 export function MagazineCoverView({
   photo,
-  zoom,
+  onZoomReady,
   mastheadTitle
 }: MagazineCoverViewProps): ReactElement {
   const fontsLoaded = useLazyFonts([() => import('@fontsource/bebas-neue')])
+  const zoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  useLayoutEffect(() => onZoomReady(zoom), [zoom, onZoomReady])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken
     ? formatDateTaken(photo.metadata.dateTaken, 'monthYear')

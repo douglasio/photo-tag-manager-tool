@@ -1,18 +1,19 @@
+import { type ReactElement, useLayoutEffect } from 'react'
+
 import type { UsePannableZoomResult } from '@hooks'
 import { Box, Text } from '@mantine/core'
-import type { ReactElement } from 'react'
 
 import { PannableZoomableImage } from '@components'
-import { useLazyFonts } from '@hooks'
+import { useLazyFonts, usePannableZoom } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
 
 import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface MovieTheaterViewProps {
   photo: PhotoRecord
-  // Owned by PhotoView so it can render the matching ZoomToolbar in its own
-  // footer bar instead of a separate floating one here.
-  zoom: UsePannableZoomResult
+  // Owns its zoom locally (see usePannableZoom below) and reports it here so
+  // PhotoView's single footer ZoomToolbar can render from the same instance.
+  onZoomReady: (zoom: UsePannableZoomResult) => void
   // Reuses the DVD cover's "production studio" text for the marquee credit
   // line — both are already the same "our production company" brand, so a
   // second customizable string would just duplicate it.
@@ -91,8 +92,14 @@ function SeatRow(): ReactElement {
 // vignette, and a row of seat silhouettes along the bottom as if watched
 // from the audience — reusing PannableZoomableImage for the drag-to-pan +
 // wheel-to-zoom screen image.
-export function MovieTheaterView({ photo, zoom, studioName }: MovieTheaterViewProps): ReactElement {
+export function MovieTheaterView({
+  photo,
+  onZoomReady,
+  studioName
+}: MovieTheaterViewProps): ReactElement {
   const fontsLoaded = useLazyFonts([() => import('@fontsource/anton')])
+  const zoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  useLayoutEffect(() => onZoomReady(zoom), [zoom, onZoomReady])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
 
   if (!fontsLoaded) return <CoverLoadingPlaceholder />

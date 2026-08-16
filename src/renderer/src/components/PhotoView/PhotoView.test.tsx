@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 import { MantineProvider } from '@mantine/core'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -36,11 +38,28 @@ vi.mock('@state', () => ({
 }))
 
 vi.mock('@components', () => ({
-  ZoomToolbar: () => <div>ZoomToolbar</div>
+  ZoomToolbar: (props: { scale: number }) => <div>ZoomToolbar:{props.scale}</div>
 }))
 
+const fakeZoom = {
+  scale: 2.5,
+  setScale: vi.fn(),
+  zoomToFit: vi.fn(),
+  zoomToNativeSize: vi.fn(),
+  zoomOut: vi.fn(),
+  zoomIn: vi.fn(),
+  min: 0.5,
+  max: 5
+}
+
 vi.mock('./MagazineCoverView', () => ({
-  MagazineCoverView: () => <div>MagazineCoverView</div>
+  // Reports a fake zoom on mount, the same way the real component does via
+  // usePannableZoom + onZoomReady — verifies PhotoView actually wires it
+  // through to its own footer ZoomToolbar instead of a disconnected copy.
+  MagazineCoverView: ({ onZoomReady }: { onZoomReady: (zoom: typeof fakeZoom) => void }) => {
+    useEffect(() => onZoomReady(fakeZoom), [onZoomReady])
+    return <div>MagazineCoverView</div>
+  }
 }))
 vi.mock('./NewspaperCoverView', () => ({
   NewspaperCoverView: () => <div>NewspaperCoverView</div>
@@ -97,7 +116,7 @@ describe('PhotoView', () => {
   it('renders the plain view (no theme component) when no visualization is active', () => {
     renderView(makePhoto('/a.jpg'))
     expect(screen.queryByText('MagazineCoverView')).not.toBeInTheDocument()
-    expect(screen.getByText('ZoomToolbar')).toBeInTheDocument()
+    expect(screen.getByText('ZoomToolbar:1')).toBeInTheDocument()
   })
 
   it('switches to the matching theme view, and only that one, when a visualization button is clicked', async () => {
@@ -111,6 +130,15 @@ describe('PhotoView', () => {
     expect(screen.queryByText('DvdCoverView')).not.toBeInTheDocument()
     expect(screen.queryByText('ArtGalleryView')).not.toBeInTheDocument()
     expect(screen.queryByText('MovieTheaterView')).not.toBeInTheDocument()
+  })
+
+  it("renders the footer ZoomToolbar from the active theme's own reported zoom", async () => {
+    const user = userEvent.setup()
+    renderView(makePhoto('/a.jpg'))
+
+    await user.click(screen.getByRole('button', { name: 'Magazine cover visualization' }))
+
+    expect(screen.getByText('ZoomToolbar:2.5')).toBeInTheDocument()
   })
 
   it('returns to the plain view when the exit-visualization button is clicked', async () => {
