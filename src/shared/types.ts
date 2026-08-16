@@ -110,6 +110,31 @@ export interface GallerySort {
   sortOrder: 'asc' | 'desc'
 }
 
+// Every field PhotoLibraryContext's startup effect needs from the settings
+// table, batched into one IPC round-trip instead of ~20 separate ones.
+export interface AppSettings {
+  gallerySort: GallerySort | null
+  defaultView: DefaultView
+  showEmptyFolders: boolean
+  tagsPanelGridView: boolean
+  peoplePanelGridView: boolean
+  galleryViewMode: GalleryViewMode
+  aiTagSuggestionsEnabled: boolean
+  faceDetectionEnabled: boolean
+  detailsPanelCollapsed: boolean
+  galleryAnimationsEnabled: boolean
+  showFilenames: boolean
+  showViewCounts: boolean
+  magazineTitle: string
+  newspaperTitle: string
+  dvdStudioName: string
+  artGalleryName: string
+  navbarSplitSizes: number[] | null
+  navbarCollapsedPanels: Record<string, boolean>
+  excludePatterns: string[]
+  excludedFolders: string[]
+}
+
 export interface MoveProgressEvent {
   completed: number
   total: number

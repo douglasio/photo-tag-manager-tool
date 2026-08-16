@@ -192,3 +192,22 @@ describe('getNavbarCollapsedPanels', () => {
     expect(settings.getNavbarCollapsedPanels()).toEqual({})
   })
 })
+
+describe('getAllSettings', () => {
+  it('composes every setting into one object, mixing defaults and persisted values', () => {
+    createFakeDb()
+    settings.setMagazineTitle('My Mag')
+    settings.setGallerySort({ sortBy: 'dateTaken', sortOrder: 'desc' })
+
+    const all = settings.getAllSettings()
+
+    expect(all.magazineTitle).toBe('My Mag')
+    expect(all.gallerySort).toEqual({ sortBy: 'dateTaken', sortOrder: 'desc' })
+    expect(all.defaultView).toBe('dashboard')
+    expect(all.galleryAnimationsEnabled).toBe(true)
+    expect(all.showFilenames).toBe(true)
+    expect(all.showEmptyFolders).toBe(false)
+    expect(all.navbarSplitSizes).toBeNull()
+    expect(all.excludePatterns).toEqual([])
+  })
+})

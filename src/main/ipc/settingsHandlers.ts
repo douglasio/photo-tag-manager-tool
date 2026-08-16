@@ -5,6 +5,7 @@ import { dirname, join } from 'path'
 import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
   getAiTagSuggestionsEnabled,
+  getAllSettings,
   getArtGalleryName,
   getDefaultView,
   getDetailsPanelCollapsed,
@@ -58,7 +59,7 @@ import { disposeTagSuggestionWorker } from '@main/services/tagSuggestionService'
 import { disposeThrowbackSimilarityWorker } from '@main/services/throwbackService'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
-import type { DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
+import type { AppSettings, DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
 
 // Conservative cross-platform block list — matches photoHandlers.ts's file
 // rename validation, since folder names share the same filesystem constraints.
@@ -72,6 +73,8 @@ function isPathUnderFolder(path: string, folder: string): boolean {
 
 export function registerSettingsHandlers(): void {
   ipcMain.handle('settings:getFolders', () => getFolders())
+
+  ipcMain.handle('settings:getAllSettings', (): AppSettings => getAllSettings())
 
   ipcMain.handle('settings:getGalleryCellWidth', (): number | null => getGalleryCellWidth())
 

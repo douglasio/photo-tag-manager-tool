@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
+import type { AppSettings, PhotoRecord, ScanCompleteEvent, TagGroup } from '@shared/types'
 
 import {
   initialState,
@@ -36,6 +36,32 @@ function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): Phot
 
 function makeGroup(overrides: Partial<TagGroup> & { id: string }): TagGroup {
   return { name: 'Group', position: 0, matchPattern: null, ...overrides }
+}
+
+function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
+  return {
+    gallerySort: null,
+    defaultView: 'gallery',
+    showEmptyFolders: true,
+    tagsPanelGridView: true,
+    peoplePanelGridView: true,
+    galleryViewMode: 'list',
+    aiTagSuggestionsEnabled: true,
+    faceDetectionEnabled: true,
+    detailsPanelCollapsed: true,
+    galleryAnimationsEnabled: false,
+    showFilenames: false,
+    showViewCounts: true,
+    magazineTitle: 'Custom Mag',
+    newspaperTitle: 'Custom Paper',
+    dvdStudioName: 'Custom Studio',
+    artGalleryName: 'Custom Gallery',
+    navbarSplitSizes: null,
+    navbarCollapsedPanels: { tags: true },
+    excludePatterns: ['*.tmp'],
+    excludedFolders: ['/skip'],
+    ...overrides
+  }
 }
 
 function withPhotos(...paths: string[]): PhotoLibraryState {
@@ -92,6 +118,62 @@ describe('photoLibraryReducer', () => {
       expect(renamed.selectedFolder).toBe('/root/new')
       expect(renamed.openTabs).toEqual(['/root/new/a.jpg'])
       expect(renamed.activeTab).toBe('/root/new/a.jpg')
+    })
+  })
+
+  describe('SETTINGS_LOADED', () => {
+    it('applies every field from the batched settings object', () => {
+      const settings = makeSettings()
+      const state = photoLibraryReducer(initialState, { type: 'SETTINGS_LOADED', settings })
+
+      expect(state.defaultView).toBe('gallery')
+      expect(state.showEmptyFolders).toBe(true)
+      expect(state.tagsPanelGridView).toBe(true)
+      expect(state.peoplePanelGridView).toBe(true)
+      expect(state.galleryViewMode).toBe('list')
+      expect(state.aiTagSuggestionsEnabled).toBe(true)
+      expect(state.faceDetectionEnabled).toBe(true)
+      expect(state.detailsPanelCollapsed).toBe(true)
+      expect(state.galleryAnimationsEnabled).toBe(false)
+      expect(state.showFilenames).toBe(false)
+      expect(state.showViewCounts).toBe(true)
+      expect(state.magazineTitle).toBe('Custom Mag')
+      expect(state.newspaperTitle).toBe('Custom Paper')
+      expect(state.dvdStudioName).toBe('Custom Studio')
+      expect(state.artGalleryName).toBe('Custom Gallery')
+      expect(state.navbarCollapsedPanels).toEqual({ tags: true })
+      expect(state.excludePatterns).toEqual(['*.tmp'])
+      expect(state.excludedFolders).toEqual(['/skip'])
+    })
+
+    it('only overrides sortBy/sortOrder when gallerySort is non-null', () => {
+      const withoutSort = photoLibraryReducer(initialState, {
+        type: 'SETTINGS_LOADED',
+        settings: makeSettings({ gallerySort: null })
+      })
+      expect(withoutSort.sortBy).toBe(initialState.sortBy)
+      expect(withoutSort.sortOrder).toBe(initialState.sortOrder)
+
+      const withSort = photoLibraryReducer(initialState, {
+        type: 'SETTINGS_LOADED',
+        settings: makeSettings({ gallerySort: { sortBy: 'dateTaken', sortOrder: 'desc' } })
+      })
+      expect(withSort.sortBy).toBe('dateTaken')
+      expect(withSort.sortOrder).toBe('desc')
+    })
+
+    it('only overrides navbarSplitSizes when non-null', () => {
+      const withoutSizes = photoLibraryReducer(initialState, {
+        type: 'SETTINGS_LOADED',
+        settings: makeSettings({ navbarSplitSizes: null })
+      })
+      expect(withoutSizes.navbarSplitSizes).toEqual(initialState.navbarSplitSizes)
+
+      const withSizes = photoLibraryReducer(initialState, {
+        type: 'SETTINGS_LOADED',
+        settings: makeSettings({ navbarSplitSizes: [34, 33, 33] })
+      })
+      expect(withSizes.navbarSplitSizes).toEqual([34, 33, 33])
     })
   })
 

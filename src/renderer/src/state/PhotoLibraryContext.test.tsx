@@ -60,19 +60,34 @@ function createMockApi(): {
     dismissDuplicateGroup: vi.fn().mockResolvedValue(undefined),
     getGalleryCellWidth: vi.fn().mockResolvedValue(null),
     setGalleryCellWidth: vi.fn().mockResolvedValue(undefined),
-    getGallerySort: vi.fn().mockResolvedValue(null),
+    getAllSettings: vi.fn().mockResolvedValue({
+      gallerySort: null,
+      defaultView: 'gallery',
+      showEmptyFolders: false,
+      tagsPanelGridView: false,
+      peoplePanelGridView: false,
+      galleryViewMode: 'grid',
+      aiTagSuggestionsEnabled: false,
+      faceDetectionEnabled: false,
+      detailsPanelCollapsed: false,
+      galleryAnimationsEnabled: true,
+      showFilenames: true,
+      showViewCounts: false,
+      magazineTitle: 'TAG ME',
+      newspaperTitle: 'The Tag Me Times',
+      dvdStudioName: 'TAG ME PICTURES',
+      artGalleryName: 'The Tag Me Gallery',
+      navbarSplitSizes: null,
+      navbarCollapsedPanels: {},
+      excludePatterns: [],
+      excludedFolders: []
+    }),
     setGallerySort: vi.fn().mockResolvedValue(undefined),
-    getDefaultView: vi.fn().mockResolvedValue('gallery'),
     setDefaultView: vi.fn().mockResolvedValue(undefined),
-    getShowEmptyFolders: vi.fn().mockResolvedValue(false),
     setShowEmptyFolders: vi.fn().mockResolvedValue(undefined),
-    getTagsPanelGridView: vi.fn().mockResolvedValue(false),
-    getPeoplePanelGridView: vi.fn().mockResolvedValue(false),
     setPeoplePanelGridView: vi.fn().mockResolvedValue(undefined),
     setTagsPanelGridView: vi.fn().mockResolvedValue(undefined),
-    getGalleryViewMode: vi.fn().mockResolvedValue('grid'),
     setGalleryViewMode: vi.fn().mockResolvedValue(undefined),
-    getAiTagSuggestionsEnabled: vi.fn().mockResolvedValue(false),
     setAiTagSuggestionsEnabled: vi.fn().mockResolvedValue(undefined),
     enableAiFeaturesAndScan: vi.fn().mockResolvedValue({
       duplicateGroups: [],
@@ -88,7 +103,6 @@ function createMockApi(): {
     wasAiScanInterrupted: vi.fn().mockResolvedValue(false),
     onAiScanProgress: onMethod('onAiScanProgress'),
     suggestTags: vi.fn().mockResolvedValue([]),
-    getFaceDetectionEnabled: vi.fn().mockResolvedValue(false),
     setFaceDetectionEnabled: vi.fn().mockResolvedValue(undefined),
     getFacesForPhoto: vi.fn().mockResolvedValue([]),
     getPeople: vi.fn().mockResolvedValue([]),
@@ -119,29 +133,17 @@ function createMockApi(): {
     hidePerson: vi.fn().mockResolvedValue(undefined),
     unhidePerson: vi.fn().mockResolvedValue(undefined),
     getHiddenPeople: vi.fn().mockResolvedValue([]),
-    getDetailsPanelCollapsed: vi.fn().mockResolvedValue(false),
     setDetailsPanelCollapsed: vi.fn().mockResolvedValue(undefined),
-    getNavbarSplitSizes: vi.fn().mockResolvedValue(null),
-    getNavbarCollapsedPanels: vi.fn().mockResolvedValue({}),
     setNavbarCollapsedPanels: vi.fn().mockResolvedValue(undefined),
     setNavbarSplitSizes: vi.fn().mockResolvedValue(undefined),
-    getGalleryAnimationsEnabled: vi.fn().mockResolvedValue(true),
     setGalleryAnimationsEnabled: vi.fn().mockResolvedValue(undefined),
-    getShowFilenames: vi.fn().mockResolvedValue(true),
     setShowFilenames: vi.fn().mockResolvedValue(undefined),
-    getShowViewCounts: vi.fn().mockResolvedValue(false),
     setShowViewCounts: vi.fn().mockResolvedValue(undefined),
-    getMagazineTitle: vi.fn().mockResolvedValue('TAG ME'),
     setMagazineTitle: vi.fn().mockResolvedValue(undefined),
-    getNewspaperTitle: vi.fn().mockResolvedValue('The Tag Me Times'),
     setNewspaperTitle: vi.fn().mockResolvedValue(undefined),
-    getDvdStudioName: vi.fn().mockResolvedValue('TAG ME PICTURES'),
     setDvdStudioName: vi.fn().mockResolvedValue(undefined),
-    getArtGalleryName: vi.fn().mockResolvedValue('The Tag Me Gallery'),
     setArtGalleryName: vi.fn().mockResolvedValue(undefined),
-    getExcludePatterns: vi.fn().mockResolvedValue([]),
     setExcludePatterns: vi.fn().mockResolvedValue(undefined),
-    getExcludedFolders: vi.fn().mockResolvedValue([]),
     setExcludedFolders: vi.fn().mockResolvedValue(undefined),
     addFolder: vi.fn().mockResolvedValue(undefined),
     removeFolder: vi.fn().mockResolvedValue(undefined),
@@ -194,16 +196,29 @@ describe('PhotoLibraryContext', () => {
   })
 
   it('hydrates settings from window.api on mount', async () => {
-    mockApi.getShowEmptyFolders.mockResolvedValue(true)
-    mockApi.getShowFilenames.mockResolvedValue(false)
-    mockApi.getGalleryAnimationsEnabled.mockResolvedValue(false)
-    mockApi.getDetailsPanelCollapsed.mockResolvedValue(true)
-    mockApi.getExcludePatterns.mockResolvedValue(['.trash'])
-    mockApi.getExcludedFolders.mockResolvedValue(['/root/test'])
+    mockApi.getAllSettings.mockResolvedValue({
+      gallerySort: null,
+      defaultView: 'gallery',
+      showEmptyFolders: true,
+      tagsPanelGridView: false,
+      peoplePanelGridView: false,
+      galleryViewMode: 'grid',
+      aiTagSuggestionsEnabled: false,
+      faceDetectionEnabled: false,
+      detailsPanelCollapsed: true,
+      galleryAnimationsEnabled: false,
+      showFilenames: false,
+      showViewCounts: false,
+      magazineTitle: 'Custom Mag',
+      newspaperTitle: 'Custom Paper',
+      dvdStudioName: 'Custom Studio',
+      artGalleryName: 'The Tag Me Gallery',
+      navbarSplitSizes: null,
+      navbarCollapsedPanels: {},
+      excludePatterns: ['.trash'],
+      excludedFolders: ['/root/test']
+    })
     mockApi.getTagDescriptions.mockResolvedValue({ vacation: 'Beach trips' })
-    mockApi.getMagazineTitle.mockResolvedValue('Custom Mag')
-    mockApi.getNewspaperTitle.mockResolvedValue('Custom Paper')
-    mockApi.getDvdStudioName.mockResolvedValue('Custom Studio')
 
     const { result } = setup()
 

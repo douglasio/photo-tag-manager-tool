@@ -408,12 +408,28 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   // Renders AppLayout as soon as folders are known, instead of blocking on
   // the full startup scan — photos stream in progressively via METADATA_BATCH.
+  // Folders and settings are fetched in parallel (one round-trip each,
+  // instead of ~20 separate settings calls) but kept as separate API calls
+  // since folders alone drives the scan below.
   useEffect(() => {
-    window.api.getFolders().then((folders) => {
-      dispatch({ type: 'FOLDERS_LOADED', folders })
-      dispatch({ type: 'INITIAL_LOAD_COMPLETE' })
-      void startScanForAll(folders)
-    })
+    Promise.all([window.api.getFolders(), window.api.getAllSettings()]).then(
+      ([folders, settings]) => {
+        dispatch({ type: 'FOLDERS_LOADED', folders })
+        dispatch({ type: 'SETTINGS_LOADED', settings })
+        dispatch({ type: 'SET_ACTIVE_TAB', tab: settings.defaultView })
+        dispatch({ type: 'INITIAL_LOAD_COMPLETE' })
+        void startScanForAll(folders)
+        if (settings.faceDetectionEnabled) {
+          window.api.getPeople().then((people) => dispatch({ type: 'SET_PEOPLE', people }))
+          window.api.getFacePhotoAssignments().then((rows) =>
+            dispatch({
+              type: 'SET_PERSON_PHOTO_ASSIGNMENTS',
+              assignments: toPersonPhotoAssignments(rows)
+            })
+          )
+        }
+      }
+    )
   }, [startScanForAll])
 
   useEffect(() => {
@@ -431,135 +447,6 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     void loadTagGroupsData()
   }, [loadTagGroupsData])
-
-  useEffect(() => {
-    window.api.getGallerySort().then((sort) => {
-      if (sort) dispatch({ type: 'SET_SORT', sortBy: sort.sortBy, sortOrder: sort.sortOrder })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getDefaultView().then((value) => {
-      dispatch({ type: 'SET_DEFAULT_VIEW', value })
-      dispatch({ type: 'SET_ACTIVE_TAB', tab: value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getShowEmptyFolders().then((value) => {
-      dispatch({ type: 'SET_SHOW_EMPTY_FOLDERS', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getTagsPanelGridView().then((value) => {
-      dispatch({ type: 'SET_TAGS_PANEL_GRID_VIEW', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getPeoplePanelGridView().then((value) => {
-      dispatch({ type: 'SET_PEOPLE_PANEL_GRID_VIEW', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getGalleryViewMode().then((value) => {
-      dispatch({ type: 'SET_GALLERY_VIEW_MODE', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getAiTagSuggestionsEnabled().then((value) => {
-      dispatch({ type: 'SET_AI_TAG_SUGGESTIONS_ENABLED', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getFaceDetectionEnabled().then((value) => {
-      dispatch({ type: 'SET_FACE_DETECTION_ENABLED', value })
-      if (!value) return
-      window.api.getPeople().then((people) => dispatch({ type: 'SET_PEOPLE', people }))
-      window.api.getFacePhotoAssignments().then((rows) =>
-        dispatch({
-          type: 'SET_PERSON_PHOTO_ASSIGNMENTS',
-          assignments: toPersonPhotoAssignments(rows)
-        })
-      )
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getExcludePatterns().then((patterns) => {
-      dispatch({ type: 'SET_EXCLUDE_PATTERNS', patterns })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getExcludedFolders().then((folders) => {
-      dispatch({ type: 'SET_EXCLUDED_FOLDERS', folders })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getDetailsPanelCollapsed().then((value) => {
-      dispatch({ type: 'SET_DETAILS_PANEL_COLLAPSED', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getNavbarSplitSizes().then((sizes) => {
-      if (sizes) dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getNavbarCollapsedPanels().then((panels) => {
-      dispatch({ type: 'SET_NAVBAR_COLLAPSED_PANELS', panels })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getGalleryAnimationsEnabled().then((value) => {
-      dispatch({ type: 'SET_GALLERY_ANIMATIONS_ENABLED', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getShowFilenames().then((value) => {
-      dispatch({ type: 'SET_SHOW_FILENAMES', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getShowViewCounts().then((value) => {
-      dispatch({ type: 'SET_SHOW_VIEW_COUNTS', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getMagazineTitle().then((value) => {
-      dispatch({ type: 'SET_MAGAZINE_TITLE', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getNewspaperTitle().then((value) => {
-      dispatch({ type: 'SET_NEWSPAPER_TITLE', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getDvdStudioName().then((value) => {
-      dispatch({ type: 'SET_DVD_STUDIO_NAME', value })
-    })
-  }, [])
-
-  useEffect(() => {
-    window.api.getArtGalleryName().then((value) => {
-      dispatch({ type: 'SET_ART_GALLERY_NAME', value })
-    })
-  }, [])
 
   const addFolder = useCallback(async () => {
     const rootPath = await window.api.selectFolder()

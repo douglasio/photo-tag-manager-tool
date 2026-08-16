@@ -1,4 +1,4 @@
-import type { DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
+import type { AppSettings, DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
 
 import { getDb } from './database'
 
@@ -287,4 +287,31 @@ export function getNavbarCollapsedPanels(): Record<string, boolean> {
 
 export function setNavbarCollapsedPanels(value: Record<string, boolean>): void {
   setSetting('navbarCollapsedPanels', JSON.stringify(value))
+}
+
+// Batches every setting PhotoLibraryContext's startup effect needs into one
+// call, instead of ~20 separate IPC round-trips on mount.
+export function getAllSettings(): AppSettings {
+  return {
+    gallerySort: getGallerySort(),
+    defaultView: getDefaultView(),
+    showEmptyFolders: getShowEmptyFolders(),
+    tagsPanelGridView: getTagsPanelGridView(),
+    peoplePanelGridView: getPeoplePanelGridView(),
+    galleryViewMode: getGalleryViewMode(),
+    aiTagSuggestionsEnabled: getAiTagSuggestionsEnabled(),
+    faceDetectionEnabled: getFaceDetectionEnabled(),
+    detailsPanelCollapsed: getDetailsPanelCollapsed(),
+    galleryAnimationsEnabled: getGalleryAnimationsEnabled(),
+    showFilenames: getShowFilenames(),
+    showViewCounts: getShowViewCounts(),
+    magazineTitle: getMagazineTitle(),
+    newspaperTitle: getNewspaperTitle(),
+    dvdStudioName: getDvdStudioName(),
+    artGalleryName: getArtGalleryName(),
+    navbarSplitSizes: getNavbarSplitSizes(),
+    navbarCollapsedPanels: getNavbarCollapsedPanels(),
+    excludePatterns: getExcludePatterns(),
+    excludedFolders: getExcludedFolders()
+  }
 }
