@@ -168,3 +168,17 @@ See VIDEO_PLAN.md
 5. Dashboard widgets each call `useKeyHeld(PREVIEW_TRIGGER_KEY)` independently (6 separate window keydown/keyup listener pairs for the same key). Fold `previewTriggerHeld` into the shared `DashboardPreviewZoomContext` (already built for per-widget preview zoom) so it's one listener instead of six.
 
 6. Take a full pass to reduce comments to 1-2 lines
+
+### Performance
+
+Found while investigating startup/dashboard/gallery-tab/photo-open sluggishness — none implemented yet. Keep inline comments to 1-2 lines when landing any of these (see #6 above for why).
+
+1. Startup is fully gated behind re-verifying every photo in the library. `runScan` (`scanHandlers.ts`) doesn't send `scan:complete` until every file's metadata _and_ thumbnail check resolve, and `AppGate` shows nothing but a loading screen until that fires — even on a totally unchanged library, that's an `fs.stat` + DB lookup per photo before the dashboard can appear at all. Biggest lever, but riskiest: likely needs `AppGate` to stop gating on the full scan and let the UI render once folders are known, with photos populating progressively the way `photosByPath` already streams in via `METADATA_BATCH`. Keep inline comments to 1-2 lines.
+
+2. ~27 independent IPC round-trips fire on mount. `PhotoLibraryContext.tsx` has one `useEffect` per setting (`getGallerySort`, `getDefaultView`, `getShowEmptyFolders`, `getMagazineTitle`, ...), all firing in parallel the instant the provider mounts and each dispatching independently as it resolves — landing as a burst of renders right as the dashboard first paints. These live in one flat `settings` table and could be fetched in a single `getAllSettings()` call instead. Keep inline comments to 1-2 lines.
+
+3. Three dashboard widgets re-sort the whole library, unmemoized, on every one of those 27 renders. `RecentlyAddedWidget`, `TopTagsWidget`, and `TopViewedWidget` all do `Array.from(activePhotosByPath.values()).sort(...)` directly in the render body with no `useMemo`, and all three still use the broad back-compat `usePhotoLibrary()` instead of the narrow `useGalleryLibrary()`/`useSidebarLibrary()` hooks — so they re-render (and re-sort the full library) on every settling dispatch from #2. Fix: memoize the sort/filter and migrate off `usePhotoLibrary()`. Keep inline comments to 1-2 lines.
+
+4. `main.tsx` eagerly loads 6 font families used by almost nothing. `bebas-neue`, 4 weights of `playfair-display`, `anton`, and `unifrakturmaguntia` are all imported at module scope and loaded/parsed on every launch, but they're only referenced by the 5 niche PhotoView "cover" themes (Magazine/Newspaper/DVD/Art Gallery/Movie Theater) most sessions never open. Lazy-load each only when its theme view actually mounts. Keep inline comments to 1-2 lines.
+
+5. Opening any photo instantiates 5x pannable-zoom state, 4 of which are always thrown away. `PhotoView.tsx` unconditionally calls `usePannableZoom()` five times (once per theme), even though only one theme is ever active and the plain view (`visualization === 'none'`, the common case) uses none of them — that's 25 wasted `useState` calls and 5 wasted wheel-listener attachments on every single photo you double-click into. Fix: move each theme's `usePannableZoom()` call into its own component instead of `PhotoView` calling all 5 up front. Keep inline comments to 1-2 lines.
