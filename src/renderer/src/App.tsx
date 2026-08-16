@@ -84,8 +84,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
-// Roles/elements that natively activate on a Space keypress — space must
-// keep its default behavior there instead of being swallowed globally below.
+// Elements/roles where Space should keep its native behavior, not be swallowed globally below.
 const SPACE_ACTIVATABLE_ROLES = new Set([
   'button',
   'checkbox',
@@ -113,7 +112,7 @@ const DRAG_PREVIEW_SIZE = 64
 const DRAG_PREVIEW_OFFSET_X = 0
 const DRAG_PREVIEW_OFFSET_Y = 0
 
-// dnd-kit's official recipe for snapping the overlay to be centered directly under the pointer, using draggingNodeRect (the overlay's own measured rect) rather than the original dragged element's rect.
+// dnd-kit's recipe for centering the overlay under the pointer via its own measured rect.
 const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
   if (draggingNodeRect && activatorEvent) {
     const activatorCoordinates = getEventCoordinates(activatorEvent)
@@ -129,7 +128,7 @@ const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transf
   return transform
 }
 
-// The DragOverlay ghost that follows the cursor while a gallery thumbnail is being dragged onto a tag
+// Drag ghost for a gallery thumbnail being dragged onto a tag/folder.
 function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): React.JSX.Element {
   return (
     <Box pos="relative" w={DRAG_PREVIEW_SIZE} h={DRAG_PREVIEW_SIZE}>
@@ -174,8 +173,7 @@ function DragPreview({ photo, count }: { photo: PhotoRecord; count: number }): R
   )
 }
 
-// The DragOverlay ghost for a tag being dragged into a group — deliberately
-// much lighter than DragPreview above, no thumbnail to show.
+// Drag ghost for a tag being dragged into a group (lighter than DragPreview — no thumbnail).
 function TagDragPreview({ tag }: { tag: string }): React.JSX.Element {
   return (
     <Paper
@@ -193,9 +191,7 @@ function TagDragPreview({ tag }: { tag: string }): React.JSX.Element {
   )
 }
 
-// The DragOverlay ghost for a face being dragged onto a person — same
-// lightweight shape as TagDragPreview above (no crop-thumbnail rendering,
-// just a name-less placeholder since a bare face has no label to show).
+// Drag ghost for a face being dragged onto a person (no thumbnail, just a name-less placeholder).
 function FaceDragPreview(): React.JSX.Element {
   return (
     <Paper
@@ -213,7 +209,7 @@ function FaceDragPreview(): React.JSX.Element {
   )
 }
 
-// The DragOverlay ghost for a person being dragged onto another one to merge.
+// Drag ghost for a person being dragged onto another one to merge.
 function PersonDragPreview({ name }: { name: string | null }): React.JSX.Element {
   return (
     <Paper
@@ -231,65 +227,35 @@ function PersonDragPreview({ name }: { name: string | null }): React.JSX.Element
   )
 }
 
-// Self-contained: subscribes only to PhotoLibrarySidebarContext/
-// PhotoLibraryActionsContext, takes no props. Pulled out of AppLayout so a
-// Splitter-drag frame (or anything else that only affects the navbar) only
-// re-renders this component — not the tab bar, Gallery/Dashboard/PhotoView
-// content, or DetailPanel, which used to all live in the same component and
-// so all re-rendered together on every drag frame. Wrapped in React.memo as
-// defense-in-depth (a zero-prop component already bails out on a parent
-// re-render by default, but this documents the intent and survives someone
-// later adding props).
-const NavbarSplitter = memo(function NavbarSplitter(): React.JSX.Element {
+// Pulled out of AppLayout so a Splitter drag only re-renders this subtree, not the whole app.
+export const NavbarSplitter = memo(function NavbarSplitter(): React.JSX.Element {
   const { state } = useSidebarLibrary()
   const { setNavbarSplitSizes, setNavbarCollapsedPanels } = useLibraryActions()
 
-  // Default even split for the navbar Splitter's current pane count (Tags,
-  // People, Folders — People only present once face detection is enabled).
+  // Default even split; People pane only exists once face detection is enabled.
   const navbarPaneSizes = state.faceDetectionEnabled ? [34, 33, 33] : [50, 50]
-  // Stable ids for the same panes, in render order — used to key the
-  // id-keyed navbarCollapsedPanels record (index alone would silently mean
-  // a different panel once People's pane appears/disappears).
+  // Stable ids (not index) to key navbarCollapsedPanels, since People's pane can appear/disappear.
   const navbarPaneIds = state.faceDetectionEnabled
     ? ['tags', 'people', 'folders']
     : ['tags', 'folders']
 
-  // Collapse is driven entirely through Splitter's `sizes` prop (a fixed-px
-  // entry for a collapsed pane, its normal flexible size otherwise) rather
-  // than Splitter's own collapsible/collapse() API — that API always snaps a
-  // pane to literal 0 (verified against @mantine/hooks' source), which would
-  // hide its header too and leave no way to re-expand it. This way a
-  // "collapsed" pane still reserves exactly PanelSection's header height.
-  // Self-healing against a specific pre-existing corruption: the old
-  // collapse-to-zero behavior (before this fix) persisted a literal 0 into
-  // navbarSplitSizes for whichever pane was collapsed at the time, since
-  // Splitter's native collapse() reports the panel's size as 0 through
-  // onSizeChange. A stored 0 is never a size a user actually wants "expanded"
-  // to, so fall back to the even-split default for that one slot instead of
-  // trusting it forever.
+  // Collapse uses Splitter's `sizes` prop (fixed header height) rather than its collapse() API,
+  // which snaps to 0 with no way back. Self-heals a stored 0 (old collapse-to-zero bug) to the default.
   const defaultPaneSizes = (
     state.navbarSplitSizes.length === navbarPaneSizes.length
       ? state.navbarSplitSizes
       : navbarPaneSizes
   ).map((size, index) => (size > 0 ? size : navbarPaneSizes[index]))
-  // Live drag position, separate from state.navbarSplitSizes — updating the
-  // real reducer (and its persisted-settings IPC write) on every drag frame
-  // is what made resizing laggy. This drives the Splitter's visual position
-  // during a drag; the reducer/IPC write only happens once, on release. It's
-  // local to this component specifically so a drag frame re-renders only
-  // this subtree, not the rest of the app.
+  // Live drag position, separate from state.navbarSplitSizes — committing to the reducer/IPC on
+  // every drag frame is what made resizing laggy; that commit now happens once, on release.
   const [liveNavbarSizes, setLiveNavbarSizes] = useState<number[] | null>(null)
   const navbarSizes = navbarPaneIds.map((id, index) =>
     state.navbarCollapsedPanels[id]
       ? `${PANEL_HEADER_HEIGHT}px`
       : (liveNavbarSizes ?? defaultPaneSizes)[index]
   )
-  // Stable across renders as long as navbarCollapsedPanels itself hasn't
-  // changed (in particular, stable across every drag frame above, since
-  // dragging never touches navbarCollapsedPanels) — passed to
-  // TagPanel/PeoplePanel/FolderTree below, each via its own useCallback, so
-  // those (memoized) components can actually bail out during a drag instead
-  // of the callback prop's identity alone forcing them to re-render.
+  // Stable across drags (dragging never touches navbarCollapsedPanels), so the memoized
+  // TagPanel/PeoplePanel/FolderTree below can actually bail out during a drag.
   const toggleNavbarPanel = useCallback(
     (id: string): void => {
       setNavbarCollapsedPanels({
@@ -303,11 +269,8 @@ const NavbarSplitter = memo(function NavbarSplitter(): React.JSX.Element {
   const togglePeoplePanel = useCallback(() => toggleNavbarPanel('people'), [toggleNavbarPanel])
   const toggleFoldersPanel = useCallback(() => toggleNavbarPanel('folders'), [toggleNavbarPanel])
 
-  // Sizing is plain flex-basis/flex-grow under the hood (verified against
-  // @mantine/core's Splitter source), so a CSS transition animates collapse/
-  // expand for free — but only when the size change comes from the toggle
-  // button, not from an active drag, where a transition would lag a frame
-  // behind the cursor instead of tracking it 1:1.
+  // CSS transition animates collapse/expand, but only via the toggle button — during an active
+  // drag it would lag a frame behind the cursor.
   const [isResizingNavbar, setIsResizingNavbar] = useState(false)
   const navbarPaneTransition = isResizingNavbar
     ? undefined
@@ -323,18 +286,14 @@ const NavbarSplitter = memo(function NavbarSplitter(): React.JSX.Element {
         onResizeStart={() => setIsResizingNavbar(true)}
         onResizeEnd={() => {
           setIsResizingNavbar(false)
-          // Commit to the reducer/persisted settings once, here, instead of
-          // on every drag frame (see liveNavbarSizes).
+          // Commit to the reducer/persisted settings once, here (see liveNavbarSizes above).
           if (liveNavbarSizes) {
             setNavbarSplitSizes(liveNavbarSizes)
             setLiveNavbarSizes(null)
           }
         }}
         onSizeChange={(sizes) => {
-          // Never persist a collapsed pane's fixed header-height entry as
-          // its "real" size — keep whatever was there before, so
-          // un-collapsing restores a sensible split instead of reopening at
-          // header height.
+          // Don't persist a collapsed pane's fixed header height as its "real" size.
           const merged = navbarPaneIds.map((id, index) =>
             state.navbarCollapsedPanels[id] ? defaultPaneSizes[index] : sizes[index]
           )
@@ -398,9 +357,8 @@ const NavbarSplitter = memo(function NavbarSplitter(): React.JSX.Element {
   )
 })
 
-// Split out from App so it can call the state hooks — a component can't read
-// a context it also renders the Provider for in the same function.
-function AppLayout(): React.JSX.Element {
+// Split out from App since a component can't read a context it also renders the Provider for.
+export function AppLayout(): React.JSX.Element {
   const { state: sidebarState } = useSidebarLibrary()
   const { state, openTabEntries } = useGalleryLibrary()
   const {
@@ -415,28 +373,15 @@ function AppLayout(): React.JSX.Element {
     assignFaceToPerson,
     mergePeople
   } = useLibraryActions()
-  // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
+  // Navbar hides for any non-Gallery tab. Details aside is independent (user-togglable/persisted).
   const isPhotoTabActive = state.activeTab !== 'gallery'
-  // Compare View always hides the details panel outright
   const isCompareTabActive = state.compareTabs.has(state.activeTab)
-  // Dashboard is full-screen — no details panel either.
   const isDashboardTabActive = state.activeTab === 'dashboard'
-  // Duplicates tab browses across many photos at once — no single photo for
-  // the details panel to describe.
+  // No single photo for the details panel to describe when browsing duplicates.
   const isDuplicatesTabActive = state.activeTab === 'duplicates'
 
-  // Mantine's Tooltip only closes on a real mouseleave (it's built on
-  // floating-ui's useHover) — clicking a tooltip's own trigger doesn't
-  // dismiss it, so if that click's handler navigates away (e.g. opens a
-  // different tab) while the mouse never actually left the button, the
-  // tooltip has no event left to close it and stays floating over whatever
-  // renders next. floating-ui supports exactly this case via useDismiss's
-  // referencePress option, but Mantine's Tooltip doesn't expose it. This
-  // reproduces the same effect globally: every Mantine floating element
-  // (Tooltip, Popover, Menu, ...) closes on a real Escape keydown via its
-  // own built-in dismiss handling, so dispatching one on every pointerdown
-  // — before the target's own click handler runs — closes whatever's
-  // currently open first, regardless of what that click goes on to do.
+  // Mantine's Tooltip only closes on mouseleave, so a click that navigates away can leave it stuck
+  // open. Dispatching Escape on every pointerdown closes any open floating element instead.
   useEffect(() => {
     const handlePointerDown = (): void => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -474,9 +419,7 @@ function AppLayout(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [state.openTabs, state.activeTab, setActiveTab])
 
-  // Space bar's default action is page-down scrolling, which fights with
-  // its other job as the hover/photo preview trigger — suppressed globally
-  // except where a focused control natively needs Space (buttons, inputs...).
+  // Space's default page-down scroll fights with its job as the preview trigger key.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== PREVIEW_TRIGGER_KEY) return
@@ -487,13 +430,8 @@ function AppLayout(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Four independent drag domains share this one DndContext (tags can't
-  // move to a second, nested context scoped to the tag panel without
-  // shadowing their existing useDroppable — see the tag-drag branch below)
-  // — 'photo' is the original dragged-thumbnail-onto-tag/folder flow, 'tag'
-  // is a tag being dragged into a group, 'face' is a face (from
-  // DetailPanelFaces) being dragged onto a person (assign), 'person' is a
-  // whole person row dragged onto another one (merge).
+  // Four drag domains share this one DndContext: 'photo' (thumbnail onto tag/folder), 'tag'
+  // (into a group), 'face' (onto a person, assign), 'person' (onto another person, merge).
   const [activeDrag, setActiveDrag] = useState<
     | { kind: 'photo'; paths: string[] }
     | { kind: 'tag'; tag: string }
@@ -502,9 +440,7 @@ function AppLayout(): React.JSX.Element {
     | null
   >(null)
 
-  // Dropping one person onto another stages a merge here rather than
-  // applying it immediately — unlike a single face assignment, a merge
-  // deletes a whole person row, so it gets an explicit confirm step.
+  // A merge deletes a whole person row, so unlike face assignment it gets an explicit confirm step.
   const [pendingMerge, setPendingMerge] = useState<{
     sourceId: string
     sourceName: string
@@ -650,14 +586,10 @@ function AppLayout(): React.JSX.Element {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDrag(null)}
     >
-      {/* Plain string|null, so it only changes on drag start/end — rows read
-          this instead of dnd-kit's useDndContext(), which re-renders its
-          consumers on every pointermove (see ActiveDragContext). */}
+      {/* Rows read this instead of dnd-kit's useDndContext(), which re-renders on every pointermove. */}
       <ActiveDragContext.Provider value={activeDrag?.kind ?? null}>
-        {/* Wraps the whole AppShell (rather than just AppShell.Main) so the tab
-          bar in the header — a Tabs.List sibling of Tabs.Panel deep inside
-          Main — can share this context; Mantine's Tabs is context-driven, so
-          List/Panel don't need to be DOM-adjacent to it. */}
+        {/* Wraps the whole AppShell so the header's Tabs.List (not DOM-adjacent to Tabs.Panel) can
+            still share this context — Mantine's Tabs is context-driven, not position-driven. */}
         <Tabs value={state.activeTab} onChange={(value) => value && setActiveTab(value)}>
           <AppShell
             header={{ height: HEADER_HEIGHT }}
@@ -886,8 +818,9 @@ function AppLayout(): React.JSX.Element {
   )
 }
 
-// Reads context to decide between the two screens above — kept separate from AppLayout so that component's hooks (keyboard shortcuts, drag sensors, etc.) are never conditionally skipped, which switching on a value inside AppLayout itself would do once initialLoadComplete flips partway through its lifetime.
-function AppGate(): React.JSX.Element {
+// Kept separate from AppLayout so its hooks (keyboard shortcuts, drag sensors) are never
+// conditionally skipped when initialLoadComplete flips.
+export function AppGate(): React.JSX.Element {
   const { state } = useGalleryLibrary()
   return state.initialLoadComplete ? <AppLayout /> : <StartupLoadingScreen />
 }
