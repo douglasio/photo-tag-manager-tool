@@ -406,11 +406,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     })
   }, [])
 
+  // Renders AppLayout as soon as folders are known, instead of blocking on
+  // the full startup scan — photos stream in progressively via METADATA_BATCH.
   useEffect(() => {
-    window.api.getFolders().then(async (folders) => {
+    window.api.getFolders().then((folders) => {
       dispatch({ type: 'FOLDERS_LOADED', folders })
-      await startScanForAll(folders)
       dispatch({ type: 'INITIAL_LOAD_COMPLETE' })
+      void startScanForAll(folders)
     })
   }, [startScanForAll])
 

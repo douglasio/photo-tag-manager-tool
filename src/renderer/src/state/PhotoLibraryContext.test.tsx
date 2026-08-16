@@ -227,26 +227,12 @@ describe('PhotoLibraryContext', () => {
     expect(result.current.state.folders).toEqual(['/root'])
   })
 
-  it('flips initialLoadComplete only once every folder finishes its startup scan', async () => {
+  it('flips initialLoadComplete as soon as folders are known, without waiting for the startup scan', async () => {
     mockApi.getFolders.mockResolvedValue(['/root'])
     const { result } = setup()
 
-    await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalledWith(['/root']))
-    expect(result.current.state.initialLoadComplete).toBe(false)
-
-    act(() => {
-      subscriptions.onScanComplete({
-        scanId: 'scan-1',
-        rootPaths: ['/root'],
-        totalScanned: 0,
-        cacheHits: 0,
-        errors: [],
-        allFolders: [],
-        filePaths: []
-      })
-    })
-
     await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+    expect(mockApi.startScanAll).toHaveBeenCalledWith(['/root'])
   })
 
   it('sets initialLoadComplete immediately when there are no folders to scan', async () => {

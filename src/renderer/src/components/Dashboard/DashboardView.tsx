@@ -7,6 +7,7 @@ import {
   FeaturedTagWidget,
   PhotosFromYearWidget,
   RecentlyAddedWidget,
+  ScanProgressIndicator,
   TaggingProgressWidget,
   TagThisPhotoWidget,
   TimeWarpWidget,
@@ -64,7 +65,7 @@ function DashboardSection({
 // (e.g. a drag starting/ending flips its activeDrag state) and only
 // re-renders when its own context subscriptions actually change.
 export const DashboardView = memo(function DashboardView(): React.JSX.Element {
-  const { activePhotosByPath, addFolder } = usePhotoLibrary()
+  const { activePhotosByPath, addFolder, state } = usePhotoLibrary()
 
   const sections: DashboardSectionData[] = [
     {
@@ -107,6 +108,18 @@ export const DashboardView = memo(function DashboardView(): React.JSX.Element {
   ]
 
   if (activePhotosByPath.size === 0) {
+    if (state.status === 'scanning') {
+      return (
+        <Box
+          flex="1"
+          mih={0}
+          display="flex"
+          style={{ alignItems: 'center', justifyContent: 'center' }}
+        >
+          <ScanProgressIndicator percent={null} label="Scanning for photos…" />
+        </Box>
+      )
+    }
     return (
       <Box
         flex="1"

@@ -15,7 +15,6 @@ import {
   EmptyState,
   Flex,
   Group,
-  Loader,
   Pill,
   RollingNumber,
   Scroller,
@@ -36,7 +35,12 @@ import {
 } from '@tabler/icons-react'
 import { Grid } from 'react-window'
 
-import { PersonDescriptionField, TagDeleteButton, TagDescriptionField } from '@components'
+import {
+  PersonDescriptionField,
+  ScanProgressIndicator,
+  TagDeleteButton,
+  TagDescriptionField
+} from '@components'
 import { useGalleryGridLayout } from '@hooks'
 import { useGalleryPreviewZoom } from '@hooks'
 import { isUnderExcludedFolder } from '@shared/folderExclusion'
@@ -393,10 +397,7 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
         {photos.length === 0 ? (
           <Center h="100%">
             {state.status === 'scanning' ? (
-              <Group gap="xs">
-                <Loader />
-                <Text c="dimmed">Scanning for photos…</Text>
-              </Group>
+              <ScanProgressIndicator percent={null} label="Scanning for photos…" />
             ) : (
               <Box
                 style={{

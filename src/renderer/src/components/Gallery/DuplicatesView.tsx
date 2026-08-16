@@ -10,8 +10,6 @@ import {
   Center,
   Group,
   Image,
-  Loader,
-  Progress,
   ScrollArea,
   Stack,
   Text,
@@ -21,7 +19,12 @@ import {
 import { useReducedMotion } from '@mantine/hooks'
 import { IconFolderOpen, IconRefresh, IconTrash, IconX } from '@tabler/icons-react'
 
-import { ConfirmDialog, EnableAiFeaturesDialog, GalleryHoverPreview } from '@components'
+import {
+  ConfirmDialog,
+  EnableAiFeaturesDialog,
+  GalleryHoverPreview,
+  ScanProgressIndicator
+} from '@components'
 import { useHoverPreview, useKeyHeld } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { DuplicateGroup, PhotoRecord } from '@shared/types'
@@ -278,21 +281,12 @@ export function DuplicatesView(): ReactElement {
       {loading && (
         <Center flex={1} mih={0}>
           <Stack align="center" gap="xl" w={320}>
-            {progress ? (
-              <Stack align="center" gap="xs" w="100%">
-                <Progress
-                  value={progress.total > 0 ? (progress.done / progress.total) * 100 : 0}
-                  size="sm"
-                  w="100%"
-                  animated
-                />
-                <Text c="dimmed" size="sm">
-                  {aiScanStepLabel(progress.phase)}
-                </Text>
-              </Stack>
-            ) : (
-              <Loader size="sm" />
-            )}
+            <ScanProgressIndicator
+              percent={
+                progress ? (progress.total > 0 ? (progress.done / progress.total) * 100 : 0) : null
+              }
+              label={progress ? aiScanStepLabel(progress.phase) : undefined}
+            />
             <Button variant="subtle" color="red" size="xs" onClick={cancelAiScan}>
               Cancel
             </Button>
