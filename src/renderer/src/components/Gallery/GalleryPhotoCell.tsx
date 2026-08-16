@@ -1,5 +1,6 @@
+import { memo, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react'
+
 import { Box } from '@mantine/core'
-import type { MouseEvent as ReactMouseEvent, ReactElement } from 'react'
 import type { CellComponentProps } from 'react-window'
 
 import type { PhotoRecord } from '@shared/types'
@@ -74,8 +75,43 @@ export function GalleryThumbnailCell({
   )
 }
 
-/** react-window cell renderer for GalleryGrid — one photo thumbnail per cell. */
-export function GalleryPhotoCell({
+// custom memoization for cells whose actual rendered output wouldn't change on a thumbnail select
+function cellPropsAreEqual(
+  prev: CellComponentProps<GalleryCellProps>,
+  next: CellComponentProps<GalleryCellProps>
+): boolean {
+  if (
+    prev.rowIndex !== next.rowIndex ||
+    prev.columnIndex !== next.columnIndex ||
+    prev.columnCount !== next.columnCount ||
+    prev.photos !== next.photos ||
+    prev.onSelect !== next.onSelect ||
+    prev.onStartRename !== next.onStartRename ||
+    prev.onStopRename !== next.onStopRename ||
+    prev.onRename !== next.onRename ||
+    prev.previewTriggerHeld !== next.previewTriggerHeld ||
+    prev.previewScale !== next.previewScale ||
+    prev.showFilenames !== next.showFilenames ||
+    prev.showViewCounts !== next.showViewCounts ||
+    prev.style.transform !== next.style.transform ||
+    prev.style.width !== next.style.width ||
+    prev.style.height !== next.style.height
+  ) {
+    return false
+  }
+
+  const photo = prev.photos[prev.rowIndex * prev.columnCount + prev.columnIndex]
+  const filePath = photo?.filePath
+
+  return (
+    (filePath === prev.selectedPath) === (filePath === next.selectedPath) &&
+    (filePath !== undefined && prev.selectedPaths.has(filePath)) ===
+      (filePath !== undefined && next.selectedPaths.has(filePath)) &&
+    (filePath === prev.renamingPath) === (filePath === next.renamingPath)
+  )
+}
+
+function GalleryPhotoCellImpl({
   columnIndex,
   rowIndex,
   style,
@@ -92,3 +128,11 @@ export function GalleryPhotoCell({
     </Box>
   )
 }
+
+// react-window's cellComponent type expects a plain function component, not
+// a MemoExoticComponent — cast back to that shape rather than widening the
+// prop type everywhere just to satisfy memo()'s broader ReactNode return.
+/** react-window cell renderer for GalleryGrid — one photo thumbnail per cell. */
+export const GalleryPhotoCell = memo(GalleryPhotoCellImpl, cellPropsAreEqual) as unknown as (
+  props: CellComponentProps<GalleryCellProps>
+) => ReactElement

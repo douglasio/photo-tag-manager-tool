@@ -196,8 +196,12 @@ export function FeaturedTagWidget(): ReactElement {
       if (!hasShownReadyToastRef.current) {
         hasShownReadyToastRef.current = true
         notifications.show({
+          allowClose: true,
+          autoClose: 10000,
           color: 'teal',
-          message: `#${selectedTag} now has enough photos to be featured on the Dashboard!`
+          message: `#${selectedTag} now has enough photos to be featured on the Dashboard!`,
+          onClick: () => state.activeTab === 'dashboard',
+          withCloseButton: true
         })
       }
       return
