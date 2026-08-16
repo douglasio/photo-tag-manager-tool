@@ -5,11 +5,7 @@ import { detectFacesInImage } from './faceDetectionService'
 
 const PROGRESS_INTERVAL_MS = 150
 
-/** Detects+embeds faces for every ready photo that hasn't been scanned yet
- * (see faceRepository.hasFacesForPhoto), inserting one photo_faces row per
- * detected face. Mirrors photoEmbedding.ts's embedAllReadyPhotos: skip-on-
- * error per photo (a corrupt/unreadable file doesn't abort the whole scan),
- * throttled progress, polled cancellation. */
+// Detects+embeds faces for every ready photo that hasn't been scanned yet
 export async function detectAllReadyPhotoFaces(
   onProgress?: (done: number, total: number) => void,
   isCancelled?: () => boolean

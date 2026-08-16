@@ -4,14 +4,10 @@ import type { TagSuggestion } from '@shared/types'
 import { cosineSimilarity } from './embeddingSimilarity'
 import { getOrComputeEmbedding } from './photoEmbedding'
 
-// Kept small since a cold cache (right after enabling the feature, or for a
-// newly-popular tag) means computing this many *fresh* embeddings — each a
-// synchronous ~1-2s trip through the same worker — before results come back.
 const MAX_EXAMPLES_PER_TAG = 8
 const MIN_EXAMPLES_PER_TAG = 3
 
-// Average embedding across a tag's own tagged photos — its "visual
-// prototype" — or null if it doesn't have enough examples to be reliable yet.
+// Average embedding across a tag's photos
 async function getTagPrototype(tag: string): Promise<number[] | null> {
   const examples = findPhotoPathsWithTag(tag, MAX_EXAMPLES_PER_TAG)
   if (examples.length < MIN_EXAMPLES_PER_TAG) return null
@@ -28,9 +24,7 @@ async function getTagPrototype(tag: string): Promise<number[] | null> {
   return sums.map((sum) => sum / embeddings.length)
 }
 
-// Ranks candidateTags by how visually similar this photo is to each tag's
-// own already-tagged examples — tags without enough examples are omitted
-// rather than scored, since a 1-2 photo prototype is too noisy to trust.
+// Ranks candidateTags by how visually similar this photo is to each tag's already-tagged examples
 export async function suggestTagsByExemplar(
   filePath: string,
   thumbnailKey: string,

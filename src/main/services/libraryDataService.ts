@@ -11,18 +11,12 @@ import { disposeThrowbackSimilarityWorker } from './throwbackService'
 import { deleteAllThumbnails } from './thumbnailService'
 import { unwatchAllFolders } from './watchManager'
 
-// A raw copy of the live SQLite file — captures photos, tags, tag groups,
-// settings, and embeddings perfectly with no custom serialization. Safe to
-// run against the live connection regardless of WAL state (better-sqlite3's
-// backup() performs an online hot backup, not a plain file copy).
+// A raw copy of the live SQLite file
 export async function exportDatabase(destinationPath: string): Promise<void> {
   await getDb().backup(destinationPath)
 }
 
 // Opens the picked file as a throwaway read-only connection just to confirm
-// it's actually a Tag Me database before letting importDatabase replace the
-// live one with it — anything that fails to open, or opens but lacks the
-// `photos` table, is rejected rather than silently wiping the real library.
 export function validateDatabaseFile(filePath: string): boolean {
   let candidate: Database.Database | null = null
   try {
@@ -38,9 +32,7 @@ export function validateDatabaseFile(filePath: string): boolean {
   }
 }
 
-// Shared by importDatabase/clearLibrary — both mutate the live DB file out
-// from under the running app, so both stop everything that might touch it
-// (watchers, AI workers) and close the connection before doing so.
+// Shared by importDatabase/clearLibrary — stops everything before mutating db
 async function shutDownForDataChange(): Promise<void> {
   await unwatchAllFolders()
   await Promise.all([
@@ -51,21 +43,14 @@ async function shutDownForDataChange(): Promise<void> {
   closeDb()
 }
 
-// app.relaunch() spawns the new process immediately — it doesn't wait for
-// this one to actually exit, so the new process's requestSingleInstanceLock()
-// can race this process's (delayed until real OS exit) lock release and
-// lose, silently skipping window/handler setup entirely. Releasing the lock
-// explicitly first closes that race.
+// app.relaunch() spawns the new process immediately
 function relaunch(): void {
   app.releaseSingleInstanceLock()
   app.relaunch()
   app.exit(0)
 }
 
-// Restores from a backup by fully replacing the live library — not a merge.
-// Ends the process; the relaunched app's normal startup (getDb()'s own
-// migrations, main/index.ts watching every folder in the imported settings)
-// picks up the swapped-in file with no extra wiring needed.
+// Restores from a backup by fully replacing the live library
 export async function importDatabase(sourcePath: string): Promise<void> {
   await shutDownForDataChange()
 
@@ -76,9 +61,7 @@ export async function importDatabase(sourcePath: string): Promise<void> {
   relaunch()
 }
 
-// Full factory reset: wipes the database, every cached thumbnail, and the
-// downloaded AI model weights (re-enabling AI afterward simply re-downloads
-// them) — then relaunches into a completely fresh app.
+// Full factory reset: wipes the database
 export async function clearLibrary(): Promise<void> {
   await shutDownForDataChange()
 

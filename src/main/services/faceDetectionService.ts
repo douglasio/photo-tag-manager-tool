@@ -11,8 +11,7 @@ import { rejectAllPending } from '@main/workers/pendingRequests'
 import { getModelPath } from './modelPaths'
 
 let worker: Worker | null = null
-// Memoized so concurrent callers share one in-flight init instead of each
-// sending their own 'init' message — same reasoning as tagSuggestionService.
+// Memoized so concurrent callers share one in-flight init
 let readyPromise: Promise<void> | null = null
 let readyReject: ((err: Error) => void) | null = null
 
@@ -45,10 +44,7 @@ function send(message: WorkerRequest): void {
   getWorker().postMessage(message)
 }
 
-// Loads YuNet/SFace into the worker — near-instant since both are bundled
-// app assets (see modelPaths.ts), not downloaded, but still memoized since
-// creating the ONNX sessions isn't literally free and only needs doing once
-// per worker lifetime.
+// Loads YuNet/SFace into the worker
 export function ensureFaceModelReady(): Promise<void> {
   if (readyPromise) return readyPromise
 
@@ -87,8 +83,7 @@ export async function detectFacesInImage(imagePath: string): Promise<DetectedFac
   })
 }
 
-// Frees the worker's memory when face detection is disabled — the next
-// request transparently respawns it.
+// Frees the worker's memory when face detection is disabled
 export async function disposeFaceDetectionWorker(): Promise<void> {
   if (!worker) return
   const w = worker

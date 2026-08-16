@@ -58,11 +58,7 @@ function send(message: WorkerRequest): void {
   getWorker().postMessage(message)
 }
 
-// Clusters already-embedded photos by pairwise cosine similarity, off the
-// main process — the O(n²) comparison used to run inline here and could
-// visibly block the app on a large library. isCancelled is polled (the
-// worker can't see the caller's flag directly) and forwarded as a 'cancel'
-// message the first time it flips true.
+// Clusters already-embedded photos by pairwise cosine similarity
 export async function clusterDuplicates(
   photos: EmbeddedPhoto[],
   onProgress?: (comparisons: number, totalPairs: number) => void,
@@ -90,9 +86,7 @@ export async function clusterDuplicates(
 
   try {
     const result = await resultPromise
-    // Filtered here (the single point every clusterDuplicates caller flows
-    // through) rather than in each caller — a dismissed group stays hidden
-    // regardless of who requests a scan.
+    // A dismissed group stays hidden regardless of who requests a scan
     const dismissed = getDismissedDuplicateSignatures()
     return {
       ...result,
@@ -105,9 +99,7 @@ export async function clusterDuplicates(
   }
 }
 
-// For one photo's Details Panel — only compares against embeddings already
-// cached (no full-library embedding pass), so this stays fast regardless of
-// library size; the target photo itself is embedded on demand if missing.
+// For individual photo's Details Panel
 export async function findSimilarPhotos(
   filePath: string,
   thumbnailKey: string,

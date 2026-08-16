@@ -1,6 +1,4 @@
-// Shared by duplicateClustering and throwbackSimilarity — yield to the event
-// loop every this-many pairwise comparisons, so a large embedding count
-// doesn't hog whichever thread one of their O(n²) loops runs on.
+// Shared by duplicateClustering and throwbackSimilarity — yield to the event loop every this-many pairwise comparisons
 export const SIMILARITY_YIELD_EVERY = 20_000
 
 export function yieldToEventLoop(): Promise<void> {
@@ -23,9 +21,7 @@ export function cosineSimilarity(a: ArrayLike<number>, b: ArrayLike<number>): nu
 }
 
 // Union-find — shared by duplicatePhotoService and throwbackService, both of
-// which merge items whose embeddings are similarity-linked, transitively, so
-// a chain of related items ends up in one group rather than several
-// overlapping pairs.
+// which merge items whose embeddings are similarity-linked
 export class DisjointSet {
   private parent: number[]
 

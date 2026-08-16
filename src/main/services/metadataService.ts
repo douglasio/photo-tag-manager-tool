@@ -27,11 +27,7 @@ function formatFromExtension(filePath: string): SupportedFormat {
   return 'JPEG'
 }
 
-// exiftool-vendored types Keywords/Subject as string | string[], but a
-// purely-numeric keyword (e.g. a photo tagged "2024") can come back from
-// exiftool itself as a raw JSON number — coerced here since a non-string
-// tag crashes TagsInput's rendering (draft.trim is not a function) far
-// downstream, at a point with no context to explain why.
+// purely-numeric keyword can come back from exiftool as a raw JSON number — coerce to string
 function toArray(value: unknown): string[] {
   if (value == null) return []
   const items = Array.isArray(value) ? value : [value]
@@ -50,9 +46,6 @@ function dateToIso(value: Tags['DateTimeOriginal'] | Tags['CreateDate']): string
 }
 
 export async function writeTags(filePath: string, tags: string[]): Promise<void> {
-  // Keywords (IPTC) and Subject (XMP) are the two fields mergeTags() reads back;
-  // writing both keeps other tools (Lightroom, Photos, etc.) in sync too. A `null`
-  // value clears the tag entirely, which a plain empty array won't do.
   const value = tags.length > 0 ? tags : null
   await getExifTool().write(
     filePath,
@@ -61,11 +54,6 @@ export async function writeTags(filePath: string, tags: string[]): Promise<void>
   )
 }
 
-// EXIF date/time tags (DateTimeOriginal, CreateDate) are conventionally
-// naive local time with no timezone attached — formatting via the Date
-// object's local getters (rather than toISOString, which would shift to
-// UTC) is what keeps this a lossless round-trip with dateToIso's reverse
-// conversion above, since both run on the same machine/timezone.
 function formatExifDateTime(date: Date): string {
   const pad = (n: number): string => String(n).padStart(2, '0')
   const y = date.getFullYear()
@@ -86,9 +74,7 @@ export async function writeDateTaken(filePath: string, isoDate: string): Promise
   )
 }
 
-// UserComment (EXIF) and Description (IPTC/XMP) are the two fields
-// readPhotoRecord falls back across when reading — writing both keeps them
-// in sync so other tools looking at either one see the update.
+// writing comment and description in sync so other tools looking at either one see the update
 export async function writeComment(filePath: string, comment: string): Promise<void> {
   const value = comment.trim() === '' ? null : comment
   await getExifTool().write(
@@ -98,28 +84,17 @@ export async function writeComment(filePath: string, comment: string): Promise<v
   )
 }
 
-// EXIF Orientation values 1-8, mapping each to what it becomes after a 90°
-// rotation in that direction. Covers the four mirrored orientations (2, 4,
-// 5, 7) too, rotating them in place rather than only handling the four
-// plain (unmirrored) ones — a photo that was already flipped stays flipped.
+// EXIF Orientation values 1-8
 const ROTATE_RIGHT_MAP: Record<number, number> = { 1: 6, 6: 3, 3: 8, 8: 1, 2: 7, 7: 4, 4: 5, 5: 2 }
 const ROTATE_LEFT_MAP: Record<number, number> = { 1: 8, 8: 3, 3: 6, 6: 1, 2: 5, 5: 4, 4: 7, 7: 2 }
 
-// Purely a metadata write (EXIF Orientation tag) — no pixels are touched, so
-// this is instant and perfectly lossless, unlike re-encoding the image with
-// sharp. Only meaningful for formats whose Orientation tag viewers actually
-// respect; callers are expected to gate this to JPEG/TIFF (ROTATABLE_FORMATS).
+// Lossless metadata orientation write
 export async function rotatePhoto(filePath: string, direction: RotateDirection): Promise<void> {
   const tags = await getExifTool().read(filePath)
   const current = tags.Orientation ?? 1
   const map = direction === 'right' ? ROTATE_RIGHT_MAP : ROTATE_LEFT_MAP
   const next = map[current] ?? 1
-  // -n is required here: without it, exiftool tries to match the raw number
-  // against Orientation's PrintConv table (human-readable strings like
-  // "Rotate 90 CW") and silently no-ops with a "Can't convert IFD0:
-  // Orientation (not in PrintConv)" warning instead of writing anything —
-  // exiftool-vendored doesn't throw on that, so the failure is invisible
-  // unless the write result's `warnings` field is inspected.
+  // -n is required here by exiftool
   await getExifTool().write(
     filePath,
     { Orientation: next },

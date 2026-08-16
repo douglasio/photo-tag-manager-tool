@@ -6,9 +6,7 @@ import { runFaceClustering } from './faceClustering'
 import { detectAllReadyPhotoFaces } from './faceDetection'
 import { ensureFaceModelReady } from './faceDetectionService'
 
-// Single shared in-flight scan, mirroring aiScanService.ts's currentScan —
-// centralizing it here is what lets Cancel work regardless of where the
-// scan was started.
+// Single shared cancellable in-flight scan
 let currentScan: { cancelled: boolean } | null = null
 
 export async function runFullFaceScan(
@@ -17,8 +15,6 @@ export async function runFullFaceScan(
   const scan = { cancelled: false }
   currentScan = scan
   try {
-    // Bundled models, so this resolves near-instantly — no 'downloading'
-    // phase to report, unlike aiScanService's CLIP-download flow.
     await ensureFaceModelReady()
 
     const { photosScanned, facesDetected } = await detectAllReadyPhotoFaces(

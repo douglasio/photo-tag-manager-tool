@@ -1,16 +1,10 @@
 // Aligns a detected face to SFace's expected 112x112 input crop before
 // embedding, using a 2-point (eye-to-eye) similarity transform — rotation +
-// uniform scale + translation, no shear. OpenCV's own FaceRecognizerSF uses
-// a 5-point least-squares (Umeyama/SVD) fit instead; the 2-point version is
-// materially simpler to get right and is accurate enough for the
-// near-frontal faces personal photos are mostly made of, at some cost to
-// robustness on extreme poses.
+// uniform scale + translation, no shear (simpler than FaceRecognizerSF's 5-point fit)
 
 export const SFACE_INPUT_SIZE = 112
 
-// The right/left-eye targets from OpenCV's own SFace alignment template
-// (face_recognize.cpp's getSimilarityTransformMatrix dst points) — reused
-// here so the crop framing matches what the model was trained on.
+// match crop framing to what the model was trained on
 const TEMPLATE_RIGHT_EYE = { x: 38.2946, y: 51.6963 }
 const TEMPLATE_LEFT_EYE = { x: 73.5318, y: 51.5014 }
 

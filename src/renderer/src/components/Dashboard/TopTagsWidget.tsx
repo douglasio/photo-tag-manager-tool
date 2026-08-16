@@ -8,28 +8,20 @@ import { usePhotoLibrary } from '@state'
 import { shuffle } from '@utils'
 
 const TOP_TAG_COUNT = 5
-// Reserved space for the tag-name column — without an explicit width here,
-// a long tag name has no bound and can spill past the chart's own left edge.
+// Reserved space for the tag-name column
 const Y_AXIS_WIDTH = 110
-// A rough (not pixel-measured) character cap for what fits in that width at
-// the tick's font size — SVG text has no CSS text-overflow/ellipsis, so
-// truncation has to happen on the string itself before rendering it.
+// A rough (not pixel-measured) character cap for what fits in that width
 const MAX_LABEL_CHARS = 14
-// How many candidate photos are locked in per tag — the bar shows however
-// many of these actually fit at BLOCK_WIDTH, cycling back through the list
-// if the bar is wider than the candidate count.
+// How many candidate photos are locked in per tag
 const MAX_CANDIDATE_PHOTOS = 8
-// Target width per photo block — the bar's actual block count is derived
-// from this (barWidth / BLOCK_WIDTH, rounded), so a longer bar naturally
-// shows more blocks.
+// Target width per photo block — the bar's actual block count is derived from (barWidth / BLOCK_WIDTH, rounded)
 const BLOCK_WIDTH = 36
 const BLOCK_GAP = 2
 
 export interface TopTagDatum {
   tag: string
   count: number
-  // Empty until this tag's photos are picked (see TopTagsWidget below) —
-  // the bar falls back to a solid color for that one render.
+  // Empty until this tag's photos are picked
   thumbnailUrls: string[]
 }
 
@@ -38,9 +30,7 @@ function truncateLabel(value: string): string {
   return `${value.slice(0, MAX_LABEL_CHARS - 1)}…`
 }
 
-// Renders the Y-axis tag label as clickable text, same navigation as the bar
-// itself — Recharts calls tick renderers as plain functions with the axis
-// value already resolved, so no extra data lookup is needed.
+// Renders the Y-axis tag label as clickable text
 // eslint-disable-next-line react-refresh/only-export-components -- exported for direct unit testing, colocated by design
 export function makeTagTick(onSelect: (tag: string) => void) {
   return function TagTick(props: {
@@ -67,10 +57,7 @@ export function makeTagTick(onSelect: (tag: string) => void) {
   }
 }
 
-// Fills the bar with same-width photo "blocks" built up left-to-right from
-// the tag's own tagged photos, like TopViewedWidget's image-filled bars but
-// tiled instead of a single stretched image. Falls back to a solid color
-// bar if no candidate photos are available yet.
+// Fills the bar with same-width photo "blocks" built up left-to-right from tag's tagged photos
 // eslint-disable-next-line react-refresh/only-export-components -- exported for direct unit testing, colocated by design
 export function makeCountBarShape(onSelect: (tag: string) => void) {
   return function CountBarShape(props: {
@@ -84,8 +71,7 @@ export function makeCountBarShape(onSelect: (tag: string) => void) {
     if (!payload) return null
     const barWidth = Math.max(width, 0)
     const urls = payload.thumbnailUrls
-    // payload.tag can contain spaces/slashes/etc — invalid raw in a
-    // url(#id) reference (see TopViewedWidget's makeImageBarShape).
+    // strip out spaces/slashes/etc from payload.tag
     const safeTag = payload.tag.replace(/[^a-zA-Z0-9_-]/g, '_')
     const clipId = `top-tags-bar-${safeTag}`
     const gradientId = `top-tags-gradient-${safeTag}`
@@ -93,8 +79,7 @@ export function makeCountBarShape(onSelect: (tag: string) => void) {
     // fit at BLOCK_WIDTH just cycles back through the ones it has.
     const numBlocks = urls.length > 0 ? Math.max(1, Math.round(barWidth / BLOCK_WIDTH)) : 0
     const blockWidth = numBlocks > 0 ? barWidth / numBlocks : 0
-    // Same clamp as TopViewedWidget's makeImageBarShape — keeps the count
-    // centered on a normal bar but still inside a very short one.
+    // Same clamp as TopViewedWidget's makeImageBarShape
     const textOffset = height >= 52 ? 40 : height >= 20 ? height - 17 : height / 2
     const textY = numBlocks > 0 ? y + textOffset : y + height / 2
 
@@ -172,9 +157,7 @@ export function TopTagsWidget(): ReactElement {
     .slice(0, TOP_TAG_COUNT)
     .map(([tag, count]) => ({ tag, count }))
 
-  // Locked in per tag (lazily, one at a time) rather than recomputed every
-  // render — a fresh shuffle each render would otherwise reshuffle every
-  // bar's blocks on any unrelated library change while the dashboard sits open.
+  // Locked in per tag (lazily, one at a time)
   const [photosByTag, setPhotosByTag] = useState<Record<string, string[]>>({})
   const missingTag = topTags.find((datum) => !photosByTag[datum.tag])
   if (missingTag) {

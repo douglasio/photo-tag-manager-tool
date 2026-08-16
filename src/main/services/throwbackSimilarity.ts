@@ -13,11 +13,7 @@ export interface ThrowbackCandidate {
   year: number
 }
 
-// Pure clustering + selection math, pulled out of throwbackService so it can
-// run inside throwbackSimilarityWorker (off the main process — this used to
-// run inline and could visibly block the app once enough embeddings piled
-// up) while staying directly unit-testable. Picks the cross-year cluster
-// spanning the most distinct years, then the best-fitting photo per year.
+// Pure clustering + selection math
 export async function computeThrowbackSimilarity(
   photos: ThrowbackCandidate[],
   threshold: number
@@ -47,8 +43,7 @@ export async function computeThrowbackSimilarity(
     else groupIndices.set(root, [i])
   }
 
-  // The cluster spanning the most distinct years is the most
-  // "throwback"-worthy set to show.
+  // The cluster spanning the most distinct years is the most "throwback"-worthy set to show
   let best: { indices: number[]; years: Set<number> } | null = null
   for (const indices of groupIndices.values()) {
     const years = new Set(indices.map((i) => photos[i].year))
@@ -57,8 +52,7 @@ export async function computeThrowbackSimilarity(
   }
   if (!best) return null
 
-  // At most one photo per year within the winning cluster — pick whichever
-  // has the highest average similarity to the rest of the group.
+  // At most one photo per year within the winning cluster by highest similarity
   const indicesByYear = new Map<number, number[]>()
   for (const i of best.indices) {
     const year = photos[i].year

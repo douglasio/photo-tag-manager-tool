@@ -13,16 +13,11 @@ export interface IngestMetadataResult {
   fileStat: Stats
 }
 
-// The metadata half of ingestFile's pipeline — stat, cache-check, exiftool
-// read, DB upsert. Split out (rather than inlined in ingestFile) so a bulk
-// scan can run this under its own concurrency limit and let a file's slot
-// free immediately, instead of holding it open through thumbnail generation
-// too (see scanHandlers.ts's runScan, which is the reason this exists).
+// Splits out metadata ingestion so a bulk scan can run this under its own concurrency limit
 export async function ingestMetadata(
   filePath: string,
   options?: {
-    // Metadata-only writes (tags/comment/date-taken) bump mtime without
-    // touching pixels — set this to skip the pointless thumbnail regen. Omit for rotate.
+    // Metadata-only writes (tags/comment/date-taken) bump mtime without touching pixels
     pixelsUnchanged?: boolean
   }
 ): Promise<IngestMetadataResult> {
@@ -45,8 +40,7 @@ export async function ingestMetadata(
       }
     }
     upsertPhoto(photo, fileStat.mtimeMs, fileStat.size)
-    // upsertPhoto preserves viewCount/firstSeenAt on a rescan — reflect
-    // those true DB values here too, instead of readPhotoRecord's placeholders.
+    // Reflect true DB values here instead of readPhotoRecord's placeholders
     photo = {
       ...photo,
       viewCount: cached?.record.viewCount ?? 0,
@@ -57,10 +51,7 @@ export async function ingestMetadata(
   return { photo, fromCache, fileStat }
 }
 
-// The thumbnail half — caller decides whether this is needed
-// (photo.thumbnailStatus !== 'ready') and how it's paced (its own p-limit).
-// Never throws: a generation failure is recorded as a normal 'error' status
-// rather than rejecting, so callers can fire-and-collect these freely.
+// A generation failure is recorded as a normal 'error' status rather than rejecting, so callers can fire-and-collect these freely
 export async function ingestThumbnail(
   filePath: string,
   photo: PhotoRecord,

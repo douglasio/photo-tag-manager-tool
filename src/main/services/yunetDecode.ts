@@ -1,8 +1,4 @@
-// Pure decode/NMS math for YuNet's raw ONNX outputs, kept separate from the
-// worker so it's unit-testable without a real ONNX runtime session. Ported
-// directly from OpenCV's own C++ implementation (modules/objdetect/src/
-// face_detect.cpp, FaceDetectorYNImpl::postProcess) rather than guessed —
-// same score/bbox/landmark decode formulas, same greedy IoU NMS.
+// Pure decode/NMS math for YuNet's raw ONNX outputs
 
 export interface YuNetStrideOutput {
   stride: number
@@ -20,8 +16,7 @@ export interface DecodedFace {
   w: number
   h: number
   score: number
-  // 5 points: right eye, left eye, nose tip, right mouth corner, left mouth
-  // corner — same order YuNet's own landmark output uses.
+  // 5 points: right eye, left eye, nose tip, right mouth corner, left mouth corner
   landmarks: [number, number][]
 }
 

@@ -17,9 +17,7 @@ import { rejectAllPending } from '@main/workers/pendingRequests'
 
 import { cosineSimilarity } from './embeddingSimilarity'
 
-// Same OpenCV SFace same-person cosine threshold used as faceClusterWorker's
-// DBSCAN radius (see that file's comment) — reused here to decide whether a
-// freshly-clustered group of faces matches an existing person's centroid
+// Decides whether a freshly-clustered group of faces matches an existing person's centroid
 // closely enough to join them, rather than becoming a new person.
 const CENTROID_MATCH_THRESHOLD = 0.363
 
@@ -67,11 +65,7 @@ function averageEmbedding(embeddings: ArrayLike<number>[]): number[] {
   return sum.map((v) => v / embeddings.length)
 }
 
-/** Re-clusters every unpinned face (pinned faces — manual assign/split/
- * unassign — are never touched, see faceRepository.getUnpinnedFaces) and
- * writes the result back: existing DBSCAN groups that centroid-match a
- * pinned person join that person, groups that don't match anyone become a
- * new person, and noise faces are cleared back to unassigned. */
+// Re-clusters every unpinned face
 export async function runFaceClustering(
   isCancelled?: () => boolean
 ): Promise<{ peopleCreated: number; facesAssigned: number; canceled: boolean }> {
