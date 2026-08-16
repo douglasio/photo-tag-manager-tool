@@ -75,7 +75,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 6. Full-tab views for each left panel section?
 
-7. Resizing panels in the sidebar is very laggy
+7. The gallery sidebar is overall rather laggy -- resizing the panels, expanding/collapsing folders, selecting items, dragging and dropping. Can you investigate and see if there's a way to get this experience to be smoother?
 
 8. Make the left sidebar wider by default.
 
@@ -139,7 +139,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Optimization
 
-## Duplicates View
+## Video
+
+See VIDEO_PLAN.md
 
 ## Codebase
 

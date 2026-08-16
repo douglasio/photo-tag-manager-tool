@@ -105,10 +105,10 @@ export function DashboardView(): React.JSX.Element {
   if (activePhotosByPath.size === 0) {
     return (
       <Box
+        flex="1"
+        mih={0}
+        display="flex"
         style={{
-          flex: 1,
-          minHeight: 0,
-          display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
         }}
