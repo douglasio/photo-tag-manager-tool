@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import { type ReactElement, useMemo } from 'react'
 
 import { Image, SimpleGrid, Text, UnstyledButton } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
@@ -7,7 +7,7 @@ import { GalleryHoverPreview, PhotoGradientOverlay } from '@components'
 import { useHoverPreview, useKeyHeld } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useGalleryLibrary, useLibraryActions } from '@state'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
@@ -72,15 +72,22 @@ function RecentTile({
 
 // The RECENT_COUNT most recently added photos (by firstSeenAt), newest first.
 export function RecentlyAddedWidget(): ReactElement {
-  const { state, activePhotosByPath, openPhotoTab } = usePhotoLibrary()
+  const { state, activePhotosByPath } = useGalleryLibrary()
+  const { openPhotoTab } = useLibraryActions()
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
-  const recentPhotos = Array.from(activePhotosByPath.values())
-    .filter((photo) => photo.thumbnailStatus === 'ready' && photo.thumbnailKey && photo.firstSeenAt)
-    .sort((a, b) => (b.firstSeenAt ?? 0) - (a.firstSeenAt ?? 0))
-    .slice(0, RECENT_COUNT)
+  const recentPhotos = useMemo(
+    () =>
+      Array.from(activePhotosByPath.values())
+        .filter(
+          (photo) => photo.thumbnailStatus === 'ready' && photo.thumbnailKey && photo.firstSeenAt
+        )
+        .sort((a, b) => (b.firstSeenAt ?? 0) - (a.firstSeenAt ?? 0))
+        .slice(0, RECENT_COUNT),
+    [activePhotosByPath]
+  )
 
   if (recentPhotos.length === 0) {
     return (

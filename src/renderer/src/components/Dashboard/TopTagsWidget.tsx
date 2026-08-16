@@ -1,10 +1,10 @@
-import { type ReactElement, useState } from 'react'
+import { type ReactElement, useMemo, useState } from 'react'
 
 import { BarChart } from '@mantine/charts'
 import { DEFAULT_THEME, Text } from '@mantine/core'
 
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
-import { usePhotoLibrary } from '@state'
+import { useGalleryLibrary, useLibraryActions, useSidebarLibrary } from '@state'
 import { shuffle } from '@utils'
 
 const TOP_TAG_COUNT = 5
@@ -150,12 +150,18 @@ export function makeCountBarShape(onSelect: (tag: string) => void) {
 }
 
 export function TopTagsWidget(): ReactElement {
-  const { activePhotosByPath, tagCounts, setTagFilter, setActiveTab } = usePhotoLibrary()
+  const { activePhotosByPath } = useGalleryLibrary()
+  const { tagCounts } = useSidebarLibrary()
+  const { setTagFilter, setActiveTab } = useLibraryActions()
 
-  const topTags = Array.from(tagCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, TOP_TAG_COUNT)
-    .map(([tag, count]) => ({ tag, count }))
+  const topTags = useMemo(
+    () =>
+      Array.from(tagCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, TOP_TAG_COUNT)
+        .map(([tag, count]) => ({ tag, count })),
+    [tagCounts]
+  )
 
   // Locked in per tag (lazily, one at a time)
   const [photosByTag, setPhotosByTag] = useState<Record<string, string[]>>({})
@@ -174,10 +180,10 @@ export function TopTagsWidget(): ReactElement {
     setPhotosByTag((prev) => ({ ...prev, [missingTag.tag]: candidates }))
   }
 
-  const data: TopTagDatum[] = topTags.map((datum) => ({
-    ...datum,
-    thumbnailUrls: photosByTag[datum.tag] ?? []
-  }))
+  const data: TopTagDatum[] = useMemo(
+    () => topTags.map((datum) => ({ ...datum, thumbnailUrls: photosByTag[datum.tag] ?? [] })),
+    [topTags, photosByTag]
+  )
 
   if (data.length === 0) {
     return (

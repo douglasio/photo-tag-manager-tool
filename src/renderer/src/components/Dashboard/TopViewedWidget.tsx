@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect, useRef, useState } from 'react'
+import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react'
 
 import { BarChart } from '@mantine/charts'
 import { Stack, Text } from '@mantine/core'
@@ -8,7 +8,7 @@ import { GalleryHoverPreview } from '@components'
 import { useKeyHeld } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useGalleryLibrary, useLibraryActions } from '@state'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
@@ -131,7 +131,8 @@ export function makeImageBarShape(
 }
 
 export function TopViewedWidget(): ReactElement {
-  const { state, activePhotosByPath, openPhotoTab } = usePhotoLibrary()
+  const { state, activePhotosByPath } = useGalleryLibrary()
+  const { openPhotoTab } = useLibraryActions()
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -162,36 +163,44 @@ export function TopViewedWidget(): ReactElement {
     setHover(null)
   }
 
-  const viewedPhotos = Array.from(activePhotosByPath.values())
-    .filter(
-      (photo) => photo.viewCount > 0 && photo.thumbnailStatus === 'ready' && photo.thumbnailKey
-    )
-    .sort((a, b) => b.viewCount - a.viewCount)
-    .slice(0, TOP_COUNT)
+  const viewedPhotos = useMemo(
+    () =>
+      Array.from(activePhotosByPath.values())
+        .filter(
+          (photo) => photo.viewCount > 0 && photo.thumbnailStatus === 'ready' && photo.thumbnailKey
+        )
+        .sort((a, b) => b.viewCount - a.viewCount)
+        .slice(0, TOP_COUNT),
+    [activePhotosByPath]
+  )
 
   // Padded out to a full TOP_COUNT categories — with fewer real bars, the
   // category axis stretches each one to fill the available width, making a
   // library with only 1-2 viewed photos look broken (two oversized bars)
   // rather than just sparse.
-  const data: TopViewedDatum[] = Array.from({ length: TOP_COUNT }, (_, index) => {
-    const photo = viewedPhotos[index]
-    if (!photo) {
-      return {
-        id: `placeholder-${index}`,
-        fileName: `placeholder-${index}`,
-        viewCount: 0,
-        thumbnailUrl: null,
-        photo: null
-      }
-    }
-    return {
-      id: photo.id,
-      fileName: photo.fileName,
-      viewCount: photo.viewCount,
-      thumbnailUrl: toThumbProtocolUrl(photo.thumbnailKey!),
-      photo
-    }
-  })
+  const data: TopViewedDatum[] = useMemo(
+    () =>
+      Array.from({ length: TOP_COUNT }, (_, index) => {
+        const photo = viewedPhotos[index]
+        if (!photo) {
+          return {
+            id: `placeholder-${index}`,
+            fileName: `placeholder-${index}`,
+            viewCount: 0,
+            thumbnailUrl: null,
+            photo: null
+          }
+        }
+        return {
+          id: photo.id,
+          fileName: photo.fileName,
+          viewCount: photo.viewCount,
+          thumbnailUrl: toThumbProtocolUrl(photo.thumbnailKey!),
+          photo
+        }
+      }),
+    [viewedPhotos]
+  )
 
   return (
     <Stack h="100%" gap={4}>
