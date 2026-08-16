@@ -3,7 +3,7 @@ import { type ReactElement, useState } from 'react'
 import { ActionIcon, Tooltip } from '@mantine/core'
 import { IconTrash } from '@tabler/icons-react'
 
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions } from '@state'
 
 import { FolderRemoveDialog } from './FolderRemoveDialog'
 
@@ -13,7 +13,7 @@ interface FolderRemoveButtonProps {
 }
 
 export function FolderRemoveButton({ folder, count }: FolderRemoveButtonProps): ReactElement {
-  const { removeFolder } = usePhotoLibrary()
+  const { removeFolder } = useLibraryActions()
   const [confirming, setConfirming] = useState(false)
   const [removing, setRemoving] = useState(false)
 
@@ -42,14 +42,17 @@ export function FolderRemoveButton({ folder, count }: FolderRemoveButtonProps): 
           <IconTrash size="70%" />
         </ActionIcon>
       </Tooltip>
-      <FolderRemoveDialog
-        folder={folder}
-        count={count}
-        opened={confirming}
-        saving={removing}
-        onConfirm={() => void handleConfirm()}
-        onCancel={() => setConfirming(false)}
-      />
+      {/* Mounted only while open — see TagPanel's dialogs for the reasoning. */}
+      {confirming && (
+        <FolderRemoveDialog
+          folder={folder}
+          count={count}
+          opened
+          saving={removing}
+          onConfirm={() => void handleConfirm()}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
     </>
   )
 }

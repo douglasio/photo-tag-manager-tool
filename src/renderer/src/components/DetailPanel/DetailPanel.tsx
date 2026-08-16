@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from 'react'
+import { memo, type ReactElement, useState } from 'react'
 
 import { Center, Stack, Text } from '@mantine/core'
 
@@ -13,7 +13,10 @@ import { DetailPanelMultiSelect } from './DetailPanelMultiSelect'
 import { DetailPanelQuickTag } from './DetailPanelQuickTag'
 import { DetailPanelTags } from './DetailPanelTags'
 
-export function DetailPanel(): ReactElement {
+// Memoized: takes no props, so it bails out when AppLayout re-renders
+// (e.g. a drag starting/ending flips its activeDrag state) and only
+// re-renders when its own context subscriptions actually change.
+export const DetailPanel = memo(function DetailPanel(): ReactElement {
   const { selectedPhoto, state } = usePhotoLibrary()
   // Deliberately not reset when selectedPhoto changes — staying open across
   // photo switches is the point (quickly tag several photos in a row without
@@ -58,4 +61,4 @@ export function DetailPanel(): ReactElement {
       <DetailPanelMetadata photo={selectedPhoto} />
     </Stack>
   )
-}
+})

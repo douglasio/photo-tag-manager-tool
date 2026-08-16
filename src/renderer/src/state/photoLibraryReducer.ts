@@ -16,7 +16,7 @@ import {
   rewritePathPrefix
 } from '@utils'
 
-type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
+export type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 
 export type GallerySortBy = 'name' | 'dateTaken' | 'viewCount' | 'random'
 export type GallerySortOrder = 'asc' | 'desc'
@@ -640,14 +640,25 @@ export function photoLibraryReducer(
       return { ...state, allFolderPaths }
     }
     case 'PHOTO_UPSERTED': {
-      const rootFolder = findRootFolder(action.photo.filePath, state.folders)
+      const isNewPhoto = !state.photosByPath.has(action.photo.filePath)
       const photosByPath = new Map(state.photosByPath)
-      const folderCounts = new Map(state.folderCounts)
-      const folderChildren = new Map(state.folderChildren)
-      if (rootFolder && !photosByPath.has(action.photo.filePath)) {
-        addPhotoToFolderTree(action.photo.filePath, rootFolder, folderCounts, folderChildren)
-      }
       photosByPath.set(action.photo.filePath, action.photo)
+
+      // Only copy+rebuild the folder tree when a photo is genuinely new to
+      // it — an existing photo's write (tags, comment, viewCount, rotate,
+      // ...) never changes folder membership, so giving folderCounts/
+      // folderChildren a new identity on every such write was forcing
+      // FolderTree to rebuild+rerender its whole tree for no reason.
+      let folderCounts = state.folderCounts
+      let folderChildren = state.folderChildren
+      if (isNewPhoto) {
+        const rootFolder = findRootFolder(action.photo.filePath, state.folders)
+        if (rootFolder) {
+          folderCounts = new Map(state.folderCounts)
+          folderChildren = new Map(state.folderChildren)
+          addPhotoToFolderTree(action.photo.filePath, rootFolder, folderCounts, folderChildren)
+        }
+      }
       return { ...state, photosByPath, folderCounts, folderChildren }
     }
     case 'PHOTO_REMOVED': {

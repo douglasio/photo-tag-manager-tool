@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 const mockDeleteTag = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@state', () => ({
-  usePhotoLibrary: () => ({
+  useSidebarLibrary: () => ({
     allTags: ['vacation'],
     tagCounts: new Map([['vacation', 2]]),
     tagCoverPhotos: new Map(),
@@ -18,11 +18,14 @@ vi.mock('@state', () => ({
       tagGroups: [],
       tagGroupAssignments: new Map(),
       tagsPanelGridView: false
-    },
+    }
+  }),
+  useLibraryActions: () => ({
     setTagFilter: vi.fn(),
     renameTag: vi.fn(),
     deleteTag: mockDeleteTag
-  })
+  }),
+  useActiveDragKind: () => null
 }))
 
 import { TagPanel } from './TagPanel'

@@ -6,7 +6,7 @@ import { IconEye, IconPhoto } from '@tabler/icons-react'
 
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useSidebarLibrary } from '@state'
 
 const HOVER_DELAY_MS = 700
 const CARD_WIDTH = 220
@@ -87,7 +87,7 @@ export function TagHoverCardBody({
 
 // Shared by both components below — the four lookups TagHoverCardBody needs.
 function useTagHoverCardBodyProps(tag: string): Omit<TagHoverCardBodyProps, 'tag'> {
-  const { state, tagCounts, tagCoverPhotos, tagViewCounts } = usePhotoLibrary()
+  const { state, tagCounts, tagCoverPhotos, tagViewCounts } = useSidebarLibrary()
   return {
     description: state.tagDescriptions.get(tag),
     coverPhoto: tagCoverPhotos.get(tag),
@@ -144,7 +144,7 @@ export function TagHoverCardTarget({
   tag,
   target,
   disabled
-}: TagHoverCardTargetProps): ReactElement {
+}: TagHoverCardTargetProps): ReactElement | null {
   const bodyProps = useTagHoverCardBodyProps(tag)
   const [opened, setOpened] = useState(false)
 
@@ -173,10 +173,17 @@ export function TagHoverCardTarget({
     }
   }, [target, disabled])
 
+  // Mounted only while actually open — Tooltip drags in Popover/floating-ui
+  // machinery whose render cost is paid per instance even when closed, and
+  // this renders once per tag row (hundreds of them in a large library).
+  // Hover detection lives in the effect above, not in Tooltip, so nothing is
+  // lost by leaving it unmounted until then.
+  if (!opened || disabled) return null
+
   return (
     <Tooltip
       target={target}
-      opened={opened && !disabled}
+      opened
       position="right"
       withArrow
       multiline

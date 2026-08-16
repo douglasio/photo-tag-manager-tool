@@ -1,9 +1,7 @@
 import {
-  createContext,
   type ReactElement,
   type ReactNode,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useReducer,
@@ -35,6 +33,17 @@ import { basename, isPathUnderOrEqual, isPhotoInFolder, shuffle } from '@utils'
 import { type DisplayMetadata, toDisplayMetadata } from '@utils'
 
 import {
+  type LibraryActions,
+  PhotoLibraryActionsContext,
+  useLibraryActions
+} from './PhotoLibraryActionsContext'
+import {
+  type GalleryLibraryState,
+  PhotoLibraryGalleryContext,
+  type PhotoLibraryGalleryValue,
+  useGalleryLibrary
+} from './PhotoLibraryGalleryContext'
+import {
   type GallerySortBy,
   type GallerySortOrder,
   initialState,
@@ -42,6 +51,12 @@ import {
   photoLibraryReducer,
   type PhotoLibraryState
 } from './photoLibraryReducer'
+import {
+  PhotoLibrarySidebarContext,
+  type PhotoLibrarySidebarValue,
+  type SidebarLibraryState,
+  useSidebarLibrary
+} from './PhotoLibrarySidebarContext'
 
 // selectedPhoto is the only place metadata is ever rendered (DetailPanel), so
 // only it gets the labeled/display-formatted shape — transforming the whole
@@ -82,6 +97,31 @@ export type OpenTabEntry =
 
 function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+// Covers compared by filePath + thumbnailKey (not object reference, which
+// changes on every photo write regardless of relevance) — filePath catches a
+// genuine cover-selection change, thumbnailKey catches the cover's own image
+// changing (rotate/regenerate); a viewCount/comment-only write on the cover
+// photo correctly counts as "no change" here.
+function tagAggregatesEqual(
+  prevCounts: Map<string, number>,
+  prevCovers: Map<string, PhotoRecord>,
+  nextCounts: Map<string, number>,
+  nextCovers: Map<string, PhotoRecord>
+): boolean {
+  if (prevCounts.size !== nextCounts.size) return false
+  for (const [tag, count] of prevCounts) {
+    if (nextCounts.get(tag) !== count) return false
+  }
+  if (prevCovers.size !== nextCovers.size) return false
+  for (const [tag, photo] of prevCovers) {
+    const next = nextCovers.get(tag)
+    if (!next || next.filePath !== photo.filePath || next.thumbnailKey !== photo.thumbnailKey) {
+      return false
+    }
+  }
+  return true
 }
 
 // Groups the flat (photo, person) rows from getFacePhotoAssignments by
@@ -233,10 +273,18 @@ interface PhotoLibraryContextValue {
   consumeVisualization: (filePath: string) => PhotoVisualization | null
 }
 
-const PhotoLibraryContext = createContext<PhotoLibraryContextValue | null>(null)
-
 export function PhotoLibraryProvider({ children }: { children: ReactNode }): ReactElement {
   const [state, dispatch] = useReducer(photoLibraryReducer, initialState)
+  // Lets actions below read the latest state without closing over `state`
+  // itself — an action that closes over `state` gets a new identity on every
+  // dispatch anywhere, which (bundled together for the actions context, see
+  // PhotoLibraryActionsContext) would otherwise re-render every actions
+  // consumer on every unrelated state change, the same class of bug this
+  // whole context split is fixing.
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
   const scanIdRef = useRef<string | null>(null)
   const pendingWatchCountsRef = useRef({ added: 0, removed: 0 })
   const watchFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -526,24 +574,21 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [startScanFor])
 
-  const removeFolder = useCallback(
-    async (folder: string) => {
-      const count = state.folderCounts.get(folder) ?? 0
-      try {
-        await window.api.removeFolder(folder)
-        dispatch({ type: 'FOLDER_REMOVED', folder })
-        notifications.show({
-          color: 'red',
-          message: `Removed "${basename(folder)}" — ${count} photo${count === 1 ? '' : 's'} removed`
-        })
-      } catch (err) {
-        console.error(`failed to remove folder ${folder}`, err)
-        notifications.show({ color: 'red', message: 'Failed to remove folder' })
-        throw err
-      }
-    },
-    [state.folderCounts]
-  )
+  const removeFolder = useCallback(async (folder: string) => {
+    const count = stateRef.current.folderCounts.get(folder) ?? 0
+    try {
+      await window.api.removeFolder(folder)
+      dispatch({ type: 'FOLDER_REMOVED', folder })
+      notifications.show({
+        color: 'red',
+        message: `Removed "${basename(folder)}" — ${count} photo${count === 1 ? '' : 's'} removed`
+      })
+    } catch (err) {
+      console.error(`failed to remove folder ${folder}`, err)
+      notifications.show({ color: 'red', message: 'Failed to remove folder' })
+      throw err
+    }
+  }, [])
 
   const renameFolder = useCallback(async (folder: string, newBaseName: string) => {
     try {
@@ -572,8 +617,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   }, [])
 
   const rescanAll = useCallback(async () => {
-    await startScanForAll(state.folders)
-  }, [state.folders, startScanForAll])
+    await startScanForAll(stateRef.current.folders)
+  }, [startScanForAll])
 
   // A plain click always replaces the whole selection with just this photo —
   // both the DetailPanel-primary pointer and the multi-select batch.
@@ -582,16 +627,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_SELECTED_PATHS', paths: path ? [path] : [] })
   }, [])
 
-  const toggleSelectPhoto = useCallback(
-    (path: string) => {
-      const next = new Set(state.selectedPaths)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      dispatch({ type: 'SET_SELECTED_PATHS', paths: Array.from(next) })
-      dispatch({ type: 'SELECT_PHOTO', path })
-    },
-    [state.selectedPaths]
-  )
+  const toggleSelectPhoto = useCallback((path: string) => {
+    const next = new Set(stateRef.current.selectedPaths)
+    if (next.has(path)) next.delete(path)
+    else next.add(path)
+    dispatch({ type: 'SET_SELECTED_PATHS', paths: Array.from(next) })
+    dispatch({ type: 'SELECT_PHOTO', path })
+  }, [])
 
   const clearSelection = useCallback(() => {
     dispatch({ type: 'SET_SELECTED_PATHS', paths: [] })
@@ -620,8 +662,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   )
 
   const addTagsToSelection = useCallback(
-    (tags: string[]) => addTagsToPhotos(tags, Array.from(state.selectedPaths)),
-    [addTagsToPhotos, state.selectedPaths]
+    (tags: string[]) => addTagsToPhotos(tags, Array.from(stateRef.current.selectedPaths)),
+    [addTagsToPhotos]
   )
 
   // Mirrors addTagsToPhotos, but for removal — unlike deleteTag, scoped to
@@ -639,8 +681,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   }, [])
 
   const removeTagsFromSelection = useCallback(
-    (tags: string[]) => removeTagsFromPhotos(tags, Array.from(state.selectedPaths)),
-    [removeTagsFromPhotos, state.selectedPaths]
+    (tags: string[]) => removeTagsFromPhotos(tags, Array.from(stateRef.current.selectedPaths)),
+    [removeTagsFromPhotos]
   )
 
   // Drag-and-drop onto a folder row moves the dragged photo(s) into it. Mirrors
@@ -648,71 +690,71 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // same as a rename — same DB row, new full path) for each moved photo, plus
   // re-pointing selectedPath/selectedPaths from old to new paths since a move
   // (unlike a same-folder rename) can be triggered on a multi-selection.
-  const movePhotosToFolder = useCallback(
-    async (filePaths: string[], destFolder: string) => {
-      if (filePaths.length === 0) return
+  const movePhotosToFolder = useCallback(async (filePaths: string[], destFolder: string) => {
+    if (filePaths.length === 0) return
 
-      const notificationId = crypto.randomUUID()
-      notifications.show({
+    const notificationId = crypto.randomUUID()
+    notifications.show({
+      id: notificationId,
+      color: 'indigo',
+      autoClose: false,
+      withCloseButton: false,
+      message: <MoveProgressToast completed={0} total={filePaths.length} />
+    })
+    const unsubscribe = window.api.onMoveProgress((progress) => {
+      notifications.update({
         id: notificationId,
-        color: 'indigo',
-        autoClose: false,
-        withCloseButton: false,
-        message: <MoveProgressToast completed={0} total={filePaths.length} />
+        message: <MoveProgressToast completed={progress.completed} total={progress.total} />
       })
-      const unsubscribe = window.api.onMoveProgress((progress) => {
-        notifications.update({
-          id: notificationId,
-          message: <MoveProgressToast completed={progress.completed} total={progress.total} />
-        })
-      })
+    })
 
-      try {
-        const { moved, skipped } = await window.api.movePhotosToFolder(filePaths, destFolder)
-        const pathMap = new Map(moved.map(({ oldPath, photo }) => [oldPath, photo.filePath]))
+    try {
+      const { moved, skipped } = await window.api.movePhotosToFolder(filePaths, destFolder)
+      const pathMap = new Map(moved.map(({ oldPath, photo }) => [oldPath, photo.filePath]))
 
-        for (const { oldPath, photo } of moved) {
-          dispatch({ type: 'RENAME_PHOTO_TAB', oldPath, newPath: photo.filePath })
-          dispatch({ type: 'PHOTO_REMOVED', filePath: oldPath })
-          dispatch({ type: 'PHOTO_UPSERTED', photo })
-        }
-        if (state.selectedPath && pathMap.has(state.selectedPath)) {
-          dispatch({ type: 'SELECT_PHOTO', path: pathMap.get(state.selectedPath)! })
-        }
-        if (state.selectedPaths.size > 0 && moved.some(({ oldPath }) => pathMap.has(oldPath))) {
-          dispatch({
-            type: 'SET_SELECTED_PATHS',
-            paths: Array.from(state.selectedPaths, (path) => pathMap.get(path) ?? path)
-          })
-        }
-
-        notifications.update({
-          id: notificationId,
-          color: moved.length > 0 ? 'teal' : 'yellow',
-          autoClose: 4000,
-          withCloseButton: true,
-          message:
-            moved.length > 0
-              ? `Moved ${pluralize(moved.length, 'photo')} to "${basename(destFolder)}"${
-                  skipped > 0 ? ` (${pluralize(skipped, 'photo')} already there)` : ''
-                }`
-              : `${pluralize(skipped, 'photo')} already in "${basename(destFolder)}"`
-        })
-      } catch (err) {
-        console.error(`failed to move photos to ${destFolder}`, err)
-        notifications.update({
-          id: notificationId,
-          color: 'red',
-          autoClose: 4000,
-          withCloseButton: true,
-          message: 'Failed to move photos'
-        })
-      } finally {
-        unsubscribe()
+      for (const { oldPath, photo } of moved) {
+        dispatch({ type: 'RENAME_PHOTO_TAB', oldPath, newPath: photo.filePath })
+        dispatch({ type: 'PHOTO_REMOVED', filePath: oldPath })
+        dispatch({ type: 'PHOTO_UPSERTED', photo })
       }
-    },
-    [state.selectedPath, state.selectedPaths]
-  )
+      if (stateRef.current.selectedPath && pathMap.has(stateRef.current.selectedPath)) {
+        dispatch({ type: 'SELECT_PHOTO', path: pathMap.get(stateRef.current.selectedPath)! })
+      }
+      if (
+        stateRef.current.selectedPaths.size > 0 &&
+        moved.some(({ oldPath }) => pathMap.has(oldPath))
+      ) {
+        dispatch({
+          type: 'SET_SELECTED_PATHS',
+          paths: Array.from(stateRef.current.selectedPaths, (path) => pathMap.get(path) ?? path)
+        })
+      }
+
+      notifications.update({
+        id: notificationId,
+        color: moved.length > 0 ? 'teal' : 'yellow',
+        autoClose: 4000,
+        withCloseButton: true,
+        message:
+          moved.length > 0
+            ? `Moved ${pluralize(moved.length, 'photo')} to "${basename(destFolder)}"${
+                skipped > 0 ? ` (${pluralize(skipped, 'photo')} already there)` : ''
+              }`
+            : `${pluralize(skipped, 'photo')} already in "${basename(destFolder)}"`
+      })
+    } catch (err) {
+      console.error(`failed to move photos to ${destFolder}`, err)
+      notifications.update({
+        id: notificationId,
+        color: 'red',
+        autoClose: 4000,
+        withCloseButton: true,
+        message: 'Failed to move photos'
+      })
+    } finally {
+      unsubscribe()
+    }
+  }, [])
 
   // Moves each file to the OS trash (main process) then reuses PHOTO_REMOVED
   // for cleanup — same reducer case the watcher's own unlink detection
@@ -734,7 +776,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const updateTags = useCallback(
     async (filePath: string, tags: string[]) => {
-      const current = state.photosByPath.get(filePath)
+      const current = stateRef.current.photosByPath.get(filePath)
       if (current) dispatch({ type: 'PHOTO_UPSERTED', photo: { ...current, tags } })
 
       const newlyAdded = tags.filter((tag) => !current?.tags.includes(tag))
@@ -765,7 +807,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       tagWriteQueueRef.current.set(filePath, next)
       await next
     },
-    [state.photosByPath, loadTagGroupsData]
+    [loadTagGroupsData]
   )
 
   const setFolderFilter = useCallback((folder: string | null) => {
@@ -792,24 +834,21 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     dispatch({ type: 'SET_FOLDER_UNTAGGED_FILTER', active })
   }, [])
 
-  const setTagDescription = useCallback(
-    async (tag: string, description: string) => {
-      const previous = state.tagDescriptions.get(tag) ?? ''
-      dispatch({ type: 'TAG_DESCRIPTION_UPDATED', tag, description })
-      try {
-        await window.api.setTagDescription(tag, description)
-      } catch (err) {
-        console.error(`failed to save description for tag ${tag}`, err)
-        notifications.show({ color: 'red', message: 'Failed to save tag description' })
-        dispatch({ type: 'TAG_DESCRIPTION_UPDATED', tag, description: previous })
-      }
-    },
-    [state.tagDescriptions]
-  )
+  const setTagDescription = useCallback(async (tag: string, description: string) => {
+    const previous = stateRef.current.tagDescriptions.get(tag) ?? ''
+    dispatch({ type: 'TAG_DESCRIPTION_UPDATED', tag, description })
+    try {
+      await window.api.setTagDescription(tag, description)
+    } catch (err) {
+      console.error(`failed to save description for tag ${tag}`, err)
+      notifications.show({ color: 'red', message: 'Failed to save tag description' })
+      dispatch({ type: 'TAG_DESCRIPTION_UPDATED', tag, description: previous })
+    }
+  }, [])
 
   const renameTag = useCallback(
     async (oldTag: string, newTag: string) => {
-      const filePaths = Array.from(state.photosByPath.values())
+      const filePaths = Array.from(stateRef.current.photosByPath.values())
         .filter((photo) => photo.tags.includes(oldTag))
         .map((photo) => photo.filePath)
 
@@ -823,12 +862,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         throw err
       }
     },
-    [state.photosByPath, loadTagGroupsData]
+    [loadTagGroupsData]
   )
 
   const deleteTag = useCallback(
     async (tag: string) => {
-      const filePaths = Array.from(state.photosByPath.values())
+      const filePaths = Array.from(stateRef.current.photosByPath.values())
         .filter((photo) => photo.tags.includes(tag))
         .map((photo) => photo.filePath)
 
@@ -842,7 +881,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         throw err
       }
     },
-    [state.photosByPath, loadTagGroupsData]
+    [loadTagGroupsData]
   )
 
   // Group id/position are assigned server-side (createTagGroup), so this
@@ -896,29 +935,26 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setTagGroupAssignment(tag, groupId)
   }, [])
 
-  const renameFile = useCallback(
-    async (filePath: string, newBaseName: string) => {
-      try {
-        const photo = await window.api.renamePhoto(filePath, newBaseName)
-        const wasSelected = state.selectedPath === filePath
-        // Dispatched before PHOTO_REMOVED so a tab open on the old path is
-        // repointed to the new one, rather than PHOTO_REMOVED's own openTabs
-        // pruning treating the rename as if the file had just disappeared.
-        dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: filePath, newPath: photo.filePath })
-        dispatch({ type: 'PHOTO_REMOVED', filePath })
-        dispatch({ type: 'PHOTO_UPSERTED', photo })
-        if (wasSelected) dispatch({ type: 'SELECT_PHOTO', path: photo.filePath })
-      } catch (err) {
-        console.error(`failed to rename ${filePath}`, err)
-        notifications.show({
-          color: 'red',
-          message: err instanceof Error ? err.message : 'Failed to rename file'
-        })
-        throw err
-      }
-    },
-    [state.selectedPath]
-  )
+  const renameFile = useCallback(async (filePath: string, newBaseName: string) => {
+    try {
+      const photo = await window.api.renamePhoto(filePath, newBaseName)
+      const wasSelected = stateRef.current.selectedPath === filePath
+      // Dispatched before PHOTO_REMOVED so a tab open on the old path is
+      // repointed to the new one, rather than PHOTO_REMOVED's own openTabs
+      // pruning treating the rename as if the file had just disappeared.
+      dispatch({ type: 'RENAME_PHOTO_TAB', oldPath: filePath, newPath: photo.filePath })
+      dispatch({ type: 'PHOTO_REMOVED', filePath })
+      dispatch({ type: 'PHOTO_UPSERTED', photo })
+      if (wasSelected) dispatch({ type: 'SELECT_PHOTO', path: photo.filePath })
+    } catch (err) {
+      console.error(`failed to rename ${filePath}`, err)
+      notifications.show({
+        color: 'red',
+        message: err instanceof Error ? err.message : 'Failed to rename file'
+      })
+      throw err
+    }
+  }, [])
 
   const updateDateTaken = useCallback(async (filePath: string, isoDate: string) => {
     try {
@@ -1478,25 +1514,18 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // No rescan needed — unlike excludePatterns, this never touches
   // scanning/watching, so the persisted change alone is enough; every
   // consumer (tags, AI, dashboard) already re-derives from live state.
-  const excludeFolder = useCallback(
-    async (folder: string) => {
-      const folders = state.excludedFolders.includes(folder)
-        ? state.excludedFolders
-        : [...state.excludedFolders, folder]
-      dispatch({ type: 'SET_EXCLUDED_FOLDERS', folders })
-      await window.api.setExcludedFolders(folders)
-    },
-    [state.excludedFolders]
-  )
+  const excludeFolder = useCallback(async (folder: string) => {
+    const current = stateRef.current.excludedFolders
+    const folders = current.includes(folder) ? current : [...current, folder]
+    dispatch({ type: 'SET_EXCLUDED_FOLDERS', folders })
+    await window.api.setExcludedFolders(folders)
+  }, [])
 
-  const includeFolder = useCallback(
-    async (folder: string) => {
-      const folders = state.excludedFolders.filter((f) => f !== folder)
-      dispatch({ type: 'SET_EXCLUDED_FOLDERS', folders })
-      await window.api.setExcludedFolders(folders)
-    },
-    [state.excludedFolders]
-  )
+  const includeFolder = useCallback(async (folder: string) => {
+    const folders = stateRef.current.excludedFolders.filter((f) => f !== folder)
+    dispatch({ type: 'SET_EXCLUDED_FOLDERS', folders })
+    await window.api.setExcludedFolders(folders)
+  }, [])
 
   // True while the current folder view is scoped to (at or under) an
   // excluded folder — the one deliberate way to still browse its photos,
@@ -1546,6 +1575,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     state.excludedFolders,
     isViewingExcludedFolderDirectly
   ])
+  // Lets selectPhotoRange below read the latest visiblePhotos without
+  // closing over it directly — same stateRef reasoning as above.
+  const visiblePhotosRef = useRef(visiblePhotos)
+  useEffect(() => {
+    visiblePhotosRef.current = visiblePhotos
+  }, [visiblePhotos])
 
   // Shift+click range-select, anchored at the current selectedPath (the
   // last-engaged photo) through targetPath, within the currently visible
@@ -1553,25 +1588,22 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // anchor: selectedPath — and so the anchor for the *next* Shift+click —
   // moves to targetPath each time, rather than staying pinned to the first
   // click of the sequence.
-  const selectPhotoRange = useCallback(
-    (targetPath: string) => {
-      const anchorPath = state.selectedPath
-      if (!anchorPath) {
-        dispatch({ type: 'SET_SELECTED_PATHS', paths: [targetPath] })
-        dispatch({ type: 'SELECT_PHOTO', path: targetPath })
-        return
-      }
-      const ordered = visiblePhotos.map((photo) => photo.filePath)
-      const anchorIndex = ordered.indexOf(anchorPath)
-      const targetIndex = ordered.indexOf(targetPath)
-      if (anchorIndex === -1 || targetIndex === -1) return
-      const [start, end] =
-        anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex]
-      dispatch({ type: 'SET_SELECTED_PATHS', paths: ordered.slice(start, end + 1) })
+  const selectPhotoRange = useCallback((targetPath: string) => {
+    const anchorPath = stateRef.current.selectedPath
+    if (!anchorPath) {
+      dispatch({ type: 'SET_SELECTED_PATHS', paths: [targetPath] })
       dispatch({ type: 'SELECT_PHOTO', path: targetPath })
-    },
-    [state.selectedPath, visiblePhotos]
-  )
+      return
+    }
+    const ordered = visiblePhotosRef.current.map((photo) => photo.filePath)
+    const anchorIndex = ordered.indexOf(anchorPath)
+    const targetIndex = ordered.indexOf(targetPath)
+    if (anchorIndex === -1 || targetIndex === -1) return
+    const [start, end] =
+      anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex]
+    dispatch({ type: 'SET_SELECTED_PATHS', paths: ordered.slice(start, end + 1) })
+    dispatch({ type: 'SELECT_PHOTO', path: targetPath })
+  }, [])
 
   // While a photo-view tab is active, DetailPanel should track that tab's
   // photo (not the gallery's own selection cursor, which keeps whatever it
@@ -1602,15 +1634,27 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   // gallery's own sort order/direction — otherwise switching gallery sort
   // would make tag thumbnails jump around. Iterates activePhotosByPath
   // directly (not the sorted `photos`) since order doesn't matter here.
-  const { tagCounts, tagCoverPhotos, tagViewCounts } = useMemo(() => {
+  //
+  // Stabilized against its own previous output (see tagAggregatesEqual)
+  // rather than just publishing whatever activePhotosByPath produces: a
+  // passive write like a hover-driven view-count bump still gives
+  // activePhotosByPath a new identity (see PHOTO_UPSERTED), but never
+  // changes which tags exist or which photo is each tag's cover —
+  // recomputing here is cheap, but publishing a "changed" reference every
+  // time cascades into re-rendering every sidebar row that reads
+  // tagCounts/tagCoverPhotos, which is the actual cost we're avoiding.
+  // Uses state (committed in an effect), not a ref read during render,
+  // since the latter is an eslint-enforced anti-pattern here (react-hooks/
+  // refs) — React bails out of the setState below when the updater returns
+  // the same object back, so an unrelated write still costs one extra
+  // (otherwise-invisible) render, not a published reference change.
+  const rawTagAggregates = useMemo(() => {
     const counts = new Map<string, number>()
     const covers = new Map<string, PhotoRecord>()
-    const viewCounts = new Map<string, number>()
     for (const photo of activePhotosByPath.values()) {
       const photoTime = photo.metadata.dateTaken ? Date.parse(photo.metadata.dateTaken) : null
       for (const tag of photo.tags) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
-        viewCounts.set(tag, (viewCounts.get(tag) ?? 0) + photo.viewCount)
         const current = covers.get(tag)
         if (!current) {
           covers.set(tag, photo)
@@ -1631,7 +1675,40 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         if (photoWins) covers.set(tag, photo)
       }
     }
-    return { tagCounts: counts, tagCoverPhotos: covers, tagViewCounts: viewCounts }
+    return { tagCounts: counts, tagCoverPhotos: covers }
+  }, [activePhotosByPath])
+  // The React-docs-endorsed "adjust state during render" pattern (calling
+  // setState conditionally in the render body, not in an effect) — updates
+  // synchronously before this render commits, so a genuine change shows up
+  // immediately with no extra visible frame, while an irrelevant change
+  // (rawTagAggregates recomputed but content-equal) never calls setState at
+  // all, so tagAggregates — and everything downstream of it — keeps its
+  // existing reference.
+  const [tagAggregates, setTagAggregates] = useState(rawTagAggregates)
+  if (
+    !tagAggregatesEqual(
+      tagAggregates.tagCounts,
+      tagAggregates.tagCoverPhotos,
+      rawTagAggregates.tagCounts,
+      rawTagAggregates.tagCoverPhotos
+    )
+  ) {
+    setTagAggregates(rawTagAggregates)
+  }
+  const { tagCounts, tagCoverPhotos } = tagAggregates
+
+  // Split out from tagCounts/tagCoverPhotos above (rather than computed in
+  // the same pass) specifically because this one SHOULD get a new reference
+  // on every view-count change — bundling it with the stabilized pair would
+  // force them to publish a new reference too on every hover.
+  const tagViewCounts = useMemo(() => {
+    const viewCounts = new Map<string, number>()
+    for (const photo of activePhotosByPath.values()) {
+      for (const tag of photo.tags) {
+        viewCounts.set(tag, (viewCounts.get(tag) ?? 0) + photo.viewCount)
+      }
+    }
+    return viewCounts
   }, [activePhotosByPath])
 
   const untaggedCount = useMemo(() => {
@@ -1645,8 +1722,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const allTags = useMemo(() => Array.from(tagCounts.keys()).sort(), [tagCounts])
 
   // Tags found among photos in the currently selected folder (independent of
-  // any active tag filter), used to render the folder's tag pills.
-  const { folderTags, folderHasUntagged } = useMemo(() => {
+  // any active tag filter), used to render the folder's tag pills. Same
+  // stabilize-against-previous-output reasoning as tagCounts/tagCoverPhotos
+  // above — `photos` gets a new identity on every photo write.
+  const rawFolderTags = useMemo(() => {
     if (!state.selectedFolder) return { folderTags: [], folderHasUntagged: false }
     const tags = new Set<string>()
     let hasUntagged = false
@@ -1666,6 +1745,33 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
     return { folderTags: Array.from(tags).sort(), folderHasUntagged: hasUntagged }
   }, [photos, state.selectedFolder, state.excludedFolders, isViewingExcludedFolderDirectly])
+  // Same render-time adjustment pattern as tagAggregates above.
+  const [folderTagsState, setFolderTagsState] = useState(rawFolderTags)
+  const folderTagsUnchanged =
+    folderTagsState.folderHasUntagged === rawFolderTags.folderHasUntagged &&
+    folderTagsState.folderTags.length === rawFolderTags.folderTags.length &&
+    folderTagsState.folderTags.every((tag, index) => tag === rawFolderTags.folderTags[index])
+  if (!folderTagsUnchanged) {
+    setFolderTagsState(rawFolderTags)
+  }
+  const { folderTags, folderHasUntagged } = folderTagsState
+
+  // personId -> cover photo's thumbnailKey — computed here (mirrors
+  // tagCoverPhotos) so PersonRow can read it from PhotoLibrarySidebarContext
+  // instead of reaching into photosByPath directly, which would otherwise
+  // force it to subscribe to the high-churn Gallery-bucket state.
+  const personCoverPhotos = useMemo(() => {
+    const covers = new Map<string, string | null>()
+    for (const person of state.people) {
+      covers.set(
+        person.id,
+        person.coverPhotoPath
+          ? (activePhotosByPath.get(person.coverPhotoPath)?.thumbnailKey ?? null)
+          : null
+      )
+    }
+    return covers
+  }, [state.people, activePhotosByPath])
 
   // Resolved in openTabs order (not sorted) so tabs stay in the order they
   // were opened rather than jumping around as the user opens more.
@@ -1688,120 +1794,383 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [state.openTabs, state.compareTabs, state.photosByPath]
   )
 
-  const value: PhotoLibraryContextValue = {
-    state,
-    photos,
-    visiblePhotos,
-    activePhotosByPath,
-    selectedPhoto,
-    allTags,
-    tagCounts,
-    tagCoverPhotos,
-    tagViewCounts,
-    untaggedCount,
-    folderTags,
-    folderHasUntagged,
-    addFolder,
-    removeFolder,
-    renameFolder,
-    excludeFolder,
-    includeFolder,
-    cancelScan,
-    rescanAll,
-    selectPhoto,
-    toggleSelectPhoto,
-    selectPhotoRange,
-    clearSelection,
-    addTagsToSelection,
-    addTagsToPhotos,
-    removeTagsFromSelection,
-    removeTagsFromPhotos,
-    movePhotosToFolder,
-    deletePhotos,
-    setFolderFilter,
-    setTagFilter,
-    setFolderTagFilter,
-    setPersonFilter,
-    setUntaggedFilter,
-    setFolderUntaggedFilter,
-    setSort,
-    setDefaultView,
-    setShowEmptyFolders,
-    setTagsPanelGridView,
-    setPeoplePanelGridView,
-    setGalleryViewMode,
-    setAiTagSuggestionsEnabled,
-    suggestTags,
-    findSimilarPhotos,
-    dismissDuplicateGroup,
-    openDuplicatesTab,
-    getThrowbackSimilarity,
-    getThrowbackYearSample,
-    getThrowbackPreview,
-    enableAiFeatures,
-    rescanAiFeatures,
-    cancelAiScan,
-    setFaceDetectionEnabled,
-    enableFaceDetection,
-    rescanFaces,
-    cancelFaceScan,
-    getFacesForPhoto,
-    refreshPeople,
-    renamePerson,
-    assignFaceToPerson,
-    splitFaceAsNewPerson,
-    unassignFace,
-    mergePeople,
-    deletePerson,
-    setPersonDescription,
-    hidePerson,
-    unhidePerson,
-    getHiddenPeople,
-    setNavbarSplitSizes,
-    setNavbarCollapsedPanels,
-    setSettingsModalOpened,
-    setDetailsPanelCollapsed,
-    setGalleryAnimationsEnabled,
-    setShowFilenames,
-    setShowViewCounts,
-    setMagazineTitle,
-    setNewspaperTitle,
-    setDvdStudioName,
-    setArtGalleryName,
-    setExcludePatterns,
-    updateTags,
-    setTagDescription,
-    renameTag,
-    deleteTag,
-    createTagGroup,
-    renameTagGroup,
-    updateTagGroupPattern,
-    deleteTagGroup,
-    assignTagToGroup,
-    renameFile,
-    updateDateTaken,
-    updateComment,
-    rotatePhoto,
-    incrementViewCount,
-    openTabEntries,
-    openPhotoTab,
-    openCompareTab,
-    removeFromCompareTab,
-    closePhotoTab,
-    closeAllTabs,
-    setActiveTab,
-    reorderPhotoTabs,
-    navigateToPhoto,
-    consumeNavDirection,
-    consumeVisualization
-  }
+  // All actions are permanently-stable useCallbacks (see stateRef/
+  // visiblePhotosRef above), so this bag's identity never changes across
+  // renders — consuming it alone never causes a re-render.
+  const actions: LibraryActions = useMemo(
+    () => ({
+      addFolder,
+      removeFolder,
+      renameFolder,
+      excludeFolder,
+      includeFolder,
+      cancelScan,
+      rescanAll,
+      selectPhoto,
+      toggleSelectPhoto,
+      selectPhotoRange,
+      clearSelection,
+      addTagsToSelection,
+      addTagsToPhotos,
+      removeTagsFromSelection,
+      removeTagsFromPhotos,
+      movePhotosToFolder,
+      deletePhotos,
+      setFolderFilter,
+      setTagFilter,
+      setFolderTagFilter,
+      setPersonFilter,
+      setUntaggedFilter,
+      setFolderUntaggedFilter,
+      setSort,
+      setDefaultView,
+      setShowEmptyFolders,
+      setTagsPanelGridView,
+      setPeoplePanelGridView,
+      setGalleryViewMode,
+      setAiTagSuggestionsEnabled,
+      suggestTags,
+      findSimilarPhotos,
+      dismissDuplicateGroup,
+      openDuplicatesTab,
+      getThrowbackSimilarity,
+      getThrowbackYearSample,
+      getThrowbackPreview,
+      enableAiFeatures,
+      rescanAiFeatures,
+      cancelAiScan,
+      setFaceDetectionEnabled,
+      enableFaceDetection,
+      rescanFaces,
+      cancelFaceScan,
+      getFacesForPhoto,
+      refreshPeople,
+      renamePerson,
+      assignFaceToPerson,
+      splitFaceAsNewPerson,
+      unassignFace,
+      mergePeople,
+      deletePerson,
+      setPersonDescription,
+      hidePerson,
+      unhidePerson,
+      getHiddenPeople,
+      setNavbarSplitSizes,
+      setNavbarCollapsedPanels,
+      setSettingsModalOpened,
+      setDetailsPanelCollapsed,
+      setGalleryAnimationsEnabled,
+      setShowFilenames,
+      setShowViewCounts,
+      setMagazineTitle,
+      setNewspaperTitle,
+      setDvdStudioName,
+      setArtGalleryName,
+      setExcludePatterns,
+      updateTags,
+      setTagDescription,
+      renameTag,
+      deleteTag,
+      createTagGroup,
+      renameTagGroup,
+      updateTagGroupPattern,
+      deleteTagGroup,
+      assignTagToGroup,
+      renameFile,
+      updateDateTaken,
+      updateComment,
+      rotatePhoto,
+      incrementViewCount,
+      openPhotoTab,
+      openCompareTab,
+      removeFromCompareTab,
+      closePhotoTab,
+      closeAllTabs,
+      setActiveTab,
+      reorderPhotoTabs,
+      navigateToPhoto,
+      consumeNavDirection,
+      consumeVisualization
+    }),
+    [
+      addFolder,
+      removeFolder,
+      renameFolder,
+      excludeFolder,
+      includeFolder,
+      cancelScan,
+      rescanAll,
+      selectPhoto,
+      toggleSelectPhoto,
+      selectPhotoRange,
+      clearSelection,
+      addTagsToSelection,
+      addTagsToPhotos,
+      removeTagsFromSelection,
+      removeTagsFromPhotos,
+      movePhotosToFolder,
+      deletePhotos,
+      setFolderFilter,
+      setTagFilter,
+      setFolderTagFilter,
+      setPersonFilter,
+      setUntaggedFilter,
+      setFolderUntaggedFilter,
+      setSort,
+      setDefaultView,
+      setShowEmptyFolders,
+      setTagsPanelGridView,
+      setPeoplePanelGridView,
+      setGalleryViewMode,
+      setAiTagSuggestionsEnabled,
+      suggestTags,
+      findSimilarPhotos,
+      dismissDuplicateGroup,
+      openDuplicatesTab,
+      getThrowbackSimilarity,
+      getThrowbackYearSample,
+      getThrowbackPreview,
+      enableAiFeatures,
+      rescanAiFeatures,
+      cancelAiScan,
+      setFaceDetectionEnabled,
+      enableFaceDetection,
+      rescanFaces,
+      cancelFaceScan,
+      getFacesForPhoto,
+      refreshPeople,
+      renamePerson,
+      assignFaceToPerson,
+      splitFaceAsNewPerson,
+      unassignFace,
+      mergePeople,
+      deletePerson,
+      setPersonDescription,
+      hidePerson,
+      unhidePerson,
+      getHiddenPeople,
+      setNavbarSplitSizes,
+      setNavbarCollapsedPanels,
+      setSettingsModalOpened,
+      setDetailsPanelCollapsed,
+      setGalleryAnimationsEnabled,
+      setShowFilenames,
+      setShowViewCounts,
+      setMagazineTitle,
+      setNewspaperTitle,
+      setDvdStudioName,
+      setArtGalleryName,
+      setExcludePatterns,
+      updateTags,
+      setTagDescription,
+      renameTag,
+      deleteTag,
+      createTagGroup,
+      renameTagGroup,
+      updateTagGroupPattern,
+      deleteTagGroup,
+      assignTagToGroup,
+      renameFile,
+      updateDateTaken,
+      updateComment,
+      rotatePhoto,
+      incrementViewCount,
+      openPhotoTab,
+      openCompareTab,
+      removeFromCompareTab,
+      closePhotoTab,
+      closeAllTabs,
+      setActiveTab,
+      reorderPhotoTabs,
+      navigateToPhoto,
+      consumeNavDirection,
+      consumeVisualization
+    ]
+  )
 
-  return <PhotoLibraryContext.Provider value={value}>{children}</PhotoLibraryContext.Provider>
+  const sidebarState: SidebarLibraryState = useMemo(
+    () => ({
+      folders: state.folders,
+      folderCounts: state.folderCounts,
+      folderChildren: state.folderChildren,
+      allFolderPaths: state.allFolderPaths,
+      excludedFolders: state.excludedFolders,
+      showEmptyFolders: state.showEmptyFolders,
+      selectedFolder: state.selectedFolder,
+      selectedTag: state.selectedTag,
+      selectedPerson: state.selectedPerson,
+      untaggedFilterActive: state.untaggedFilterActive,
+      people: state.people,
+      personPhotoAssignments: state.personPhotoAssignments,
+      faceDetectionEnabled: state.faceDetectionEnabled,
+      peoplePanelGridView: state.peoplePanelGridView,
+      tagsPanelGridView: state.tagsPanelGridView,
+      tagGroups: state.tagGroups,
+      tagGroupAssignments: state.tagGroupAssignments,
+      tagDescriptions: state.tagDescriptions,
+      recentTags: state.recentTags,
+      navbarSplitSizes: state.navbarSplitSizes,
+      navbarCollapsedPanels: state.navbarCollapsedPanels
+    }),
+    [
+      state.folders,
+      state.folderCounts,
+      state.folderChildren,
+      state.allFolderPaths,
+      state.excludedFolders,
+      state.showEmptyFolders,
+      state.selectedFolder,
+      state.selectedTag,
+      state.selectedPerson,
+      state.untaggedFilterActive,
+      state.people,
+      state.personPhotoAssignments,
+      state.faceDetectionEnabled,
+      state.peoplePanelGridView,
+      state.tagsPanelGridView,
+      state.tagGroups,
+      state.tagGroupAssignments,
+      state.tagDescriptions,
+      state.recentTags,
+      state.navbarSplitSizes,
+      state.navbarCollapsedPanels
+    ]
+  )
+  const sidebarValue: PhotoLibrarySidebarValue = useMemo(
+    () => ({
+      state: sidebarState,
+      allTags,
+      tagCounts,
+      tagCoverPhotos,
+      tagViewCounts,
+      untaggedCount,
+      folderTags,
+      folderHasUntagged,
+      personCoverPhotos
+    }),
+    [
+      sidebarState,
+      allTags,
+      tagCounts,
+      tagCoverPhotos,
+      tagViewCounts,
+      untaggedCount,
+      folderTags,
+      folderHasUntagged,
+      personCoverPhotos
+    ]
+  )
+
+  const galleryState: GalleryLibraryState = useMemo(
+    () => ({
+      photosByPath: state.photosByPath,
+      selectedPath: state.selectedPath,
+      selectedPaths: state.selectedPaths,
+      status: state.status,
+      initialLoadComplete: state.initialLoadComplete,
+      filesFound: state.filesFound,
+      cacheHits: state.cacheHits,
+      errors: state.errors,
+      scanId: state.scanId,
+      sortBy: state.sortBy,
+      sortOrder: state.sortOrder,
+      galleryViewMode: state.galleryViewMode,
+      galleryAnimationsEnabled: state.galleryAnimationsEnabled,
+      showFilenames: state.showFilenames,
+      showViewCounts: state.showViewCounts,
+      defaultView: state.defaultView,
+      aiTagSuggestionsEnabled: state.aiTagSuggestionsEnabled,
+      aiScanProgress: state.aiScanProgress,
+      faceScanProgress: state.faceScanProgress,
+      settingsModalOpened: state.settingsModalOpened,
+      detailsPanelCollapsed: state.detailsPanelCollapsed,
+      magazineTitle: state.magazineTitle,
+      newspaperTitle: state.newspaperTitle,
+      dvdStudioName: state.dvdStudioName,
+      artGalleryName: state.artGalleryName,
+      excludePatterns: state.excludePatterns,
+      openTabs: state.openTabs,
+      activeTab: state.activeTab,
+      compareTabs: state.compareTabs
+    }),
+    [
+      state.photosByPath,
+      state.selectedPath,
+      state.selectedPaths,
+      state.status,
+      state.initialLoadComplete,
+      state.filesFound,
+      state.cacheHits,
+      state.errors,
+      state.scanId,
+      state.sortBy,
+      state.sortOrder,
+      state.galleryViewMode,
+      state.galleryAnimationsEnabled,
+      state.showFilenames,
+      state.showViewCounts,
+      state.defaultView,
+      state.aiTagSuggestionsEnabled,
+      state.aiScanProgress,
+      state.faceScanProgress,
+      state.settingsModalOpened,
+      state.detailsPanelCollapsed,
+      state.magazineTitle,
+      state.newspaperTitle,
+      state.dvdStudioName,
+      state.artGalleryName,
+      state.excludePatterns,
+      state.openTabs,
+      state.activeTab,
+      state.compareTabs
+    ]
+  )
+  const galleryValue: PhotoLibraryGalleryValue = useMemo(
+    () => ({
+      state: galleryState,
+      photos,
+      visiblePhotos,
+      activePhotosByPath,
+      selectedPhoto,
+      openTabEntries
+    }),
+    [galleryState, photos, visiblePhotos, activePhotosByPath, selectedPhoto, openTabEntries]
+  )
+
+  return (
+    <PhotoLibraryActionsContext.Provider value={actions}>
+      <PhotoLibrarySidebarContext.Provider value={sidebarValue}>
+        <PhotoLibraryGalleryContext.Provider value={galleryValue}>
+          {children}
+        </PhotoLibraryGalleryContext.Provider>
+      </PhotoLibrarySidebarContext.Provider>
+    </PhotoLibraryActionsContext.Provider>
+  )
 }
 
+// Back-compat composition of the 3 narrower hooks above, kept so every
+// existing consumer keeps compiling/behaving identically while being
+// migrated one area at a time — see docs/CLAUDE.md-adjacent plan notes.
+// Delete once no production file imports this anymore.
 // eslint-disable-next-line react-refresh/only-export-components -- context + hook are colocated by design
 export function usePhotoLibrary(): PhotoLibraryContextValue {
-  const ctx = useContext(PhotoLibraryContext)
-  if (!ctx) throw new Error('usePhotoLibrary must be used within a PhotoLibraryProvider')
-  return ctx
+  const actions = useLibraryActions()
+  const sidebar = useSidebarLibrary()
+  const gallery = useGalleryLibrary()
+  return {
+    ...actions,
+    state: { ...sidebar.state, ...gallery.state } as PhotoLibraryState,
+    photos: gallery.photos,
+    visiblePhotos: gallery.visiblePhotos,
+    activePhotosByPath: gallery.activePhotosByPath,
+    selectedPhoto: gallery.selectedPhoto,
+    openTabEntries: gallery.openTabEntries,
+    allTags: sidebar.allTags,
+    tagCounts: sidebar.tagCounts,
+    tagCoverPhotos: sidebar.tagCoverPhotos,
+    tagViewCounts: sidebar.tagViewCounts,
+    untaggedCount: sidebar.untaggedCount,
+    folderTags: sidebar.folderTags,
+    folderHasUntagged: sidebar.folderHasUntagged
+  }
 }

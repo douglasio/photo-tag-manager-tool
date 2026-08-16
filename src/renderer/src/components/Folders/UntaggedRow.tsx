@@ -2,7 +2,7 @@ import { Badge, Box, Button, Text } from '@mantine/core'
 import { useHover } from '@mantine/hooks'
 import type { ReactElement } from 'react'
 
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions, useSidebarLibrary } from '@state'
 import { activeHoverBackground } from '@utils'
 
 /** Top-level navbar item directly under AllPhotosRow, selecting every
@@ -10,7 +10,8 @@ import { activeHoverBackground } from '@utils'
  * rather than inside the Tags panel, so it reads as a library-wide filter
  * rather than a pseudo-tag buried among the real ones. */
 export function UntaggedRow(): ReactElement | null {
-  const { untaggedCount, state, setUntaggedFilter } = usePhotoLibrary()
+  const { untaggedCount, state } = useSidebarLibrary()
+  const { setUntaggedFilter } = useLibraryActions()
   const { hovered, ref } = useHover<HTMLButtonElement>()
 
   if (untaggedCount === 0) return null

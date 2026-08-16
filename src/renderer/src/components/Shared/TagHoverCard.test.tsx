@@ -36,7 +36,7 @@ let mockTagCoverPhotos: Map<
 let mockTagViewCounts: Map<string, number>
 
 vi.mock('@state', () => ({
-  usePhotoLibrary: () => ({
+  useSidebarLibrary: () => ({
     state: { tagDescriptions: mockTagDescriptions },
     tagCounts: mockTagCounts,
     tagCoverPhotos: mockTagCoverPhotos,

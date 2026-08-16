@@ -1,4 +1,4 @@
-import { type ReactElement, useRef, useState } from 'react'
+import { memo, type ReactElement, useCallback, useRef, useState } from 'react'
 
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
@@ -19,7 +19,7 @@ import { IconPencil } from '@tabler/icons-react'
 import { PanelSection } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PersonRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions, useSidebarLibrary } from '@state'
 import { activeHoverBackground } from '@utils'
 
 import { PeopleSettingsMenu } from './PeopleSettingsMenu'
@@ -33,13 +33,26 @@ const COVER_SIZE = 32
 interface PersonRowProps {
   person: PersonRecord
   editing: boolean
-  onStartEdit: () => void
+  isActive: boolean
+  coverThumbnailKey: string | null | undefined
+  onStartEdit: (personId: string) => void
   onStopEdit: () => void
 }
 
-function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps): ReactElement {
-  const { state, renamePerson, hidePerson, deletePerson, setPersonFilter } = usePhotoLibrary()
-  const isActive = state.selectedPerson === person.id
+// No usePhotoLibrary()/sidebar-state subscription of its own beyond the
+// permanently-stable actions bag — isActive/coverThumbnailKey come from the
+// parent (PeoplePanel), and onStartEdit/onStopEdit are passed through
+// unbound, so this row's props stay reference-stable across an unrelated
+// re-render, letting React.memo below bail out. Mirrors FolderTree's TreeRow.
+const PersonRow = memo(function PersonRow({
+  person,
+  editing,
+  isActive,
+  coverThumbnailKey,
+  onStartEdit,
+  onStopEdit
+}: PersonRowProps): ReactElement {
+  const { renamePerson, hidePerson, deletePerson, setPersonFilter } = useLibraryActions()
   const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
   // Drop target for a face dragged from DetailPanelFaces (assign) or another
   // person row dragged from below (merge) — see handleDragEnd's
@@ -70,9 +83,6 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
   const ref = useMergedRef(hoverRef, setDropRef, setDragRef, buttonRef)
 
   const displayName = person.name ?? 'Unnamed person'
-  const coverThumbnailKey = person.coverPhotoPath
-    ? state.photosByPath.get(person.coverPhotoPath)?.thumbnailKey
-    : null
 
   // Inline rename, matching TagListItem's edit style (no confirm dialog —
   // unlike a tag rename, this never touches photo files, just a DB row).
@@ -136,7 +146,7 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
   return (
     <>
       <PersonContextMenu
-        onRename={onStartEdit}
+        onRename={() => onStartEdit(person.id)}
         onHide={() => setConfirmingHide(true)}
         onDelete={() => setConfirmingDelete(true)}
       >
@@ -196,7 +206,7 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
                     style={{ flexShrink: 0 }}
                     onClick={(event) => {
                       event.stopPropagation()
-                      onStartEdit()
+                      onStartEdit(person.id)
                     }}
                     aria-label={`Rename ${displayName}`}
                   >
@@ -253,23 +263,30 @@ function PersonRow({ person, editing, onStartEdit, onStopEdit }: PersonRowProps)
           multiline
         />
       )}
-      <PersonHideDialog
-        name={displayName}
-        opened={confirmingHide}
-        saving={saving}
-        onConfirm={() => void handleHide()}
-        onCancel={() => setConfirmingHide(false)}
-      />
-      <PersonDeleteDialog
-        name={displayName}
-        opened={confirmingDelete}
-        saving={saving}
-        onConfirm={() => void handleDelete()}
-        onCancel={() => setConfirmingDelete(false)}
-      />
+      {/* Mounted only while open — a Mantine Modal renders its whole
+          ModalBase/Transition/overlay tree even when closed, and this is one
+          row of many (same fix as TagPanel's TagListItem dialogs). */}
+      {confirmingHide && (
+        <PersonHideDialog
+          name={displayName}
+          opened
+          saving={saving}
+          onConfirm={() => void handleHide()}
+          onCancel={() => setConfirmingHide(false)}
+        />
+      )}
+      {confirmingDelete && (
+        <PersonDeleteDialog
+          name={displayName}
+          opened
+          saving={saving}
+          onConfirm={() => void handleDelete()}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </>
   )
-}
+})
 
 // Mirrors TagPanel's shape (PanelSection + list of rows), but people aren't
 // nested in groups the way tags are — a flat list, since merging one person
@@ -280,9 +297,17 @@ interface PeoplePanelProps {
   onToggleCollapse?: () => void
 }
 
-export function PeoplePanel({ collapsed, onToggleCollapse }: PeoplePanelProps = {}): ReactElement {
-  const { state, setPersonFilter } = usePhotoLibrary()
+// Memoized so a re-render of its parent (e.g. NavbarSplitter during a
+// Splitter drag) doesn't force this whole panel to re-render when its own
+// props (collapsed/onToggleCollapse) haven't changed.
+export const PeoplePanel = memo(function PeoplePanel({
+  collapsed,
+  onToggleCollapse
+}: PeoplePanelProps = {}): ReactElement {
+  const { state, personCoverPhotos } = useSidebarLibrary()
+  const { setPersonFilter } = useLibraryActions()
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null)
+  const handleStopEdit = useCallback(() => setEditingPersonId(null), [])
 
   if (state.people.length === 0) {
     return (
@@ -310,11 +335,7 @@ export function PeoplePanel({ collapsed, onToggleCollapse }: PeoplePanelProps = 
                 key={person.id}
                 name={person.name ?? 'Unnamed person'}
                 faceCount={person.faceCount}
-                coverThumbnailKey={
-                  person.coverPhotoPath
-                    ? state.photosByPath.get(person.coverPhotoPath)?.thumbnailKey
-                    : null
-                }
+                coverThumbnailKey={personCoverPhotos.get(person.id)}
                 isActive={isActive}
                 onSelect={() => setPersonFilter(isActive ? null : person.id)}
               />
@@ -328,12 +349,14 @@ export function PeoplePanel({ collapsed, onToggleCollapse }: PeoplePanelProps = 
               key={person.id}
               person={person}
               editing={editingPersonId === person.id}
-              onStartEdit={() => setEditingPersonId(person.id)}
-              onStopEdit={() => setEditingPersonId(null)}
+              isActive={state.selectedPerson === person.id}
+              coverThumbnailKey={personCoverPhotos.get(person.id)}
+              onStartEdit={setEditingPersonId}
+              onStopEdit={handleStopEdit}
             />
           ))}
         </Stack>
       )}
     </PanelSection>
   )
-}
+})

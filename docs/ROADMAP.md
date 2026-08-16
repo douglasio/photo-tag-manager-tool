@@ -75,7 +75,15 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 6. Full-tab views for each left panel section?
 
-7. The gallery sidebar is overall rather laggy -- resizing the panels, expanding/collapsing folders, selecting items, dragging and dropping. Can you investigate and see if there's a way to get this experience to be smoother?
+7. ~~The gallery sidebar is overall rather laggy -- resizing the panels, expanding/collapsing folders, selecting items, dragging and dropping. Can you investigate and see if there's a way to get this experience to be smoother?~~ Fixed. Measured via DevTools traces of the **production** build (dev-mode traces are useless here — React 19 DEV calls `console.createTask` per element for Owner Stacks, which with StrictMode's double-render drowned out all real signal at ~28% of samples). Per-pointermove input cost went 22.4ms → 4.22ms (60fps budget is 16.67ms) and GC 4.85s → 1.8s across four fixes, in descending order of impact:
+   - **Closed dialogs were mounted per row.** Every `TagListItem` unconditionally rendered two Mantine `Modal`s (rename + delete) plus a `Tooltip`; a `Modal` with `opened={false}` still renders its whole `ModalBase`/`Transition`/overlay tree. With hundreds of tags that was ~1000 floating-UI subtrees re-rendering per pass (`_Box` alone was 1221ms). Now mounted only while open — also applied to `TagGroupSection`, `PersonRow`, `FolderRemoveButton`, `PhotoContextMenu`.
+   - **`useDndContext()` in per-row components.** dnd-kit's `publicContext` memo lists `collisions` as a dependency, which is recomputed on _every pointermove_, so all ~300 rows re-rendered continuously mid-drag. Rows now read `ActiveDragContext` (a plain `string | null` derived from `App.tsx`'s existing `activeDrag` state) instead, changing twice per drag rather than ~100 times.
+   - **Heavy row subtree coupled to dnd-kit's `InternalContext`** (whose memo depends on `over`, i.e. the hovered drop target — this was the "clunky when you reach the target" symptom). `TagListItem` is now a thin dnd-wiring shell around a memoized `TagListItemView`; `attributes`/`listeners`/`setNodeRef` are stable in dnd-kit's own source, so only the 1-2 rows whose `isOver`/`isDragging` actually changed re-render.
+   - **`activeDrag` lives in `AppLayout`**, so drag start/end re-rendered the entire app tree. `GalleryGrid`/`DashboardView`/`DetailPanel` take no props and are now `memo`'d so they bail out.
+
+   Also landed alongside (real but smaller): the Splitter now commits to the reducer/IPC on release instead of ~60x/sec during a drag, and `PhotoLibraryContext` was split into `PhotoLibraryActionsContext`/`PhotoLibrarySidebarContext`/`PhotoLibraryGalleryContext` with the sidebar migrated onto the narrow hooks. Note the context split was _not_ what fixed the reported lag — app-code render time measured 0.02% of the profile — but it's sound architecture and removes the "any dispatch re-renders all 53 consumers" ceiling. Gallery/Dashboard/DetailPanel/Settings still use the fully-compatible `usePhotoLibrary()` shim.
+
+   **Known remaining cost:** two ~550ms stalls at drag start and at drop, dominated by dnd-kit's `DroppableContainersMap` iterating every registered droppable (~300 tag rows). The fix is virtualizing the tag list (`react-window` is already a dependency and `GalleryGrid` uses it) so only ~25 rows mount at a time. See Optimization below.
 
 8. Make the left sidebar wider by default.
 
@@ -139,6 +147,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Optimization
 
+1. Virtualize the Tags panel list (and People panel, same shape). Follow-up from Gallery View #7: with hundreds of tags, every row mounts a `useDroppable`/`useDraggable` registration, so dnd-kit's `DroppableContainersMap` iterating all of them costs ~550ms at drag start and again at drop. Severity scales with tag count — a library with a few dozen tags likely won't notice this at all, so it's worth confirming it's still felt before investing in the redesign below. `react-window` is already a dependency and `GalleryGrid` uses its `Grid`. Complication worth planning around: the panel renders inside a Mantine `Accordion` when tag groups exist, so a naive per-panel virtualizer doesn't fit — likely wants a single flat virtualized list of (group header | tag) rows instead.
+
+2. Profile the production build, never dev, for any renderer perf work. React 19 DEV calls `console.createTask` for every element (Owner Stacks) and StrictMode double-renders everything; in a dev trace that machinery was ~28% of samples and app code measured 0.02%, which is actively misleading. `npm run build && npm run preview`.
+
 ## Video
 
 See VIDEO_PLAN.md
@@ -154,3 +166,5 @@ See VIDEO_PLAN.md
 4. Centralize the repeated `photo.thumbnailStatus === 'ready' && photo.thumbnailKey` check (inline in ~13 places across Dashboard widgets, Gallery, and Tags) into a shared `isPhotoDisplayable(photo)`-style helper.
 
 5. Dashboard widgets each call `useKeyHeld(PREVIEW_TRIGGER_KEY)` independently (6 separate window keydown/keyup listener pairs for the same key). Fold `previewTriggerHeld` into the shared `DashboardPreviewZoomContext` (already built for per-widget preview zoom) so it's one listener instead of six.
+
+6. Take a full pass to reduce comments to 1-2 lines

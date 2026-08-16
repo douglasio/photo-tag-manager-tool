@@ -27,6 +27,14 @@ vi.mock('@state', () => ({
     tagCoverPhotos: new Map(),
     tagViewCounts: new Map()
   }),
+  // TagHoverCardTarget (rendered inside the tag chips here) reads this
+  // context directly rather than through usePhotoLibrary.
+  useSidebarLibrary: () => ({
+    state: { tagDescriptions: new Map() },
+    tagCounts: new Map(),
+    tagCoverPhotos: new Map(),
+    tagViewCounts: new Map()
+  }),
   MIN_COMPARE_PHOTOS: 2,
   MAX_COMPARE_PHOTOS: 4
 }))

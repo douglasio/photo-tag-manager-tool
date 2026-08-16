@@ -3,12 +3,13 @@ import { type ReactElement, useState } from 'react'
 import { ActionIcon, Tooltip } from '@mantine/core'
 import { IconPlus } from '@tabler/icons-react'
 
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions, useSidebarLibrary } from '@state'
 
 import { TagGroupNameDialog } from './TagGroupNameDialog'
 
 export function TagGroupCreateButton(): ReactElement {
-  const { state, createTagGroup } = usePhotoLibrary()
+  const { state } = useSidebarLibrary()
+  const { createTagGroup } = useLibraryActions()
   const [opened, setOpened] = useState(false)
   const [saving, setSaving] = useState(false)
 

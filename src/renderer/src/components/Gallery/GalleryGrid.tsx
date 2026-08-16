@@ -1,4 +1,5 @@
 import {
+  memo,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
   useCallback,
@@ -56,7 +57,10 @@ import { type GalleryCellProps, GalleryPhotoCell } from './GalleryPhotoCell'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
 
-export function GalleryGrid(): ReactElement {
+// Memoized: takes no props, so it bails out when AppLayout re-renders
+// (e.g. a drag starting/ending flips its activeDrag state) and only
+// re-renders when its own context subscriptions actually change.
+export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
   const {
     addFolder,
     visiblePhotos: photos,
@@ -471,4 +475,4 @@ export function GalleryGrid(): ReactElement {
       )}
     </Flex>
   )
-}
+})

@@ -2,7 +2,7 @@ import { Menu } from '@mantine/core'
 import { IconEdit, IconEyeOff, IconEyeUp, IconFolderOpen } from '@tabler/icons-react'
 import type { ReactElement, ReactNode } from 'react'
 
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions, useSidebarLibrary } from '@state'
 import { isMac, isPathUnderOrEqual } from '@utils'
 
 interface FolderContextMenuProps {
@@ -16,7 +16,8 @@ export function FolderContextMenu({
   onRename,
   children
 }: FolderContextMenuProps): ReactElement {
-  const { state, excludeFolder, includeFolder } = usePhotoLibrary()
+  const { state } = useSidebarLibrary()
+  const { excludeFolder, includeFolder } = useLibraryActions()
   const isExcluded = state.excludedFolders.some((folder) => isPathUnderOrEqual(folderPath, folder))
 
   return (

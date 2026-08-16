@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 
 import {
   closestCenter,
@@ -71,7 +71,11 @@ import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
-import { PhotoLibraryProvider, usePhotoLibrary } from './state/PhotoLibraryContext'
+import { ActiveDragContext } from './state/ActiveDragContext'
+import { useLibraryActions } from './state/PhotoLibraryActionsContext'
+import { PhotoLibraryProvider } from './state/PhotoLibraryContext'
+import { useGalleryLibrary } from './state/PhotoLibraryGalleryContext'
+import { useSidebarLibrary } from './state/PhotoLibrarySidebarContext'
 
 // True while focus is inside anything the "g" shortcut below shouldn't
 // hijack a keystroke from (text/date inputs, contenteditable, etc.).
@@ -227,34 +231,18 @@ function PersonDragPreview({ name }: { name: string | null }): React.JSX.Element
   )
 }
 
-// Split out from App so it can call usePhotoLibrary — a component can't read
-// a context it also renders the Provider for in the same function.
-function AppLayout(): React.JSX.Element {
-  const {
-    state,
-    openTabEntries,
-    closePhotoTab,
-    closeAllTabs,
-    setActiveTab,
-    addTagsToPhotos,
-    movePhotosToFolder,
-    setDetailsPanelCollapsed,
-    reorderPhotoTabs,
-    assignTagToGroup,
-    assignFaceToPerson,
-    mergePeople,
-    setNavbarSplitSizes,
-    setNavbarCollapsedPanels
-  } = usePhotoLibrary()
-  // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
-  const isPhotoTabActive = state.activeTab !== 'gallery'
-  // Compare View always hides the details panel outright
-  const isCompareTabActive = state.compareTabs.has(state.activeTab)
-  // Dashboard is full-screen — no details panel either.
-  const isDashboardTabActive = state.activeTab === 'dashboard'
-  // Duplicates tab browses across many photos at once — no single photo for
-  // the details panel to describe.
-  const isDuplicatesTabActive = state.activeTab === 'duplicates'
+// Self-contained: subscribes only to PhotoLibrarySidebarContext/
+// PhotoLibraryActionsContext, takes no props. Pulled out of AppLayout so a
+// Splitter-drag frame (or anything else that only affects the navbar) only
+// re-renders this component — not the tab bar, Gallery/Dashboard/PhotoView
+// content, or DetailPanel, which used to all live in the same component and
+// so all re-rendered together on every drag frame. Wrapped in React.memo as
+// defense-in-depth (a zero-prop component already bails out on a parent
+// re-render by default, but this documents the intent and survives someone
+// later adding props).
+const NavbarSplitter = memo(function NavbarSplitter(): React.JSX.Element {
+  const { state } = useSidebarLibrary()
+  const { setNavbarSplitSizes, setNavbarCollapsedPanels } = useLibraryActions()
 
   // Default even split for the navbar Splitter's current pane count (Tags,
   // People, Folders — People only present once face detection is enabled).
@@ -284,15 +272,36 @@ function AppLayout(): React.JSX.Element {
       ? state.navbarSplitSizes
       : navbarPaneSizes
   ).map((size, index) => (size > 0 ? size : navbarPaneSizes[index]))
+  // Live drag position, separate from state.navbarSplitSizes — updating the
+  // real reducer (and its persisted-settings IPC write) on every drag frame
+  // is what made resizing laggy. This drives the Splitter's visual position
+  // during a drag; the reducer/IPC write only happens once, on release. It's
+  // local to this component specifically so a drag frame re-renders only
+  // this subtree, not the rest of the app.
+  const [liveNavbarSizes, setLiveNavbarSizes] = useState<number[] | null>(null)
   const navbarSizes = navbarPaneIds.map((id, index) =>
-    state.navbarCollapsedPanels[id] ? `${PANEL_HEADER_HEIGHT}px` : defaultPaneSizes[index]
+    state.navbarCollapsedPanels[id]
+      ? `${PANEL_HEADER_HEIGHT}px`
+      : (liveNavbarSizes ?? defaultPaneSizes)[index]
   )
-  const toggleNavbarPanel = (id: string): void => {
-    setNavbarCollapsedPanels({
-      ...state.navbarCollapsedPanels,
-      [id]: !state.navbarCollapsedPanels[id]
-    })
-  }
+  // Stable across renders as long as navbarCollapsedPanels itself hasn't
+  // changed (in particular, stable across every drag frame above, since
+  // dragging never touches navbarCollapsedPanels) — passed to
+  // TagPanel/PeoplePanel/FolderTree below, each via its own useCallback, so
+  // those (memoized) components can actually bail out during a drag instead
+  // of the callback prop's identity alone forcing them to re-render.
+  const toggleNavbarPanel = useCallback(
+    (id: string): void => {
+      setNavbarCollapsedPanels({
+        ...state.navbarCollapsedPanels,
+        [id]: !state.navbarCollapsedPanels[id]
+      })
+    },
+    [state.navbarCollapsedPanels, setNavbarCollapsedPanels]
+  )
+  const toggleTagsPanel = useCallback(() => toggleNavbarPanel('tags'), [toggleNavbarPanel])
+  const togglePeoplePanel = useCallback(() => toggleNavbarPanel('people'), [toggleNavbarPanel])
+  const toggleFoldersPanel = useCallback(() => toggleNavbarPanel('folders'), [toggleNavbarPanel])
 
   // Sizing is plain flex-basis/flex-grow under the hood (verified against
   // @mantine/core's Splitter source), so a CSS transition animates collapse/
@@ -303,6 +312,118 @@ function AppLayout(): React.JSX.Element {
   const navbarPaneTransition = isResizingNavbar
     ? undefined
     : 'flex-basis 200ms ease, flex-grow 200ms ease'
+
+  return (
+    <AppShell.Section grow mih={0} display="flex" style={{ flexDirection: 'column' }}>
+      <Splitter
+        orientation="vertical"
+        withHandle={false}
+        handleColor="var(--mantine-color-default-border)"
+        sizes={navbarSizes}
+        onResizeStart={() => setIsResizingNavbar(true)}
+        onResizeEnd={() => {
+          setIsResizingNavbar(false)
+          // Commit to the reducer/persisted settings once, here, instead of
+          // on every drag frame (see liveNavbarSizes).
+          if (liveNavbarSizes) {
+            setNavbarSplitSizes(liveNavbarSizes)
+            setLiveNavbarSizes(null)
+          }
+        }}
+        onSizeChange={(sizes) => {
+          // Never persist a collapsed pane's fixed header-height entry as
+          // its "real" size — keep whatever was there before, so
+          // un-collapsing restores a sensible split instead of reopening at
+          // header height.
+          const merged = navbarPaneIds.map((id, index) =>
+            state.navbarCollapsedPanels[id] ? defaultPaneSizes[index] : sizes[index]
+          )
+          setLiveNavbarSizes(merged as number[])
+        }}
+        flex={1}
+        mih={0}
+      >
+        <Splitter.Pane
+          defaultSize={navbarPaneSizes[0]}
+          min={`${PANEL_HEADER_HEIGHT}px`}
+          mih={0}
+          display="flex"
+          style={{
+            flexDirection: 'column',
+            overflow: 'hidden',
+            transition: navbarPaneTransition
+          }}
+        >
+          <TagPanel
+            collapsed={Boolean(state.navbarCollapsedPanels.tags)}
+            onToggleCollapse={toggleTagsPanel}
+          />
+        </Splitter.Pane>
+        {state.faceDetectionEnabled && (
+          <Splitter.Pane
+            defaultSize={navbarPaneSizes[1]}
+            min={`${PANEL_HEADER_HEIGHT}px`}
+            mih={0}
+            display="flex"
+            style={{
+              flexDirection: 'column',
+              overflow: 'hidden',
+              transition: navbarPaneTransition
+            }}
+          >
+            <PeoplePanel
+              collapsed={Boolean(state.navbarCollapsedPanels.people)}
+              onToggleCollapse={togglePeoplePanel}
+            />
+          </Splitter.Pane>
+        )}
+        <Splitter.Pane
+          defaultSize={navbarPaneSizes[navbarPaneSizes.length - 1]}
+          min={`${PANEL_HEADER_HEIGHT}px`}
+          mih={0}
+          display="flex"
+          style={{
+            flexDirection: 'column',
+            overflow: 'hidden',
+            transition: navbarPaneTransition
+          }}
+        >
+          <FolderTree
+            collapsed={Boolean(state.navbarCollapsedPanels.folders)}
+            onToggleCollapse={toggleFoldersPanel}
+          />
+        </Splitter.Pane>
+      </Splitter>
+    </AppShell.Section>
+  )
+})
+
+// Split out from App so it can call the state hooks — a component can't read
+// a context it also renders the Provider for in the same function.
+function AppLayout(): React.JSX.Element {
+  const { state: sidebarState } = useSidebarLibrary()
+  const { state, openTabEntries } = useGalleryLibrary()
+  const {
+    closePhotoTab,
+    closeAllTabs,
+    setActiveTab,
+    addTagsToPhotos,
+    movePhotosToFolder,
+    setDetailsPanelCollapsed,
+    reorderPhotoTabs,
+    assignTagToGroup,
+    assignFaceToPerson,
+    mergePeople
+  } = useLibraryActions()
+  // The navbar (Tags/Folders) hides for any non-Gallery tab, including Dashboard (full-screen, no side panels) — switching back to Gallery (with other tabs still open in the background) restores it. The details aside is independent of this: it's user-togglable and persisted, shown on both the gallery and photo-view screens.
+  const isPhotoTabActive = state.activeTab !== 'gallery'
+  // Compare View always hides the details panel outright
+  const isCompareTabActive = state.compareTabs.has(state.activeTab)
+  // Dashboard is full-screen — no details panel either.
+  const isDashboardTabActive = state.activeTab === 'dashboard'
+  // Duplicates tab browses across many photos at once — no single photo for
+  // the details panel to describe.
+  const isDuplicatesTabActive = state.activeTab === 'duplicates'
 
   // Mantine's Tooltip only closes on a real mouseleave (it's built on
   // floating-ui's useHover) — clicking a tooltip's own trigger doesn't
@@ -475,7 +596,7 @@ function AppLayout(): React.JSX.Element {
     if (activeData?.personId) {
       const overData = over.data.current as { personId?: string } | undefined
       if (overData?.personId && overData.personId !== activeData.personId) {
-        const targetName = state.people.find((p) => p.id === overData.personId)?.name
+        const targetName = sidebarState.people.find((p) => p.id === overData.personId)?.name
         setPendingMerge({
           sourceId: activeData.personId,
           sourceName: activeData.personName ?? 'Unnamed person',
@@ -529,310 +650,245 @@ function AppLayout(): React.JSX.Element {
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDrag(null)}
     >
-      {/* Wraps the whole AppShell (rather than just AppShell.Main) so the tab
+      {/* Plain string|null, so it only changes on drag start/end — rows read
+          this instead of dnd-kit's useDndContext(), which re-renders its
+          consumers on every pointermove (see ActiveDragContext). */}
+      <ActiveDragContext.Provider value={activeDrag?.kind ?? null}>
+        {/* Wraps the whole AppShell (rather than just AppShell.Main) so the tab
           bar in the header — a Tabs.List sibling of Tabs.Panel deep inside
           Main — can share this context; Mantine's Tabs is context-driven, so
           List/Panel don't need to be DOM-adjacent to it. */}
-      <Tabs value={state.activeTab} onChange={(value) => value && setActiveTab(value)}>
-        <AppShell
-          header={{ height: HEADER_HEIGHT }}
-          navbar={{
-            width: 260,
-            breakpoint: 0,
-            collapsed: { desktop: isPhotoTabActive, mobile: isPhotoTabActive }
-          }}
-          aside={{
-            width: 320,
-            breakpoint: 0,
-            collapsed: {
-              desktop:
-                state.detailsPanelCollapsed ||
-                isCompareTabActive ||
-                isDashboardTabActive ||
-                isDuplicatesTabActive,
-              mobile:
-                state.detailsPanelCollapsed ||
-                isCompareTabActive ||
-                isDashboardTabActive ||
-                isDuplicatesTabActive
-            }
-          }}
-          padding={0}
-        >
-          <AppShell.Header h="auto">
-            <Group px="md" justify="space-between" wrap="nowrap">
-              <Tabs.List className="tabs-list-no-divider" miw={0} style={{ flexGrow: 1 }}>
-                <Scroller>
-                  <Tooltip
-                    openDelay={1000}
-                    label={
-                      <>
-                        shortcut: <Kbd>d</Kbd>
-                      </>
-                    }
-                  >
-                    <Tabs.Tab
-                      value="dashboard"
-                      leftSection={<IconLayoutDashboard size={TAB_ICON_SIZE} />}
+        <Tabs value={state.activeTab} onChange={(value) => value && setActiveTab(value)}>
+          <AppShell
+            header={{ height: HEADER_HEIGHT }}
+            navbar={{
+              width: 260,
+              breakpoint: 0,
+              collapsed: { desktop: isPhotoTabActive, mobile: isPhotoTabActive }
+            }}
+            aside={{
+              width: 320,
+              breakpoint: 0,
+              collapsed: {
+                desktop:
+                  state.detailsPanelCollapsed ||
+                  isCompareTabActive ||
+                  isDashboardTabActive ||
+                  isDuplicatesTabActive,
+                mobile:
+                  state.detailsPanelCollapsed ||
+                  isCompareTabActive ||
+                  isDashboardTabActive ||
+                  isDuplicatesTabActive
+              }
+            }}
+            padding={0}
+          >
+            <AppShell.Header h="auto">
+              <Group px="md" justify="space-between" wrap="nowrap">
+                <Tabs.List className="tabs-list-no-divider" miw={0} style={{ flexGrow: 1 }}>
+                  <Scroller>
+                    <Tooltip
+                      openDelay={1000}
+                      label={
+                        <>
+                          shortcut: <Kbd>d</Kbd>
+                        </>
+                      }
                     >
-                      Dashboard
-                    </Tabs.Tab>
-                  </Tooltip>
-                  <Tooltip
-                    openDelay={1000}
-                    label={
-                      <>
-                        shortcut: <Kbd>g</Kbd>
-                      </>
-                    }
-                  >
-                    <Tabs.Tab
-                      value="gallery"
-                      leftSection={<IconLibraryPhoto size={TAB_ICON_SIZE} />}
+                      <Tabs.Tab
+                        value="dashboard"
+                        leftSection={<IconLayoutDashboard size={TAB_ICON_SIZE} />}
+                      >
+                        Dashboard
+                      </Tabs.Tab>
+                    </Tooltip>
+                    <Tooltip
+                      openDelay={1000}
+                      label={
+                        <>
+                          shortcut: <Kbd>g</Kbd>
+                        </>
+                      }
                     >
-                      Gallery
-                    </Tabs.Tab>
-                  </Tooltip>
-                  <DndContext
-                    sensors={tabSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleTabDragEnd}
-                  >
-                    <SortableContext
-                      items={state.openTabs}
-                      strategy={horizontalListSortingStrategy}
+                      <Tabs.Tab
+                        value="gallery"
+                        leftSection={<IconLibraryPhoto size={TAB_ICON_SIZE} />}
+                      >
+                        Gallery
+                      </Tabs.Tab>
+                    </Tooltip>
+                    <DndContext
+                      sensors={tabSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleTabDragEnd}
                     >
-                      {openTabEntries.map((entry) => (
-                        <SortableTab
-                          key={entry.id}
-                          id={entry.id}
-                          value={entry.id}
-                          leftSection={
-                            entry.kind === 'compare' ? (
-                              <IconColumns2 size={ACTION_ICONS.ICON_SIZE} />
+                      <SortableContext
+                        items={state.openTabs}
+                        strategy={horizontalListSortingStrategy}
+                      >
+                        {openTabEntries.map((entry) => (
+                          <SortableTab
+                            key={entry.id}
+                            id={entry.id}
+                            value={entry.id}
+                            leftSection={
+                              entry.kind === 'compare' ? (
+                                <IconColumns2 size={ACTION_ICONS.ICON_SIZE} />
+                              ) : entry.kind === 'duplicates' ? (
+                                <IconStack2 size={ACTION_ICONS.ICON_SIZE} />
+                              ) : undefined
+                            }
+                            rightSection={
+                              <ActionIcon
+                                component="span"
+                                size="xs"
+                                variant="subtle"
+                                color="gray"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  closePhotoTab(entry.id)
+                                }}
+                              >
+                                <IconX size={ACTION_ICONS.ICON_SIZE} />
+                              </ActionIcon>
+                            }
+                          >
+                            {entry.kind === 'compare' ? (
+                              <CompareTabLabel
+                                fileNames={entry.photos.map((photo) => photo.fileName)}
+                              />
                             ) : entry.kind === 'duplicates' ? (
-                              <IconStack2 size={ACTION_ICONS.ICON_SIZE} />
-                            ) : undefined
-                          }
-                          rightSection={
-                            <ActionIcon
-                              component="span"
-                              size="xs"
-                              variant="subtle"
-                              color="gray"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                closePhotoTab(entry.id)
-                              }}
-                            >
-                              <IconX size={ACTION_ICONS.ICON_SIZE} />
-                            </ActionIcon>
-                          }
-                        >
-                          {entry.kind === 'compare' ? (
-                            <CompareTabLabel
-                              fileNames={entry.photos.map((photo) => photo.fileName)}
-                            />
-                          ) : entry.kind === 'duplicates' ? (
-                            'Duplicates'
-                          ) : (
-                            <TabLabel fileName={entry.photo.fileName} />
-                          )}
-                        </SortableTab>
-                      ))}
-                    </SortableContext>
-                  </DndContext>
-                </Scroller>
-              </Tabs.List>
-              <Group gap="md" wrap="nowrap">
-                {state.openTabs.length > 0 && (
-                  <Tooltip label="Close all tabs">
-                    <ActionIcon
-                      variant="subtle"
-                      color="gray"
-                      aria-label="Close all tabs"
-                      onClick={closeAllTabs}
-                    >
-                      <IconX size={ACTION_ICONS.ICON_SIZE} />
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-                <ScanProgressBar />
-                {!(isCompareTabActive || isDashboardTabActive || isDuplicatesTabActive) && (
-                  <Tooltip
-                    label={
-                      state.detailsPanelCollapsed ? 'Show details panel' : 'Hide details panel'
-                    }
-                  >
-                    <ActionIcon
-                      variant="subtle"
-                      aria-label="Toggle details panel"
-                      onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
-                    >
-                      {state.detailsPanelCollapsed ? (
-                        <IconLayoutSidebarRightExpand size={ACTION_ICONS.ICON_SIZE} />
-                      ) : (
-                        <IconLayoutSidebarRightCollapse size={ACTION_ICONS.ICON_SIZE} />
-                      )}
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-                <SettingsModal />
-              </Group>
-            </Group>
-          </AppShell.Header>
-          <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
-            <AppShell.Section component={AllPhotosRow} />
-            <AppShell.Section component={UntaggedRow} />
-            <Divider />
-            <AppShell.Section grow mih={0} display="flex" style={{ flexDirection: 'column' }}>
-              <Splitter
-                orientation="vertical"
-                withHandle={false}
-                handleColor="var(--mantine-color-default-border)"
-                sizes={navbarSizes}
-                onResizeStart={() => setIsResizingNavbar(true)}
-                onResizeEnd={() => setIsResizingNavbar(false)}
-                onSizeChange={(sizes) => {
-                  // Never persist a collapsed pane's fixed header-height
-                  // entry as its "real" size — keep whatever was there
-                  // before, so un-collapsing restores a sensible split
-                  // instead of reopening at header height.
-                  const merged = navbarPaneIds.map((id, index) =>
-                    state.navbarCollapsedPanels[id] ? defaultPaneSizes[index] : sizes[index]
-                  )
-                  setNavbarSplitSizes(merged as number[])
-                }}
-                flex={1}
-                mih={0}
-              >
-                <Splitter.Pane
-                  defaultSize={navbarPaneSizes[0]}
-                  min={`${PANEL_HEADER_HEIGHT}px`}
-                  mih={0}
-                  display="flex"
-                  style={{
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                    transition: navbarPaneTransition
-                  }}
-                >
-                  <TagPanel
-                    collapsed={Boolean(state.navbarCollapsedPanels.tags)}
-                    onToggleCollapse={() => toggleNavbarPanel('tags')}
-                  />
-                </Splitter.Pane>
-                {state.faceDetectionEnabled && (
-                  <Splitter.Pane
-                    defaultSize={navbarPaneSizes[1]}
-                    min={`${PANEL_HEADER_HEIGHT}px`}
-                    mih={0}
-                    display="flex"
-                    style={{
-                      flexDirection: 'column',
-                      overflow: 'hidden',
-                      transition: navbarPaneTransition
-                    }}
-                  >
-                    <PeoplePanel
-                      collapsed={Boolean(state.navbarCollapsedPanels.people)}
-                      onToggleCollapse={() => toggleNavbarPanel('people')}
-                    />
-                  </Splitter.Pane>
-                )}
-                <Splitter.Pane
-                  defaultSize={navbarPaneSizes[navbarPaneSizes.length - 1]}
-                  min={`${PANEL_HEADER_HEIGHT}px`}
-                  mih={0}
-                  display="flex"
-                  style={{
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                    transition: navbarPaneTransition
-                  }}
-                >
-                  <FolderTree
-                    collapsed={Boolean(state.navbarCollapsedPanels.folders)}
-                    onToggleCollapse={() => toggleNavbarPanel('folders')}
-                  />
-                </Splitter.Pane>
-              </Splitter>
-            </AppShell.Section>
-          </AppShell.Navbar>
-          <AppShell.Main>
-            <Box
-              h={`calc(100dvh - ${HEADER_HEIGHT}px)`}
-              display="flex"
-              style={{ flexDirection: 'column' }}
-            >
-              <Tabs.Panel value="dashboard" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-                <DashboardView />
-              </Tabs.Panel>
-              <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-                <GalleryGrid />
-              </Tabs.Panel>
-              {openTabEntries.map((entry) => (
-                <Tabs.Panel
-                  key={entry.id}
-                  value={entry.id}
-                  style={{ flex: 1, minHeight: 0, display: 'flex' }}
-                >
-                  {entry.kind === 'compare' ? (
-                    <CompareView id={entry.id} photos={entry.photos} />
-                  ) : entry.kind === 'duplicates' ? (
-                    <DuplicatesView />
-                  ) : (
-                    <PhotoView photo={entry.photo} />
+                              'Duplicates'
+                            ) : (
+                              <TabLabel fileName={entry.photo.fileName} />
+                            )}
+                          </SortableTab>
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                  </Scroller>
+                </Tabs.List>
+                <Group gap="md" wrap="nowrap">
+                  {state.openTabs.length > 0 && (
+                    <Tooltip label="Close all tabs">
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        aria-label="Close all tabs"
+                        onClick={closeAllTabs}
+                      >
+                        <IconX size={ACTION_ICONS.ICON_SIZE} />
+                      </ActionIcon>
+                    </Tooltip>
                   )}
+                  <ScanProgressBar />
+                  {!(isCompareTabActive || isDashboardTabActive || isDuplicatesTabActive) && (
+                    <Tooltip
+                      label={
+                        state.detailsPanelCollapsed ? 'Show details panel' : 'Hide details panel'
+                      }
+                    >
+                      <ActionIcon
+                        variant="subtle"
+                        aria-label="Toggle details panel"
+                        onClick={() => setDetailsPanelCollapsed(!state.detailsPanelCollapsed)}
+                      >
+                        {state.detailsPanelCollapsed ? (
+                          <IconLayoutSidebarRightExpand size={ACTION_ICONS.ICON_SIZE} />
+                        ) : (
+                          <IconLayoutSidebarRightCollapse size={ACTION_ICONS.ICON_SIZE} />
+                        )}
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  <SettingsModal />
+                </Group>
+              </Group>
+            </AppShell.Header>
+            <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
+              <AppShell.Section component={AllPhotosRow} />
+              <AppShell.Section component={UntaggedRow} />
+              <Divider />
+              <NavbarSplitter />
+            </AppShell.Navbar>
+            <AppShell.Main>
+              <Box
+                h={`calc(100dvh - ${HEADER_HEIGHT}px)`}
+                display="flex"
+                style={{ flexDirection: 'column' }}
+              >
+                <Tabs.Panel value="dashboard" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+                  <DashboardView />
                 </Tabs.Panel>
-              ))}
-            </Box>
-          </AppShell.Main>
-          <AppShell.Aside p="md" style={{ overflowY: 'auto' }}>
-            <DetailPanel />
-          </AppShell.Aside>
-        </AppShell>
-      </Tabs>
-      <DragOverlay
-        modifiers={[snapCenterToCursor]}
-        style={
-          activeDrag?.kind === 'tag' || activeDrag?.kind === 'face' || activeDrag?.kind === 'person'
-            ? undefined
-            : { width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }
-        }
-      >
-        {activeDrag?.kind === 'tag' ? (
-          <TagDragPreview tag={activeDrag.tag} />
-        ) : activeDrag?.kind === 'face' ? (
-          <FaceDragPreview />
-        ) : activeDrag?.kind === 'person' ? (
-          <PersonDragPreview name={activeDrag.personName} />
-        ) : (
-          activeDragPhoto && (
-            <DragPreview
-              photo={activeDragPhoto}
-              count={activeDrag?.kind === 'photo' ? activeDrag.paths.length : 1}
-            />
-          )
+                <Tabs.Panel value="gallery" style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+                  <GalleryGrid />
+                </Tabs.Panel>
+                {openTabEntries.map((entry) => (
+                  <Tabs.Panel
+                    key={entry.id}
+                    value={entry.id}
+                    style={{ flex: 1, minHeight: 0, display: 'flex' }}
+                  >
+                    {entry.kind === 'compare' ? (
+                      <CompareView id={entry.id} photos={entry.photos} />
+                    ) : entry.kind === 'duplicates' ? (
+                      <DuplicatesView />
+                    ) : (
+                      <PhotoView photo={entry.photo} />
+                    )}
+                  </Tabs.Panel>
+                ))}
+              </Box>
+            </AppShell.Main>
+            <AppShell.Aside p="md" style={{ overflowY: 'auto' }}>
+              <DetailPanel />
+            </AppShell.Aside>
+          </AppShell>
+        </Tabs>
+        <DragOverlay
+          modifiers={[snapCenterToCursor]}
+          style={
+            activeDrag?.kind === 'tag' ||
+            activeDrag?.kind === 'face' ||
+            activeDrag?.kind === 'person'
+              ? undefined
+              : { width: DRAG_PREVIEW_SIZE, height: DRAG_PREVIEW_SIZE }
+          }
+        >
+          {activeDrag?.kind === 'tag' ? (
+            <TagDragPreview tag={activeDrag.tag} />
+          ) : activeDrag?.kind === 'face' ? (
+            <FaceDragPreview />
+          ) : activeDrag?.kind === 'person' ? (
+            <PersonDragPreview name={activeDrag.personName} />
+          ) : (
+            activeDragPhoto && (
+              <DragPreview
+                photo={activeDragPhoto}
+                count={activeDrag?.kind === 'photo' ? activeDrag.paths.length : 1}
+              />
+            )
+          )}
+        </DragOverlay>
+        {pendingMerge && (
+          <PersonMergeDialog
+            sourceName={pendingMerge.sourceName}
+            targetName={pendingMerge.targetName}
+            opened
+            saving={mergeSaving}
+            onConfirm={() => void handleConfirmMerge()}
+            onCancel={() => setPendingMerge(null)}
+          />
         )}
-      </DragOverlay>
-      {pendingMerge && (
-        <PersonMergeDialog
-          sourceName={pendingMerge.sourceName}
-          targetName={pendingMerge.targetName}
-          opened
-          saving={mergeSaving}
-          onConfirm={() => void handleConfirmMerge()}
-          onCancel={() => setPendingMerge(null)}
-        />
-      )}
+      </ActiveDragContext.Provider>
     </DndContext>
   )
 }
 
 // Reads context to decide between the two screens above — kept separate from AppLayout so that component's hooks (keyboard shortcuts, drag sensors, etc.) are never conditionally skipped, which switching on a value inside AppLayout itself would do once initialLoadComplete flips partway through its lifetime.
 function AppGate(): React.JSX.Element {
-  const { state } = usePhotoLibrary()
+  const { state } = useGalleryLibrary()
   return state.initialLoadComplete ? <AppLayout /> : <StartupLoadingScreen />
 }
 

@@ -1,6 +1,6 @@
-import { type ReactElement, useRef, useState } from 'react'
+import { memo, type ReactElement, useCallback, useRef, useState } from 'react'
 
-import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
   Accordion,
   ActionIcon,
@@ -29,7 +29,7 @@ import {
 } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, TagGroup } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useActiveDragKind, useLibraryActions, useSidebarLibrary } from '@state'
 import { activeHoverBackground, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { TagContextMenu } from './TagContextMenu'
@@ -51,35 +51,34 @@ interface TagListItemProps {
   // Only draggable once there's at least one group to drag it into — no
   // point offering the affordance with nowhere for a drop to land.
   draggable: boolean
-  onSelect: () => void
-  onStartEdit: () => void
+  onSelect: (tag: string | null) => void
+  onStartEdit: (tag: string) => void
   onStopEdit: () => void
-  onRename: (newTag: string) => Promise<void>
-  onDelete: () => Promise<void>
+  onRename: (tag: string, newTag: string) => Promise<void>
+  onDelete: (tag: string) => Promise<void>
 }
 
-function TagListItem({
-  tag,
-  count,
-  description,
-  coverPhoto,
-  isActive,
-  editing,
-  draggable,
-  onSelect,
-  onStartEdit,
-  onStopEdit,
-  onRename,
-  onDelete
-}: TagListItemProps): ReactElement {
-  const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
+// Deliberately thin: this is the only part that subscribes to dnd-kit's
+// InternalContext (via useDroppable/useDraggable), which gets a new identity
+// every time the hovered drop target changes mid-drag. React re-renders every
+// context consumer on that change, so with hundreds of tag rows the heavy
+// Mantine subtree below used to re-render hundreds of times per drag — the
+// single largest remaining cost in the drag profile.
+//
+// Everything dnd-kit hands back here is either referentially stable
+// (setNodeRef, the memoized listeners/attributes) or changes for just one or
+// two rows (isOver, isDragging), so TagListItemView's memo actually bails out
+// for the other rows instead of re-rendering the whole list.
+function TagListItem(props: TagListItemProps): ReactElement {
+  const { tag, draggable, editing } = props
   // Tags are drop targets for photos (dragging a photo onto one adds the
   // tag), but not for other tags — only a group's control should light up
   // while a tag is being dragged, so this droppable is switched off for
   // that case rather than just hiding the isOver highlight (also keeps it
   // out of collision detection entirely).
-  const { active } = useDndContext()
-  const isDraggingTag = Boolean((active?.data.current as { tag?: string } | undefined)?.tag)
+  // Deliberately NOT dnd-kit's useDndContext() — that re-renders every
+  // consumer on each pointermove; this only changes on drag start/end.
+  const isDraggingTag = useActiveDragKind() === 'tag'
   const { isOver, setNodeRef: setDropRef } = useDroppable({
     id: `tag:${tag}`,
     data: { tag },
@@ -95,6 +94,58 @@ function TagListItem({
     data: { tag },
     disabled: !draggable || editing
   })
+
+  return (
+    <TagListItemView
+      {...props}
+      isOver={isOver}
+      isDragging={isDragging}
+      setDropRef={setDropRef}
+      setDragRef={setDragRef}
+      dragAttributes={attributes}
+      dragListeners={listeners}
+    />
+  )
+}
+
+interface TagListItemViewProps extends TagListItemProps {
+  isOver: boolean
+  isDragging: boolean
+  setDropRef: (element: HTMLElement | null) => void
+  setDragRef: (element: HTMLElement | null) => void
+  // Sourced from useDraggable's own return type rather than restated, so
+  // these stay correct if dnd-kit's shape changes.
+  dragAttributes: ReturnType<typeof useDraggable>['attributes']
+  dragListeners: ReturnType<typeof useDraggable>['listeners']
+}
+
+// No usePhotoLibrary()/sidebar-state subscription — already fully
+// props-driven. Callback props are passed through unbound by the parent
+// (TagPanel), rather than one new closure per tag per render, so they stay
+// reference-stable and this memo can actually bail out. Mirrors FolderTree's
+// TreeRow/PeoplePanel's PersonRow.
+const TagListItemView = memo(function TagListItemView({
+  tag,
+  count,
+  description,
+  coverPhoto,
+  isActive,
+  editing,
+  onSelect,
+  onStartEdit,
+  onStopEdit,
+  onRename,
+  onDelete,
+  isOver,
+  isDragging,
+  setDropRef,
+  setDragRef,
+  dragAttributes,
+  dragListeners
+}: TagListItemViewProps): ReactElement {
+  const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
+  const attributes = dragAttributes
+  const listeners = dragListeners
   // Mantine's Tooltip only forwards a fixed prop whitelist (onClick,
   // onMouseEnter, ...) onto a wrapped child — onContextMenu isn't in it, so
   // Menu.ContextMenu's right-click handler never reached the button when
@@ -145,7 +196,7 @@ function TagListItem({
   const handleConfirm = async (): Promise<void> => {
     setSaving(true)
     try {
-      await onRename(trimmed)
+      await onRename(tag, trimmed)
       setConfirming(false)
       onStopEdit()
       notifications.show({
@@ -163,7 +214,7 @@ function TagListItem({
   const handleDeleteConfirm = async (): Promise<void> => {
     setDeleting(true)
     try {
-      await onDelete()
+      await onDelete(tag)
       setConfirmingDelete(false)
       notifications.show({
         color: 'teal',
@@ -179,7 +230,7 @@ function TagListItem({
 
   return (
     <>
-      <TagContextMenu onRename={onStartEdit} onDelete={() => setConfirmingDelete(true)}>
+      <TagContextMenu onRename={() => onStartEdit(tag)} onDelete={() => setConfirmingDelete(true)}>
         {/* Edit mode reuses the exact same Button/leftSection/padding chrome
             as view mode, only swapping Text for a TextInput as the button's
             content — otherwise the differing padding/gap shifts the row's
@@ -191,7 +242,7 @@ function TagListItem({
           {...listeners}
           onClick={() => {
             if (editing) return
-            onSelect()
+            onSelect(isActive ? null : tag)
           }}
           // Space is the gallery's preview-trigger key, not a click here —
           // without this, a native space-triggers-click on this button (still
@@ -243,7 +294,7 @@ function TagListItem({
                     style={{ flexShrink: 0 }}
                     onClick={(event) => {
                       event.stopPropagation()
-                      onStartEdit()
+                      onStartEdit(tag)
                     }}
                     aria-label={`Rename #${tag}`}
                   >
@@ -290,26 +341,34 @@ function TagListItem({
         </Button>
       </TagContextMenu>
       <TagHoverCardTarget tag={tag} target={buttonRef} disabled={editing} />
-      <TagRenameDialog
-        oldTag={tag}
-        newTag={trimmed}
-        count={count}
-        opened={confirming}
-        saving={saving}
-        onConfirm={() => void handleConfirm()}
-        onCancel={handleCancelConfirm}
-      />
-      <TagDeleteDialog
-        tag={tag}
-        count={count}
-        opened={confirmingDelete}
-        saving={deleting}
-        onConfirm={() => void handleDeleteConfirm()}
-        onCancel={() => setConfirmingDelete(false)}
-      />
+      {/* Mounted only while open. A Mantine Modal renders its whole
+          ModalBase/Transition/overlay tree even with opened={false}, so
+          keeping two per row mounted cost ~2x(rows) floating-UI subtrees on
+          every render — the dominant cost in a hundreds-of-tags panel. */}
+      {confirming && (
+        <TagRenameDialog
+          oldTag={tag}
+          newTag={trimmed}
+          count={count}
+          opened
+          saving={saving}
+          onConfirm={() => void handleConfirm()}
+          onCancel={handleCancelConfirm}
+        />
+      )}
+      {confirmingDelete && (
+        <TagDeleteDialog
+          tag={tag}
+          count={count}
+          opened
+          saving={deleting}
+          onConfirm={() => void handleDeleteConfirm()}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </>
   )
-}
+})
 
 interface TagGroupSectionProps {
   // null renders the synthetic "Other Tags" section — no rename/delete,
@@ -329,13 +388,13 @@ function TagGroupSection({
   existingGroupNames,
   renderTags
 }: TagGroupSectionProps): ReactElement {
-  const { renameTagGroup, updateTagGroupPattern, deleteTagGroup } = usePhotoLibrary()
+  const { renameTagGroup, updateTagGroupPattern, deleteTagGroup } = useLibraryActions()
   const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
   // Groups are drop targets for tags (see TagListItem's draggable), not
   // photos — mirrors that component's own tag-vs-photo disabling so a
   // dragged photo doesn't light this up as if dropping it here did anything.
-  const { active } = useDndContext()
-  const isDraggingPhoto = Boolean((active?.data.current as { paths?: string[] } | undefined)?.paths)
+  // See TagListItem above — avoids useDndContext's per-pointermove churn.
+  const isDraggingPhoto = useActiveDragKind() === 'photo'
   const { isOver, setNodeRef } = useDroppable({
     id: `group:${group?.id ?? 'other'}`,
     data: { groupId: group?.id ?? null },
@@ -407,33 +466,36 @@ function TagGroupSection({
         control
       )}
       <Accordion.Panel styles={{ content: { paddingLeft: 0 } }}>{renderTags(tags)}</Accordion.Panel>
-      {group && (
-        <>
-          <TagGroupNameDialog
-            title="Rename tag group"
-            confirmLabel="Rename"
-            opened={renaming}
-            saving={saving}
-            initialName={group.name}
-            existingNames={existingGroupNames}
-            onConfirm={(name) => void handleRename(name)}
-            onCancel={() => setRenaming(false)}
-          />
-          <TagGroupPatternDialog
-            opened={editingPattern}
-            saving={saving}
-            initialMatchPattern={group.matchPattern}
-            onConfirm={(matchPattern) => void handleEditPattern(matchPattern)}
-            onCancel={() => setEditingPattern(false)}
-          />
-          <TagGroupDeleteDialog
-            name={group.name}
-            opened={confirmingDelete}
-            saving={saving}
-            onConfirm={() => void handleDelete()}
-            onCancel={() => setConfirmingDelete(false)}
-          />
-        </>
+      {/* Same mount-only-while-open reasoning as TagListItem's dialogs. */}
+      {group && renaming && (
+        <TagGroupNameDialog
+          title="Rename tag group"
+          confirmLabel="Rename"
+          opened
+          saving={saving}
+          initialName={group.name}
+          existingNames={existingGroupNames}
+          onConfirm={(name) => void handleRename(name)}
+          onCancel={() => setRenaming(false)}
+        />
+      )}
+      {group && editingPattern && (
+        <TagGroupPatternDialog
+          opened
+          saving={saving}
+          initialMatchPattern={group.matchPattern}
+          onConfirm={(matchPattern) => void handleEditPattern(matchPattern)}
+          onCancel={() => setEditingPattern(false)}
+        />
+      )}
+      {group && confirmingDelete && (
+        <TagGroupDeleteDialog
+          name={group.name}
+          opened
+          saving={saving}
+          onConfirm={() => void handleDelete()}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
     </Accordion.Item>
   )
@@ -444,10 +506,19 @@ interface TagPanelProps {
   onToggleCollapse?: () => void
 }
 
-export function TagPanel({ collapsed, onToggleCollapse }: TagPanelProps = {}): ReactElement {
-  const { allTags, tagCounts, tagCoverPhotos, state, setTagFilter, renameTag, deleteTag } =
-    usePhotoLibrary()
+// Memoized so a re-render of its parent (e.g. NavbarSplitter during a
+// Splitter drag) doesn't force this whole panel to re-render when its own
+// props (collapsed/onToggleCollapse) haven't changed.
+export const TagPanel = memo(function TagPanel({
+  collapsed,
+  onToggleCollapse
+}: TagPanelProps = {}): ReactElement {
+  const { allTags, tagCounts, tagCoverPhotos, state } = useSidebarLibrary()
+  const { setTagFilter, renameTag, deleteTag } = useLibraryActions()
   const [editingTag, setEditingTag] = useState<string | null>(null)
+  // Single stable reference (not one closure per tag per render) so
+  // TagListItem's React.memo can bail out — see onSelect/onStartEdit below.
+  const handleStopEdit = useCallback(() => setEditingTag(null), [])
 
   if (allTags.length === 0) {
     return (
@@ -469,11 +540,11 @@ export function TagPanel({ collapsed, onToggleCollapse }: TagPanelProps = {}): R
         isActive={isActive}
         editing={editingTag === tag}
         draggable={state.tagGroups.length > 0}
-        onSelect={() => setTagFilter(isActive ? null : tag)}
-        onStartEdit={() => setEditingTag(tag)}
-        onStopEdit={() => setEditingTag(null)}
-        onRename={(newTag) => renameTag(tag, newTag)}
-        onDelete={() => deleteTag(tag)}
+        onSelect={setTagFilter}
+        onStartEdit={setEditingTag}
+        onStopEdit={handleStopEdit}
+        onRename={renameTag}
+        onDelete={deleteTag}
       />
     )
   }
@@ -551,4 +622,4 @@ export function TagPanel({ collapsed, onToggleCollapse }: TagPanelProps = {}): R
       </Accordion>
     </PanelSection>
   )
-}
+})

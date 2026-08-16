@@ -1,6 +1,7 @@
+import { memo, type ReactElement } from 'react'
+
 import { Box, Button, Divider, EmptyState, Group, SimpleGrid, Stack, Title } from '@mantine/core'
 import { IconHistory, IconHome2, IconLibraryPhoto, IconTags } from '@tabler/icons-react'
-import type { ReactElement } from 'react'
 
 import {
   FeaturedTagWidget,
@@ -59,7 +60,10 @@ function DashboardSection({
   )
 }
 
-export function DashboardView(): React.JSX.Element {
+// Memoized: takes no props, so it bails out when AppLayout re-renders
+// (e.g. a drag starting/ending flips its activeDrag state) and only
+// re-renders when its own context subscriptions actually change.
+export const DashboardView = memo(function DashboardView(): React.JSX.Element {
   const { activePhotosByPath, addFolder } = usePhotoLibrary()
 
   const sections: DashboardSectionData[] = [
@@ -141,4 +145,4 @@ export function DashboardView(): React.JSX.Element {
       </Stack>
     </Box>
   )
-}
+})
