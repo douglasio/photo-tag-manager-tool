@@ -3,8 +3,11 @@ import { Box, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 import { PannableZoomableImage } from '@components'
+import { useLazyFonts } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
 import { formatDateTaken } from '@utils'
+
+import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface NewspaperCoverViewProps {
   photo: PhotoRecord
@@ -15,11 +18,8 @@ interface NewspaperCoverViewProps {
   mastheadTitle: string
 }
 
-// UnifrakturMaguntia (self-hosted via @fontsource/unifrakturmaguntia,
-// imported once in main.tsx) is a genuine blackletter face — real broadsheet
-// nameplates (the NYT, WSJ, and countless small-town papers) lean on this
-// same Old English lettering tradition; Playfair Display alone read as
-// "elegant magazine," not "newspaper."
+// UnifrakturMaguntia (self-hosted, lazy-loaded below) is a genuine blackletter
+// face — real broadsheet nameplates lean on this same Old English tradition.
 const MASTHEAD_FONT = "'UnifrakturMaguntia', serif"
 // Playfair Display carries the headline/byline/caption — a real front page
 // pairs a blackletter nameplate with an ordinary (if bold) body/headline serif.
@@ -66,10 +66,19 @@ export function NewspaperCoverView({
   zoom,
   mastheadTitle
 }: NewspaperCoverViewProps): ReactElement {
+  const fontsLoaded = useLazyFonts([
+    () => import('@fontsource/unifrakturmaguntia'),
+    () => import('@fontsource/playfair-display/400.css'),
+    () => import('@fontsource/playfair-display/400-italic.css'),
+    () => import('@fontsource/playfair-display/700.css'),
+    () => import('@fontsource/playfair-display/900.css')
+  ])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken
     ? formatDateTaken(photo.metadata.dateTaken, 'dateOnly')
     : null
+
+  if (!fontsLoaded) return <CoverLoadingPlaceholder />
 
   return (
     <Box

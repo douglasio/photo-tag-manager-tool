@@ -3,7 +3,10 @@ import { Box, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 import { PannableZoomableImage } from '@components'
+import { useLazyFonts } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
+
+import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface MovieTheaterViewProps {
   photo: PhotoRecord
@@ -16,7 +19,7 @@ interface MovieTheaterViewProps {
   studioName: string
 }
 
-// Anton (already self-hosted for the DVD cover) is a heavy poster/marquee
+// Anton (already lazy-loaded for the DVD cover) is a heavy poster/marquee
 // display face — the same personality real cinema marquees use.
 const DISPLAY_FONT = "'Anton', sans-serif"
 const CURTAIN_RED = '#4a0e14'
@@ -89,7 +92,10 @@ function SeatRow(): ReactElement {
 // from the audience — reusing PannableZoomableImage for the drag-to-pan +
 // wheel-to-zoom screen image.
 export function MovieTheaterView({ photo, zoom, studioName }: MovieTheaterViewProps): ReactElement {
+  const fontsLoaded = useLazyFonts([() => import('@fontsource/anton')])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
+
+  if (!fontsLoaded) return <CoverLoadingPlaceholder />
 
   return (
     <Box

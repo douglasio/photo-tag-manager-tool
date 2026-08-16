@@ -3,8 +3,11 @@ import { Box, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 import { CoverBarcode, PannableZoomableImage } from '@components'
+import { useLazyFonts } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
 import { formatDateTaken } from '@utils'
+
+import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface MagazineCoverViewProps {
   photo: PhotoRecord
@@ -15,9 +18,8 @@ interface MagazineCoverViewProps {
   mastheadTitle: string
 }
 
-// Bebas Neue (self-hosted via @fontsource/bebas-neue, imported once in
-// main.tsx) is the tall, condensed display face real magazine mastheads and
-// cover lines use — Mantine's theme sans doesn't have anything like it.
+// Bebas Neue (self-hosted via @fontsource/bebas-neue, lazy-loaded below) is
+// the tall, condensed display face real magazine mastheads/cover lines use.
 const DISPLAY_FONT = "'Bebas Neue', sans-serif"
 // One restrained accent, used sparingly (a rule, a single teaser) — real
 // newsstand covers lean on clean white/black type for legibility and use
@@ -71,10 +73,13 @@ export function MagazineCoverView({
   zoom,
   mastheadTitle
 }: MagazineCoverViewProps): ReactElement {
+  const fontsLoaded = useLazyFonts([() => import('@fontsource/bebas-neue')])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken
     ? formatDateTaken(photo.metadata.dateTaken, 'monthYear')
     : null
+
+  if (!fontsLoaded) return <CoverLoadingPlaceholder />
 
   return (
     <Box

@@ -3,10 +3,13 @@ import { Box, Image, Text } from '@mantine/core'
 import type { ReactElement, ReactNode } from 'react'
 
 import { PannableZoomableImage } from '@components'
+import { useLazyFonts } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { formatDateTaken } from '@utils'
+
+import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface ArtGalleryViewProps {
   photo: PhotoRecord
@@ -18,8 +21,8 @@ interface ArtGalleryViewProps {
   galleryName: string
 }
 
-// Playfair Display (already self-hosted for the newspaper's headlines) also
-// carries a real museum placard's serif typography well — no new font needed.
+// Playfair Display (also lazy-loaded for the newspaper's headlines) carries
+// a real museum placard's serif typography well.
 const SERIF_FONT = "'Playfair Display', serif"
 const WALL_COLOR = '#2b2926'
 const FRAME_COLOR = '#181614'
@@ -112,6 +115,12 @@ function SidePiece({ photo }: { photo: PhotoRecord }): ReactElement | null {
 // under the main piece — reusing PannableZoomableImage for the drag-to-pan +
 // wheel-to-zoom main print itself.
 export function ArtGalleryView({ photo, zoom, galleryName }: ArtGalleryViewProps): ReactElement {
+  const fontsLoaded = useLazyFonts([
+    () => import('@fontsource/playfair-display/400.css'),
+    () => import('@fontsource/playfair-display/400-italic.css'),
+    () => import('@fontsource/playfair-display/700.css'),
+    () => import('@fontsource/playfair-display/900.css')
+  ])
   const { visiblePhotos } = usePhotoLibrary()
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken ? formatDateTaken(photo.metadata.dateTaken) : null
@@ -119,6 +128,8 @@ export function ArtGalleryView({ photo, zoom, galleryName }: ArtGalleryViewProps
   const otherPhotos = visiblePhotos
     .filter((p) => p.filePath !== photo.filePath && p.thumbnailStatus === 'ready' && p.thumbnailKey)
     .slice(0, 2)
+
+  if (!fontsLoaded) return <CoverLoadingPlaceholder />
 
   return (
     <Box

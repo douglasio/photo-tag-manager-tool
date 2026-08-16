@@ -3,8 +3,11 @@ import { Box, Text } from '@mantine/core'
 import type { ReactElement } from 'react'
 
 import { CoverBarcode, PannableZoomableImage } from '@components'
+import { useLazyFonts } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
 import { toDisplayMetadata } from '@utils'
+
+import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
 interface DvdCoverViewProps {
   photo: PhotoRecord
@@ -15,9 +18,8 @@ interface DvdCoverViewProps {
   studioName: string
 }
 
-// Anton (self-hosted via @fontsource/anton, imported once in main.tsx) is a
-// heavier, more block-poster display face than the magazine's Bebas Neue or
-// the newspaper's Playfair Display — a third distinct type personality.
+// Anton (self-hosted via @fontsource/anton, lazy-loaded below) is a heavier
+// display face than Bebas Neue/Playfair Display — a third distinct personality.
 const DISPLAY_FONT = "'Anton', sans-serif"
 const CASE_COLOR = '#111214'
 const SILVER = '#c9ccd1'
@@ -51,7 +53,10 @@ function TechSpecs({ photo }: { photo: PhotoRecord }): ReactElement {
 // PannableZoomableImage for the drag-to-pan + wheel-to-zoom photo, scoped to
 // the front panel only.
 export function DvdCoverView({ photo, zoom, studioName }: DvdCoverViewProps): ReactElement {
+  const fontsLoaded = useLazyFonts([() => import('@fontsource/anton')])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
+
+  if (!fontsLoaded) return <CoverLoadingPlaceholder />
 
   return (
     <Box
