@@ -4,9 +4,7 @@ A photo organizer for reading and browsing photo metadata tags. Details about yo
 
 No cloud features, no telemetry, just your photos on your computer: organized, tagged, sorted, and more.
 
-Point it at a folder, and it recursively scans for JPEG/PNG/TIFF images,
-reads their EXIF/IPTC keyword tags and camera metadata, generates
-thumbnails, and displays everything in a fast, virtualized gallery.
+Point it at a folder, and it recursively scans for JPEG/PNG/TIFF images, reads their EXIF/IPTC keyword tags and camera metadata, generates thumbnails, and displays everything in a fast, virtualized gallery. Folders are watched live, so new or changed photos show up automatically without a manual rescan.
 
 Built with Electron, React, and TypeScript.
 
@@ -25,85 +23,54 @@ no need to build from source. Grab the one for your platform:
 
 ## Features
 
-- Recursive folder scan for `.jpg` / `.jpeg` / `.png` / `.tif` / `.tiff`
-- Reads EXIF/IPTC metadata (keywords, camera make/model, dimensions, date
-  taken) via `exiftool-vendored`
-- Generates and caches thumbnails on disk
-- SQLite-backed cache keyed by file path + modified time/size, so re-scanning
-  an unchanged folder is instant and avoids re-reading EXIF or regenerating
-  thumbnails
-- Automatically prunes cache entries and thumbnails for files that have been
-  moved or deleted since the last scan
-- Virtualized gallery grid (handles large photo libraries without choking
-  the renderer)
-- Cancelable scans with live progress
+### Library & tags
 
-## Architecture
+- Recursive folder scan for `.jpg` / `.jpeg` / `.png` / `.tif` / `.tiff`, with live folder watching for new/changed/removed files
+- Reads and writes EXIF/IPTC keyword tags directly on the file — tags travel with the photo, no proprietary database lock-in
+- Tag groups (organize related tags together, with optional auto-add match rules) and per-tag descriptions
+- Exclude specific folders or filename patterns from scanning, or from being counted in AI/aggregate features
+- Rename, rotate (lossless), delete, and comment on photos; per-photo view counts
+- Instant re-scans via a SQLite-backed cache — unchanged files skip re-reading EXIF and regenerating thumbnails entirely
 
-The app follows Electron's standard three-process split, wired together with
-`electron-vite`.
+### Gallery
 
-### Main process (`src/main`)
+- Fast, virtualized grid and list views that stay smooth on very large libraries
+- Folder tree, tag panel, and People panel for browsing/filtering by folder, tag, or person
+- Drag-and-drop tagging, multi-select, keyboard navigation, and a hover/spacebar photo preview
+- Side-by-side compare view, and a duplicate-photo view for reviewing near-identical shots
+- Magazine, newspaper, DVD cover, art gallery, and movie theater visualizations for a selected photo
 
-- **`index.ts`** — app entry point; creates the `BrowserWindow` and registers
-  protocols/IPC handlers on startup.
-- **`services/directoryScanner.ts`** — recursively walks a folder (via
-  [`fdir`](https://github.com/thecodrr/fdir)) and returns matching image
-  paths.
-- **`services/metadataService.ts`** — wraps a long-lived `exiftool-vendored`
-  process pool to read EXIF/IPTC tags per file. `Keywords` and `Subject`
-  fields are merged and deduplicated into a single `tags` array.
-- **`services/thumbnailService.ts`** — generates a 300px-long-edge JPEG
-  thumbnail per photo via [`sharp`](https://sharp.pixelplumbing.com/),
-  cached on disk under the app's `userData/thumbnails` directory. Thumbnail
-  filenames are a SHA-1 hash of `path:mtime:size`, so a modified file
-  naturally gets a new thumbnail instead of serving a stale cached one.
-- **`db/database.ts`** / **`db/photoRepository.ts`** — a single SQLite table
-  (`better-sqlite3`) keyed by absolute file path, storing tags, metadata,
-  thumbnail status, and the `mtime`/size pair used to decide whether a file
-  needs to be re-read on the next scan.
-- **`ipc/scanHandlers.ts`** — orchestrates a scan: walks the directory, then
-  processes files concurrently (`p-limit` caps metadata reads at 6 and
-  thumbnail generation at 4 in flight), diffing against the SQLite cache so
-  unchanged files skip both exiftool and sharp entirely. Results are batched
-  (every 30 photos or 120ms, whichever comes first) before being pushed to
-  the renderer over IPC, to avoid flooding it with thousands of individual
-  events on a large library. After the scan, any cached entries whose files
-  are no longer present are pruned along with their thumbnails.
-- **`ipc/dialogHandlers.ts`** — native folder-picker dialog.
-- **`protocols/fileProtocol.ts`** / **`protocols/thumbProtocol.ts`** —
-  register two custom, privileged protocols (`photag-file://`,
-  `photag-thumb://`) so the renderer can request full-resolution originals
-  and cached thumbnails by path/hash without needing Node/filesystem access
-  itself.
+### People (face detection)
 
-### Preload (`src/preload`)
+- Opt-in, fully offline face detection and grouping using bundled on-device models — nothing leaves your computer
+- Automatically clusters detected faces into people you can name, and filter the gallery by
+- Manually merge, split, hide, or reassign a face if a grouping isn't quite right — corrections stick and survive future re-scans
+- Cover photos are automatically the best-matching, face-cropped shot for each person
 
-Exposes a small typed `window.api` surface (folder picking, starting/
-canceling scans, subscribing to scan progress/metadata/completion events) to
-the renderer via `contextBridge`, keeping the renderer sandboxed from direct
-Node/IPC access.
+### AI features (opt-in, on-device)
 
-### Renderer (`src/renderer/src`)
+All AI features run locally via small on-device models (downloaded once, cached, never uploaded anywhere):
 
-- **`state/photoLibraryReducer.ts`** + **`state/PhotoLibraryContext.tsx`** —
-  a single `useReducer`-based store (no external state library) tracking
-  scan status, the in-progress photo map, and the selected photo. Subscribes
-  to the three scan IPC events pushed from the main process.
-- **`components/GalleryGrid.tsx`** — virtualized grid (via `react-window`)
-  that lays out `PhotoThumbnail` cells based on available width, so
-  rendering cost stays flat regardless of library size.
-- **`components/PhotoThumbnail.tsx`** — a single grid cell; requests its
-  image over the `photag-thumb://` protocol.
-- **`components/DetailPanel.tsx`** / **`components/TagList.tsx`** —
-  metadata and tag display for the currently selected photo.
-- **`components/FolderPicker.tsx`** / **`components/ScanProgressBar.tsx`** —
-  scan controls and live progress/status.
+- **Tag suggestions** — suggests tags for untagged photos based on ones you've already tagged
+- **Duplicate detection** — finds near-identical photos across your library
+- **Time Warp** — surfaces photos from the same day in past years, like a "on this day" memory feed
 
-### Shared (`src/shared`)
+### Dashboard
 
-Types and helpers shared between main and renderer (`PhotoRecord`, scan
-event payloads, and the custom protocol URL builders).
+An overview page with widgets for onboarding (get started tagging), a featured tag, tagging progress, top tags, top-viewed photos, recently added photos, a "photos from this year" throwback, and Time Warp.
+
+### Settings
+
+Manage watched folders, exclude patterns/folders, view keyboard shortcuts, and tune general/gallery preferences — including enabling or resetting AI features and face detection.
+
+## How it works
+
+The app follows Electron's standard three-process split (main / preload / renderer), wired together with `electron-vite`:
+
+- **Main process** (`src/main`) owns the filesystem: scanning, EXIF reads/writes (`exiftool-vendored`), thumbnail generation (`sharp`), the SQLite cache (`better-sqlite3`), folder watching, and the on-device AI models (face detection, embeddings, clustering) run in worker threads so they never block the UI.
+- **Preload** (`src/preload`) exposes a small typed `window.api` surface over `contextBridge`, keeping the renderer sandboxed from direct Node/filesystem access.
+- **Renderer** (`src/renderer/src`) is a React app with a `useReducer`-based store (no external state library), a virtualized gallery (`react-window`), and Mantine for UI. Photos and thumbnails are served to it through two custom, privileged protocols rather than direct file access.
+- **Shared** (`src/shared`) holds types and helpers used by both processes.
 
 ## Development
 
@@ -118,6 +85,7 @@ Other useful scripts:
 npm run typecheck   # TypeScript, main + renderer
 npm run lint         # ESLint
 npm run format       # Prettier
+npm run test         # Vitest
 ```
 
 ## Building

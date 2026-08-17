@@ -75,29 +75,15 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 6. Full-tab views for each left panel section?
 
-7. ~~The gallery sidebar is overall rather laggy -- resizing the panels, expanding/collapsing folders, selecting items, dragging and dropping. Can you investigate and see if there's a way to get this experience to be smoother?~~ Fixed. Measured via DevTools traces of the **production** build (dev-mode traces are useless here — React 19 DEV calls `console.createTask` per element for Owner Stacks, which with StrictMode's double-render drowned out all real signal at ~28% of samples). Per-pointermove input cost went 22.4ms → 4.22ms (60fps budget is 16.67ms) and GC 4.85s → 1.8s across four fixes, in descending order of impact:
-   - **Closed dialogs were mounted per row.** Every `TagListItem` unconditionally rendered two Mantine `Modal`s (rename + delete) plus a `Tooltip`; a `Modal` with `opened={false}` still renders its whole `ModalBase`/`Transition`/overlay tree. With hundreds of tags that was ~1000 floating-UI subtrees re-rendering per pass (`_Box` alone was 1221ms). Now mounted only while open — also applied to `TagGroupSection`, `PersonRow`, `FolderRemoveButton`, `PhotoContextMenu`.
-   - **`useDndContext()` in per-row components.** dnd-kit's `publicContext` memo lists `collisions` as a dependency, which is recomputed on _every pointermove_, so all ~300 rows re-rendered continuously mid-drag. Rows now read `ActiveDragContext` (a plain `string | null` derived from `App.tsx`'s existing `activeDrag` state) instead, changing twice per drag rather than ~100 times.
-   - **Heavy row subtree coupled to dnd-kit's `InternalContext`** (whose memo depends on `over`, i.e. the hovered drop target — this was the "clunky when you reach the target" symptom). `TagListItem` is now a thin dnd-wiring shell around a memoized `TagListItemView`; `attributes`/`listeners`/`setNodeRef` are stable in dnd-kit's own source, so only the 1-2 rows whose `isOver`/`isDragging` actually changed re-render.
-   - **`activeDrag` lives in `AppLayout`**, so drag start/end re-rendered the entire app tree. `GalleryGrid`/`DashboardView`/`DetailPanel` take no props and are now `memo`'d so they bail out.
+7. Make the left sidebar wider by default.
 
-   Also landed alongside (real but smaller): the Splitter now commits to the reducer/IPC on release instead of ~60x/sec during a drag, and `PhotoLibraryContext` was split into `PhotoLibraryActionsContext`/`PhotoLibrarySidebarContext`/`PhotoLibraryGalleryContext` with the sidebar migrated onto the narrow hooks. Note the context split was _not_ what fixed the reported lag — app-code render time measured 0.02% of the profile — but it's sound architecture and removes the "any dispatch re-renders all 53 consumers" ceiling. Gallery/Dashboard/DetailPanel/Settings still use the fully-compatible `usePhotoLibrary()` shim.
+8. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated)
 
-   **Known remaining cost:** two ~550ms stalls at drag start and at drop, dominated by dnd-kit's `DroppableContainersMap` iterating every registered droppable (~300 tag rows). The fix is virtualizing the tag list (`react-window` is already a dependency and `GalleryGrid` uses it) so only ~25 rows mount at a time. See Optimization below.
+9. Make the breadcrumb section headers sticky so it's easier to tell what section you're in
 
-8. Make the left sidebar wider by default.
-
-9. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated)
-
-10. Make the breadcrumb section headers sticky so it's easier to tell what section you're in
-
-11. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
+10. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
 
 ### People
-
-1. ~~The face scan is doing a pretty good job but it's pulling in a lot of non-face photos or photos that really don't look like the same face, any way to tune that?~~ Fixed. Raised YuNet's detection `SCORE_THRESHOLD` from 0.6 to 0.9 in `faceDetectionWorker.ts` — matches OpenCV's own `FaceDetectorYN` default, so it's a principled tightening rather than a guess. Scoped to the "non-face detections" symptom per user confirmation; the DBSCAN grouping threshold was left as-is.
-
-2. ~~Disable the "scan for faces" button if the initial scan is currently running. It disables if you start the scan from that button but it should also disable if any face scan is running~~ Fixed. Added a derived `faceScanInProgress` boolean to `SidebarLibraryState` (flips only at scan start/end, not per progress tick, preserving the deliberate exclusion of the raw `faceScanProgress` object from that context) and wired it into the People panel's "Scan for faces" button.
 
 ## Tools
 
