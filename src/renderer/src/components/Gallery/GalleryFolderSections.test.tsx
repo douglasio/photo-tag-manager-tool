@@ -1,5 +1,5 @@
 import { MantineProvider } from '@mantine/core'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -141,6 +141,92 @@ describe('GalleryFolderSections', () => {
     )
 
     expect(document.querySelectorAll('[role="separator"]')).toHaveLength(1)
+  })
+
+  describe('sticky section header', () => {
+    function manyPhotos(prefix: string, count: number): PhotoRecord[] {
+      return Array.from({ length: count }, (_, i) => makePhoto(`${prefix}/${i}.jpg`))
+    }
+
+    function renderScrollableSections(
+      sections: string[],
+      photosBySection: Map<string, PhotoRecord[]>
+    ): HTMLElement {
+      render(
+        <MantineProvider>
+          <GalleryFolderSections
+            rootFolder="/root"
+            sections={sections}
+            photosBySection={photosBySection}
+            columnCount={4}
+            cellHeight={200}
+            width={800}
+            height={400}
+            {...thumbnailProps}
+          />
+        </MantineProvider>
+      )
+      // react-window's List root is the real, natively-scrolling element —
+      // simulating a scroll means setting scrollTop on it directly and
+      // firing the event, same as a real scroll would.
+      return document.querySelector('[role="list"]') as HTMLElement
+    }
+
+    it('does not show a duplicate header while the real one is still at the top', () => {
+      renderScrollableSections(
+        ['/root/a', '/root/b'],
+        new Map([
+          ['/root/a', manyPhotos('/root/a', 40)],
+          ['/root/b', manyPhotos('/root/b', 40)]
+        ])
+      )
+
+      expect(screen.getAllByText('a')).toHaveLength(1)
+    })
+
+    it('pins the current section breadcrumb to the top once its real header scrolls out of view', () => {
+      const scrollContainer = renderScrollableSections(
+        ['/root/a', '/root/b'],
+        new Map([
+          ['/root/a', manyPhotos('/root/a', 40)],
+          ['/root/b', manyPhotos('/root/b', 40)]
+        ])
+      )
+
+      // Far enough that "/root/a"'s real header row (72px tall, at the very
+      // top) is outside react-window's overscan window and isn't mounted at
+      // all — the only "a" left in the document is the sticky overlay's copy.
+      scrollContainer.scrollTop = 900
+      fireEvent.scroll(scrollContainer)
+
+      expect(screen.getAllByText('a')).toHaveLength(1)
+    })
+
+    it('scrolls to a section when its sticky-header crumb is clicked', async () => {
+      const scrollTo = vi.fn()
+      Element.prototype.scrollTo = scrollTo
+      const user = userEvent.setup()
+
+      const scrollContainer = renderScrollableSections(
+        ['/root', '/root/a', '/root/a/b'],
+        new Map([
+          ['/root', []],
+          ['/root/a', manyPhotos('/root/a', 40)],
+          ['/root/a/b', manyPhotos('/root/a/b', 4)]
+        ])
+      )
+
+      // Deep enough into "/root/a"'s photos that both its own real header
+      // and "/root"'s are well outside the virtualized render range, so the
+      // sticky overlay's "root" ancestor crumb is the only one mounted.
+      scrollContainer.scrollTop = 1000
+      fireEvent.scroll(scrollContainer)
+
+      const rootCrumb = screen.getAllByText('root').find((el) => el.tagName === 'A')
+      await user.click(rootCrumb!)
+
+      expect(scrollTo).toHaveBeenCalledWith({ behavior: 'smooth', top: 0 })
+    })
   })
 
   it('only mounts thumbnails near the viewport, not every photo in the subtree', () => {

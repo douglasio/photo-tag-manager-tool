@@ -79,7 +79,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 8. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated)
 
-9. Make the breadcrumb section headers sticky so it's easier to tell what section you're in
+9. ~~Make the breadcrumb section headers sticky so it's easier to tell what section you're in~~ Fixed. `GalleryFolderSections` now tracks scroll position and overlays the current section's breadcrumb at the top of the list once its real header row has scrolled out of view, with a subtle "handoff" push as the next section's header arrives.
 
 10. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
 
