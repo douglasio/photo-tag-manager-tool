@@ -9,10 +9,10 @@ import type { PhotoRecord } from '@shared/types'
 import { useSidebarLibrary } from '@state'
 
 const HOVER_DELAY_MS = 700
-const CARD_WIDTH = 220
-const COVER_IMAGE_HEIGHT = 120
+const CARD_WIDTH = 320
+const COVER_IMAGE_HEIGHT = 220
 const STAT_ICON_SIZE = 14
-// Neutralizes Tooltip's own chrome (padding/background/shadow/radius) so
+// Neutralizes Tooltip's chrome (padding/background/shadow/radius) so
 // only the Card inside it is visible — used by TagHoverCardTarget below.
 const TRANSPARENT_TOOLTIP_STYLES = {
   tooltip: {
@@ -32,11 +32,6 @@ interface TagHoverCardBodyProps {
   viewCount: number
 }
 
-// The full popover card — cover photo on top, tag name + description as the
-// body, and total photo/view counts as a footer section. Kept as its own
-// component (rather than inlined in TagHoverCard below) so it's directly
-// unit-testable: Mantine's Popover.Dropdown renders through a floating-ui
-// portal that never actually settles/mounts under jsdom.
 export function TagHoverCardBody({
   tag,
   description,
@@ -47,7 +42,7 @@ export function TagHoverCardBody({
   const hasCoverImage = coverPhoto?.thumbnailStatus === 'ready' && !!coverPhoto.thumbnailKey
 
   return (
-    <Card w={CARD_WIDTH} padding="sm" radius={0}>
+    <Card w={CARD_WIDTH} padding="sm">
       {hasCoverImage && (
         <Card.Section>
           <Image
