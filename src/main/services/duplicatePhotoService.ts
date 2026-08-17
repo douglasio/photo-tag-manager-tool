@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 
+import { getDismissedDuplicateSignatures } from '@main/db/duplicateRepository'
 import { getAllEmbeddings } from '@main/db/embeddingRepository'
 import type {
   ClusterInputPhoto,
@@ -8,6 +9,7 @@ import type {
   WorkerResponse
 } from '@main/workers/duplicateClusterProtocol'
 import { rejectAllPending } from '@main/workers/pendingRequests'
+import { computeDuplicateGroupSignature } from '@shared/duplicateGroupSignature'
 import type { DuplicateGroup, SimilarPhoto } from '@shared/types'
 
 import { cosineSimilarity } from './embeddingSimilarity'
@@ -56,11 +58,7 @@ function send(message: WorkerRequest): void {
   getWorker().postMessage(message)
 }
 
-// Clusters already-embedded photos by pairwise cosine similarity, off the
-// main process — the O(n²) comparison used to run inline here and could
-// visibly block the app on a large library. isCancelled is polled (the
-// worker can't see the caller's flag directly) and forwarded as a 'cancel'
-// message the first time it flips true.
+// Clusters already-embedded photos by pairwise cosine similarity
 export async function clusterDuplicates(
   photos: EmbeddedPhoto[],
   onProgress?: (comparisons: number, totalPairs: number) => void,
@@ -87,15 +85,21 @@ export async function clusterDuplicates(
   }
 
   try {
-    return await resultPromise
+    const result = await resultPromise
+    // A dismissed group stays hidden regardless of who requests a scan
+    const dismissed = getDismissedDuplicateSignatures()
+    return {
+      ...result,
+      groups: result.groups.filter(
+        (group) => !dismissed.has(computeDuplicateGroupSignature(group.filePaths))
+      )
+    }
   } finally {
     if (cancelTimer) clearInterval(cancelTimer)
   }
 }
 
-// For one photo's Details Panel — only compares against embeddings already
-// cached (no full-library embedding pass), so this stays fast regardless of
-// library size; the target photo itself is embedded on demand if missing.
+// For individual photo's Details Panel
 export async function findSimilarPhotos(
   filePath: string,
   thumbnailKey: string,

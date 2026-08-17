@@ -6,12 +6,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PhotoRecord } from '@shared/types'
 
 let mockPhotosByPath: Map<string, PhotoRecord>
+let mockExcludedFolders: string[]
 const mockGetThrowbackYearSample = vi.fn()
 const mockOpenPhotoTab = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { photosByPath: mockPhotosByPath, galleryAnimationsEnabled: true },
+    state: {
+      photosByPath: mockPhotosByPath,
+      galleryAnimationsEnabled: true,
+      excludedFolders: mockExcludedFolders
+    },
+    activePhotosByPath: mockPhotosByPath,
     getThrowbackYearSample: mockGetThrowbackYearSample,
     openPhotoTab: mockOpenPhotoTab
   })
@@ -55,6 +61,7 @@ function renderWidget(): ReturnType<typeof render> {
 describe('PhotosFromYearWidget', () => {
   beforeEach(() => {
     mockPhotosByPath = new Map()
+    mockExcludedFolders = []
     mockGetThrowbackYearSample.mockReset().mockResolvedValue(null)
     mockOpenPhotoTab.mockClear()
   })
@@ -85,5 +92,27 @@ describe('PhotosFromYearWidget', () => {
     await user.click(await screen.findByRole('img'))
 
     expect(mockOpenPhotoTab).toHaveBeenCalledExactlyOnceWith('/a.jpg')
+  })
+
+  it('recalculates (not just re-filters) once a folder is excluded from features', async () => {
+    mockGetThrowbackYearSample.mockResolvedValueOnce({ year: 2019, filePaths: ['/excluded/a.jpg'] })
+    const { rerender } = renderWidget()
+
+    await screen.findByText('Photos from 2019')
+
+    // Excluding /excluded means that year no longer qualifies at all — the
+    // sample gets recalculated, not just filtered down to an empty grid.
+    mockGetThrowbackYearSample.mockResolvedValueOnce(null)
+    mockExcludedFolders = ['/excluded']
+    rerender(
+      <MantineProvider>
+        <PhotosFromYearWidget />
+      </MantineProvider>
+    )
+
+    expect(mockGetThrowbackYearSample).toHaveBeenCalledTimes(2)
+    expect(
+      await screen.findByText('Add photos spanning more than one year to see photos from the past.')
+    ).toBeInTheDocument()
   })
 })

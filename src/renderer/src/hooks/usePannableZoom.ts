@@ -3,6 +3,7 @@ import {
   type RefObject,
   type SyntheticEvent,
   useEffect,
+  useMemo,
   useRef,
   useState
 } from 'react'
@@ -163,23 +164,30 @@ export function usePannableZoom(
     setScale(clampScale(naturalSize.width / baseSize.width))
   }
 
-  return {
-    containerRef,
-    scale,
-    setScale: (value) => setScale(clampScale(value)),
-    pan,
-    isDragging,
-    baseSize,
-    anchor,
-    handlePointerDown,
-    handlePointerMove,
-    stopDragging,
-    handleImageLoad,
-    zoomToFit,
-    zoomToNativeSize,
-    zoomOut: () => setScale((prev) => clampScale(prev - SCALE_STEP)),
-    zoomIn: () => setScale((prev) => clampScale(prev + SCALE_STEP)),
-    min: MIN_SCALE,
-    max: MAX_SCALE
-  }
+  // Memoized so a caller reporting this object up to a parent (e.g. PhotoView
+  // mirroring the active theme's zoom for its footer toolbar) doesn't loop —
+  // identity only changes when a value it actually depends on does.
+  return useMemo<UsePannableZoomResult>(
+    () => ({
+      containerRef,
+      scale,
+      setScale: (value) => setScale(clampScale(value)),
+      pan,
+      isDragging,
+      baseSize,
+      anchor,
+      handlePointerDown,
+      handlePointerMove,
+      stopDragging,
+      handleImageLoad,
+      zoomToFit,
+      zoomToNativeSize,
+      zoomOut: () => setScale((prev) => clampScale(prev - SCALE_STEP)),
+      zoomIn: () => setScale((prev) => clampScale(prev + SCALE_STEP)),
+      min: MIN_SCALE,
+      max: MAX_SCALE
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close only over stable setters plus these values
+    [scale, pan, isDragging, baseSize, anchor, naturalSize, defaultFit]
+  )
 }

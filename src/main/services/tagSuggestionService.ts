@@ -7,14 +7,9 @@ import type { WorkerRequest, WorkerResponse } from '@main/workers/tagSuggestionP
 import type { TagSuggestion } from '@shared/types'
 
 let worker: Worker | null = null
-// Memoized so concurrent callers (e.g. the Settings toggle and Quick Tag
-// opening around the same time) share one in-flight init instead of each
-// sending their own 'init' message.
+// Memoized so concurrent callers (Settings toggle, Quick Tag) share one in-flight init
 let readyPromise: Promise<void> | null = null
-// The pending readyPromise's own reject — disposeTagSuggestionWorker uses
-// this to unblock a caller stuck awaiting ensureModelReady() when the
-// worker is torn down mid-download, since nulling readyPromise alone
-// doesn't settle the promise callers are already awaiting.
+// Unblocks a caller stuck awaiting ensureModelReady() when the worker is torn down mid-download
 let readyReject: ((err: Error) => void) | null = null
 
 let nextRequestId = 0

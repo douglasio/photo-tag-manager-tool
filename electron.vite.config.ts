@@ -19,7 +19,9 @@ export default defineConfig({
           index: resolve('src/main/index.ts'),
           tagSuggestionWorker: resolve('src/main/workers/tagSuggestionWorker.ts'),
           duplicateClusterWorker: resolve('src/main/workers/duplicateClusterWorker.ts'),
-          throwbackSimilarityWorker: resolve('src/main/workers/throwbackSimilarityWorker.ts')
+          throwbackSimilarityWorker: resolve('src/main/workers/throwbackSimilarityWorker.ts'),
+          faceDetectionWorker: resolve('src/main/workers/faceDetectionWorker.ts'),
+          faceClusterWorker: resolve('src/main/workers/faceClusterWorker.ts')
         }
       }
     },

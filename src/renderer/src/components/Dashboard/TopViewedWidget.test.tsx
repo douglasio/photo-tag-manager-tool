@@ -8,10 +8,14 @@ let mockPhotosByPath: Map<string, PhotoRecord>
 const mockOpenPhotoTab = vi.fn()
 
 vi.mock('@state', () => ({
-  usePhotoLibrary: () => ({
+  useGalleryLibrary: () => ({
     state: { photosByPath: mockPhotosByPath },
-    openPhotoTab: mockOpenPhotoTab
-  })
+    activePhotosByPath: mockPhotosByPath
+  }),
+  useLibraryActions: () => ({ openPhotoTab: mockOpenPhotoTab }),
+  // The real (unstubbed) GalleryHoverPreview rendered by this widget calls
+  // usePhotoLibrary() itself for incrementViewCount.
+  usePhotoLibrary: () => ({ incrementViewCount: vi.fn() })
 }))
 
 // BarChart drags in Recharts' ResponsiveContainer, which needs real layout
@@ -128,6 +132,27 @@ describe('TopViewedWidget', () => {
     const data = mockBarChart.mock.calls[0][0].data as { viewCount: number }[]
     expect(data).toHaveLength(5)
     expect(data.filter((d) => d.viewCount > 0)).toHaveLength(2)
+  })
+
+  it('shows a progress caption while below the 5-viewed goal', () => {
+    setLibrary([makePhoto('/a.jpg', { viewCount: 5 }), makePhoto('/b.jpg', { viewCount: 2 })])
+    renderWidget()
+
+    expect(screen.getByText('2 of 5 photos viewed')).toBeInTheDocument()
+  })
+
+  it('hides the progress caption once the 5-viewed goal is reached', () => {
+    setLibrary(Array.from({ length: 5 }, (_, i) => makePhoto(`/p${i}.jpg`, { viewCount: i + 1 })))
+    renderWidget()
+
+    expect(screen.queryByText(/photos viewed/)).not.toBeInTheDocument()
+  })
+
+  it('does not show the progress caption when no photo has been viewed yet', () => {
+    setLibrary([makePhoto('/a.jpg', { viewCount: 0 })])
+    renderWidget()
+
+    expect(screen.queryByText(/photos viewed/)).not.toBeInTheDocument()
   })
 })
 

@@ -11,6 +11,14 @@ vi.mock('@state', () => ({
     tagCounts: new Map(),
     tagCoverPhotos: new Map(),
     tagViewCounts: new Map()
+  }),
+  // TagHoverCardTarget (rendered inside DetailPanelTagChip) reads this
+  // context directly rather than through usePhotoLibrary.
+  useSidebarLibrary: () => ({
+    state: { tagDescriptions: new Map() },
+    tagCounts: new Map(),
+    tagCoverPhotos: new Map(),
+    tagViewCounts: new Map()
   })
 }))
 

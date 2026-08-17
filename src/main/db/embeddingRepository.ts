@@ -1,4 +1,7 @@
+import { isUnderExcludedFolder } from '@shared/folderExclusion'
+
 import { getDb } from './database'
+import { getExcludedFolders } from './settingsRepository'
 
 export function getEmbedding(filePath: string): Float32Array | null {
   const row = getDb()
@@ -22,21 +25,25 @@ export function setEmbedding(filePath: string, embedding: Float32Array): void {
     .run({ path: filePath, embedding: buffer })
 }
 
-/** Every cached embedding — used for duplicate detection, which needs to
- * compare a photo against the whole set rather than one tag's examples. */
+/** Every cached embedding outside an excluded folder — used for duplicate
+ * detection and Time Warp, which both need to compare a photo against the
+ * whole set rather than one tag's examples. */
 export function getAllEmbeddings(): { filePath: string; embedding: Float32Array }[] {
+  const excludedFolders = getExcludedFolders()
   const rows = getDb().prepare('SELECT path, embedding FROM photo_embeddings').all() as {
     path: string
     embedding: Buffer
   }[]
-  return rows.map((row) => ({
-    filePath: row.path,
-    embedding: new Float32Array(
-      row.embedding.buffer,
-      row.embedding.byteOffset,
-      row.embedding.byteLength / Float32Array.BYTES_PER_ELEMENT
-    )
-  }))
+  return rows
+    .filter((row) => !isUnderExcludedFolder(row.path, excludedFolders))
+    .map((row) => ({
+      filePath: row.path,
+      embedding: new Float32Array(
+        row.embedding.buffer,
+        row.embedding.byteOffset,
+        row.embedding.byteLength / Float32Array.BYTES_PER_ELEMENT
+      )
+    }))
 }
 
 export function deleteEmbedding(filePath: string): void {

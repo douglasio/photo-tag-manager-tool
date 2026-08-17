@@ -1,7 +1,10 @@
+import { isUnderExcludedFolder } from '@shared/folderExclusion'
 import type { PhotoRecord } from '@shared/types'
 
 import { getDb } from './database'
 import { deleteEmbedding, renameEmbedding } from './embeddingRepository'
+import { deleteFacesForPhoto, renameFacesForPhoto } from './faceRepository'
+import { getExcludedFolders } from './settingsRepository'
 import { reconcileTagGroups } from './tagMetadataRepository'
 
 interface PhotoRow {
@@ -23,12 +26,21 @@ interface PhotoRow {
   firstSeenAt: number | null
 }
 
+// Coerces every element to a string — a row written before metadataService's
+// own toArray() started doing this can still have a non-string tag (e.g. a
+// number from a purely-numeric EXIF keyword) sitting in the DB, which
+// crashes TagsInput's rendering downstream if passed through as-is.
+function parsePhotoTags(raw: string): string[] {
+  const parsed: unknown = JSON.parse(raw)
+  return Array.isArray(parsed) ? parsed.map((tag) => String(tag)) : []
+}
+
 function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
   return {
     id: row.path,
     filePath: row.path,
     fileName: row.fileName,
-    tags: JSON.parse(row.tags),
+    tags: parsePhotoTags(row.tags),
     metadata: {
       dateTaken: row.dateTaken,
       cameraMake: row.cameraMake,
@@ -46,7 +58,8 @@ function rowToPhotoRecord(row: PhotoRow): PhotoRecord {
     // override this to true; a DB row read on its own isn't "from cache."
     fromCache: false,
     viewCount: row.viewCount,
-    firstSeenAt: row.firstSeenAt ?? undefined
+    firstSeenAt: row.firstSeenAt ?? undefined,
+    mtimeMs: row.mtimeMs
   }
 }
 
@@ -90,7 +103,10 @@ export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: num
       fileName: record.fileName,
       mtimeMs,
       sizeBytes,
-      tags: JSON.stringify(record.tags),
+      // Coerced defensively (not just trusted as already string[]) — this is
+      // the one place anything ever writes to photos.tags, so guaranteeing
+      // the invariant here closes off every downstream read path at once.
+      tags: JSON.stringify(record.tags.map(String)),
       dateTaken: record.metadata.dateTaken,
       cameraMake: record.metadata.cameraMake,
       cameraModel: record.metadata.cameraModel,
@@ -120,6 +136,7 @@ export function findPhotoPathsWithTag(
   tag: string,
   limit: number
 ): { filePath: string; thumbnailKey: string }[] {
+  const excludedFolders = getExcludedFolders()
   const matches: { filePath: string; thumbnailKey: string }[] = []
   const rows = getDb()
     .prepare(
@@ -134,8 +151,9 @@ export function findPhotoPathsWithTag(
 
   for (const row of rows) {
     if (matches.length >= limit) break
+    if (isUnderExcludedFolder(row.path, excludedFolders)) continue
     try {
-      if ((JSON.parse(row.tags) as string[]).includes(tag)) {
+      if (parsePhotoTags(row.tags).includes(tag)) {
         matches.push({ filePath: row.path, thumbnailKey: row.thumbnailKey })
       }
     } catch {
@@ -146,35 +164,41 @@ export function findPhotoPathsWithTag(
   return matches
 }
 
-/** Every thumbnail-ready photo — used to build the duplicate-detection
- * embedding set (unlike findPhotoPathsWithTag, no filtering needed here). */
+/** Every thumbnail-ready photo outside an excluded folder — used to build
+ * the duplicate-detection embedding set. */
 export function findAllReadyPhotos(): { filePath: string; thumbnailKey: string }[] {
+  const excludedFolders = getExcludedFolders()
   const rows = getDb()
     .prepare(
       `SELECT path, thumbnailKey FROM photos WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL`
     )
     .all() as { path: string; thumbnailKey: string }[]
-  return rows.map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
+  return rows
+    .filter((row) => !isUnderExcludedFolder(row.path, excludedFolders))
+    .map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
 }
 
-/** Every thumbnail-ready photo with a known dateTaken — used to group
- * photos by year for the Throwback widget. */
+/** Every thumbnail-ready photo with a known dateTaken, outside an excluded
+ * folder — used to group photos by year for the Throwback widget. */
 export function findAllReadyPhotosWithDate(): {
   filePath: string
   thumbnailKey: string
   dateTaken: string
 }[] {
+  const excludedFolders = getExcludedFolders()
   const rows = getDb()
     .prepare(
       `SELECT path, thumbnailKey, dateTaken FROM photos
        WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL AND dateTaken IS NOT NULL`
     )
     .all() as { path: string; thumbnailKey: string; dateTaken: string }[]
-  return rows.map((row) => ({
-    filePath: row.path,
-    thumbnailKey: row.thumbnailKey,
-    dateTaken: row.dateTaken
-  }))
+  return rows
+    .filter((row) => !isUnderExcludedFolder(row.path, excludedFolders))
+    .map((row) => ({
+      filePath: row.path,
+      thumbnailKey: row.thumbnailKey,
+      dateTaken: row.dateTaken
+    }))
 }
 
 /** Reverse lookup for the thumbnail protocol handler's regenerate-on-miss
@@ -211,6 +235,7 @@ export function removePhoto(filePath: string): string | null {
   db.prepare('DELETE FROM photos WHERE path = ?').run(filePath)
   reconcileTagGroups()
   deleteEmbedding(filePath)
+  deleteFacesForPhoto(filePath)
   return row.thumbnailKey
 }
 
@@ -222,6 +247,7 @@ export function renamePhotoPath(oldPath: string, newPath: string, fileName: stri
     .prepare('UPDATE photos SET path = @newPath, fileName = @fileName WHERE path = @oldPath')
     .run({ oldPath, newPath, fileName })
   renameEmbedding(oldPath, newPath)
+  renameFacesForPhoto(oldPath, newPath)
 }
 
 function isPathUnderFolder(path: string, folder: string): boolean {
@@ -253,7 +279,10 @@ export function renamePhotoPathPrefix(oldFolder: string, newFolder: string): voi
     for (const pair of pairs) update.run(pair)
   })
   updateMany(affected)
-  for (const { oldPath, newPath } of affected) renameEmbedding(oldPath, newPath)
+  for (const { oldPath, newPath } of affected) {
+    renameEmbedding(oldPath, newPath)
+    renameFacesForPhoto(oldPath, newPath)
+  }
 }
 
 export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[] {
@@ -271,7 +300,10 @@ export function pruneMissing(rootPath: string, seenPaths: Set<string>): string[]
   })
   deleteMany(stale.map((row) => row.path))
   reconcileTagGroups()
-  for (const row of stale) deleteEmbedding(row.path)
+  for (const row of stale) {
+    deleteEmbedding(row.path)
+    deleteFacesForPhoto(row.path)
+  }
 
   return stale.map((row) => row.thumbnailKey).filter((key): key is string => Boolean(key))
 }

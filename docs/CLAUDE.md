@@ -4,6 +4,6 @@ Suggest an external library before rolling custom solutions for things that are 
 
 Keep your inline comments in files to no more than 2 lines.
 
-Double-check with me about the implementation plan before tackling items off of ROADMAP.md
+Double-check with me about the implementation plan before tackling items off of ROADMAP.md. Mark items as done when they've been completed in the roadmap.
 
 Tell me when you've completed a task you might want to run tests for and ask me whether to proceed with tests or skip.

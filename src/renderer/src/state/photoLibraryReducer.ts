@@ -1,7 +1,10 @@
 import type {
   AiScanProgress,
+  AppSettings,
   DefaultView,
+  FaceScanProgress,
   GalleryViewMode,
+  PersonRecord,
   PhotoRecord,
   ScanCompleteEvent,
   TagGroup
@@ -14,7 +17,7 @@ import {
   rewritePathPrefix
 } from '@utils'
 
-type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
+export type ScanStatus = 'idle' | 'scanning' | 'complete' | 'canceled'
 
 export type GallerySortBy = 'name' | 'dateTaken' | 'viewCount' | 'random'
 export type GallerySortOrder = 'asc' | 'desc'
@@ -45,51 +48,63 @@ export interface PhotoLibraryState {
   selectedPaths: Set<string>
   selectedFolder: string | null
   selectedTag: string | null
-  // Pseudo-filter for photos with no tags — mutually exclusive with
-  // selectedTag/selectedFolder rather than a sentinel value on selectedTag,
-  // since a real tag could otherwise collide with it.
+  selectedPerson: string | null
+  // Every (photo, person) pairing, keyed by personId — lets the gallery filter
+  // by person synchronously, same as tags (which live directly on PhotoRecord).
+  personPhotoAssignments: Map<string, Set<string>>
+  // Pseudo-filter for untagged photos — separate flag rather than a sentinel
+  // on selectedTag, since a real tag name could otherwise collide with it.
   untaggedFilterActive: boolean
   sortBy: GallerySortBy
   sortOrder: GallerySortOrder
   folderCounts: Map<string, number>
   folderChildren: Map<string, Set<string>>
-  // Every folder on disk per watched root, including empty ones (folderCounts/
-  // folderChildren above never include those). From SCAN_COMPLETE's
-  // allFolders, so it's as of the last scan, not live filesystem changes.
+  // Every folder on disk per watched root, including empty ones (unlike
+  // folderCounts/folderChildren) — as of the last scan, not live changes.
   allFolderPaths: Set<string>
   // Which pinned tab ('dashboard' or 'gallery') the app loads into on launch.
   defaultView: DefaultView
   showEmptyFolders: boolean
   tagsPanelGridView: boolean
+  peoplePanelGridView: boolean
   galleryViewMode: GalleryViewMode
   aiTagSuggestionsEnabled: boolean
   // Session-only — null when no AI scan is in flight. Spans the whole
-  // "enable AI features" flow (model download, then embedding, then
-  // duplicate clustering), driven from PhotoLibraryContext's
-  // enableAiFeatures/rescanAiFeatures regardless of which component
-  // triggered it.
+  // download/embed/cluster flow, regardless of which component triggered it.
   aiScanProgress: AiScanProgress | null
-  // Session-only (not persisted) — whether the Settings modal is open, so
-  // other components (e.g. the dashboard's onboarding checklist) can open it
-  // without needing a ref/portal into SettingsModal's own local state.
+  faceDetectionEnabled: boolean
+  // Session-only, same reasoning as aiScanProgress — spans the whole
+  // detect-then-cluster face scan regardless of which component triggered it.
+  faceScanProgress: FaceScanProgress | null
+  // People (labeled/unlabeled face clusters) — loaded once face detection is
+  // enabled and refreshed after any scan or manual assign/merge/split.
+  people: PersonRecord[]
+  // Session-only — lets other components (e.g. onboarding checklists) open
+  // the Settings modal without a ref/portal into its own local state.
   settingsModalOpened: boolean
   detailsPanelCollapsed: boolean
   galleryAnimationsEnabled: boolean
   showFilenames: boolean
   showViewCounts: boolean
-  // Percentage split [tags, folders] of the navbar's Tags/Folders Splitter.
-  navbarSplitSizes: [number, number]
+  // Percentage split of the navbar's Splitter panes — [tags, people, folders]
+  // when People is shown, [tags, folders] otherwise; App.tsx defaults on mismatch.
+  navbarSplitSizes: number[]
+  // Accordion-style collapse for the same panes, keyed by a stable panel id
+  // ('tags' | 'people' | 'folders') rather than index — missing key means expanded.
+  navbarCollapsedPanels: Record<string, boolean>
   // Global masthead/studio text for PhotoView's magazine/newspaper/DVD
   // visualizations, editable from Settings.
   magazineTitle: string
   newspaperTitle: string
   dvdStudioName: string
+  artGalleryName: string
   excludePatterns: string[]
+  // Folders excluded from tags/AI/duplicates/Time Warp/dashboard aggregates —
+  // still fully ingested and browsable directly, just filtered from those.
+  excludedFolders: string[]
   tagDescriptions: Map<string, string>
-  // User-defined tag groups (TagPanel's accordion view) and each grouped
-  // tag's membership (tag -> group id) — a tag not present here is ungrouped
-  // ("Other Tags"). A group with no tags still stays in tagGroups; only an
-  // explicit delete removes one.
+  // User-defined tag groups (TagPanel's accordion view) — a tag missing from
+  // tagGroupAssignments below is ungrouped ("Other Tags").
   tagGroups: TagGroup[]
   tagGroupAssignments: Map<string, string>
   // Newest-first shortcut list for the tag-input dropdown. Session-only.
@@ -116,6 +131,8 @@ export const initialState: PhotoLibraryState = {
   selectedPaths: new Set(),
   selectedFolder: null,
   selectedTag: null,
+  selectedPerson: null,
+  personPhotoAssignments: new Map(),
   untaggedFilterActive: false,
   sortBy: 'name',
   sortOrder: 'asc',
@@ -125,19 +142,26 @@ export const initialState: PhotoLibraryState = {
   defaultView: 'dashboard',
   showEmptyFolders: false,
   tagsPanelGridView: false,
+  peoplePanelGridView: false,
   galleryViewMode: 'grid',
   aiTagSuggestionsEnabled: false,
   aiScanProgress: null,
+  faceDetectionEnabled: false,
+  faceScanProgress: null,
+  people: [],
   settingsModalOpened: false,
   detailsPanelCollapsed: false,
   galleryAnimationsEnabled: true,
   showFilenames: true,
   showViewCounts: false,
   navbarSplitSizes: [50, 50],
+  navbarCollapsedPanels: {},
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
   dvdStudioName: 'TAG ME PICTURES',
+  artGalleryName: 'The Tag Me Gallery',
   excludePatterns: [],
+  excludedFolders: [],
   tagDescriptions: new Map(),
   tagGroups: [],
   tagGroupAssignments: new Map(),
@@ -149,6 +173,7 @@ export const initialState: PhotoLibraryState = {
 
 export type PhotoLibraryAction =
   | { type: 'FOLDERS_LOADED'; folders: string[] }
+  | { type: 'SETTINGS_LOADED'; settings: AppSettings }
   | { type: 'FOLDER_ADDED'; folder: string }
   | { type: 'FOLDER_REMOVED'; folder: string }
   | { type: 'FOLDER_RENAMED'; oldFolder: string; newFolder: string }
@@ -165,24 +190,34 @@ export type PhotoLibraryAction =
   | { type: 'SET_TAG_FILTER'; tag: string | null }
   | { type: 'SET_FOLDER_TAG_FILTER'; tag: string | null }
   | { type: 'SET_UNTAGGED_FILTER'; active: boolean }
+  | { type: 'SET_FOLDER_UNTAGGED_FILTER'; active: boolean }
+  | { type: 'SET_PERSON_FILTER'; personId: string | null }
+  | { type: 'SET_PERSON_PHOTO_ASSIGNMENTS'; assignments: Map<string, Set<string>> }
   | { type: 'SET_SORT'; sortBy: GallerySortBy; sortOrder: GallerySortOrder }
   | { type: 'SET_DEFAULT_VIEW'; value: DefaultView }
   | { type: 'SET_SHOW_EMPTY_FOLDERS'; value: boolean }
   | { type: 'SET_TAGS_PANEL_GRID_VIEW'; value: boolean }
+  | { type: 'SET_PEOPLE_PANEL_GRID_VIEW'; value: boolean }
   | { type: 'SET_GALLERY_VIEW_MODE'; value: GalleryViewMode }
   | { type: 'SET_AI_TAG_SUGGESTIONS_ENABLED'; value: boolean }
   | { type: 'SET_AI_SCAN_PROGRESS'; progress: AiScanProgress | null }
+  | { type: 'SET_FACE_DETECTION_ENABLED'; value: boolean }
+  | { type: 'SET_FACE_SCAN_PROGRESS'; progress: FaceScanProgress | null }
+  | { type: 'SET_PEOPLE'; people: PersonRecord[] }
   | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
   | { type: 'SET_GALLERY_ANIMATIONS_ENABLED'; value: boolean }
   | { type: 'SET_SHOW_FILENAMES'; value: boolean }
   | { type: 'SET_SHOW_VIEW_COUNTS'; value: boolean }
-  | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: [number, number] }
+  | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: number[] }
+  | { type: 'SET_NAVBAR_COLLAPSED_PANELS'; panels: Record<string, boolean> }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
   | { type: 'SET_DVD_STUDIO_NAME'; value: string }
+  | { type: 'SET_ART_GALLERY_NAME'; value: string }
   | { type: 'TAGS_ASSIGNED'; tags: string[] }
   | { type: 'SET_EXCLUDE_PATTERNS'; patterns: string[] }
+  | { type: 'SET_EXCLUDED_FOLDERS'; folders: string[] }
   | { type: 'WATCH_FOLDER_ADDED'; folderPath: string }
   | { type: 'WATCH_FOLDER_REMOVED'; folderPath: string }
   | { type: 'PHOTO_UPSERTED'; photo: PhotoRecord }
@@ -211,10 +246,8 @@ export type PhotoLibraryAction =
   | { type: 'REORDER_PHOTO_TABS'; openTabs: string[] }
   | { type: 'OPEN_DUPLICATES_TAB' }
 
-// Shared by CLOSE_PHOTO_TAB and REMOVE_FROM_COMPARE_TAB (which closes its
-// whole tab once too few photos remain) — falls back to the tab immediately
-// left in the visible order (Gallery first, then openTabs) rather than
-// always jumping to Gallery.
+// Shared by CLOSE_PHOTO_TAB and REMOVE_FROM_COMPARE_TAB — falls back to the
+// tab immediately left in visible order, rather than always jumping to Gallery.
 function closeTab(
   state: PhotoLibraryState,
   tabId: string
@@ -236,6 +269,17 @@ export function photoLibraryReducer(
   switch (action.type) {
     case 'FOLDERS_LOADED':
       return { ...state, folders: action.folders }
+    // Batched startup settings load — gallerySort/navbarSplitSizes only
+    // override when persisted (non-null), same as SET_SORT/SET_NAVBAR_SPLIT_SIZES.
+    case 'SETTINGS_LOADED': {
+      const { gallerySort, navbarSplitSizes, ...rest } = action.settings
+      return {
+        ...state,
+        ...rest,
+        ...(gallerySort ? { sortBy: gallerySort.sortBy, sortOrder: gallerySort.sortOrder } : {}),
+        ...(navbarSplitSizes ? { navbarSplitSizes } : {})
+      }
+    }
     case 'FOLDER_ADDED':
       if (state.folders.includes(action.folder)) return state
       return { ...state, folders: [...state.folders, action.folder] }
@@ -295,9 +339,8 @@ export function photoLibraryReducer(
         activeTab
       }
     }
-    // Folder renamed on disk — every path-shaped bit of state needs oldFolder
-    // swapped for newFolder. rewritePathPrefix no-ops on anything unrelated,
-    // so it's safe to apply everywhere below.
+    // Folder renamed on disk — rewritePathPrefix no-ops on anything unrelated,
+    // so it's safe to apply to every path-shaped bit of state below.
     case 'FOLDER_RENAMED': {
       const { oldFolder, newFolder } = action
       const rewrite = (path: string): string => rewritePathPrefix(path, oldFolder, newFolder)
@@ -374,10 +417,8 @@ export function photoLibraryReducer(
       }
       return { ...state, photosByPath, folderCounts, folderChildren }
     }
-    // filePaths (null if the scan aborted before finishing) is authoritative
-    // for what exists under rootPaths. METADATA_BATCH already added new
-    // finds; this prunes anything previously known that's now missing,
-    // mirroring the main process's own pruneMissing.
+    // filePaths (null if the scan aborted) is authoritative for what exists
+    // under rootPaths — prunes anything previously known that's now missing.
     case 'SCAN_COMPLETE': {
       const { rootPaths, filePaths, allFolders } = action.result
       const isUnderAnyRoot = (path: string): boolean =>
@@ -458,6 +499,7 @@ export function photoLibraryReducer(
         ...state,
         selectedFolder: action.folder,
         selectedTag: null,
+        selectedPerson: null,
         untaggedFilterActive: false
       }
     case 'SET_TAG_FILTER':
@@ -465,19 +507,49 @@ export function photoLibraryReducer(
         ...state,
         selectedTag: action.tag,
         selectedFolder: null,
+        selectedPerson: null,
         untaggedFilterActive: false
       }
     // Unlike SET_TAG_FILTER, keeps selectedFolder intact — for the
     // per-folder tag pills that narrow within a folder rather than replace it.
     case 'SET_FOLDER_TAG_FILTER':
-      return { ...state, selectedTag: action.tag, untaggedFilterActive: false }
+      return {
+        ...state,
+        selectedTag: action.tag,
+        selectedPerson: null,
+        untaggedFilterActive: false
+      }
     case 'SET_UNTAGGED_FILTER':
       return {
         ...state,
         untaggedFilterActive: action.active,
         selectedTag: null,
-        selectedFolder: null
+        selectedFolder: null,
+        selectedPerson: null
       }
+    // Like SET_FOLDER_TAG_FILTER, keeps selectedFolder intact — the folder
+    // pill row's own "Untagged" entry narrows within the folder rather than
+    // replacing it with the global (folder-agnostic) untagged view.
+    case 'SET_FOLDER_UNTAGGED_FILTER':
+      return {
+        ...state,
+        untaggedFilterActive: action.active,
+        selectedTag: null,
+        selectedPerson: null
+      }
+    // Global (folder-agnostic), same as SET_TAG_FILTER — selecting a person
+    // in PeoplePanel replaces whatever other filter was active rather than
+    // stacking, keeping "one primary filter at a time" consistent with tags.
+    case 'SET_PERSON_FILTER':
+      return {
+        ...state,
+        selectedPerson: action.personId,
+        selectedFolder: null,
+        selectedTag: null,
+        untaggedFilterActive: false
+      }
+    case 'SET_PERSON_PHOTO_ASSIGNMENTS':
+      return { ...state, personPhotoAssignments: action.assignments }
     case 'SET_SORT':
       return { ...state, sortBy: action.sortBy, sortOrder: action.sortOrder }
     case 'SET_DEFAULT_VIEW':
@@ -486,6 +558,8 @@ export function photoLibraryReducer(
       return { ...state, showEmptyFolders: action.value }
     case 'SET_TAGS_PANEL_GRID_VIEW':
       return { ...state, tagsPanelGridView: action.value }
+    case 'SET_PEOPLE_PANEL_GRID_VIEW':
+      return { ...state, peoplePanelGridView: action.value }
     case 'SET_GALLERY_VIEW_MODE':
       return { ...state, galleryViewMode: action.value }
     case 'SET_AI_TAG_SUGGESTIONS_ENABLED':
@@ -496,6 +570,25 @@ export function photoLibraryReducer(
         : { ...state, aiTagSuggestionsEnabled: action.value }
     case 'SET_AI_SCAN_PROGRESS':
       return { ...state, aiScanProgress: action.progress }
+    case 'SET_FACE_DETECTION_ENABLED':
+      // Guarded for the same reason as SET_AI_TAG_SUGGESTIONS_ENABLED above.
+      if (state.faceDetectionEnabled === action.value) return state
+      // Disabling is a full reset on the backend (clearAllFaceData) — clear
+      // the local mirror of that data too, rather than leaving stale people/
+      // assignments/filter around until the next reload.
+      return action.value
+        ? { ...state, faceDetectionEnabled: true }
+        : {
+            ...state,
+            faceDetectionEnabled: false,
+            people: [],
+            personPhotoAssignments: new Map(),
+            selectedPerson: null
+          }
+    case 'SET_FACE_SCAN_PROGRESS':
+      return { ...state, faceScanProgress: action.progress }
+    case 'SET_PEOPLE':
+      return { ...state, people: action.people }
     case 'SET_SETTINGS_MODAL_OPENED':
       return { ...state, settingsModalOpened: action.value }
     case 'SET_DETAILS_PANEL_COLLAPSED':
@@ -508,12 +601,16 @@ export function photoLibraryReducer(
       return { ...state, showViewCounts: action.value }
     case 'SET_NAVBAR_SPLIT_SIZES':
       return { ...state, navbarSplitSizes: action.sizes }
+    case 'SET_NAVBAR_COLLAPSED_PANELS':
+      return { ...state, navbarCollapsedPanels: action.panels }
     case 'SET_MAGAZINE_TITLE':
       return { ...state, magazineTitle: action.value }
     case 'SET_NEWSPAPER_TITLE':
       return { ...state, newspaperTitle: action.value }
     case 'SET_DVD_STUDIO_NAME':
       return { ...state, dvdStudioName: action.value }
+    case 'SET_ART_GALLERY_NAME':
+      return { ...state, artGalleryName: action.value }
     // Newest-first, deduped, capped — an already-listed tag moves to the
     // front instead of duplicating.
     case 'TAGS_ASSIGNED': {
@@ -527,6 +624,8 @@ export function photoLibraryReducer(
     }
     case 'SET_EXCLUDE_PATTERNS':
       return { ...state, excludePatterns: action.patterns }
+    case 'SET_EXCLUDED_FOLDERS':
+      return { ...state, excludedFolders: action.folders }
     case 'WATCH_FOLDER_ADDED': {
       if (state.allFolderPaths.has(action.folderPath)) return state
       const allFolderPaths = new Set(state.allFolderPaths)
@@ -544,14 +643,25 @@ export function photoLibraryReducer(
       return { ...state, allFolderPaths }
     }
     case 'PHOTO_UPSERTED': {
-      const rootFolder = findRootFolder(action.photo.filePath, state.folders)
+      const isNewPhoto = !state.photosByPath.has(action.photo.filePath)
       const photosByPath = new Map(state.photosByPath)
-      const folderCounts = new Map(state.folderCounts)
-      const folderChildren = new Map(state.folderChildren)
-      if (rootFolder && !photosByPath.has(action.photo.filePath)) {
-        addPhotoToFolderTree(action.photo.filePath, rootFolder, folderCounts, folderChildren)
-      }
       photosByPath.set(action.photo.filePath, action.photo)
+
+      // Only copy+rebuild the folder tree when a photo is genuinely new to
+      // it — an existing photo's write (tags, comment, viewCount, rotate,
+      // ...) never changes folder membership, so giving folderCounts/
+      // folderChildren a new identity on every such write was forcing
+      // FolderTree to rebuild+rerender its whole tree for no reason.
+      let folderCounts = state.folderCounts
+      let folderChildren = state.folderChildren
+      if (isNewPhoto) {
+        const rootFolder = findRootFolder(action.photo.filePath, state.folders)
+        if (rootFolder) {
+          folderCounts = new Map(state.folderCounts)
+          folderChildren = new Map(state.folderChildren)
+          addPhotoToFolderTree(action.photo.filePath, rootFolder, folderCounts, folderChildren)
+        }
+      }
       return { ...state, photosByPath, folderCounts, folderChildren }
     }
     case 'PHOTO_REMOVED': {
@@ -605,11 +715,8 @@ export function photoLibraryReducer(
       tagDescriptions.delete(action.oldTag)
       if (movedDescription) tagDescriptions.set(action.newTag, movedDescription)
 
-      // Carries group membership across the rename too — from allTags'
-      // perspective a rename looks identical to "old tag gone, new tag
-      // appeared," so this can't be inferred generically the way a tag
-      // actually disappearing can (see the reconciliation this mirrors on
-      // the main-process side, renameTagMetadata).
+      // Carries group membership across the rename — a rename otherwise looks
+      // identical to "old tag gone, new tag appeared" (mirrors renameTagMetadata).
       const tagGroupAssignments = new Map(state.tagGroupAssignments)
       const movedGroupId = tagGroupAssignments.get(action.oldTag)
       tagGroupAssignments.delete(action.oldTag)

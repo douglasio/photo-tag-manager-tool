@@ -1,4 +1,5 @@
 import {
+  memo,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
   useCallback,
@@ -9,14 +10,16 @@ import {
 import {
   ActionIcon,
   Box,
+  Button,
   Center,
+  EmptyState,
   Flex,
   Group,
-  Loader,
   Pill,
   RollingNumber,
   Scroller,
   Slider,
+  Stack,
   Text,
   Title,
   Tooltip
@@ -26,19 +29,34 @@ import {
   IconEye,
   IconLayoutGrid,
   IconLayoutList,
+  IconLibraryPhoto,
   IconPhoto,
   IconStack2,
+  IconUsers,
   IconX
 } from '@tabler/icons-react'
 import { Grid } from 'react-window'
 
-import { TagDeleteButton, TagDescriptionField } from '@components'
+import {
+  FaceCropThumbnail,
+  PersonDescriptionField,
+  ScanProgressIndicator,
+  TagDeleteButton,
+  TagDescriptionField
+} from '@components'
 import { useGalleryGridLayout } from '@hooks'
 import { useGalleryPreviewZoom } from '@hooks'
+import { isUnderExcludedFolder } from '@shared/folderExclusion'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { MAX_COMPARE_PHOTOS, MIN_COMPARE_PHOTOS } from '@state'
-import { basename, buildFolderChildrenMap, collectFolderSectionOrder, dirname } from '@utils'
+import {
+  basename,
+  buildFolderChildrenMap,
+  collectFolderSectionOrder,
+  dirname,
+  isPathUnderOrEqual
+} from '@utils'
 
 import { GalleryFolderSections } from './GalleryFolderSections'
 import { GalleryListView } from './GalleryListView'
@@ -46,9 +64,14 @@ import { type GalleryCellProps, GalleryPhotoCell } from './GalleryPhotoCell'
 import { GallerySettingsMenu } from './GallerySettingsMenu'
 import { GallerySortMenu } from './GallerySortMenu'
 
-export function GalleryGrid(): ReactElement {
+// Memoized: takes no props, so it bails out when AppLayout re-renders
+// (e.g. a drag starting/ending flips its activeDrag state) and only
+// re-renders when its own context subscriptions actually change.
+export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
   const {
+    addFolder,
     visiblePhotos: photos,
+    activePhotosByPath,
     state,
     selectPhoto,
     toggleSelectPhoto,
@@ -59,7 +82,11 @@ export function GalleryGrid(): ReactElement {
     tagCounts,
     tagViewCounts,
     folderTags,
+    folderHasUntagged,
     setFolderTagFilter,
+    setFolderUntaggedFilter,
+    setPersonFilter,
+    setPersonDescription,
     renameFile,
     openCompareTab,
     openDuplicatesTab,
@@ -73,8 +100,16 @@ export function GalleryGrid(): ReactElement {
     const childrenOf = buildFolderChildrenMap(state.allFolderPaths)
     const hasSubfolders = (childrenOf.get(state.selectedFolder)?.size ?? 0) > 0
     if (!hasSubfolders) return null
-    return collectFolderSectionOrder(state.selectedFolder, childrenOf)
-  }, [state.selectedFolder, state.allFolderPaths])
+    const sections = collectFolderSectionOrder(state.selectedFolder, childrenOf)
+    // An excluded subfolder's section is skipped entirely when browsing an
+    // ancestor — unless selectedFolder is itself at/under an excluded
+    // folder, the "direct browse" exception (matches visiblePhotos below).
+    const isViewingExcludedFolderDirectly = state.excludedFolders.some((folder) =>
+      isPathUnderOrEqual(state.selectedFolder!, folder)
+    )
+    if (isViewingExcludedFolderDirectly) return sections
+    return sections.filter((folder) => !isUnderExcludedFolder(folder, state.excludedFolders))
+  }, [state.selectedFolder, state.allFolderPaths, state.excludedFolders])
 
   // Buckets the already folder+tag-filtered `photos` by which section folder
   // directly contains each one (not recursively) — sort order within each
@@ -168,16 +203,29 @@ export function GalleryGrid(): ReactElement {
   // name/description UI; a folder view shows the folder as the title
   // instead, since the tag there is just a filter.
   const isPureTagView = state.selectedTag !== null && state.selectedFolder === null
+  // SET_PERSON_FILTER always clears selectedFolder (see the reducer), so
+  // this is never combined with a folder view.
+  const isPersonView = state.selectedPerson !== null
+  const selectedPerson = isPersonView
+    ? state.people.find((person) => person.id === state.selectedPerson)
+    : undefined
+  const selectedPersonName = isPersonView ? (selectedPerson?.name ?? 'Unnamed person') : null
+  const personDescription = isPersonView ? (selectedPerson?.description ?? '') : ''
+  const selectedPersonCoverThumbnailKey = selectedPerson?.coverPhotoPath
+    ? (activePhotosByPath.get(selectedPerson.coverPhotoPath)?.thumbnailKey ?? null)
+    : null
 
   const galleryTitle = state.untaggedFilterActive
-    ? 'Untagged'
+    ? 'untagged'
     : isPureTagView
       ? `#${state.selectedTag}`
-      : state.selectedFolder
-        ? basename(state.selectedFolder)
-        : state.folders.length > 0
-          ? 'All Photos'
-          : null
+      : isPersonView
+        ? selectedPersonName
+        : state.selectedFolder
+          ? basename(state.selectedFolder)
+          : state.folders.length > 0
+            ? 'All Photos'
+            : null
 
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
@@ -186,32 +234,72 @@ export function GalleryGrid(): ReactElement {
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
           <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
-            <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
-              <Title
-                order={2}
-                flex={1}
-                miw={0}
-                style={{
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-              >
-                {galleryTitle}
-              </Title>
-              {isPureTagView && (
-                <Group gap={4} c="dimmed" wrap="nowrap" style={{ flexShrink: 0 }}>
-                  <IconEye size={16} />
-                  <RollingNumber value={tagViewCounts.get(state.selectedTag!) ?? 0} fz="sm" />
-                </Group>
-              )}
-              {isPureTagView && (
-                <TagDeleteButton
-                  tag={state.selectedTag!}
-                  count={tagCounts.get(state.selectedTag!) ?? 0}
-                  onDelete={() => deleteTag(state.selectedTag!)}
+            <Group gap="sm" wrap="nowrap" align="center" flex={1} miw={0}>
+              {isPersonView && selectedPersonCoverThumbnailKey && selectedPerson?.coverFaceBox && (
+                <FaceCropThumbnail
+                  thumbnailKey={selectedPersonCoverThumbnailKey}
+                  box={selectedPerson.coverFaceBox}
+                  size={64}
+                  radius="md"
                 />
               )}
+              <Stack gap={2} flex={1} miw={0}>
+                <Group gap={4} wrap="nowrap" align="center">
+                  <Title
+                    order={2}
+                    flex={1}
+                    miw={0}
+                    style={{
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {galleryTitle}
+                  </Title>
+                  {isPureTagView && (
+                    <Group gap={4} c="dimmed" wrap="nowrap" style={{ flexShrink: 0 }}>
+                      <IconEye size={16} />
+                      <RollingNumber value={tagViewCounts.get(state.selectedTag!) ?? 0} fz="sm" />
+                    </Group>
+                  )}
+                  {isPureTagView && (
+                    <TagDeleteButton
+                      tag={state.selectedTag!}
+                      count={tagCounts.get(state.selectedTag!) ?? 0}
+                      onDelete={() => deleteTag(state.selectedTag!)}
+                    />
+                  )}
+                  {isPersonView && (
+                    <Tooltip label="Clear person filter">
+                      <ActionIcon
+                        variant="subtle"
+                        onClick={() => setPersonFilter(null)}
+                        aria-label="Clear person filter"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <IconX size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+                {isPureTagView && (
+                  <TagDescriptionField
+                    description={tagDescription}
+                    onSave={(description) =>
+                      void setTagDescription(state.selectedTag!, description)
+                    }
+                  />
+                )}
+                {isPersonView && (
+                  <PersonDescriptionField
+                    description={personDescription}
+                    onSave={(description) =>
+                      void setPersonDescription(state.selectedPerson!, description)
+                    }
+                  />
+                )}
+              </Stack>
             </Group>
             <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
               {state.selectedPaths.size > 0 && (
@@ -276,15 +364,23 @@ export function GalleryGrid(): ReactElement {
               </ActionIcon.Group>
             </Group>
           </Group>
-          {isPureTagView && (
-            <TagDescriptionField
-              description={tagDescription}
-              onSave={(description) => void setTagDescription(state.selectedTag!, description)}
-            />
-          )}
-          {state.selectedFolder && folderTags.length > 0 && (
+          {state.selectedFolder && (folderTags.length > 0 || folderHasUntagged) && (
             <Scroller mt="xs">
               <Pill.Group style={{ flexWrap: 'nowrap' }}>
+                {folderHasUntagged && (
+                  <Pill
+                    onClick={() => setFolderUntaggedFilter(!state.untaggedFilterActive)}
+                    bg={
+                      state.untaggedFilterActive
+                        ? 'var(--mantine-color-red-filled)'
+                        : 'var(--mantine-color-red-light)'
+                    }
+                    c={state.untaggedFilterActive ? 'var(--mantine-color-white)' : undefined}
+                    style={{ cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    untagged
+                  </Pill>
+                )}
                 {folderTags.map((tag) => {
                   const isActive = state.selectedTag === tag
                   return (
@@ -312,7 +408,7 @@ export function GalleryGrid(): ReactElement {
         ref={containerRef}
         flex={1}
         miw={0}
-        style={{ overflow: folderSections ? 'auto' : 'hidden' }}
+        style={{ overflow: 'hidden' }}
         onClick={(event) => {
           // Only clears on a direct click here (not bubbled from a
           // thumbnail) — the usual "click empty space to deselect" convention.
@@ -322,12 +418,49 @@ export function GalleryGrid(): ReactElement {
         {photos.length === 0 ? (
           <Center h="100%">
             {state.status === 'scanning' ? (
-              <Group gap="xs">
-                <Loader />
-                <Text c="dimmed">Scanning for photos…</Text>
-              </Group>
+              <ScanProgressIndicator percent={null} label="Scanning for photos…" />
+            ) : state.selectedPerson ? (
+              <Box
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <EmptyState
+                  icon={<IconUsers size={32} />}
+                  title="No photos for this person"
+                  description="This person doesn't have any matching photos in your library right now."
+                >
+                  <EmptyState.Actions>
+                    <Button variant="default" onClick={() => setPersonFilter(null)}>
+                      Clear filter
+                    </Button>
+                  </EmptyState.Actions>
+                </EmptyState>
+              </Box>
             ) : (
-              <Text c="dimmed">No photos yet. Add a folder to begin.</Text>
+              <Box
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <EmptyState
+                  icon={<IconLibraryPhoto size={32} />}
+                  title="No photos yet"
+                  description="Add a folder to start building your library."
+                >
+                  <EmptyState.Actions>
+                    <Button onClick={() => void addFolder()}>Add Folder</Button>
+                  </EmptyState.Actions>
+                </EmptyState>
+              </Box>
             )}
           </Center>
         ) : state.galleryViewMode === 'list' ? (
@@ -338,6 +471,9 @@ export function GalleryGrid(): ReactElement {
             rootFolder={state.selectedFolder!}
             sections={folderSections}
             photosBySection={photosBySection}
+            cellHeight={cellHeight}
+            width={size.width}
+            height={size.height}
           />
         ) : (
           // Pinned to the debounced size (not 100%) — react-window's Grid
@@ -383,4 +519,4 @@ export function GalleryGrid(): ReactElement {
       )}
     </Flex>
   )
-}
+})

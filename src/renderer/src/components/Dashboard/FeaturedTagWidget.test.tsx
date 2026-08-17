@@ -1,4 +1,5 @@
 import { MantineProvider } from '@mantine/core'
+import { Notifications } from '@mantine/notifications'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +18,7 @@ const mockSetSettingsModalOpened = vi.fn()
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
     state: { photosByPath: mockPhotosByPath, tagDescriptions: mockTagDescriptions },
+    activePhotosByPath: mockPhotosByPath,
     tagCounts: mockTagCounts,
     allTags: mockAllTags,
     openPhotoTab: mockOpenPhotoTab,
@@ -66,6 +68,7 @@ function setLibrary(photos: PhotoRecord[]): void {
 function renderWidget(): ReturnType<typeof render> {
   return render(
     <MantineProvider>
+      <Notifications />
       <FeaturedTagWidget />
     </MantineProvider>
   )
@@ -172,6 +175,7 @@ describe('FeaturedTagWidget', () => {
       ])
       rerender(
         <MantineProvider>
+          <Notifications />
           <FeaturedTagWidget />
         </MantineProvider>
       )
@@ -194,6 +198,7 @@ describe('FeaturedTagWidget', () => {
       setLibrary(photos)
       rerender(
         <MantineProvider>
+          <Notifications />
           <FeaturedTagWidget />
         </MantineProvider>
       )
@@ -236,6 +241,57 @@ describe('FeaturedTagWidget', () => {
 
       expect(mockSetTagFilter).toHaveBeenCalledExactlyOnceWith('vacation')
       expect(mockSetActiveTab).toHaveBeenCalledExactlyOnceWith('gallery')
+    })
+  })
+
+  describe('onboarding-step toasts', () => {
+    it('does not toast on initial mount at whatever step things already start at', () => {
+      setLibrary([makePhoto('/a.jpg')])
+      renderWidget()
+
+      expect(screen.queryByText(/Step complete/)).not.toBeInTheDocument()
+    })
+
+    it('toasts a completed step, with a Back to Dashboard action, only on a real transition', async () => {
+      const user = userEvent.setup()
+      setLibrary([])
+      const { rerender } = renderWidget()
+      expect(screen.queryByText(/Step complete/)).not.toBeInTheDocument()
+
+      setLibrary([makePhoto('/a.jpg')])
+      rerender(
+        <MantineProvider>
+          <Notifications />
+          <FeaturedTagWidget />
+        </MantineProvider>
+      )
+
+      expect(
+        await screen.findByText('Step complete: Add photos to your library')
+      ).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Back to Dashboard' }))
+      expect(mockSetActiveTab).toHaveBeenCalledWith('dashboard')
+    })
+
+    it('toasts once a tag actually becomes featured', async () => {
+      setLibrary([
+        makePhoto('/a.jpg', { tags: ['vacation'] }),
+        makePhoto('/b.jpg', { tags: ['vacation'] })
+      ])
+      const { rerender } = renderWidget()
+
+      setLibrary(threeVacationPhotos())
+      rerender(
+        <MantineProvider>
+          <Notifications />
+          <FeaturedTagWidget />
+        </MantineProvider>
+      )
+
+      expect(
+        await screen.findByText('#vacation now has enough photos to be featured on the Dashboard!')
+      ).toBeInTheDocument()
     })
   })
 })

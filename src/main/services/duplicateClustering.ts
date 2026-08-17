@@ -12,14 +12,10 @@ export interface ClusterablePhoto {
   embedding: number[]
 }
 
-// A huge library's pair count can cross SIMILARITY_YIELD_EVERY thousands of
-// times over one run; reporting progress on every single one of those
-// flooded the renderer. Throttle the onProgress call itself (not the
-// yield/cancel-check cadence, which must stay responsive) to roughly this often.
+// Throttle the onProgress call to avoid excess rerenders during progress
 const PROGRESS_INTERVAL_MS = 150
 
-// Pure clustering math, pulled out of duplicatePhotoService so it can run
-// inside duplicateClusterWorker (off the main process) while staying
+// Clustering math runs inside duplicateClusterWorker (off the main process) while staying
 // directly unit-testable without spinning up a real worker_thread.
 export async function clusterByEmbeddingSimilarity(
   photos: ClusterablePhoto[],

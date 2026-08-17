@@ -10,7 +10,8 @@ import {
   SimpleGrid,
   Stack,
   Text,
-  Timeline
+  Timeline,
+  Title
 } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 
@@ -78,15 +79,15 @@ function TimelinePhotoTile({
 // Confined to the widget's first column (see the 2-col SimpleGrid below) so
 // a vertical Timeline doesn't stretch oddly across the widget's full width.
 function ThrowbackTimeline({ entries }: ThrowbackTimelineProps): ReactElement {
-  const { state, openPhotoTab } = usePhotoLibrary()
+  const { state, activePhotosByPath, openPhotoTab } = usePhotoLibrary()
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
   return (
-    <Timeline active={entries.length} bulletSize={16} lineWidth={2}>
+    <Timeline active={entries.length} bulletSize={16} lineWidth={2} w="50%">
       {entries.map((entry) => {
-        const photo = state.photosByPath.get(entry.filePath)
+        const photo = activePhotosByPath.get(entry.filePath)
         return (
           <Timeline.Item
             key={entry.year}
@@ -124,10 +125,12 @@ export function TimeWarpWidget(): ReactElement {
   const [enableAiOpened, setEnableAiOpened] = useState(false)
   const hasLoadedOnceRef = useRef(false)
   const scanning = state.aiScanProgress !== null
-  // Tracks the `scanning` value as of the last actual fetch, so a Dashboard
-  // tab revisit (which re-runs this effect without `scanning` truly
-  // changing) can be told apart from a genuine scan start/finish.
+  // Tracks the `scanning` value and excludedFolders reference as of the
+  // last actual fetch, so a Dashboard tab revisit (which re-runs this
+  // effect without either truly changing) can be told apart from a genuine
+  // scan start/finish or a folder's excluded-from-features status flipping.
   const lastFetchedScanningRef = useRef(scanning)
+  const lastFetchedExcludedFoldersRef = useRef(state.excludedFolders)
   const hasRealTimeline = state.aiTagSuggestionsEnabled && !!similarity && similarity.length > 0
 
   // Skips the query entirely while AI is disabled — the expensive half of
@@ -136,11 +139,20 @@ export function TimeWarpWidget(): ReactElement {
   // `similarity` left over from AI being on earlier is never actually shown.
   useEffect(() => {
     if (!state.aiTagSuggestionsEnabled) return
-    // Once loaded, only refetch on a real scanning-state transition (a scan
-    // starting/finishing) — not on every tab revisit — per the "once per
-    // session" ask.
-    if (hasLoadedOnceRef.current && scanning === lastFetchedScanningRef.current) return
+    const excludedFoldersChanged = state.excludedFolders !== lastFetchedExcludedFoldersRef.current
+    // Once loaded, only refetch on a real scanning transition or an
+    // excluded-folders change — not on every tab revisit. This must be a
+    // genuine recalculation, not just activePhotosByPath's render-time
+    // filter, since excluding a photo can change which cluster is best.
+    if (
+      hasLoadedOnceRef.current &&
+      scanning === lastFetchedScanningRef.current &&
+      !excludedFoldersChanged
+    ) {
+      return
+    }
     lastFetchedScanningRef.current = scanning
+    lastFetchedExcludedFoldersRef.current = state.excludedFolders
     let cancelled = false
     if (!hasLoadedOnceRef.current) setLoading(true)
     getThrowbackSimilarity()
@@ -156,7 +168,7 @@ export function TimeWarpWidget(): ReactElement {
     return () => {
       cancelled = true
     }
-  }, [getThrowbackSimilarity, scanning, state.aiTagSuggestionsEnabled])
+  }, [getThrowbackSimilarity, scanning, state.aiTagSuggestionsEnabled, state.excludedFolders])
 
   // Loads automatically (no button) whenever there's no real timeline to
   // show instead — whether that's because AI is off, or because AI is on
@@ -179,16 +191,19 @@ export function TimeWarpWidget(): ReactElement {
     return (
       <Group>
         <Loader size="sm" />
-        <Text>Loading...</Text>
+        <Text>Creating timeline...</Text>
       </Group>
     )
   }
 
   if (hasRealTimeline) {
     return (
-      <SimpleGrid cols={2}>
+      <Stack gap="md">
+        <Title order={3} c="dimmed">
+          Here are some similar photos taken over time.
+        </Title>
         <ThrowbackTimeline entries={similarity!.slice(0, MAX_TIMELINE_ENTRIES)} />
-      </SimpleGrid>
+      </Stack>
     )
   }
 
@@ -200,7 +215,9 @@ export function TimeWarpWidget(): ReactElement {
           : 'Enable AI features to see photos matched across the years by visual similarity.'}
       </Text>
       {!state.aiTagSuggestionsEnabled && (
-        <Button onClick={() => setEnableAiOpened(true)}>Enable AI Features</Button>
+        <Button variant="gradient" onClick={() => setEnableAiOpened(true)}>
+          Enable AI Features
+        </Button>
       )}
       {previewEntries && previewEntries.length > 0 && (
         <Box w="100%">

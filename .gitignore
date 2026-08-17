@@ -6,3 +6,4 @@ out
 *.log*
 INSTRUCTIONS.md
 coverage/*
+docs/Trace*

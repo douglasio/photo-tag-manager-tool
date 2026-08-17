@@ -1,14 +1,14 @@
-import { type ReactElement, useEffect, useRef, useState } from 'react'
+import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react'
 
 import { BarChart } from '@mantine/charts'
-import { Text } from '@mantine/core'
+import { Stack, Text } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 
 import { GalleryHoverPreview } from '@components'
 import { useKeyHeld } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useGalleryLibrary, useLibraryActions } from '@state'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
@@ -94,8 +94,8 @@ export function makeImageBarShape(
           <rect x={x} y={y} width={barWidth} height={height} rx={6} />
         </clipPath>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="40%" stopColor="black" stopOpacity={0.65} />
-          <stop offset="100%" stopColor="black" stopOpacity={0.45} />
+          <stop offset="40%" stopColor="black" stopOpacity={0.85} />
+          <stop offset="100%" stopColor="black" stopOpacity={0.7} />
         </linearGradient>
         <image
           href={payload.thumbnailUrl}
@@ -131,7 +131,8 @@ export function makeImageBarShape(
 }
 
 export function TopViewedWidget(): ReactElement {
-  const { state, openPhotoTab } = usePhotoLibrary()
+  const { state, activePhotosByPath } = useGalleryLibrary()
+  const { openPhotoTab } = useLibraryActions()
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
@@ -162,46 +163,54 @@ export function TopViewedWidget(): ReactElement {
     setHover(null)
   }
 
-  const viewedPhotos = Array.from(state.photosByPath.values())
-    .filter(
-      (photo) => photo.viewCount > 0 && photo.thumbnailStatus === 'ready' && photo.thumbnailKey
-    )
-    .sort((a, b) => b.viewCount - a.viewCount)
-    .slice(0, TOP_COUNT)
+  const viewedPhotos = useMemo(
+    () =>
+      Array.from(activePhotosByPath.values())
+        .filter(
+          (photo) => photo.viewCount > 0 && photo.thumbnailStatus === 'ready' && photo.thumbnailKey
+        )
+        .sort((a, b) => b.viewCount - a.viewCount)
+        .slice(0, TOP_COUNT),
+    [activePhotosByPath]
+  )
 
   // Padded out to a full TOP_COUNT categories — with fewer real bars, the
   // category axis stretches each one to fill the available width, making a
   // library with only 1-2 viewed photos look broken (two oversized bars)
   // rather than just sparse.
-  const data: TopViewedDatum[] = Array.from({ length: TOP_COUNT }, (_, index) => {
-    const photo = viewedPhotos[index]
-    if (!photo) {
-      return {
-        id: `placeholder-${index}`,
-        fileName: `placeholder-${index}`,
-        viewCount: 0,
-        thumbnailUrl: null,
-        photo: null
-      }
-    }
-    return {
-      id: photo.id,
-      fileName: photo.fileName,
-      viewCount: photo.viewCount,
-      thumbnailUrl: toThumbProtocolUrl(photo.thumbnailKey!),
-      photo
-    }
-  })
+  const data: TopViewedDatum[] = useMemo(
+    () =>
+      Array.from({ length: TOP_COUNT }, (_, index) => {
+        const photo = viewedPhotos[index]
+        if (!photo) {
+          return {
+            id: `placeholder-${index}`,
+            fileName: `placeholder-${index}`,
+            viewCount: 0,
+            thumbnailUrl: null,
+            photo: null
+          }
+        }
+        return {
+          id: photo.id,
+          fileName: photo.fileName,
+          viewCount: photo.viewCount,
+          thumbnailUrl: toThumbProtocolUrl(photo.thumbnailKey!),
+          photo
+        }
+      }),
+    [viewedPhotos]
+  )
 
   return (
-    <>
+    <Stack h="100%" gap={4}>
       {viewedPhotos.length === 0 ? (
         <Text c="dimmed" size="sm">
           Open some photos from the gallery to see them featured here.
         </Text>
       ) : (
         <BarChart
-          h="100%"
+          style={{ flex: 1, minHeight: 0 }}
           data={data}
           dataKey="fileName"
           orientation="horizontal"
@@ -233,6 +242,11 @@ export function TopViewedWidget(): ReactElement {
           gridAxis="none"
         />
       )}
+      {viewedPhotos.length > 0 && viewedPhotos.length < TOP_COUNT && (
+        <Text c="dimmed" size="xs" style={{ flexShrink: 0 }}>
+          {viewedPhotos.length} of {TOP_COUNT} photos viewed
+        </Text>
+      )}
       {viewedPhotos.map((photo) => (
         <GalleryHoverPreview
           key={photo.id}
@@ -242,6 +256,6 @@ export function TopViewedWidget(): ReactElement {
           motionEnabled={motionEnabled}
         />
       ))}
-    </>
+    </Stack>
   )
 }

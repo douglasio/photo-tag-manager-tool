@@ -46,6 +46,10 @@ export interface PhotoRecord {
   // that build a PhotoRecord by hand don't all need updating; genuine
   // records from the DB always have it.
   firstSeenAt?: number
+  // The file's filesystem last-modified time (epoch ms) — used by the
+  // Duplicates view's "date modified" column. Optional for the same reason
+  // as firstSeenAt above.
+  mtimeMs?: number
 }
 
 export interface ScanStartResult {
@@ -104,6 +108,31 @@ export interface WatchFolderRemovedEvent {
 export interface GallerySort {
   sortBy: 'name' | 'dateTaken' | 'viewCount' | 'random'
   sortOrder: 'asc' | 'desc'
+}
+
+// Every field PhotoLibraryContext's startup effect needs from the settings
+// table, batched into one IPC round-trip instead of ~20 separate ones.
+export interface AppSettings {
+  gallerySort: GallerySort | null
+  defaultView: DefaultView
+  showEmptyFolders: boolean
+  tagsPanelGridView: boolean
+  peoplePanelGridView: boolean
+  galleryViewMode: GalleryViewMode
+  aiTagSuggestionsEnabled: boolean
+  faceDetectionEnabled: boolean
+  detailsPanelCollapsed: boolean
+  galleryAnimationsEnabled: boolean
+  showFilenames: boolean
+  showViewCounts: boolean
+  magazineTitle: string
+  newspaperTitle: string
+  dvdStudioName: string
+  artGalleryName: string
+  navbarSplitSizes: number[] | null
+  navbarCollapsedPanels: Record<string, boolean>
+  excludePatterns: string[]
+  excludedFolders: string[]
 }
 
 export interface MoveProgressEvent {
@@ -174,6 +203,59 @@ export interface AiScanProgress {
 
 export interface AiScanResult {
   duplicateGroups: DuplicateGroup[]
+  photosScanned: number
+  canceled: boolean
+}
+
+// Normalized 0..1 against the photo's own dimensions, not raw pixels — keeps
+// this independent of which resolution the box was detected against.
+export interface FaceBox {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface FaceRecord {
+  id: string
+  photoPath: string
+  box: FaceBox
+  personId: string | null
+  // True once this face's person assignment was set by an explicit user
+  // action (assign/merge/split) rather than automatic clustering — mirrors
+  // TagGroup's matchPattern-vs-manual distinction. A pinned face is never
+  // reassigned by a future clustering pass.
+  personIdPinned: boolean
+}
+
+export interface PersonRecord {
+  id: string
+  // Null until the user labels this person ("Unnamed person" in the UI).
+  name: string | null
+  coverFaceId: string | null
+  // The cover face's own photo — resolved directly by getPeople() so the
+  // People panel doesn't need a separate face-lookup round trip just to
+  // render a representative thumbnail.
+  coverPhotoPath: string | null
+  // The cover face's own crop box within coverPhotoPath — lets the UI show a
+  // face-zoomed crop (via FaceCropThumbnail) instead of the full photo.
+  coverFaceBox: FaceBox | null
+  faceCount: number
+  // Same free-text pattern as tag_metadata.description.
+  description: string | null
+}
+
+export type FaceScanPhase = 'detecting' | 'clustering'
+
+export interface FaceScanProgress {
+  phase: FaceScanPhase
+  done: number
+  total: number
+}
+
+export interface FaceScanResult {
+  facesDetected: number
+  peopleCount: number
   photosScanned: number
   canceled: boolean
 }

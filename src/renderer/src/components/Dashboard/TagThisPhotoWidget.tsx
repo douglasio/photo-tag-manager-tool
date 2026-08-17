@@ -34,7 +34,7 @@ function pickUntagged(
 }
 
 export function TagThisPhotoWidget(): ReactElement {
-  const { state, allTags, updateTags } = usePhotoLibrary()
+  const { state, activePhotosByPath, allTags, updateTags } = usePhotoLibrary()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
@@ -44,9 +44,9 @@ export function TagThisPhotoWidget(): ReactElement {
   // below so tags applied via TagList show immediately without the widget
   // swapping to a different photo out from under the user mid-edit.
   const [currentPath, setCurrentPath] = useState<string | null>(() =>
-    pickUntagged(state.photosByPath, null)
+    pickUntagged(activePhotosByPath, null)
   )
-  const currentPhoto = currentPath ? (state.photosByPath.get(currentPath) ?? null) : null
+  const currentPhoto = currentPath ? (activePhotosByPath.get(currentPath) ?? null) : null
   const canPreview = previewTriggerHeld && currentPhoto?.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
   const previewScale = useDashboardPreviewScale()
@@ -57,7 +57,7 @@ export function TagThisPhotoWidget(): ReactElement {
   )
 
   const handleNext = (): void => {
-    setCurrentPath(pickUntagged(state.photosByPath, currentPath))
+    setCurrentPath(pickUntagged(activePhotosByPath, currentPath))
   }
 
   return (
@@ -136,7 +136,9 @@ export function TagThisPhotoWidget(): ReactElement {
       ) : (
         <motion.div key="empty" style={{ width: '100%' }}>
           <Text c="dimmed" size="sm">
-            Every photo is tagged — nice work!
+            {activePhotosByPath.size === 0
+              ? 'Add some photos to start tagging!'
+              : 'Every photo is tagged — nice work!'}
           </Text>
         </motion.div>
       )}

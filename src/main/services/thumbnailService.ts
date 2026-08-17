@@ -17,9 +17,7 @@ async function getThumbnailDir(): Promise<string> {
   return thumbnailDir
 }
 
-// Folding THUMBNAIL_LONG_EDGE into the key means bumping it invalidates every
-// existing thumbnail key automatically — paired with the generation check in
-// database.ts, that's what forces a one-time regeneration at the new size.
+// Forces a one-time regeneration at the new size
 export function thumbnailKeyFor(filePath: string, mtimeMs: number, sizeBytes: number): string {
   return createHash('sha1')
     .update(`${filePath}:${mtimeMs}:${sizeBytes}:${THUMBNAIL_LONG_EDGE}`)
@@ -34,16 +32,9 @@ export async function thumbnailFilePath(thumbnailKey: string): Promise<string> {
 export async function generateThumbnail(filePath: string, thumbnailKey: string): Promise<void> {
   const outputPath = await thumbnailFilePath(thumbnailKey)
   await sharp(filePath)
-    // No-arg rotate() auto-orients using the source's EXIF Orientation tag
-    // (then strips it, since the output pixels are now physically correct)
-    // — without this, a photo with a non-default Orientation renders upright
-    // in the full-res view (browsers respect EXIF orientation by default)
-    // but sideways/upside-down in its own thumbnail.
+    // Auto-orients using the source's EXIF Orientation tag
     .rotate()
-    // Grayscale/CMYK/unusual-ICC-profile sources otherwise carry an
-    // ambiguous colourspace into the thumbnail, which crashes the AI
-    // embedding pipeline's own raw-buffer resize with a libvips
-    // "colourspace: parameter space not set" error on some photos.
+    // Coerce srgb colorspace for AI pipeline compatibility
     .toColourspace('srgb')
     .resize({
       width: THUMBNAIL_LONG_EDGE,
@@ -60,9 +51,7 @@ export async function deleteThumbnail(thumbnailKey: string): Promise<void> {
   await unlink(filePath).catch(() => undefined)
 }
 
-// Wipes the entire thumbnail cache (clearing the library) — the cached
-// directory path is reset too, so the next thumbnailFilePath/generateThumbnail
-// call recreates the directory rather than assuming it still exists.
+// Wipes the entire thumbnail cache (clearing the library)
 export async function deleteAllThumbnails(): Promise<void> {
   const dir = await getThumbnailDir()
   await rm(dir, { recursive: true, force: true })

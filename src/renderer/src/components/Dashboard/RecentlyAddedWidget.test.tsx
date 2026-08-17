@@ -9,10 +9,14 @@ let mockPhotosByPath: Map<string, PhotoRecord>
 const mockOpenPhotoTab = vi.fn()
 
 vi.mock('@state', () => ({
-  usePhotoLibrary: () => ({
+  useGalleryLibrary: () => ({
     state: { photosByPath: mockPhotosByPath, galleryAnimationsEnabled: true },
-    openPhotoTab: mockOpenPhotoTab
-  })
+    activePhotosByPath: mockPhotosByPath
+  }),
+  useLibraryActions: () => ({ openPhotoTab: mockOpenPhotoTab }),
+  // The real (unstubbed) GalleryHoverPreview rendered by this widget calls
+  // usePhotoLibrary() itself for incrementViewCount.
+  usePhotoLibrary: () => ({ incrementViewCount: vi.fn() })
 }))
 
 import { RecentlyAddedWidget } from './RecentlyAddedWidget'

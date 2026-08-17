@@ -1,27 +1,22 @@
 import { MantineProvider } from '@mantine/core'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { PhotoRecord } from '@shared/types'
 
 let mockPhotosByPath: Map<string, PhotoRecord>
+const mockSetUntaggedFilter = vi.fn()
+const mockSetActiveTab = vi.fn()
 
 vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
-    state: { photosByPath: mockPhotosByPath }
+    activePhotosByPath: mockPhotosByPath,
+    untaggedCount: Array.from(mockPhotosByPath.values()).filter((photo) => photo.tags.length === 0)
+      .length,
+    setUntaggedFilter: mockSetUntaggedFilter,
+    setActiveTab: mockSetActiveTab
   })
-}))
-
-// DonutChart drags in Recharts' ResponsiveContainer, which needs real layout
-// (ResizeObserver + non-zero measured size) to render anything under jsdom —
-// stubbing it out lets these tests focus on the widget's own tagged/untagged
-// split instead of fighting the chart library.
-const mockDonutChart = vi.fn()
-vi.mock('@mantine/charts', () => ({
-  DonutChart: (props: { data: unknown }) => {
-    mockDonutChart(props)
-    return <div data-testid="donut-chart">{JSON.stringify(props.data)}</div>
-  }
 }))
 
 import { TaggingProgressWidget } from './TaggingProgressWidget'
@@ -69,10 +64,10 @@ describe('TaggingProgressWidget', () => {
     renderWidget()
 
     expect(screen.getByText('Add some photos to see your tagging progress.')).toBeInTheDocument()
-    expect(screen.queryByTestId('donut-chart')).not.toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
-  it('splits the donut by whether each photo has any tags', () => {
+  it('shows the tagged/untagged split as a progress bar', () => {
     setLibrary([
       makePhoto('/a.jpg', { tags: ['vacation'] }),
       makePhoto('/b.jpg', { tags: [] }),
@@ -80,24 +75,26 @@ describe('TaggingProgressWidget', () => {
     ])
     renderWidget()
 
-    const data = mockDonutChart.mock.calls[0][0].data as { name: string; value: number }[]
-    expect(data).toEqual([
-      { name: 'Tagged', value: 1, color: 'indigo' },
-      { name: 'Untagged', value: 2, color: 'gray' }
-    ])
     expect(screen.getByText('1 of 3 tagged')).toBeInTheDocument()
+    const bar = screen.getByRole('progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', String((1 / 3) * 100))
   })
 
-  it('keeps the chart size within its clamped range regardless of measured height', () => {
+  it('hides the "view untagged" link once everything is tagged', () => {
     setLibrary([makePhoto('/a.jpg', { tags: ['vacation'] })])
     renderWidget()
 
-    const { size, thickness } = mockDonutChart.mock.calls[0][0] as {
-      size: number
-      thickness: number
-    }
-    expect(size).toBeGreaterThanOrEqual(90)
-    expect(size).toBeLessThanOrEqual(200)
-    expect(thickness).toBeCloseTo(size / 4)
+    expect(screen.queryByText('View untagged photos')).not.toBeInTheDocument()
+  })
+
+  it('filters to untagged photos and switches to the gallery tab when clicked', async () => {
+    const user = userEvent.setup()
+    setLibrary([makePhoto('/a.jpg', { tags: [] })])
+    renderWidget()
+
+    await user.click(screen.getByText('View untagged photos'))
+
+    expect(mockSetUntaggedFilter).toHaveBeenCalledWith(true)
+    expect(mockSetActiveTab).toHaveBeenCalledWith('gallery')
   })
 })

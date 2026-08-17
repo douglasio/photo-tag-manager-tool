@@ -57,6 +57,18 @@ export function formatDateTaken(value: string | null, style: DateTakenStyle = 'f
   return parsed.isValid() ? parsed.format(DATE_TAKEN_STYLE_FORMATS[style]) : NONE_DISPLAY
 }
 
+// Same format/style set as formatDateTaken, but for a filesystem mtime
+// (epoch ms) rather than an EXIF date-taken ISO string — used by the
+// Duplicates view's "date modified" column.
+export function formatDateModified(
+  value: number | null | undefined,
+  style: DateTakenStyle = 'full'
+): string {
+  if (value == null) return NONE_DISPLAY
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.format(DATE_TAKEN_STYLE_FORMATS[style]) : NONE_DISPLAY
+}
+
 // Per-field label + display formatting, kept here so DetailPanel (and any
 // future consumer) never has to compute these at render time.
 export function toDisplayMetadata(metadata: PhotoMetadata): DisplayMetadata {

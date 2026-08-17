@@ -21,11 +21,7 @@ export async function scanDirectory(
     .withPromise()
 }
 
-// Every folder under rootPath, including ones with no photos in them — the
-// gallery's folder tree is otherwise built entirely from photo paths, so an
-// empty folder (or one containing only unsupported files) would never appear
-// anywhere without this separate listing. Includes rootPath itself so a
-// caller doesn't need to special-case adding it back in.
+// Every folder under rootPath, including ones with no photos in them
 export async function scanAllFolders(
   rootPath: string,
   excludePatterns: string[] = []
@@ -36,11 +32,7 @@ export async function scanAllFolders(
     .exclude((_dirName, dirPath) => matchesExcludePattern(dirPath, excludePatterns))
     .crawl(rootPath)
     .withPromise()
-  // fdir appends a trailing separator to directory entries — strip it so
-  // these match the app's path convention (no trailing slash) used
-  // everywhere folder paths derived from photo paths already appear. fdir's
-  // own listing already includes rootPath itself, so it's filtered back out
-  // here before being re-added, rather than ending up listed twice.
+  // strip trailing separator it so these match the app's path convention
   const stripped = dirs.map((dir) => dir.replace(/[/\\]+$/, ''))
   return [rootPath, ...stripped.filter((dir) => dir !== rootPath)]
 }

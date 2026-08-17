@@ -1,8 +1,9 @@
-import { type ReactElement, useMemo, useState } from 'react'
+import { memo, type ReactElement, useMemo, useState } from 'react'
 
 import { useDroppable } from '@dnd-kit/core'
 import {
   ActionIcon,
+  Box,
   Button,
   type RenderTreeNodePayload,
   Stack,
@@ -14,14 +15,15 @@ import {
   useTree
 } from '@mantine/core'
 import { useHover, useMergedRef } from '@mantine/hooks'
-import { IconChevronDown, IconChevronRight, IconPencil } from '@tabler/icons-react'
+import { IconChevronDown, IconChevronRight, IconEyeOff, IconPencil } from '@tabler/icons-react'
 
 import { FolderSettingsMenu, PanelSection } from '@components'
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions, useSidebarLibrary } from '@state'
 import {
   activeHoverBackground,
   foldersToTreeData,
   foldersToTreeDataWithEmpty,
+  isPathUnderOrEqual,
   PREVIEW_TRIGGER_KEY,
   splitFolderPath,
   validateFolderNameBase
@@ -59,17 +61,24 @@ interface TreeRowProps {
   payload: RenderTreeNodePayload
   isActive: boolean
   editing: boolean
-  onStartEdit: () => void
+  isExcluded: boolean
+  onStartEdit: (folder: string) => void
   onStopEdit: () => void
-  onRenameFolder: (newBaseName: string) => Promise<void>
-  onSelect: (value: string) => void
+  onRenameFolder: (folder: string, newBaseName: string) => Promise<void>
+  onSelect: (value: string | null) => void
   onToggleExpand: (value: string) => void
 }
 
-function TreeRow({
+// No usePhotoLibrary()/context subscription of its own — isExcluded is
+// computed once by the parent (FolderTreeInner) and handlers are passed
+// through unbound (rather than each renderNode call wrapping them in a new
+// per-node closure), so this row's props stay reference-stable across a
+// render that doesn't actually affect it, letting React.memo below bail out.
+const TreeRow = memo(function TreeRow({
   payload,
   isActive,
   editing,
+  isExcluded,
   onStartEdit,
   onStopEdit,
   onRenameFolder,
@@ -102,7 +111,7 @@ function TreeRow({
   const commit = (): void => {
     if (error) return
     onStopEdit()
-    if (draft.trim() !== base) void onRenameFolder(draft.trim())
+    if (draft.trim() !== base) void onRenameFolder(node.value, draft.trim())
   }
 
   const cancel = (): void => {
@@ -115,7 +124,7 @@ function TreeRow({
   // otherwise the differing padding/gap between a Button and a plain Group
   // shifts the row's font size and horizontal position when toggling.
   return (
-    <FolderContextMenu folderPath={node.value} onRename={onStartEdit}>
+    <FolderContextMenu folderPath={node.value} onRename={() => onStartEdit(node.value)}>
       <Button
         ref={ref}
         bg={
@@ -155,13 +164,22 @@ function TreeRow({
         rightSection={
           !editing && (
             <>
+              {isExcluded && (
+                <Tooltip label="Excluded from features">
+                  <IconEyeOff
+                    size={14}
+                    style={{ flexShrink: 0 }}
+                    color="var(--mantine-color-dimmed)"
+                  />
+                </Tooltip>
+              )}
               <Tooltip label="Rename folder">
                 <ActionIcon
                   opacity={hovered ? 0.7 : 0}
                   style={{ flexShrink: 0 }}
                   onClick={(event) => {
                     event.stopPropagation()
-                    onStartEdit()
+                    onStartEdit(node.value)
                   }}
                   aria-label={`Rename ${node.value}`}
                 >
@@ -209,7 +227,7 @@ function TreeRow({
       </Button>
     </FolderContextMenu>
   )
-}
+})
 
 interface FolderTreeInnerProps {
   rootPath: string
@@ -218,6 +236,7 @@ interface FolderTreeInnerProps {
   allFolderPaths: Set<string>
   showEmptyFolders: boolean
   selectedFolder: string | null
+  excludedFolders: string[]
   setFolderFilter: (folder: string | null) => void
   editingFolder: string | null
   onStartEdit: (folder: string) => void
@@ -232,6 +251,7 @@ function FolderTreeInner({
   allFolderPaths,
   showEmptyFolders,
   selectedFolder,
+  excludedFolders,
   setFolderFilter,
   editingFolder,
   onStartEdit,
@@ -273,9 +293,12 @@ function FolderTreeInner({
           payload={payload}
           isActive={selectedFolder !== null && payload.node.value === selectedFolder}
           editing={editingFolder === payload.node.value}
-          onStartEdit={() => onStartEdit(payload.node.value)}
+          isExcluded={excludedFolders.some((folder) =>
+            isPathUnderOrEqual(payload.node.value, folder)
+          )}
+          onStartEdit={onStartEdit}
           onStopEdit={onStopEdit}
-          onRenameFolder={(newBaseName) => onRenameFolder(payload.node.value, newBaseName)}
+          onRenameFolder={onRenameFolder}
           onSelect={setFolderFilter}
           onToggleExpand={tree.toggleExpanded}
         />
@@ -284,16 +307,38 @@ function FolderTreeInner({
   )
 }
 
-export function FolderTree(): ReactElement {
-  const { state, setFolderFilter, renameFolder } = usePhotoLibrary()
+interface FolderTreeProps {
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+}
+
+// Memoized so a re-render of its parent (e.g. NavbarSplitter during a
+// Splitter drag) doesn't force this whole panel to re-render when its own
+// props (collapsed/onToggleCollapse) haven't changed — it still re-renders
+// normally when its own useSidebarLibrary()/useLibraryActions() data does.
+export const FolderTree = memo(function FolderTree({
+  collapsed,
+  onToggleCollapse
+}: FolderTreeProps = {}): ReactElement {
+  const { state } = useSidebarLibrary()
+  const { setFolderFilter, renameFolder } = useLibraryActions()
   const [editingFolder, setEditingFolder] = useState<string | null>(null)
 
   if (state.folders.length === 0) {
-    return <Text c="dimmed">Add a folder to see its structure.</Text>
+    return (
+      <Box p="lg">
+        <Text c="dimmed">No folders yet.</Text>
+      </Box>
+    )
   }
 
   return (
-    <PanelSection title="Folders" headerAction={<FolderSettingsMenu />}>
+    <PanelSection
+      title="Folders"
+      headerAction={<FolderSettingsMenu />}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    >
       <Stack gap="md">
         {state.folders.map((folder) => (
           <FolderTreeInner
@@ -304,6 +349,7 @@ export function FolderTree(): ReactElement {
             allFolderPaths={state.allFolderPaths}
             showEmptyFolders={state.showEmptyFolders}
             selectedFolder={state.selectedFolder}
+            excludedFolders={state.excludedFolders}
             setFolderFilter={setFolderFilter}
             editingFolder={editingFolder}
             onStartEdit={setEditingFolder}
@@ -314,4 +360,4 @@ export function FolderTree(): ReactElement {
       </Stack>
     </PanelSection>
   )
-}
+})

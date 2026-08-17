@@ -1,11 +1,12 @@
-import { type ReactElement, useState } from 'react'
+import { memo, type ReactElement, useCallback, useRef, useState } from 'react'
 
-import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
   Accordion,
   ActionIcon,
   AspectRatio,
   Badge,
+  Box,
   Button,
   Group,
   Image,
@@ -23,15 +24,16 @@ import {
   PanelSection,
   TagGridTile,
   TagGroupCreateButton,
-  TagHoverCardContent,
+  TagHoverCardTarget,
   TagsSettingsMenu
 } from '@components'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, TagGroup } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useActiveDragKind, useLibraryActions, useSidebarLibrary } from '@state'
 import { activeHoverBackground, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { TagContextMenu } from './TagContextMenu'
+import { TagDeleteDialog } from './TagDeleteDialog'
 import { TagGroupContextMenu } from './TagGroupContextMenu'
 import { TagGroupDeleteDialog } from './TagGroupDeleteDialog'
 import { TagGroupNameDialog } from './TagGroupNameDialog'
@@ -49,33 +51,34 @@ interface TagListItemProps {
   // Only draggable once there's at least one group to drag it into — no
   // point offering the affordance with nowhere for a drop to land.
   draggable: boolean
-  onSelect: () => void
-  onStartEdit: () => void
+  onSelect: (tag: string | null) => void
+  onStartEdit: (tag: string) => void
   onStopEdit: () => void
-  onRename: (newTag: string) => Promise<void>
+  onRename: (tag: string, newTag: string) => Promise<void>
+  onDelete: (tag: string) => Promise<void>
 }
 
-function TagListItem({
-  tag,
-  count,
-  description,
-  coverPhoto,
-  isActive,
-  editing,
-  draggable,
-  onSelect,
-  onStartEdit,
-  onStopEdit,
-  onRename
-}: TagListItemProps): ReactElement {
-  const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
+// Deliberately thin: this is the only part that subscribes to dnd-kit's
+// InternalContext (via useDroppable/useDraggable), which gets a new identity
+// every time the hovered drop target changes mid-drag. React re-renders every
+// context consumer on that change, so with hundreds of tag rows the heavy
+// Mantine subtree below used to re-render hundreds of times per drag — the
+// single largest remaining cost in the drag profile.
+//
+// Everything dnd-kit hands back here is either referentially stable
+// (setNodeRef, the memoized listeners/attributes) or changes for just one or
+// two rows (isOver, isDragging), so TagListItemView's memo actually bails out
+// for the other rows instead of re-rendering the whole list.
+function TagListItem(props: TagListItemProps): ReactElement {
+  const { tag, draggable, editing } = props
   // Tags are drop targets for photos (dragging a photo onto one adds the
   // tag), but not for other tags — only a group's control should light up
   // while a tag is being dragged, so this droppable is switched off for
   // that case rather than just hiding the isOver highlight (also keeps it
   // out of collision detection entirely).
-  const { active } = useDndContext()
-  const isDraggingTag = Boolean((active?.data.current as { tag?: string } | undefined)?.tag)
+  // Deliberately NOT dnd-kit's useDndContext() — that re-renders every
+  // consumer on each pointermove; this only changes on drag start/end.
+  const isDraggingTag = useActiveDragKind() === 'tag'
   const { isOver, setNodeRef: setDropRef } = useDroppable({
     id: `tag:${tag}`,
     data: { tag },
@@ -91,7 +94,66 @@ function TagListItem({
     data: { tag },
     disabled: !draggable || editing
   })
-  const ref = useMergedRef(hoverRef, setDropRef, setDragRef)
+
+  return (
+    <TagListItemView
+      {...props}
+      isOver={isOver}
+      isDragging={isDragging}
+      setDropRef={setDropRef}
+      setDragRef={setDragRef}
+      dragAttributes={attributes}
+      dragListeners={listeners}
+    />
+  )
+}
+
+interface TagListItemViewProps extends TagListItemProps {
+  isOver: boolean
+  isDragging: boolean
+  setDropRef: (element: HTMLElement | null) => void
+  setDragRef: (element: HTMLElement | null) => void
+  // Sourced from useDraggable's own return type rather than restated, so
+  // these stay correct if dnd-kit's shape changes.
+  dragAttributes: ReturnType<typeof useDraggable>['attributes']
+  dragListeners: ReturnType<typeof useDraggable>['listeners']
+}
+
+// No usePhotoLibrary()/sidebar-state subscription — already fully
+// props-driven. Callback props are passed through unbound by the parent
+// (TagPanel), rather than one new closure per tag per render, so they stay
+// reference-stable and this memo can actually bail out. Mirrors FolderTree's
+// TreeRow/PeoplePanel's PersonRow.
+const TagListItemView = memo(function TagListItemView({
+  tag,
+  count,
+  description,
+  coverPhoto,
+  isActive,
+  editing,
+  onSelect,
+  onStartEdit,
+  onStopEdit,
+  onRename,
+  onDelete,
+  isOver,
+  isDragging,
+  setDropRef,
+  setDragRef,
+  dragAttributes,
+  dragListeners
+}: TagListItemViewProps): ReactElement {
+  const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
+  const attributes = dragAttributes
+  const listeners = dragListeners
+  // Mantine's Tooltip only forwards a fixed prop whitelist (onClick,
+  // onMouseEnter, ...) onto a wrapped child — onContextMenu isn't in it, so
+  // Menu.ContextMenu's right-click handler never reached the button when
+  // Tooltip wrapped it as a parent. Using Tooltip's `target` prop instead
+  // (a plain ref to the button) decouples the two, so the description
+  // tooltip no longer swallows the button's own context-menu events.
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const ref = useMergedRef(hoverRef, setDropRef, setDragRef, buttonRef)
 
   const [draft, setDraft] = useState(tag)
   // Adjust-during-render reset (not a useEffect) for when editing is
@@ -105,6 +167,8 @@ function TagListItem({
 
   const [confirming, setConfirming] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const trimmed = draft.trim()
   const canAttemptSave = trimmed.length > 0 && trimmed !== tag
@@ -132,7 +196,7 @@ function TagListItem({
   const handleConfirm = async (): Promise<void> => {
     setSaving(true)
     try {
-      await onRename(trimmed)
+      await onRename(tag, trimmed)
       setConfirming(false)
       onStopEdit()
       notifications.show({
@@ -147,176 +211,164 @@ function TagListItem({
     }
   }
 
+  const handleDeleteConfirm = async (): Promise<void> => {
+    setDeleting(true)
+    try {
+      await onDelete(tag)
+      setConfirmingDelete(false)
+      notifications.show({
+        color: 'teal',
+        message: `Deleted tag "${tag}" from ${count} photo${count === 1 ? '' : 's'}`
+      })
+    } catch {
+      // onDelete already surfaces an error toast — leave the dialog open so
+      // the user can retry or cancel.
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <>
-      <TagContextMenu onRename={onStartEdit}>
+      <TagContextMenu onRename={() => onStartEdit(tag)} onDelete={() => setConfirmingDelete(true)}>
         {/* Edit mode reuses the exact same Button/leftSection/padding chrome
             as view mode, only swapping Text for a TextInput as the button's
             content — otherwise the differing padding/gap shifts the row's
             font size and horizontal position when toggling (same reasoning
             as FolderTree's rename row). */}
-        <Tooltip
-          position="right"
-          label={<TagHoverCardContent tag={tag} description={description || undefined} />}
-          disabled={editing}
-          openDelay={700}
-          multiline
-          maw={260}
+        <Button
+          ref={ref}
+          {...attributes}
+          {...listeners}
+          onClick={() => {
+            if (editing) return
+            onSelect(isActive ? null : tag)
+          }}
+          // Space is the gallery's preview-trigger key, not a click here —
+          // without this, a native space-triggers-click on this button (still
+          // focused from the click that selected it) would re-fire onSelect
+          // while previewing a thumbnail and toggle this tag's filter off.
+          onKeyDown={(event) => {
+            if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+          }}
+          opacity={isDragging ? 0.4 : undefined}
+          fullWidth
+          h="auto"
+          py={6}
+          justify="space-between"
+          variant="transparent"
+          bg={
+            isOver ? 'var(--mantine-primary-color-light)' : activeHoverBackground(isActive, hovered)
+          }
+          style={{
+            outline: isOver ? '2px dashed var(--mantine-primary-color-filled)' : undefined,
+            outlineOffset: -2
+          }}
+          styles={{
+            label: {
+              flex: 1,
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              justifyContent: 'center'
+            }
+          }}
+          leftSection={
+            coverPhoto?.thumbnailStatus === 'ready' &&
+            coverPhoto.thumbnailKey && (
+              <AspectRatio ratio={1 / 1}>
+                <Image
+                  src={toThumbProtocolUrl(coverPhoto.thumbnailKey)}
+                  w={COVER_SIZE}
+                  h={COVER_SIZE}
+                  fit="cover"
+                />
+              </AspectRatio>
+            )
+          }
+          rightSection={
+            <>
+              {!editing && (
+                <Tooltip label="Rename tag">
+                  <ActionIcon
+                    opacity={hovered ? 0.7 : 0}
+                    style={{ flexShrink: 0 }}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onStartEdit(tag)
+                    }}
+                    aria-label={`Rename #${tag}`}
+                  >
+                    <IconPencil />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              <Badge size="md" variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
+                {count}
+              </Badge>
+            </>
+          }
         >
-          <Button
-            ref={ref}
-            {...attributes}
-            {...listeners}
-            onClick={() => {
-              if (editing) return
-              onSelect()
-            }}
-            // Space is the gallery's preview-trigger key, not a click here —
-            // without this, a native space-triggers-click on this button (still
-            // focused from the click that selected it) would re-fire onSelect
-            // while previewing a thumbnail and toggle this tag's filter off.
-            onKeyDown={(event) => {
-              if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
-            }}
-            opacity={isDragging ? 0.4 : undefined}
-            fullWidth
-            h="auto"
-            py={6}
-            justify="space-between"
-            variant="transparent"
-            bg={
-              isOver
-                ? 'var(--mantine-primary-color-light)'
-                : activeHoverBackground(isActive, hovered)
-            }
-            style={{
-              outline: isOver ? '2px dashed var(--mantine-primary-color-filled)' : undefined,
-              outlineOffset: -2
-            }}
-            styles={{
-              label: {
-                flex: 1,
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                justifyContent: 'center'
-              }
-            }}
-            leftSection={
-              coverPhoto?.thumbnailStatus === 'ready' &&
-              coverPhoto.thumbnailKey && (
-                <AspectRatio ratio={1 / 1}>
-                  <Image
-                    src={toThumbProtocolUrl(coverPhoto.thumbnailKey)}
-                    w={COVER_SIZE}
-                    h={COVER_SIZE}
-                    fit="cover"
-                  />
-                </AspectRatio>
-              )
-            }
-            rightSection={
-              <>
-                {!editing && (
-                  <Tooltip label="Rename tag">
-                    <ActionIcon
-                      opacity={hovered ? 0.7 : 0}
-                      style={{ flexShrink: 0 }}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onStartEdit()
-                      }}
-                      aria-label={`Rename #${tag}`}
-                    >
-                      <IconPencil />
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-                <Badge size="md" variant={isActive ? 'filled' : 'light'} style={{ flexShrink: 0 }}>
-                  {count}
-                </Badge>
-              </>
-            }
-          >
-            {editing ? (
-              <TextInput
-                autoFocus
-                variant="unstyled"
-                value={draft}
-                w="100%"
-                onChange={(event) => setDraft(event.currentTarget.value)}
-                onBlur={attemptSave}
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => {
-                  event.stopPropagation()
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    attemptSave()
-                  } else if (event.key === 'Escape') {
-                    cancel()
-                  }
-                }}
-                styles={{ input: { padding: 0, height: 'auto', minHeight: 'auto' } }}
-              />
-            ) : (
-              <Text display="block" ta="left" truncate="end">
-                {tag}
-              </Text>
-            )}
-            {description && !editing && (
-              <Text display="block" truncate="end" size="xs" c="dimmed" lineClamp={1}>
-                {description}
-              </Text>
-            )}
-          </Button>
-        </Tooltip>
+          {editing ? (
+            <TextInput
+              autoFocus
+              variant="unstyled"
+              value={draft}
+              w="100%"
+              onChange={(event) => setDraft(event.currentTarget.value)}
+              onBlur={attemptSave}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                event.stopPropagation()
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  attemptSave()
+                } else if (event.key === 'Escape') {
+                  cancel()
+                }
+              }}
+              styles={{ input: { padding: 0, height: 'auto', minHeight: 'auto' } }}
+            />
+          ) : (
+            <Text display="block" ta="left" truncate="end">
+              {tag}
+            </Text>
+          )}
+          {description && !editing && (
+            <Text display="block" truncate="end" size="xs" c="dimmed" lineClamp={1}>
+              {description}
+            </Text>
+          )}
+        </Button>
       </TagContextMenu>
-      <TagRenameDialog
-        oldTag={tag}
-        newTag={trimmed}
-        count={count}
-        opened={confirming}
-        saving={saving}
-        onConfirm={() => void handleConfirm()}
-        onCancel={handleCancelConfirm}
-      />
+      <TagHoverCardTarget tag={tag} target={buttonRef} disabled={editing} />
+      {/* Mounted only while open. A Mantine Modal renders its whole
+          ModalBase/Transition/overlay tree even with opened={false}, so
+          keeping two per row mounted cost ~2x(rows) floating-UI subtrees on
+          every render — the dominant cost in a hundreds-of-tags panel. */}
+      {confirming && (
+        <TagRenameDialog
+          oldTag={tag}
+          newTag={trimmed}
+          count={count}
+          opened
+          saving={saving}
+          onConfirm={() => void handleConfirm()}
+          onCancel={handleCancelConfirm}
+        />
+      )}
+      {confirmingDelete && (
+        <TagDeleteDialog
+          tag={tag}
+          count={count}
+          opened
+          saving={deleting}
+          onConfirm={() => void handleDeleteConfirm()}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </>
   )
-}
-
-interface UntaggedRowProps {
-  count: number
-  isActive: boolean
-  onSelect: () => void
-}
-
-// Pseudo-tag entry for photos with no tags at all — deliberately simpler
-// than TagListItem (no rename, drag, or cover photo; nothing to drag a tag
-// into, and no cover thumbnail makes sense for a set that spans every photo
-// without a tag).
-function UntaggedRow({ count, isActive, onSelect }: UntaggedRowProps): ReactElement {
-  const { hovered, ref } = useHover<HTMLButtonElement>()
-  return (
-    <Button
-      ref={ref}
-      onClick={onSelect}
-      fullWidth
-      h="auto"
-      ml={-3}
-      py="xs"
-      justify="space-between"
-      variant="transparent"
-      bg={activeHoverBackground(isActive, hovered)}
-      // leftSection={<IconTagOff size={16} />}
-      rightSection={
-        <Badge size="md" variant={isActive ? 'filled' : 'light'}>
-          {count}
-        </Badge>
-      }
-    >
-      <Text>Untagged</Text>
-    </Button>
-  )
-}
+})
 
 interface TagGroupSectionProps {
   // null renders the synthetic "Other Tags" section — no rename/delete,
@@ -336,13 +388,13 @@ function TagGroupSection({
   existingGroupNames,
   renderTags
 }: TagGroupSectionProps): ReactElement {
-  const { renameTagGroup, updateTagGroupPattern, deleteTagGroup } = usePhotoLibrary()
+  const { renameTagGroup, updateTagGroupPattern, deleteTagGroup } = useLibraryActions()
   const { hovered, ref: hoverRef } = useHover<HTMLButtonElement>()
   // Groups are drop targets for tags (see TagListItem's draggable), not
   // photos — mirrors that component's own tag-vs-photo disabling so a
   // dragged photo doesn't light this up as if dropping it here did anything.
-  const { active } = useDndContext()
-  const isDraggingPhoto = Boolean((active?.data.current as { paths?: string[] } | undefined)?.paths)
+  // See TagListItem above — avoids useDndContext's per-pointermove churn.
+  const isDraggingPhoto = useActiveDragKind() === 'photo'
   const { isOver, setNodeRef } = useDroppable({
     id: `group:${group?.id ?? 'other'}`,
     data: { groupId: group?.id ?? null },
@@ -414,64 +466,65 @@ function TagGroupSection({
         control
       )}
       <Accordion.Panel styles={{ content: { paddingLeft: 0 } }}>{renderTags(tags)}</Accordion.Panel>
-      {group && (
-        <>
-          <TagGroupNameDialog
-            title="Rename tag group"
-            confirmLabel="Rename"
-            opened={renaming}
-            saving={saving}
-            initialName={group.name}
-            existingNames={existingGroupNames}
-            onConfirm={(name) => void handleRename(name)}
-            onCancel={() => setRenaming(false)}
-          />
-          <TagGroupPatternDialog
-            opened={editingPattern}
-            saving={saving}
-            initialMatchPattern={group.matchPattern}
-            onConfirm={(matchPattern) => void handleEditPattern(matchPattern)}
-            onCancel={() => setEditingPattern(false)}
-          />
-          <TagGroupDeleteDialog
-            name={group.name}
-            opened={confirmingDelete}
-            saving={saving}
-            onConfirm={() => void handleDelete()}
-            onCancel={() => setConfirmingDelete(false)}
-          />
-        </>
+      {/* Same mount-only-while-open reasoning as TagListItem's dialogs. */}
+      {group && renaming && (
+        <TagGroupNameDialog
+          title="Rename tag group"
+          confirmLabel="Rename"
+          opened
+          saving={saving}
+          initialName={group.name}
+          existingNames={existingGroupNames}
+          onConfirm={(name) => void handleRename(name)}
+          onCancel={() => setRenaming(false)}
+        />
+      )}
+      {group && editingPattern && (
+        <TagGroupPatternDialog
+          opened
+          saving={saving}
+          initialMatchPattern={group.matchPattern}
+          onConfirm={(matchPattern) => void handleEditPattern(matchPattern)}
+          onCancel={() => setEditingPattern(false)}
+        />
+      )}
+      {group && confirmingDelete && (
+        <TagGroupDeleteDialog
+          name={group.name}
+          opened
+          saving={saving}
+          onConfirm={() => void handleDelete()}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
     </Accordion.Item>
   )
 }
 
-export function TagPanel(): ReactElement {
-  const {
-    allTags,
-    tagCounts,
-    tagCoverPhotos,
-    untaggedCount,
-    state,
-    setTagFilter,
-    setUntaggedFilter,
-    renameTag
-  } = usePhotoLibrary()
-  const [editingTag, setEditingTag] = useState<string | null>(null)
+interface TagPanelProps {
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+}
 
-  const untaggedEntry = untaggedCount > 0 && (
-    <UntaggedRow
-      count={untaggedCount}
-      isActive={state.untaggedFilterActive}
-      onSelect={() => setUntaggedFilter(!state.untaggedFilterActive)}
-    />
-  )
+// Memoized so a re-render of its parent (e.g. NavbarSplitter during a
+// Splitter drag) doesn't force this whole panel to re-render when its own
+// props (collapsed/onToggleCollapse) haven't changed.
+export const TagPanel = memo(function TagPanel({
+  collapsed,
+  onToggleCollapse
+}: TagPanelProps = {}): ReactElement {
+  const { allTags, tagCounts, tagCoverPhotos, state } = useSidebarLibrary()
+  const { setTagFilter, renameTag, deleteTag } = useLibraryActions()
+  const [editingTag, setEditingTag] = useState<string | null>(null)
+  // Single stable reference (not one closure per tag per render) so
+  // TagListItem's React.memo can bail out — see onSelect/onStartEdit below.
+  const handleStopEdit = useCallback(() => setEditingTag(null), [])
 
   if (allTags.length === 0) {
-    return untaggedEntry ? (
-      <Stack gap={0}>{untaggedEntry}</Stack>
-    ) : (
-      <Text c="dimmed">No tags yet.</Text>
+    return (
+      <Box p="lg">
+        <Text c="dimmed">No tags yet.</Text>
+      </Box>
     )
   }
 
@@ -487,10 +540,11 @@ export function TagPanel(): ReactElement {
         isActive={isActive}
         editing={editingTag === tag}
         draggable={state.tagGroups.length > 0}
-        onSelect={() => setTagFilter(isActive ? null : tag)}
-        onStartEdit={() => setEditingTag(tag)}
-        onStopEdit={() => setEditingTag(null)}
-        onRename={(newTag) => renameTag(tag, newTag)}
+        onSelect={setTagFilter}
+        onStartEdit={setEditingTag}
+        onStopEdit={handleStopEdit}
+        onRename={renameTag}
+        onDelete={deleteTag}
       />
     )
   }
@@ -528,8 +582,12 @@ export function TagPanel(): ReactElement {
 
   if (state.tagGroups.length === 0) {
     return (
-      <PanelSection title="Tags" headerAction={headerAction}>
-        {untaggedEntry}
+      <PanelSection
+        title="Tags"
+        headerAction={headerAction}
+        collapsed={collapsed}
+        onToggleCollapse={onToggleCollapse}
+      >
         {renderTags(allTags)}
       </PanelSection>
     )
@@ -539,8 +597,12 @@ export function TagPanel(): ReactElement {
   const existingGroupNames = state.tagGroups.map((group) => group.name)
 
   return (
-    <PanelSection title="Tags" headerAction={headerAction}>
-      {untaggedEntry}
+    <PanelSection
+      title="Tags"
+      headerAction={headerAction}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    >
       <Accordion multiple defaultValue={[...state.tagGroups.map((group) => group.id), '__other__']}>
         {state.tagGroups.map((group) => (
           <TagGroupSection
@@ -560,4 +622,4 @@ export function TagPanel(): ReactElement {
       </Accordion>
     </PanelSection>
   )
-}
+})

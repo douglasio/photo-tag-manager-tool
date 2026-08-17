@@ -15,9 +15,7 @@ import { startWatching, stopAllWatchers, stopWatching } from './folderWatcher'
 import { ingestFile } from './photoIngest'
 import { deleteThumbnail } from './thumbnailService'
 
-// p-limit is ESM-only; when externalized in the main-process CJS bundle,
-// `require('p-limit')` yields the module namespace object rather than the
-// callable default export, so it must be unwrapped explicitly.
+// wraps p-limit import / require
 const pLimit =
   (pLimitImport as unknown as { default?: typeof pLimitImport }).default ?? pLimitImport
 
@@ -30,11 +28,7 @@ export function setWatchTarget(target: WebContents): void {
   watchTarget = target
 }
 
-// Lets a programmatic file operation (e.g. a rename) tell the watcher to
-// ignore the filesystem event(s) it's about to cause, so the operation's own
-// IPC response stays the single source of truth instead of racing a
-// redundant unlink/add pair (which would also regenerate the thumbnail for
-// nothing and could fire a spurious "photo added" toast).
+// watcher should ignore programmatic file operations (e.g. a rename) caused by the app
 const suppressedPaths = new Set<string>()
 const SUPPRESSION_TIMEOUT_MS = 5000
 
@@ -46,11 +40,7 @@ export function suppressNextEvent(filePath: string): void {
 async function handleUpsert(filePath: string, changeType: 'add' | 'change'): Promise<void> {
   try {
     const { photo } = await ingestFile(filePath, thumbnailLimit)
-    // Both 'add' and 'change' can affect group membership now that this also
-    // auto-matches tags against group rules, not just pruning stale ones — a
-    // brand new file can introduce a tag that a rule should immediately pick
-    // up. Fine to run per live-watcher event (unlike the bulk initial-scan
-    // path, which deliberately calls this once at the end instead).
+    // Both 'add' and 'change' can affect group membership
     reconcileTagGroups()
     const payload: WatchPhotoUpsertedEvent = { photo, changeType }
     watchTarget?.send('watch:photo-upserted', payload)
@@ -89,9 +79,7 @@ export function watchFolder(rootPath: string): void {
   )
 }
 
-// Exclude patterns can't be updated on an already-running chokidar watcher,
-// so applying a change means tearing down and recreating every root's
-// watcher with the current patterns baked in fresh.
+// restarts watcher when exclude patterns are modified
 export async function restartAllWatchers(folders: string[]): Promise<void> {
   await Promise.all(folders.map((folder) => stopWatching(folder)))
   folders.forEach(watchFolder)

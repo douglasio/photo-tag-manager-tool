@@ -1,117 +1,88 @@
+import { type ReactElement, useLayoutEffect } from 'react'
+
 import type { UsePannableZoomResult } from '@hooks'
 import { Box, Text } from '@mantine/core'
-import type { ReactElement } from 'react'
 
 import { CoverBarcode, PannableZoomableImage } from '@components'
+import { useLazyFonts, usePannableZoom } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
 import { formatDateTaken } from '@utils'
 
+import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
+
 interface MagazineCoverViewProps {
   photo: PhotoRecord
-  // Owned by PhotoView so it can render the matching ZoomToolbar in its own
-  // footer bar instead of a separate floating one here.
-  zoom: UsePannableZoomResult
+  // Owns its zoom locally (see usePannableZoom below) and reports it here so
+  // PhotoView's single footer ZoomToolbar can render from the same instance.
+  onZoomReady: (zoom: UsePannableZoomResult) => void
   // Global masthead text, editable in Settings.
   mastheadTitle: string
 }
 
-// Bebas Neue (self-hosted via @fontsource/bebas-neue, imported once in
-// main.tsx) is the tall, condensed display face real magazine mastheads and
-// cover lines use — Mantine's theme sans doesn't have anything like it.
+// Bebas Neue (self-hosted via @fontsource/bebas-neue, lazy-loaded below) is
+// the tall, condensed display face real magazine mastheads/cover lines use.
 const DISPLAY_FONT = "'Bebas Neue', sans-serif"
-// Sports Illustrated / People-style punchy red + yellow, rather than a
-// single muted accent.
-const ACCENT_RED = '#e0122c'
-const ACCENT_YELLOW = '#ffde59'
-const TEXT_SHADOW = '0 2px 10px rgba(0, 0, 0, 0.9)'
+// One restrained accent, used sparingly (a rule, a single teaser) — real
+// newsstand covers lean on clean white/black type for legibility and use
+// color as a small accent, not as the dominant surface.
+const ACCENT = '#c81e3a'
+const TEXT_SHADOW = '0 1px 6px rgba(0, 0, 0, 0.85)'
 // A classic magazine trim proportion (width:height), portrait.
 const COVER_ASPECT_RATIO = '3 / 4'
 // Punchier, more saturated/contrasty than the source photo — real cover
 // photography is always retouched for pop, not shown flat.
-const COVER_IMAGE_FILTER = 'saturate(1.35) contrast(1.12) brightness(1.03)'
+const COVER_IMAGE_FILTER = 'saturate(1.25) contrast(1.08) brightness(1.02)'
 
-// The circular "burst" sticker real covers (SI's swimsuit issue, People's
-// "special") pin to a top corner — tilted, bold, high-contrast.
-function CoverBurst(): ReactElement {
-  return (
-    <Box
-      pos="absolute"
-      top={14}
-      right={14}
-      w={72}
-      h={72}
-      bg={ACCENT_RED}
-      style={{
-        borderRadius: '50%',
-        border: '2px solid white',
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
-        transform: 'rotate(12deg)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center'
-      }}
-    >
-      <Text
-        c="white"
-        style={{
-          fontFamily: DISPLAY_FONT,
-          fontSize: '1.05rem',
-          lineHeight: 0.95,
-          letterSpacing: 1
-        }}
-      >
-        PHOTO
-        <br />
-        EDITION
-      </Text>
-    </Box>
-  )
-}
-
-// Small colored pills teasing the photo's own tags, People-style "also in
-// this issue" — real data, not invented cover lines.
-function TagTeasers({ tags }: { tags: string[] }): ReactElement | null {
+// The small, numerous cover lines real newsstand covers run down one edge —
+// varied size/weight rather than one giant sticker, pulled from the photo's
+// own tags (real data, not invented headlines).
+function CoverLines({ tags }: { tags: string[] }): ReactElement | null {
   if (tags.length === 0) return null
   return (
-    <Box display="flex" mt={6} style={{ justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
-      {tags.slice(0, 3).map((tag, index) => (
-        <Box
+    <Box
+      display="flex"
+      style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 3, textAlign: 'right' }}
+    >
+      {tags.slice(0, 4).map((tag, index) => (
+        <Text
           key={tag}
-          px={8}
-          py={2}
-          bg={index % 2 === 0 ? ACCENT_YELLOW : ACCENT_RED}
-          style={{ borderRadius: 999, transform: `rotate(${index % 2 === 0 ? -2 : 2}deg)` }}
+          c={index === 0 ? ACCENT : 'white'}
+          tt="uppercase"
+          style={{
+            fontFamily: DISPLAY_FONT,
+            fontSize: index === 0 ? '1.35rem' : '1.05rem',
+            lineHeight: 1,
+            letterSpacing: 0.5,
+            textShadow: TEXT_SHADOW
+          }}
         >
-          <Text
-            c={index % 2 === 0 ? 'black' : 'white'}
-            fw={700}
-            fz={10}
-            tt="uppercase"
-            style={{ letterSpacing: 0.5, whiteSpace: 'nowrap' }}
-          >
-            {tag}
-          </Text>
-        </Box>
+          {tag}
+        </Text>
       ))}
     </Box>
   )
 }
 
-// Renders the photo inside a portrait, magazine-cover-shaped frame — a bold
-// masthead, corner burst, tag teasers, headline and barcode overlaid like a
-// real newsstand cover's furniture — reusing PannableZoomableImage for the
-// drag-to-pan + wheel-to-zoom background, scoped to the frame rather than
-// the whole PhotoView area.
+// Renders the photo inside a portrait, magazine-cover-shaped frame — a clean
+// masthead, an issue line, a column of small cover lines down the right
+// edge, a bottom coverline, and a barcode, the way a real newsstand cover is
+// actually laid out (mostly white/black type, one restrained accent color) —
+// reusing PannableZoomableImage for the drag-to-pan + wheel-to-zoom
+// background, scoped to the frame rather than the whole PhotoView area.
 export function MagazineCoverView({
   photo,
-  zoom,
+  onZoomReady,
   mastheadTitle
 }: MagazineCoverViewProps): ReactElement {
+  const fontsLoaded = useLazyFonts([() => import('@fontsource/bebas-neue')])
+  const zoom = usePannableZoom(photo, { defaultFit: 'cover' })
+  useLayoutEffect(() => onZoomReady(zoom), [zoom, onZoomReady])
   const title = photo.fileName.replace(/\.[^./]+$/, '')
   const dateDisplay = photo.metadata.dateTaken
     ? formatDateTaken(photo.metadata.dateTaken, 'monthYear')
     : null
+
+  if (!fontsLoaded) return <CoverLoadingPlaceholder />
 
   return (
     <Box
@@ -145,27 +116,26 @@ export function MagazineCoverView({
               h="100%"
               w="100%"
               display="flex"
-              style={{ flexDirection: 'column', justifyContent: 'space-between' }}
+              px="md"
+              pt="sm"
+              pb="lg"
+              style={{
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                background:
+                  'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 18%, transparent 60%, rgba(0,0,0,0.85) 100%)'
+              }}
             >
-              {/* Masthead */}
-              <Box
-                pt="md"
-                pb="xs"
-                px="md"
-                style={{
-                  textAlign: 'center',
-                  background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent)'
-                }}
-              >
+              {/* Masthead + issue line */}
+              <Box style={{ textAlign: 'center' }}>
                 <Text
-                  c={ACCENT_RED}
+                  c="white"
                   style={{
                     fontFamily: DISPLAY_FONT,
-                    fontSize: '2.75rem',
+                    fontSize: '3rem',
                     lineHeight: 1,
-                    letterSpacing: 2,
-                    textShadow: TEXT_SHADOW,
-                    WebkitTextStroke: '1.5px black'
+                    letterSpacing: 3,
+                    textShadow: TEXT_SHADOW
                   }}
                 >
                   {mastheadTitle}
@@ -173,57 +143,52 @@ export function MagazineCoverView({
                 {dateDisplay && (
                   <Text
                     c="white"
-                    fz="xs"
-                    fw={700}
+                    fz={10}
+                    fw={600}
                     tt="uppercase"
-                    style={{ letterSpacing: 3, textShadow: TEXT_SHADOW }}
+                    mt={2}
+                    style={{ letterSpacing: 3, textShadow: TEXT_SHADOW, opacity: 0.85 }}
                   >
                     {dateDisplay}
                   </Text>
                 )}
-                <TagTeasers tags={photo.tags} />
               </Box>
 
-              <CoverBurst />
+              {/* Cover lines, right edge */}
+              <Box style={{ alignSelf: 'flex-end' }}>
+                <CoverLines tags={photo.tags} />
+              </Box>
 
-              {/* Cover lines */}
-              <Box
-                pos="relative"
-                pb="lg"
-                px="md"
-                pt={6}
-                style={{
-                  background: 'linear-gradient(to top, rgba(0, 0, 0, 0.92) 40%, transparent)',
-                  borderTop: `4px solid ${ACCENT_RED}`
-                }}
-              >
-                <Text
-                  c="white"
-                  style={{
-                    fontFamily: DISPLAY_FONT,
-                    fontSize: '3.75rem',
-                    lineHeight: 0.9,
-                    letterSpacing: 1,
-                    textShadow: TEXT_SHADOW,
-                    WebkitTextStroke: '1.5px black',
-                    wordBreak: 'break-word'
-                  }}
-                >
-                  {title}
-                </Text>
-                {photo.metadata.comment && (
+              {/* Main coverline + barcode */}
+              <Box>
+                <Box style={{ borderTop: `2px solid ${ACCENT}`, paddingTop: 6 }}>
                   <Text
-                    c={ACCENT_YELLOW}
-                    fs="italic"
-                    fz="md"
-                    fw={700}
-                    mt={4}
-                    style={{ textShadow: TEXT_SHADOW }}
+                    c="white"
+                    style={{
+                      fontFamily: DISPLAY_FONT,
+                      fontSize: '3.25rem',
+                      lineHeight: 0.92,
+                      letterSpacing: 0.5,
+                      textShadow: TEXT_SHADOW,
+                      wordBreak: 'break-word'
+                    }}
                   >
-                    “{photo.metadata.comment}”
+                    {title}
                   </Text>
-                )}
-                <Box pos="absolute" bottom={10} right={10}>
+                  {photo.metadata.comment && (
+                    <Text
+                      c="white"
+                      fs="italic"
+                      fz="sm"
+                      fw={500}
+                      mt={4}
+                      style={{ textShadow: TEXT_SHADOW, opacity: 0.9 }}
+                    >
+                      “{photo.metadata.comment}”
+                    </Text>
+                  )}
+                </Box>
+                <Box mt={10} display="flex" style={{ justifyContent: 'flex-end' }}>
                   <CoverBarcode />
                 </Box>
               </Box>

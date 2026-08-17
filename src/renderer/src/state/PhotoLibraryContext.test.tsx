@@ -56,19 +56,38 @@ function createMockApi(): {
     incrementPhotoView: vi.fn(),
     movePhotosToFolder: vi.fn(),
     onMoveProgress: onMethod('onMoveProgress'),
+    deletePhotos: vi.fn().mockResolvedValue([]),
+    dismissDuplicateGroup: vi.fn().mockResolvedValue(undefined),
     getGalleryCellWidth: vi.fn().mockResolvedValue(null),
     setGalleryCellWidth: vi.fn().mockResolvedValue(undefined),
-    getGallerySort: vi.fn().mockResolvedValue(null),
+    getAllSettings: vi.fn().mockResolvedValue({
+      gallerySort: null,
+      defaultView: 'gallery',
+      showEmptyFolders: false,
+      tagsPanelGridView: false,
+      peoplePanelGridView: false,
+      galleryViewMode: 'grid',
+      aiTagSuggestionsEnabled: false,
+      faceDetectionEnabled: false,
+      detailsPanelCollapsed: false,
+      galleryAnimationsEnabled: true,
+      showFilenames: true,
+      showViewCounts: false,
+      magazineTitle: 'TAG ME',
+      newspaperTitle: 'The Tag Me Times',
+      dvdStudioName: 'TAG ME PICTURES',
+      artGalleryName: 'The Tag Me Gallery',
+      navbarSplitSizes: null,
+      navbarCollapsedPanels: {},
+      excludePatterns: [],
+      excludedFolders: []
+    }),
     setGallerySort: vi.fn().mockResolvedValue(undefined),
-    getDefaultView: vi.fn().mockResolvedValue('gallery'),
     setDefaultView: vi.fn().mockResolvedValue(undefined),
-    getShowEmptyFolders: vi.fn().mockResolvedValue(false),
     setShowEmptyFolders: vi.fn().mockResolvedValue(undefined),
-    getTagsPanelGridView: vi.fn().mockResolvedValue(false),
+    setPeoplePanelGridView: vi.fn().mockResolvedValue(undefined),
     setTagsPanelGridView: vi.fn().mockResolvedValue(undefined),
-    getGalleryViewMode: vi.fn().mockResolvedValue('grid'),
     setGalleryViewMode: vi.fn().mockResolvedValue(undefined),
-    getAiTagSuggestionsEnabled: vi.fn().mockResolvedValue(false),
     setAiTagSuggestionsEnabled: vi.fn().mockResolvedValue(undefined),
     enableAiFeaturesAndScan: vi.fn().mockResolvedValue({
       duplicateGroups: [],
@@ -84,24 +103,48 @@ function createMockApi(): {
     wasAiScanInterrupted: vi.fn().mockResolvedValue(false),
     onAiScanProgress: onMethod('onAiScanProgress'),
     suggestTags: vi.fn().mockResolvedValue([]),
-    getDetailsPanelCollapsed: vi.fn().mockResolvedValue(false),
+    setFaceDetectionEnabled: vi.fn().mockResolvedValue(undefined),
+    getFacesForPhoto: vi.fn().mockResolvedValue([]),
+    getPeople: vi.fn().mockResolvedValue([]),
+    getFacePhotoAssignments: vi.fn().mockResolvedValue([]),
+    enableFaceDetectionAndScan: vi.fn().mockResolvedValue({
+      facesDetected: 0,
+      peopleCount: 0,
+      photosScanned: 0,
+      canceled: false
+    }),
+    rescanFaces: vi.fn().mockResolvedValue({
+      facesDetected: 0,
+      peopleCount: 0,
+      photosScanned: 0,
+      canceled: false
+    }),
+    cancelFaceScan: vi.fn().mockResolvedValue(undefined),
+    onFaceScanProgress: onMethod('onFaceScanProgress'),
+    renamePerson: vi.fn().mockResolvedValue(undefined),
+    assignFaceToPerson: vi.fn().mockResolvedValue(undefined),
+    splitFaceAsNewPerson: vi
+      .fn()
+      .mockResolvedValue({ id: 'person-new', name: null, coverFaceId: null, faceCount: 1 }),
+    unassignFace: vi.fn().mockResolvedValue(undefined),
+    mergePeople: vi.fn().mockResolvedValue(undefined),
+    deletePerson: vi.fn().mockResolvedValue(undefined),
+    setPersonDescription: vi.fn().mockResolvedValue(undefined),
+    hidePerson: vi.fn().mockResolvedValue(undefined),
+    unhidePerson: vi.fn().mockResolvedValue(undefined),
+    getHiddenPeople: vi.fn().mockResolvedValue([]),
     setDetailsPanelCollapsed: vi.fn().mockResolvedValue(undefined),
-    getNavbarSplitSizes: vi.fn().mockResolvedValue(null),
+    setNavbarCollapsedPanels: vi.fn().mockResolvedValue(undefined),
     setNavbarSplitSizes: vi.fn().mockResolvedValue(undefined),
-    getGalleryAnimationsEnabled: vi.fn().mockResolvedValue(true),
     setGalleryAnimationsEnabled: vi.fn().mockResolvedValue(undefined),
-    getShowFilenames: vi.fn().mockResolvedValue(true),
     setShowFilenames: vi.fn().mockResolvedValue(undefined),
-    getShowViewCounts: vi.fn().mockResolvedValue(false),
     setShowViewCounts: vi.fn().mockResolvedValue(undefined),
-    getMagazineTitle: vi.fn().mockResolvedValue('TAG ME'),
     setMagazineTitle: vi.fn().mockResolvedValue(undefined),
-    getNewspaperTitle: vi.fn().mockResolvedValue('The Tag Me Times'),
     setNewspaperTitle: vi.fn().mockResolvedValue(undefined),
-    getDvdStudioName: vi.fn().mockResolvedValue('TAG ME PICTURES'),
     setDvdStudioName: vi.fn().mockResolvedValue(undefined),
-    getExcludePatterns: vi.fn().mockResolvedValue([]),
+    setArtGalleryName: vi.fn().mockResolvedValue(undefined),
     setExcludePatterns: vi.fn().mockResolvedValue(undefined),
+    setExcludedFolders: vi.fn().mockResolvedValue(undefined),
     addFolder: vi.fn().mockResolvedValue(undefined),
     removeFolder: vi.fn().mockResolvedValue(undefined),
     renameFolder: vi.fn(),
@@ -153,15 +196,29 @@ describe('PhotoLibraryContext', () => {
   })
 
   it('hydrates settings from window.api on mount', async () => {
-    mockApi.getShowEmptyFolders.mockResolvedValue(true)
-    mockApi.getShowFilenames.mockResolvedValue(false)
-    mockApi.getGalleryAnimationsEnabled.mockResolvedValue(false)
-    mockApi.getDetailsPanelCollapsed.mockResolvedValue(true)
-    mockApi.getExcludePatterns.mockResolvedValue(['.trash'])
+    mockApi.getAllSettings.mockResolvedValue({
+      gallerySort: null,
+      defaultView: 'gallery',
+      showEmptyFolders: true,
+      tagsPanelGridView: false,
+      peoplePanelGridView: false,
+      galleryViewMode: 'grid',
+      aiTagSuggestionsEnabled: false,
+      faceDetectionEnabled: false,
+      detailsPanelCollapsed: true,
+      galleryAnimationsEnabled: false,
+      showFilenames: false,
+      showViewCounts: false,
+      magazineTitle: 'Custom Mag',
+      newspaperTitle: 'Custom Paper',
+      dvdStudioName: 'Custom Studio',
+      artGalleryName: 'The Tag Me Gallery',
+      navbarSplitSizes: null,
+      navbarCollapsedPanels: {},
+      excludePatterns: ['.trash'],
+      excludedFolders: ['/root/test']
+    })
     mockApi.getTagDescriptions.mockResolvedValue({ vacation: 'Beach trips' })
-    mockApi.getMagazineTitle.mockResolvedValue('Custom Mag')
-    mockApi.getNewspaperTitle.mockResolvedValue('Custom Paper')
-    mockApi.getDvdStudioName.mockResolvedValue('Custom Studio')
 
     const { result } = setup()
 
@@ -170,6 +227,7 @@ describe('PhotoLibraryContext', () => {
     expect(result.current.state.galleryAnimationsEnabled).toBe(false)
     expect(result.current.state.detailsPanelCollapsed).toBe(true)
     expect(result.current.state.excludePatterns).toEqual(['.trash'])
+    await waitFor(() => expect(result.current.state.excludedFolders).toEqual(['/root/test']))
     expect(result.current.state.tagDescriptions.get('vacation')).toBe('Beach trips')
     await waitFor(() => expect(result.current.state.magazineTitle).toBe('Custom Mag'))
     expect(result.current.state.newspaperTitle).toBe('Custom Paper')
@@ -184,26 +242,12 @@ describe('PhotoLibraryContext', () => {
     expect(result.current.state.folders).toEqual(['/root'])
   })
 
-  it('flips initialLoadComplete only once every folder finishes its startup scan', async () => {
+  it('flips initialLoadComplete as soon as folders are known, without waiting for the startup scan', async () => {
     mockApi.getFolders.mockResolvedValue(['/root'])
     const { result } = setup()
 
-    await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalledWith(['/root']))
-    expect(result.current.state.initialLoadComplete).toBe(false)
-
-    act(() => {
-      subscriptions.onScanComplete({
-        scanId: 'scan-1',
-        rootPaths: ['/root'],
-        totalScanned: 0,
-        cacheHits: 0,
-        errors: [],
-        allFolders: [],
-        filePaths: []
-      })
-    })
-
     await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+    expect(mockApi.startScanAll).toHaveBeenCalledWith(['/root'])
   })
 
   it('sets initialLoadComplete immediately when there are no folders to scan', async () => {
@@ -430,6 +474,119 @@ describe('PhotoLibraryContext', () => {
       expect(result.current.state.selectedFolder).toBe('/root')
       expect(result.current.state.selectedTag).toBe('vacation')
     })
+
+    it('setFolderUntaggedFilter narrows within the folder without clearing it', () => {
+      const { result } = setup()
+      act(() => result.current.setFolderFilter('/root'))
+      act(() => result.current.setFolderUntaggedFilter(true))
+      expect(result.current.state.selectedFolder).toBe('/root')
+      expect(result.current.state.untaggedFilterActive).toBe(true)
+    })
+
+    it('setFolderUntaggedFilter clears any active tag filter', () => {
+      const { result } = setup()
+      act(() => result.current.setFolderFilter('/root'))
+      act(() => result.current.setFolderTagFilter('vacation'))
+      act(() => result.current.setFolderUntaggedFilter(true))
+      expect(result.current.state.selectedTag).toBeNull()
+    })
+  })
+
+  describe('folder pill row (folderTags/folderHasUntagged)', () => {
+    async function seedMixedFolder(): Promise<ReturnType<typeof setup>> {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const hook = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [
+            makePhoto('/root/a.jpg', { tags: ['vacation'] }),
+            makePhoto('/root/b.jpg', { tags: [] })
+          ]
+        })
+      })
+      return hook
+    }
+
+    it('reports folderHasUntagged when the folder has at least one untagged photo', async () => {
+      const { result } = await seedMixedFolder()
+      act(() => result.current.setFolderFilter('/root'))
+      expect(result.current.folderHasUntagged).toBe(true)
+      expect(result.current.folderTags).toEqual(['vacation'])
+    })
+
+    it("narrows visiblePhotos to the folder's untagged photos only", async () => {
+      const { result } = await seedMixedFolder()
+      act(() => result.current.setFolderFilter('/root'))
+      act(() => result.current.setFolderUntaggedFilter(true))
+      expect(result.current.visiblePhotos.map((p) => p.filePath)).toEqual(['/root/b.jpg'])
+    })
+  })
+
+  describe('excluded folders', () => {
+    async function seedExcludableLibrary(): Promise<ReturnType<typeof setup>> {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const hook = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [
+            makePhoto('/root/a.jpg', { tags: ['beach'], viewCount: 2 }),
+            makePhoto('/root/test/b.jpg', { tags: ['beach', 'private'], viewCount: 5 })
+          ]
+        })
+      })
+      return hook
+    }
+
+    it('excludeFolder dispatches and persists the folder', async () => {
+      const { result } = setup()
+      // Waits for the mount-time hydration effects (which dispatch their own
+      // default SET_EXCLUDED_FOLDERS: []) to settle first — otherwise a
+      // hydration dispatch landing after excludeFolder's would stomp it back.
+      await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+      await act(() => result.current.excludeFolder('/root/test'))
+
+      expect(result.current.state.excludedFolders).toEqual(['/root/test'])
+      expect(mockApi.setExcludedFolders).toHaveBeenCalledWith(['/root/test'])
+    })
+
+    it('includeFolder removes a previously excluded folder', async () => {
+      const { result } = setup()
+      await waitFor(() => expect(result.current.state.initialLoadComplete).toBe(true))
+      await act(() => result.current.excludeFolder('/root/test'))
+      await act(() => result.current.includeFolder('/root/test'))
+
+      expect(result.current.state.excludedFolders).toEqual([])
+      expect(mockApi.setExcludedFolders).toHaveBeenLastCalledWith([])
+    })
+
+    it('excludes photos under an excluded folder from tagCounts/activePhotosByPath', async () => {
+      const { result } = await seedExcludableLibrary()
+      await act(() => result.current.excludeFolder('/root/test'))
+
+      expect(result.current.activePhotosByPath.has('/root/test/b.jpg')).toBe(false)
+      expect(result.current.activePhotosByPath.has('/root/a.jpg')).toBe(true)
+      expect(result.current.tagCounts.get('beach')).toBe(1)
+      expect(result.current.tagCounts.get('private')).toBeUndefined()
+    })
+
+    it('excludes photos from visiblePhotos in All Photos mode', async () => {
+      const { result } = await seedExcludableLibrary()
+      await act(() => result.current.excludeFolder('/root/test'))
+
+      expect(result.current.visiblePhotos.map((p) => p.filePath)).toEqual(['/root/a.jpg'])
+    })
+
+    it("still shows the excluded folder's own photos when browsing directly into it", async () => {
+      const { result } = await seedExcludableLibrary()
+      await act(() => result.current.excludeFolder('/root/test'))
+      act(() => result.current.setFolderFilter('/root/test'))
+
+      expect(result.current.visiblePhotos.map((p) => p.filePath)).toEqual(['/root/test/b.jpg'])
+    })
   })
 
   describe('addFolder', () => {
@@ -567,6 +724,54 @@ describe('PhotoLibraryContext', () => {
       await act(() => result.current.rotatePhoto('/a.jpg', 'right'))
       expect(mockApi.rotatePhoto).toHaveBeenCalledWith('/a.jpg', 'right')
       expect(result.current.photos.some((p) => p.filePath === '/a.jpg')).toBe(true)
+    })
+  })
+
+  describe('deletePhotos', () => {
+    async function seedTwoPhotos(): Promise<ReturnType<typeof setup>> {
+      mockApi.getFolders.mockResolvedValue(['/root'])
+      const hook = setup()
+      await waitFor(() => expect(mockApi.startScanAll).toHaveBeenCalled())
+      act(() => {
+        subscriptions.onMetadataBatch({
+          scanId: 'scan-1',
+          photos: [makePhoto('/root/a.jpg'), makePhoto('/root/b.jpg')]
+        })
+      })
+      return hook
+    }
+
+    it('removes every deleted photo from state', async () => {
+      mockApi.deletePhotos.mockResolvedValue(['/root/a.jpg', '/root/b.jpg'])
+      const { result } = await seedTwoPhotos()
+
+      await act(() => result.current.deletePhotos(['/root/a.jpg', '/root/b.jpg']))
+
+      expect(mockApi.deletePhotos).toHaveBeenCalledWith(['/root/a.jpg', '/root/b.jpg'])
+      expect(result.current.photos).toEqual([])
+    })
+
+    it('only removes the paths the main process actually deleted', async () => {
+      mockApi.deletePhotos.mockResolvedValue(['/root/a.jpg'])
+      const { result } = await seedTwoPhotos()
+
+      await act(() => result.current.deletePhotos(['/root/a.jpg', '/root/b.jpg']))
+
+      expect(result.current.photos.map((p) => p.filePath)).toEqual(['/root/b.jpg'])
+    })
+
+    it('does nothing for an empty selection', async () => {
+      const { result } = setup()
+      await act(() => result.current.deletePhotos([]))
+      expect(mockApi.deletePhotos).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('dismissDuplicateGroup', () => {
+    it('persists the dismissal via window.api', async () => {
+      const { result } = setup()
+      await act(() => result.current.dismissDuplicateGroup(['/root/a.jpg', '/root/b.jpg']))
+      expect(mockApi.dismissDuplicateGroup).toHaveBeenCalledWith(['/root/a.jpg', '/root/b.jpg'])
     })
   })
 })

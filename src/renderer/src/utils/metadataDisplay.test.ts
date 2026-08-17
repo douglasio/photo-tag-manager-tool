@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import type { PhotoMetadata } from '@shared/types'
 
-import { DATE_TAKEN_FORMAT, formatDateTaken, toDisplayMetadata } from './metadataDisplay'
+import {
+  DATE_TAKEN_FORMAT,
+  formatDateModified,
+  formatDateTaken,
+  toDisplayMetadata
+} from './metadataDisplay'
 
 describe('formatDateTaken', () => {
   it('formats a valid ISO date using DATE_TAKEN_FORMAT', () => {
@@ -16,6 +21,21 @@ describe('formatDateTaken', () => {
 
   it('returns the placeholder for an unparsable string', () => {
     expect(formatDateTaken('not-a-date')).toBe('—')
+  })
+})
+
+describe('formatDateModified', () => {
+  it('formats a valid epoch-ms mtime using the same style as formatDateTaken', () => {
+    const result = formatDateModified(new Date('2024-03-05T14:30:00').getTime())
+    expect(result).toMatch(/Mar 5, 2024/)
+  })
+
+  it('returns the placeholder for null', () => {
+    expect(formatDateModified(null)).toBe('—')
+  })
+
+  it('returns the placeholder for undefined', () => {
+    expect(formatDateModified(undefined)).toBe('—')
   })
 })
 

@@ -1,11 +1,13 @@
-import { Box, Divider, Group, SimpleGrid, Stack, Title } from '@mantine/core'
-import { IconHistory, IconHome2, IconTags } from '@tabler/icons-react'
-import type { ReactElement } from 'react'
+import { memo, type ReactElement } from 'react'
+
+import { Box, Button, Divider, EmptyState, Group, SimpleGrid, Stack, Title } from '@mantine/core'
+import { IconHistory, IconHome2, IconLibraryPhoto, IconTags } from '@tabler/icons-react'
 
 import {
   FeaturedTagWidget,
   PhotosFromYearWidget,
   RecentlyAddedWidget,
+  ScanProgressIndicator,
   TaggingProgressWidget,
   TagThisPhotoWidget,
   TimeWarpWidget,
@@ -15,6 +17,7 @@ import {
 } from '@components'
 import DashboardWidget from '@renderer/components/Dashboard/DashboardWidget'
 import { Widget } from '@shared/types'
+import { usePhotoLibrary } from '@state'
 
 // minmax (not 1fr) — rows match by default, but can grow for tall content
 // (e.g. Throwback's Timeline), with the page scrolling instead of clipping.
@@ -58,7 +61,12 @@ function DashboardSection({
   )
 }
 
-export function DashboardView(): React.JSX.Element {
+// Memoized: takes no props, so it bails out when AppLayout re-renders
+// (e.g. a drag starting/ending flips its activeDrag state) and only
+// re-renders when its own context subscriptions actually change.
+export const DashboardView = memo(function DashboardView(): React.JSX.Element {
+  const { activePhotosByPath, addFolder, state } = usePhotoLibrary()
+
   const sections: DashboardSectionData[] = [
     {
       id: 'home',
@@ -99,6 +107,42 @@ export function DashboardView(): React.JSX.Element {
     }
   ]
 
+  if (activePhotosByPath.size === 0) {
+    if (state.status === 'scanning') {
+      return (
+        <Box
+          flex="1"
+          mih={0}
+          display="flex"
+          style={{ alignItems: 'center', justifyContent: 'center' }}
+        >
+          <ScanProgressIndicator percent={null} label="Scanning for photos…" />
+        </Box>
+      )
+    }
+    return (
+      <Box
+        flex="1"
+        mih={0}
+        display="flex"
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <EmptyState
+          icon={<IconLibraryPhoto size={32} />}
+          title="No photos yet"
+          description="Add a folder to start building your library."
+        >
+          <EmptyState.Actions>
+            <Button onClick={() => void addFolder()}>Add Folder</Button>
+          </EmptyState.Actions>
+        </EmptyState>
+      </Box>
+    )
+  }
+
   return (
     <Box p="md" pb="xl" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <Stack gap="xl">
@@ -114,4 +158,4 @@ export function DashboardView(): React.JSX.Element {
       </Stack>
     </Box>
   )
-}
+})

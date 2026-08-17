@@ -2,11 +2,12 @@ import { ActionIcon, Menu, Switch } from '@mantine/core'
 import { IconSettings } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions, useSidebarLibrary } from '@state'
 import { ACTION_ICONS } from '@utils'
 
 export function FolderSettingsMenu(): ReactElement {
-  const { state, setShowEmptyFolders } = usePhotoLibrary()
+  const { state } = useSidebarLibrary()
+  const { setShowEmptyFolders } = useLibraryActions()
 
   const { BUTTON_SIZE, ICON_SIZE } = ACTION_ICONS
 

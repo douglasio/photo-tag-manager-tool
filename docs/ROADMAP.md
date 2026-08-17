@@ -16,25 +16,50 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Corrupt photo finder
 
-5. I want a global way to "ignore" a folder from appearing in the various features, including AI features. Ex. If there's a folder called "test", I should be able to right click it in the folder tree and say "Exclude from features" or something like that. In that case, it should not show up basically anywhere except if the folder is navigated to directly., All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab.
+5. I want a global way to "ignore" a folder from appearing in the various features, including AI features. Ex. If there's a folder called "test", I should be able to right click it in the folder tree and say "Exclude from features" or something like that. Let's nail down the exact wording that would make sense to users. If they mark a folder as ignored, it should not show up basically anywhere except in the folder tree. Photos within it should not show up in tags, be factored into tag suggestions, timeline, featured widgets, duplicates, etc. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab where they can be un-ignored.
+
+6. Search -- implement spotlight search. searchable fields should include tags, filename, comments. As a future enhancement, maybe an AI-based search that can match to photo contents or faces.
+
+7. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
+
+8. Make all 'Enable AI features' buttons use the gradient variant.
+
+9. Video support?
+
+## Onboarding
+
+1. Installation guide?
 
 ## AI
 
-- Face detection?
+1. Face detection?
 
-- Disabling AI should actually uninstall the models, not just hide the features from the UI.
+2. Disabling AI should actually uninstall the models, not just hide the features from the UI.
+3.
+4. Enabling AI features needs to be cleaned up -- inconsistent dialogs, nonfunctional cancel button behavior, app slowdown while installation is happening, etc.
 
-- There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
+5. There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
 
-## Navigation
-
-1. Truncate photo filenames in the tabs so more can fit. Hovering over the tab should reveal the full filename as a tooltip.
+6. Face detection follow-ups (deferred out of the initial build):
+   - Download the YuNet/SFace models on demand (like the CLIP models already do via `@huggingface/transformers`, cached to `userData`) instead of bundling them in `resources/models/` — right now every install pays their ~37MB regardless of whether face detection is ever turned on, which is backwards for what's meant to be the more optional/heavier of the two AI features. Would need its own download/cache/checksum-verification path (no Hub-hosted `pipeline()`-compatible checkpoint to piggyback on) plus the corresponding "downloading" progress phase in the enable/scan flow.
+   - Crop the People panel's cover thumbnail to the actual face region instead of showing the full photo — DetailPanelFaces already does this via a CSS crop, PeoplePanel's cover doesn't yet.
+   - Filter the gallery by person, the same way tag filtering works today.
+   - Centroid refinement: once a person has a few manually-confirmed faces, average their embeddings into a refined match target for future auto-clustering passes, instead of relying solely on the raw DBSCAN cluster centroid.
+   -
 
 ## Dashboard
 
-### Throwback Widget
+1. Tag This Photo widget shows "every photo is tagged" when there are actually no photos at all. It should show a different message if there are simply no photos.
 
-1. Let's ramp up the similarity threshold a bit on the Throwback widget timeline -- getting some really odd choices in there. There should be logic to skip a year if no images are found that are similar enough.
+2. Change the Tagging Progress widget to use a Progress Card style indicator for tagging progress: https://github.com/mantinedev/ui.mantine.dev/blob/master/lib/ProgressCard/ProgressCard.tsx
+
+3. Featured Tag onboarding progress should show toasts each time an action is taken that "ticks a box" until the entire task is completed, with a button to bring you back to the Dashboard view.
+
+4. Top Viewed photos should have an onboarding process similar to Featured Tag to guide users until they've view 5 photos.
+
+5. Featured Person widget -- roughly the same as the Featured Tag widget except with a person's face and other stats like
+
+6. The top
 
 ## Gallery View
 
@@ -46,29 +71,41 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Contact sheet?
 
+5. For Tags and People, make it possible to select a "cover photo." Today we default to the most recent photo from the tag or person, we should be able to manually select one. I would imagine this will be under the right-click menu on gallery view items. Initially I thought it should only appear when a tag or person is selected and filtered (Make cover photo for [tag / person name]). But if the gallery isn't filtered, I think right-clicking a photo should show a Make Cover Photo for [ person in this photo ], and "Make Cover Photo for [ tag on this photo ] with a flyout showing other tags on the photo. That's a lot, so ask for clarification if anything is ambiguous.
+
+6. Full-tab views for each left panel section?
+
+7. Make the left sidebar wider by default.
+
+8. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated)
+
+9. Make the breadcrumb section headers sticky so it's easier to tell what section you're in
+
+10. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
+
+### People
+
 ## Tools
 
 2. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.
 
 3. Reset view counts
 
-4. Export database
+4. Removing folders should not delete photo data
 
-5. Removing folders should not delete photo data
+5. Collage?
 
-6. Collage?
-
-7. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
+6. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
 
 ## Tags
-
-1. Hovering over tags anywhere in the app should show a Popover Card with the full tag name and description (if available), after a short delay. Make sure this is shared functionality (hook or wrapper component), do not duplicate the Popover layout in multiple places.
 
 2. Selecting multiple photos from the gallery should open the taglist to batch add or remove tags to the entire selection.
 
 ## Photo view
 
-1. Adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
+1. Refactor Compare view to use Mantine Compare plugin instead of Splitter. I'm okay if this means removing the ability to compare >2 images for now.
+
+2. Adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
    - `onSave` returns base64/canvas, not a file — original EXIF (GPS, date-taken, camera info) is lost on re-encode unless explicitly restored. Plan: base64 → IPC → decode → copy original tags via exiftool-vendored → write via sharp → same `ingestFile`/thumbnail-regen path the current rotate handler uses.
    - No Mantine integration — it's a standalone widget with its own `theme` object (reskinnable to match), dropped in a Mantine `Modal`. Pulls in `react-konva` + `styled-components` as new deps.
    - No plugin API for custom tools/tabs — can only show/hide/reorder the built-in tool set (adjust, filters, rotate, crop, resize, watermark, shapes, text). The DVD/magazine/newspaper visualizations would stay separate, not foldable into its toolbar.
@@ -78,7 +115,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. Move the "X" to be inline with the Visualization ActionIconGroup, make it red.
 
-2. Refine visualizations...
+2. Improve the existing visualizations. They look a little silly.
 
 3. Add "Art Gallery" and "movie theater" visualizations
 
@@ -86,15 +123,15 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
-2. Clean up AI enable flag UX
-
-3. Export db, clear db
-
 ## Optimization
 
-## Duplicates View
+1. Virtualize the Tags panel list (and People panel, same shape). Follow-up from Gallery View #7: with hundreds of tags, every row mounts a `useDroppable`/`useDraggable` registration, so dnd-kit's `DroppableContainersMap` iterating all of them costs ~550ms at drag start and again at drop. Severity scales with tag count — a library with a few dozen tags likely won't notice this at all, so it's worth confirming it's still felt before investing in the redesign below. `react-window` is already a dependency and `GalleryGrid` uses its `Grid`. Complication worth planning around: the panel renders inside a Mantine `Accordion` when tag groups exist, so a naive per-panel virtualizer doesn't fit — likely wants a single flat virtualized list of (group header | tag) rows instead.
 
-1. Add actions like delete, merge, show in folder, etc.
+2. Profile the production build, never dev, for any renderer perf work. React 19 DEV calls `console.createTask` for every element (Owner Stacks) and StrictMode double-renders everything; in a dev trace that machinery was ~28% of samples and app code measured 0.02%, which is actively misleading. `npm run build && npm run preview`.
+
+## Video
+
+See VIDEO_PLAN.md
 
 ## Codebase
 
@@ -103,3 +140,11 @@ To-dos, tasks, and features loosely grouped by feature segment.
 2. Enforce component export style
 
 3. Update all deps
+
+4. Centralize the repeated `photo.thumbnailStatus === 'ready' && photo.thumbnailKey` check (inline in ~13 places across Dashboard widgets, Gallery, and Tags) into a shared `isPhotoDisplayable(photo)`-style helper.
+
+5. Dashboard widgets each call `useKeyHeld(PREVIEW_TRIGGER_KEY)` independently (6 separate window keydown/keyup listener pairs for the same key). Fold `previewTriggerHeld` into the shared `DashboardPreviewZoomContext` (already built for per-widget preview zoom) so it's one listener instead of six.
+
+6. Take a full pass to reduce comments to 1-2 lines
+
+### Performance

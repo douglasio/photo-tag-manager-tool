@@ -2,18 +2,24 @@ import { ActionIcon, Menu, Switch } from '@mantine/core'
 import { IconSettings } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions, useSidebarLibrary } from '@state'
 import { ACTION_ICONS } from '@utils'
 
 export function TagsSettingsMenu(): ReactElement {
-  const { state, setTagsPanelGridView } = usePhotoLibrary()
+  const { state } = useSidebarLibrary()
+  const { setTagsPanelGridView } = useLibraryActions()
 
   const { BUTTON_SIZE, ICON_SIZE } = ACTION_ICONS
 
   return (
     <Menu shadow="md" width={220} closeOnItemClick={false}>
       <Menu.Target>
-        <ActionIcon variant="subtle" aria-label="Tags settings" size={BUTTON_SIZE}>
+        {/* mr="sm" lines this icon's right edge up with the count badges in
+            the tag rows below — those sit inset from the row's own right
+            edge by the Button's rightSection padding (12px = spacing "sm"
+            at the default button size), while this icon otherwise sits
+            flush with the panel edge. Mirrors FolderSettingsMenu. */}
+        <ActionIcon variant="subtle" mr="sm" aria-label="Tags settings" size={BUTTON_SIZE}>
           <IconSettings size={ICON_SIZE} />
         </ActionIcon>
       </Menu.Target>

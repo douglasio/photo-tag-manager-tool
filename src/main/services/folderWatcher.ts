@@ -9,9 +9,7 @@ type WatchDirEventType = 'addDir' | 'unlinkDir'
 
 interface WatcherHandlers {
   onFileEvent: (type: WatchEventType, filePath: string) => void
-  // Directory add/remove — chokidar already tracks these internally to walk
-  // the tree recursively, so listening for them costs nothing extra beyond
-  // the file events already being watched.
+  // Directory add/remove
   onDirEvent: (type: WatchDirEventType, dirPath: string) => void
 }
 
@@ -31,8 +29,7 @@ export function startWatching(
   const watcher = watch(rootPath, {
     ignoreInitial: true,
     ignored: (path: string) => matchesExcludePattern(path, excludePatterns),
-    // Wait for copies/writes to finish before emitting add/change, so we don't
-    // try to read metadata off a partially-written file.
+    // Wait for copies/writes to finish before emitting add/change
     awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 }
   })
 

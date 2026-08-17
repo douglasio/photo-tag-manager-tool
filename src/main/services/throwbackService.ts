@@ -11,10 +11,8 @@ import type {
 } from '@main/workers/throwbackSimilarityProtocol'
 import type { ThrowbackEntry, ThrowbackYearSample } from '@shared/types'
 
-// "Kinda similar, not a match" — much looser than duplicate detection's
-// 0.97, since these are meant to be the same general subject/scene across
-// different years, not near-identical shots.
-const THROWBACK_SIMILARITY_THRESHOLD = 0.7
+// "Kinda similar, not a match"
+const THROWBACK_SIMILARITY_THRESHOLD = 0.82
 
 const MIN_YEAR_SAMPLE_PHOTOS = 4
 const YEAR_SAMPLE_SIZE = 4
@@ -74,13 +72,7 @@ function send(message: WorkerRequest): void {
   getWorker().postMessage(message)
 }
 
-// Cache-only — never triggers embedding compute, so this stays fast and
-// automatic on every Dashboard load (the opt-in "Time Warp" scan is what
-// populates the cache; see embedAllReadyPhotos). The O(n²) cross-year
-// comparison runs in a worker (mirrors duplicate detection) since a large
-// cached-embeddings backlog used to visibly block the main process here.
-// Returns null once fewer than 2 distinct years show up in the
-// best-matching cross-year cluster.
+// Cache-only — never triggers embedding compute, so this stays fast
 export async function findThrowbackSimilarity(): Promise<ThrowbackEntry[] | null> {
   const yearByPath = new Map<string, number>()
   for (const [year, photos] of readyPhotosByYear()) {
@@ -104,8 +96,7 @@ export async function findThrowbackSimilarity(): Promise<ThrowbackEntry[] | null
   return resultPromise
 }
 
-// Frees the worker when AI features are disabled — the next dashboard load
-// transparently respawns it.
+// Frees the worker when AI features are disabled
 export async function disposeThrowbackSimilarityWorker(): Promise<void> {
   if (!worker) return
   const w = worker
@@ -115,8 +106,7 @@ export async function disposeThrowbackSimilarityWorker(): Promise<void> {
   await w.terminate()
 }
 
-// Fallback for when there's no similarity match (yet) — a random sample from
-// a single past year, no embeddings involved at all.
+// Random sample fallback for when there's no similarity match (yet)
 export function findThrowbackYearSample(): ThrowbackYearSample | null {
   const currentYear = new Date().getFullYear()
   const candidateYears = Array.from(readyPhotosByYear().entries()).filter(
@@ -129,11 +119,7 @@ export function findThrowbackYearSample(): ThrowbackYearSample | null {
   return { year, filePaths: sample.map((photo) => photo.filePath) }
 }
 
-// Random one-photo-per-year across every year present — no embeddings or
-// similarity involved. Used by the widget's "Preview Time Warp" button, both
-// as a teaser of what the real feature looks like and as a way to exercise
-// the Timeline UI without needing a library with genuinely similar
-// cross-year photos on hand.
+// Random one-photo-per-year across every year present for preview
 export function findThrowbackPreview(): ThrowbackEntry[] | null {
   const byYear = readyPhotosByYear()
   if (byYear.size < 2) return null

@@ -72,6 +72,62 @@ export function getDb(): Database.Database {
     )
   `)
 
+  // A dismissed duplicate group ("these aren't actually duplicates") is
+  // keyed by its own sorted, joined file paths — groups have no other stable
+  // ID since clustering recomputes them fresh every scan — so a rescan or
+  // app restart still knows to hide it.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS dismissed_duplicate_groups (
+      signature TEXT PRIMARY KEY,
+      dismissedAt INTEGER NOT NULL
+    )
+  `)
+
+  // A person is its own entity, deliberately separate from tags — grouped
+  // faces get labeled here rather than folded into the tag system. name is
+  // null until the user labels it ("Unnamed person" in the UI).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS people (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      cover_face_id TEXT,
+      created_at INTEGER NOT NULL
+    )
+  `)
+
+  // One row per detected face. person_id_pinned mirrors
+  // tag_metadata.group_pinned: set to 1 only by an explicit user action
+  // (manual assign/merge/split), and the clustering pass skips any pinned
+  // face permanently, the same way reconcileTagGroups skips a pinned tag.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS photo_faces (
+      id TEXT PRIMARY KEY,
+      photo_path TEXT NOT NULL,
+      box_x REAL NOT NULL,
+      box_y REAL NOT NULL,
+      box_w REAL NOT NULL,
+      box_h REAL NOT NULL,
+      embedding BLOB NOT NULL,
+      person_id TEXT,
+      person_id_pinned INTEGER NOT NULL DEFAULT 0,
+      detected_at INTEGER NOT NULL
+    )
+  `)
+  db.exec('CREATE INDEX IF NOT EXISTS idx_photo_faces_photo_path ON photo_faces(photo_path)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_photo_faces_person_id ON photo_faces(person_id)')
+
+  // hidden: set by the "Hide" person action — filtered out of the People
+  // panel/gallery filter, but the person row (and its pinned faces) stay in
+  // the DB so it can be un-hidden from Settings. description: same free-text
+  // pattern as tag_metadata.description.
+  const peopleColumns = db.prepare('PRAGMA table_info(people)').all() as { name: string }[]
+  if (!peopleColumns.some((column) => column.name === 'hidden')) {
+    db.exec('ALTER TABLE people ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!peopleColumns.some((column) => column.name === 'description')) {
+    db.exec('ALTER TABLE people ADD COLUMN description TEXT')
+  }
+
   const photoColumns = db.prepare('PRAGMA table_info(photos)').all() as { name: string }[]
   if (!photoColumns.some((column) => column.name === 'comment')) {
     db.exec('ALTER TABLE photos ADD COLUMN comment TEXT')

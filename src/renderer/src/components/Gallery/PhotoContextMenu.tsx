@@ -1,15 +1,18 @@
 import { type ReactElement, type ReactNode, useState } from 'react'
 
-import { Box, Menu, MultiSelect } from '@mantine/core'
+import { Box, Menu, MultiSelect, Text } from '@mantine/core'
 import {
   IconEdit,
   IconExternalLink,
   IconFolderOpen,
   IconRotate,
   IconRotateClockwise,
-  IconTag
+  IconTag,
+  IconTrash,
+  IconUserOff
 } from '@tabler/icons-react'
 
+import { ConfirmDialog } from '@components'
 import { type PhotoRecord, ROTATABLE_FORMATS } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 import { isMac } from '@utils'
@@ -25,10 +28,22 @@ export function PhotoContextMenu({
   onRename,
   children
 }: PhotoContextMenuProps): ReactElement {
-  const { openPhotoTab, allTags, updateTags, selectPhoto, addTagsToSelection, rotatePhoto, state } =
-    usePhotoLibrary()
+  const {
+    openPhotoTab,
+    allTags,
+    updateTags,
+    selectPhoto,
+    addTagsToSelection,
+    rotatePhoto,
+    deletePhotos,
+    getFacesForPhoto,
+    unassignFace,
+    state
+  } = usePhotoLibrary()
   const [opened, setOpened] = useState(false)
   const [addingTag, setAddingTag] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const canRotate = ROTATABLE_FORMATS.includes(photo.metadata.format)
 
   // Right-clicking a photo that's part of the active multi-selection (2+
@@ -44,6 +59,36 @@ export function PhotoContextMenu({
       return
     }
     if (!state.selectedPaths.has(photo.filePath)) selectPhoto(photo.filePath)
+  }
+
+  const deleteTargets = isBatch ? Array.from(state.selectedPaths) : [photo.filePath]
+
+  // Only meaningful while browsing a specific person's photos (see
+  // PeoplePanel/GalleryGrid's filter) — "the person" wouldn't be well
+  // defined otherwise on a photo that could have several people in it.
+  const selectedPersonName = state.selectedPerson
+    ? (state.people.find((person) => person.id === state.selectedPerson)?.name ?? 'this person')
+    : null
+
+  const handleNotThisPerson = async (): Promise<void> => {
+    const personId = state.selectedPerson
+    if (!personId) return
+    for (const path of deleteTargets) {
+      const faces = await getFacesForPhoto(path)
+      for (const face of faces) {
+        if (face.personId === personId) await unassignFace(face.id)
+      }
+    }
+  }
+
+  const handleDeleteConfirm = async (): Promise<void> => {
+    setDeleting(true)
+    try {
+      await deletePhotos(deleteTargets)
+      setConfirmingDelete(false)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -99,6 +144,16 @@ export function PhotoContextMenu({
             >
               {isBatch ? `Add Tag to ${state.selectedPaths.size} Photos` : 'Add Tag'}
             </Menu.Item>
+            {selectedPersonName && (
+              <Menu.Item
+                leftSection={<IconUserOff size={14} />}
+                onClick={() => void handleNotThisPerson()}
+              >
+                {isBatch
+                  ? `Not ${selectedPersonName} (${state.selectedPaths.size} Photos)`
+                  : `Not ${selectedPersonName}`}
+              </Menu.Item>
+            )}
             {!isBatch && (
               <Menu.Item
                 leftSection={<IconFolderOpen size={14} />}
@@ -123,9 +178,39 @@ export function PhotoContextMenu({
                 </Menu.Item>
               </>
             )}
+            <Menu.Divider />
+            <Menu.Item
+              color="red"
+              leftSection={<IconTrash size={14} />}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              {isBatch ? `Delete ${state.selectedPaths.size} Photos` : 'Delete'}
+            </Menu.Item>
           </>
         )}
       </Menu.Dropdown>
+      {/* Mounted only while open — this renders once per gallery thumbnail,
+          and a closed Mantine Modal still renders its full ModalBase tree. */}
+      {confirmingDelete && (
+        <ConfirmDialog
+          title={isBatch ? `Delete ${deleteTargets.length} photos?` : 'Delete photo?'}
+          opened
+          saving={deleting}
+          confirmLabel="Delete"
+          confirmColor="red"
+          onConfirm={() => void handleDeleteConfirm()}
+          onCancel={() => setConfirmingDelete(false)}
+        >
+          <Text>
+            {isBatch
+              ? `This moves ${deleteTargets.length} photos to the trash.`
+              : `This moves "${photo.fileName}" to the trash.`}
+          </Text>
+          <Text c="dimmed" mt="xs">
+            You can restore {isBatch ? 'them' : 'it'} from your system&apos;s trash if needed.
+          </Text>
+        </ConfirmDialog>
+      )}
     </Menu>
   )
 }

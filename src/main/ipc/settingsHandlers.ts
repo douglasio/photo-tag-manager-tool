@@ -2,38 +2,50 @@ import { ipcMain } from 'electron'
 import { rename, stat } from 'fs/promises'
 import { dirname, join } from 'path'
 
+import { clearAllFaceData } from '@main/db/faceRepository'
 import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
   getAiTagSuggestionsEnabled,
+  getAllSettings,
+  getArtGalleryName,
   getDefaultView,
   getDetailsPanelCollapsed,
   getDvdStudioName,
+  getExcludedFolders,
   getExcludePatterns,
+  getFaceDetectionEnabled,
   getFolders,
   getGalleryAnimationsEnabled,
   getGalleryCellWidth,
   getGallerySort,
   getGalleryViewMode,
   getMagazineTitle,
+  getNavbarCollapsedPanels,
   getNavbarSplitSizes,
   getNewspaperTitle,
+  getPeoplePanelGridView,
   getShowEmptyFolders,
   getShowFilenames,
   getShowViewCounts,
   getTagsPanelGridView,
   setAiTagSuggestionsEnabled,
+  setArtGalleryName,
   setDefaultView,
   setDetailsPanelCollapsed,
   setDvdStudioName,
+  setExcludedFolders,
   setExcludePatterns,
+  setFaceDetectionEnabled,
   setFolders,
   setGalleryAnimationsEnabled,
   setGalleryCellWidth,
   setGallerySort,
   setGalleryViewMode,
   setMagazineTitle,
+  setNavbarCollapsedPanels,
   setNavbarSplitSizes,
   setNewspaperTitle,
+  setPeoplePanelGridView,
   setShowEmptyFolders,
   setShowFilenames,
   setShowViewCounts,
@@ -41,11 +53,14 @@ import {
 } from '@main/db/settingsRepository'
 import { cancelAiScan } from '@main/services/aiScanService'
 import { disposeDuplicateClusterWorker } from '@main/services/duplicatePhotoService'
+import { disposeFaceClusterWorker } from '@main/services/faceClustering'
+import { disposeFaceDetectionWorker } from '@main/services/faceDetectionService'
+import { cancelFaceScan } from '@main/services/faceScanService'
 import { disposeTagSuggestionWorker } from '@main/services/tagSuggestionService'
 import { disposeThrowbackSimilarityWorker } from '@main/services/throwbackService'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import { restartAllWatchers, unwatchFolder, watchFolder } from '@main/services/watchManager'
-import type { DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
+import type { AppSettings, DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
 
 // Conservative cross-platform block list — matches photoHandlers.ts's file
 // rename validation, since folder names share the same filesystem constraints.
@@ -59,6 +74,8 @@ function isPathUnderFolder(path: string, folder: string): boolean {
 
 export function registerSettingsHandlers(): void {
   ipcMain.handle('settings:getFolders', () => getFolders())
+
+  ipcMain.handle('settings:getAllSettings', (): AppSettings => getAllSettings())
 
   ipcMain.handle('settings:getGalleryCellWidth', (): number | null => getGalleryCellWidth())
 
@@ -90,6 +107,12 @@ export function registerSettingsHandlers(): void {
     setTagsPanelGridView(value)
   })
 
+  ipcMain.handle('settings:getPeoplePanelGridView', (): boolean => getPeoplePanelGridView())
+
+  ipcMain.handle('settings:setPeoplePanelGridView', (_event, value: boolean): void => {
+    setPeoplePanelGridView(value)
+  })
+
   ipcMain.handle('settings:getGalleryViewMode', (): GalleryViewMode => getGalleryViewMode())
 
   ipcMain.handle('settings:setGalleryViewMode', (_event, value: GalleryViewMode): void => {
@@ -113,6 +136,24 @@ export function registerSettingsHandlers(): void {
           disposeDuplicateClusterWorker(),
           disposeThrowbackSimilarityWorker()
         ])
+      }
+    }
+  )
+
+  ipcMain.handle('settings:getFaceDetectionEnabled', (): boolean => getFaceDetectionEnabled())
+
+  // Turning it off is a full reset, not a pause: frees both face workers'
+  // memory (detection/ONNX sessions, clustering), cancels any scan still
+  // running, and wipes every detected face/person — re-enabling later always
+  // starts a genuinely fresh scan rather than resuming from stale data.
+  ipcMain.handle(
+    'settings:setFaceDetectionEnabled',
+    async (_event, value: boolean): Promise<void> => {
+      setFaceDetectionEnabled(value)
+      if (!value) {
+        cancelFaceScan()
+        await Promise.all([disposeFaceDetectionWorker(), disposeFaceClusterWorker()])
+        clearAllFaceData()
       }
     }
   )
@@ -161,13 +202,28 @@ export function registerSettingsHandlers(): void {
     setDvdStudioName(value)
   })
 
-  ipcMain.handle('settings:getNavbarSplitSizes', (): [number, number] | null =>
-    getNavbarSplitSizes()
-  )
+  ipcMain.handle('settings:getArtGalleryName', (): string => getArtGalleryName())
 
-  ipcMain.handle('settings:setNavbarSplitSizes', (_event, sizes: [number, number]): void => {
+  ipcMain.handle('settings:setArtGalleryName', (_event, value: string): void => {
+    setArtGalleryName(value)
+  })
+
+  ipcMain.handle('settings:getNavbarSplitSizes', (): number[] | null => getNavbarSplitSizes())
+
+  ipcMain.handle('settings:setNavbarSplitSizes', (_event, sizes: number[]): void => {
     setNavbarSplitSizes(sizes)
   })
+
+  ipcMain.handle('settings:getNavbarCollapsedPanels', (): Record<string, boolean> =>
+    getNavbarCollapsedPanels()
+  )
+
+  ipcMain.handle(
+    'settings:setNavbarCollapsedPanels',
+    (_event, value: Record<string, boolean>): void => {
+      setNavbarCollapsedPanels(value)
+    }
+  )
 
   ipcMain.handle('settings:getExcludePatterns', (): string[] => getExcludePatterns())
 
@@ -182,6 +238,15 @@ export function registerSettingsHandlers(): void {
       await restartAllWatchers(getFolders())
     }
   )
+
+  ipcMain.handle('settings:getExcludedFolders', (): string[] => getExcludedFolders())
+
+  // Unlike excludePatterns, this never touches scanning/watching — excluded
+  // photos stay fully ingested, just filtered out of AI/tag/dashboard
+  // aggregates at query time (photoRepository/embeddingRepository).
+  ipcMain.handle('settings:setExcludedFolders', (_event, folders: string[]): void => {
+    setExcludedFolders(folders)
+  })
 
   ipcMain.handle('settings:addFolder', (_event, folder: string) => {
     const folders = getFolders()
