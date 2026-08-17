@@ -6,7 +6,6 @@ import {
   AspectRatio,
   Badge,
   Button,
-  Image,
   SimpleGrid,
   Stack,
   Text,
@@ -16,8 +15,7 @@ import {
 import { useHover, useMergedRef } from '@mantine/hooks'
 import { IconPencil } from '@tabler/icons-react'
 
-import { PanelSection } from '@components'
-import { toThumbProtocolUrl } from '@shared/protocolUrls'
+import { FaceCropThumbnail, PanelSection } from '@components'
 import type { PersonRecord } from '@shared/types'
 import { useLibraryActions, useSidebarLibrary } from '@state'
 import { activeHoverBackground } from '@utils'
@@ -185,14 +183,14 @@ const PersonRow = memo(function PersonRow({
             }
           }}
           leftSection={
-            coverThumbnailKey && (
+            coverThumbnailKey &&
+            person.coverFaceBox && (
               <AspectRatio ratio={1 / 1}>
-                <Image
-                  src={toThumbProtocolUrl(coverThumbnailKey)}
-                  w={COVER_SIZE}
-                  h={COVER_SIZE}
-                  fit="cover"
-                  radius="sm"
+                <FaceCropThumbnail
+                  thumbnailKey={coverThumbnailKey}
+                  box={person.coverFaceBox}
+                  size={COVER_SIZE}
+                  radius="md"
                 />
               </AspectRatio>
             )
@@ -305,16 +303,48 @@ export const PeoplePanel = memo(function PeoplePanel({
   onToggleCollapse
 }: PeoplePanelProps = {}): ReactElement {
   const { state, personCoverPhotos } = useSidebarLibrary()
-  const { setPersonFilter } = useLibraryActions()
+  const { setPersonFilter, enableFaceDetection, rescanFaces } = useLibraryActions()
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null)
   const handleStopEdit = useCallback(() => setEditingPersonId(null), [])
+  // Drives the button's own spinner for a click made right here — separate
+  // from state.faceScanInProgress (below), which also covers a scan started
+  // elsewhere (e.g. the Settings toggle) so this button stays disabled for
+  // that too, without needing the full per-tick faceScanProgress object.
+  const [scanning, setScanning] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
+
+  const handleScan = async (): Promise<void> => {
+    setScanError(null)
+    setScanning(true)
+    try {
+      // Already-enabled means a prior scan just came up empty (or everyone
+      // got merged/deleted/hidden away) — re-detect rather than re-flip the
+      // setting.
+      await (state.faceDetectionEnabled ? rescanFaces() : enableFaceDetection())
+    } catch (err) {
+      console.error('failed to start face scan', err)
+      setScanError('Failed to scan your library for faces.')
+    } finally {
+      setScanning(false)
+    }
+  }
 
   if (state.people.length === 0) {
     return (
       <PanelSection title="People" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
-        <Text c="dimmed" p="xs">
-          No people yet — run a face scan from Settings to get started.
-        </Text>
+        <Stack gap="xs" p="xs">
+          <Text c="dimmed" size="sm">
+            No people yet.
+          </Text>
+          <Button
+            loading={scanning}
+            disabled={state.faceScanInProgress}
+            onClick={() => void handleScan()}
+          >
+            Scan for faces
+          </Button>
+          {scanError && <Text c="red">{scanError}</Text>}
+        </Stack>
       </PanelSection>
     )
   }
@@ -336,6 +366,7 @@ export const PeoplePanel = memo(function PeoplePanel({
                 name={person.name ?? 'Unnamed person'}
                 faceCount={person.faceCount}
                 coverThumbnailKey={personCoverPhotos.get(person.id)}
+                coverFaceBox={person.coverFaceBox}
                 isActive={isActive}
                 onSelect={() => setPersonFilter(isActive ? null : person.id)}
               />

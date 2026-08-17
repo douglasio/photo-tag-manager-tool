@@ -572,9 +572,19 @@ export function photoLibraryReducer(
       return { ...state, aiScanProgress: action.progress }
     case 'SET_FACE_DETECTION_ENABLED':
       // Guarded for the same reason as SET_AI_TAG_SUGGESTIONS_ENABLED above.
-      return state.faceDetectionEnabled === action.value
-        ? state
-        : { ...state, faceDetectionEnabled: action.value }
+      if (state.faceDetectionEnabled === action.value) return state
+      // Disabling is a full reset on the backend (clearAllFaceData) — clear
+      // the local mirror of that data too, rather than leaving stale people/
+      // assignments/filter around until the next reload.
+      return action.value
+        ? { ...state, faceDetectionEnabled: true }
+        : {
+            ...state,
+            faceDetectionEnabled: false,
+            people: [],
+            personPhotoAssignments: new Map(),
+            selectedPerson: null
+          }
     case 'SET_FACE_SCAN_PROGRESS':
       return { ...state, faceScanProgress: action.progress }
     case 'SET_PEOPLE':

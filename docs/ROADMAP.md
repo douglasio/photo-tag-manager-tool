@@ -95,17 +95,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ### People
 
-1. Make People the middle panel, between Folders and Tags.
+1. ~~The face scan is doing a pretty good job but it's pulling in a lot of non-face photos or photos that really don't look like the same face, any way to tune that?~~ Fixed. Raised YuNet's detection `SCORE_THRESHOLD` from 0.6 to 0.9 in `faceDetectionWorker.ts` — matches OpenCV's own `FaceDetectorYN` default, so it's a principled tightening rather than a guess. Scoped to the "non-face detections" symptom per user confirmation; the DBSCAN grouping threshold was left as-is.
 
-2. Fix the side panel divider resizing -- now that there are two dividers, neither of them allow resizing and I assume both positions are not persisted.
-
-3. Make each panel (Tags, People, Folders) collapsible (accordion-style) and persist the settings.
-
-4. Allow for hiding People -- a new context menu item when right-clicking an item in the People panel - hide them from the UI and don't re-suggest that grouping of faces. Add all hidden people to the People section in the Settings modal so they can be un-hidden. This is different from "delete" which just ungroups that selection of faces until the next scan. Confirm dialogs should be updated to explain this.
-
-5. Allow descriptions to be added to People, same pattern we used for Tags.
-
-6. Apply the 2-column tile alternate layout we used for the tags panel to the people panel, with the same persisted toggle and functionality.
+2. ~~Disable the "scan for faces" button if the initial scan is currently running. It disables if you start the scan from that button but it should also disable if any face scan is running~~ Fixed. Added a derived `faceScanInProgress` boolean to `SidebarLibraryState` (flips only at scan start/end, not per progress tick, preserving the deliberate exclusion of the raw `faceScanProgress` object from that context) and wired it into the People panel's "Scan for faces" button.
 
 ## Tools
 
@@ -170,15 +162,3 @@ See VIDEO_PLAN.md
 6. Take a full pass to reduce comments to 1-2 lines
 
 ### Performance
-
-Found while investigating startup/dashboard/gallery-tab/photo-open sluggishness — all 5 items below are now implemented. Keep inline comments to 1-2 lines when landing anything else here (see #6 above for why).
-
-1. ~~Startup is fully gated behind re-verifying every photo in the library.~~ Fixed. `PhotoLibraryContext`'s mount effect now flips `initialLoadComplete` right after `FOLDERS_LOADED`, instead of awaiting the full `startScanForAll` (which doesn't resolve until every file's metadata _and_ thumbnail check finish). `AppGate` renders `AppLayout` immediately; photos populate progressively via the already-existing `METADATA_BATCH` streaming. `DashboardView` (which, unlike `GalleryGrid`, didn't previously distinguish "still scanning" from "genuinely empty") now shows a scanning indicator instead of the "Add a folder" empty state while `state.status === 'scanning'`.
-
-2. ~~27 independent IPC round-trips fire on mount.~~ Fixed. Added `settingsRepository.getAllSettings()`/`settings:getAllSettings`, batching the ~20 settings-table reads `PhotoLibraryContext.tsx` used to fire as one `useEffect` each into a single round-trip (dispatched via one new `SETTINGS_LOADED` reducer action). `getFolders` stays a separate call (drives the startup scan) but fetches in parallel via `Promise.all` with `getAllSettings`, so mount is now 2 IPC calls instead of ~21.
-
-3. ~~Three dashboard widgets re-sort the whole library, unmemoized, on every one of those 27 renders.~~ Fixed. `RecentlyAddedWidget`/`TopViewedWidget`/`TopTagsWidget` now wrap their `Array.from(activePhotosByPath.values()).filter().sort()` (and TopTagsWidget's `tagCounts`-ranking and thumbnail-data assembly) in `useMemo`, and all three migrated off the broad `usePhotoLibrary()` shim onto `useGalleryLibrary()`/`useSidebarLibrary()`/`useLibraryActions()` — so they only re-render on the specific state slices they actually read, not on every dispatch anywhere in the app.
-
-4. ~~`main.tsx` eagerly loads 6 font families used by almost nothing.~~ Fixed. Added a shared `useLazyFonts` hook (`hooks/useLazyFonts.ts`) that each of the 5 PhotoView "cover" themes (Magazine/Newspaper/DVD/Art Gallery/Movie Theater) calls on mount with its own literal `import('@fontsource/...')` specifiers, instead of `main.tsx` importing all 6 font families eagerly at startup. `useLazyFonts` now also returns a `loaded` boolean, and each theme view shows a `CoverLoadingPlaceholder` (spinner) until it flips true, so the fallback system font never flashes in before the real one pops in. Verified via `npm run build`: the font CSS now ships as 7 separate small chunks instead of being inlined into the main bundle.
-
-5. ~~Opening any photo instantiates 5x pannable-zoom state, 4 of which are always thrown away.~~ Fixed. Each of the 5 theme views now calls its own `usePannableZoom()` internally (only the active one is ever mounted) and reports it to `PhotoView` via an `onZoomReady` callback (`useLayoutEffect`, so the footer `ZoomToolbar` never flashes without controls), instead of `PhotoView` calling all 5 up front. Required memoizing `usePannableZoom`'s return object (`useMemo`, keyed off its actual reactive values) so the report-up effect doesn't loop — verified with a new stability test in `usePannableZoom.test.ts`.

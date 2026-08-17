@@ -2,6 +2,7 @@ import { type ReactElement, useCallback, useEffect, useState } from 'react'
 
 import { Button, Group, Kbd, Radio, Stack, Switch, Text, TextInput } from '@mantine/core'
 
+import { ConfirmDialog } from '@components'
 import type { DefaultView, PersonRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
 
@@ -13,11 +14,6 @@ interface AutoSaveTextInputProps {
   onSave: (value: string) => void
 }
 
-// Saved on blur (or Enter, which just blurs). Shows an "Enter to save" hint
-// while focused, then a "Saved" message that fades out via CSS animation
-// (settings-save-message in main.css) once it blurs — remounted via
-// `saveCount` as key so saving again while a previous fade is still playing
-// restarts the animation instead of no-op'ing.
 function AutoSaveTextInput({ label, value, onSave }: AutoSaveTextInputProps): ReactElement {
   const [draft, setDraft] = useState(value)
   const [focused, setFocused] = useState(false)
@@ -250,14 +246,15 @@ function HiddenPeopleList(): ReactElement | null {
 }
 
 function PeopleSection(): ReactElement {
-  const { state, setFaceDetectionEnabled, enableFaceDetection } = usePhotoLibrary()
+  const { state, setFaceDetectionEnabled, enableFaceDetection, rescanFaces } = usePhotoLibrary()
   const [error, setError] = useState<string | null>(null)
+  const [confirmingDisable, setConfirmingDisable] = useState(false)
   const scanning = state.faceScanProgress !== null
 
   const handleToggle = async (checked: boolean): Promise<void> => {
     setError(null)
     if (!checked) {
-      setFaceDetectionEnabled(false)
+      setConfirmingDisable(true)
       return
     }
     try {
@@ -270,11 +267,40 @@ function PeopleSection(): ReactElement {
     }
   }
 
+  const handleRescan = async (): Promise<void> => {
+    setError(null)
+    try {
+      // Also re-derives every person's cover photo/face crop (getPeople()
+      // recomputes coverFaceBox fresh each call — see faceRepository.ts),
+      // since refreshPeople() runs at the end of rescanFaces().
+      await rescanFaces()
+    } catch (err) {
+      console.error('failed to rescan faces', err)
+      setError('Failed to scan your library for faces.')
+    }
+  }
+
+  const handleConfirmDisable = (): void => {
+    setFaceDetectionEnabled(false)
+    setConfirmingDisable(false)
+  }
+
   return (
-    <Stack gap="xs">
+    <Stack gap="md" align="flex-start">
       <Switch
         label="Enable face detection"
-        description="Detects and groups faces across your library so you can label people — a separate, heavier pass from AI tag suggestions. Uses bundled on-device models, so there's nothing to download; runs fully offline."
+        description={
+          <Stack gap="md" align="flex-start">
+            Detects and groups faces across your library so you can label people — a separate,
+            heavier pass from AI tag suggestions. Uses bundled on-device models, so there&apos;s
+            nothing to download; runs fully offline.
+            {state.faceDetectionEnabled && (
+              <Button variant="outline" loading={scanning} onClick={() => void handleRescan()}>
+                Scan again
+              </Button>
+            )}
+          </Stack>
+        }
         checked={state.faceDetectionEnabled}
         disabled={scanning}
         onChange={(event) => void handleToggle(event.currentTarget.checked)}
@@ -285,6 +311,21 @@ function PeopleSection(): ReactElement {
         </Text>
       )}
       {state.faceDetectionEnabled && <HiddenPeopleList />}
+      <ConfirmDialog
+        title="Disable face detection?"
+        opened={confirmingDisable}
+        saving={false}
+        confirmLabel="Disable"
+        confirmColor="red"
+        onConfirm={handleConfirmDisable}
+        onCancel={() => setConfirmingDisable(false)}
+      >
+        <Text size="sm">
+          This deletes every detected face and person — labels, groupings, everything. It
+          doesn&apos;t touch your photos, only the face data. Re-enabling later starts a completely
+          fresh scan.
+        </Text>
+      </ConfirmDialog>
     </Stack>
   )
 }

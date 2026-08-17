@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { rename, stat } from 'fs/promises'
 import { dirname, join } from 'path'
 
+import { clearAllFaceData } from '@main/db/faceRepository'
 import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import {
   getAiTagSuggestionsEnabled,
@@ -141,9 +142,10 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:getFaceDetectionEnabled', (): boolean => getFaceDetectionEnabled())
 
-  // Turning it off also frees both face workers' memory (detection/ONNX
-  // sessions, clustering) rather than leaving them loaded for a feature the
-  // user just disabled, and cancels any scan still running.
+  // Turning it off is a full reset, not a pause: frees both face workers'
+  // memory (detection/ONNX sessions, clustering), cancels any scan still
+  // running, and wipes every detected face/person — re-enabling later always
+  // starts a genuinely fresh scan rather than resuming from stale data.
   ipcMain.handle(
     'settings:setFaceDetectionEnabled',
     async (_event, value: boolean): Promise<void> => {
@@ -151,6 +153,7 @@ export function registerSettingsHandlers(): void {
       if (!value) {
         cancelFaceScan()
         await Promise.all([disposeFaceDetectionWorker(), disposeFaceClusterWorker()])
+        clearAllFaceData()
       }
     }
   )

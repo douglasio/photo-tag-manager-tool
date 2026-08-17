@@ -6,6 +6,7 @@ import {
   Group,
   Image,
   Popover,
+  Switch,
   Tabs,
   Tooltip
 } from '@mantine/core'
@@ -65,6 +66,11 @@ export const theme = createTheme({
     Popover: Popover.extend({
       defaultProps: {
         radius: RADIUS_SIZE
+      }
+    }),
+    Switch: Switch.extend({
+      defaultProps: {
+        style: { cursor: 'pointer' }
       }
     }),
     Tooltip: Tooltip.extend({

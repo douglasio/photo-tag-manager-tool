@@ -4,8 +4,9 @@ import { Worker } from 'worker_threads'
 import {
   applyAutoClusterAssignment,
   createPerson,
-  getPinnedAssignedFaces,
-  getUnpinnedFaces
+  getAssignedFaces,
+  getUnpinnedFaces,
+  pruneEmptyPeople
 } from '@main/db/faceRepository'
 import type {
   ClusterableFace,
@@ -15,7 +16,7 @@ import type {
 } from '@main/workers/faceClusterProtocol'
 import { rejectAllPending } from '@main/workers/pendingRequests'
 
-import { cosineSimilarity } from './embeddingSimilarity'
+import { averageEmbedding, cosineSimilarity } from './embeddingSimilarity'
 
 // Decides whether a freshly-clustered group of faces matches an existing person's centroid
 // closely enough to join them, rather than becoming a new person.
@@ -56,23 +57,17 @@ function send(message: WorkerRequest): void {
   getWorker().postMessage(message)
 }
 
-function averageEmbedding(embeddings: ArrayLike<number>[]): number[] {
-  const dims = embeddings[0].length
-  const sum = new Array<number>(dims).fill(0)
-  for (const embedding of embeddings) {
-    for (let i = 0; i < dims; i++) sum[i] += embedding[i]
-  }
-  return sum.map((v) => v / embeddings.length)
-}
-
 // Re-clusters every unpinned face
 export async function runFaceClustering(
   isCancelled?: () => boolean
 ): Promise<{ peopleCreated: number; facesAssigned: number; canceled: boolean }> {
   const unpinned = getUnpinnedFaces()
-  if (unpinned.length === 0) return { peopleCreated: 0, facesAssigned: 0, canceled: false }
+  if (unpinned.length === 0) {
+    pruneEmptyPeople()
+    return { peopleCreated: 0, facesAssigned: 0, canceled: false }
+  }
 
-  const pinned = getPinnedAssignedFaces()
+  const previouslyAssigned = getAssignedFaces()
   const requestId = nextRequestId++
   const faces: ClusterableFace[] = unpinned.map((f) => ({
     id: f.id,
@@ -104,7 +99,7 @@ export async function runFaceClustering(
   const embeddingById = new Map(unpinned.map((f) => [f.id, f.embedding]))
 
   const personEmbeddings = new Map<string, ArrayLike<number>[]>()
-  for (const face of pinned) {
+  for (const face of previouslyAssigned) {
     const list = personEmbeddings.get(face.personId) ?? []
     list.push(face.embedding)
     personEmbeddings.set(face.personId, list)
@@ -145,6 +140,7 @@ export async function runFaceClustering(
     applyAutoClusterAssignment(faceId, null)
   }
 
+  pruneEmptyPeople()
   return { peopleCreated, facesAssigned, canceled: false }
 }
 

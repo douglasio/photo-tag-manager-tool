@@ -1,3 +1,4 @@
+import { averageEmbedding, cosineSimilarity } from '@main/services/embeddingSimilarity'
 import type { FaceBox, FaceRecord, PersonRecord } from '@shared/types'
 
 import { getDb } from './database'
@@ -101,18 +102,19 @@ export function getUnpinnedFaces(): { id: string; embedding: Float32Array }[] {
   }))
 }
 
-/** Pinned, person-assigned faces — used as reference centroids so a new
- * DBSCAN cluster can be matched back to an existing person instead of always
- * creating a new one. */
-export function getPinnedAssignedFaces(): {
+/** Every currently person-assigned face, pinned or not — used as reference
+ * centroids so a re-cluster matches new DBSCAN groups back to an existing
+ * person instead of creating a duplicate. Deliberately includes unpinned
+ * (auto-clustered) assignments too: pinning only happens on an explicit
+ * manual action, so matching against pinned faces alone would recreate every
+ * hands-off, auto-grouped person from scratch on each re-cluster. */
+export function getAssignedFaces(): {
   id: string
   personId: string
   embedding: Float32Array
 }[] {
   const rows = getDb()
-    .prepare(
-      'SELECT id, person_id, embedding FROM photo_faces WHERE person_id_pinned = 1 AND person_id IS NOT NULL'
-    )
+    .prepare('SELECT id, person_id, embedding FROM photo_faces WHERE person_id IS NOT NULL')
     .all() as { id: string; person_id: string; embedding: Buffer }[]
   return rows.map((row) => ({
     id: row.id,
@@ -131,33 +133,67 @@ export function applyAutoClusterAssignment(faceId: string, personId: string | nu
   getDb().prepare('UPDATE photo_faces SET person_id = ? WHERE id = ?').run(personId, faceId)
 }
 
-/** Self-healing cover face: falls back to the person's earliest-detected
- * face if cover_face_id is unset or no longer belongs to this person,
- * rather than requiring every mutation to keep it perfectly in sync. */
+/** The person's face whose embedding is closest to their centroid — the
+ * most representative/typical face for them, used as the fallback cover
+ * when there's no explicit pin. A confidently-detected face could still be
+ * a mismatch; this picks the one least likely to be one. */
+function computeBestMatchFaceId(personId: string): string | null {
+  const rows = getDb()
+    .prepare('SELECT id, embedding FROM photo_faces WHERE person_id = ?')
+    .all(personId) as { id: string; embedding: Buffer }[]
+  if (rows.length === 0) return null
+  if (rows.length === 1) return rows[0].id
+
+  const faces = rows.map((row) => ({
+    id: row.id,
+    embedding: new Float32Array(
+      row.embedding.buffer,
+      row.embedding.byteOffset,
+      row.embedding.byteLength / Float32Array.BYTES_PER_ELEMENT
+    )
+  }))
+  const centroid = averageEmbedding(faces.map((f) => f.embedding))
+
+  let bestId = faces[0].id
+  let bestSimilarity = -Infinity
+  for (const face of faces) {
+    const similarity = cosineSimilarity(face.embedding, centroid)
+    if (similarity > bestSimilarity) {
+      bestSimilarity = similarity
+      bestId = face.id
+    }
+  }
+  return bestId
+}
+
+/** Self-healing cover face: an explicit pin wins if it's still this
+ * person's, otherwise falls back to computeBestMatchFaceId, rather than
+ * requiring every mutation to keep it perfectly in sync. */
 function getPeopleWhere(hidden: 0 | 1): PersonRecord[] {
   const rows = getDb()
     .prepare(
-      `SELECT p.id, p.name, p.description,
-         COALESCE(
-           (SELECT id FROM photo_faces WHERE id = p.cover_face_id AND person_id = p.id),
-           (SELECT id FROM photo_faces WHERE person_id = p.id ORDER BY detected_at LIMIT 1)
-         ) AS coverFaceId,
+      `SELECT p.id, p.name, p.description, p.cover_face_id AS explicitCoverFaceId,
          (SELECT COUNT(*) FROM photo_faces WHERE person_id = p.id) AS faceCount
        FROM people p
        WHERE p.hidden = ?
        ORDER BY p.created_at`
     )
-    .all(hidden) as Omit<PersonRecord, 'coverPhotoPath'>[]
+    .all(hidden) as (Omit<PersonRecord, 'coverPhotoPath' | 'coverFaceId'> & {
+    explicitCoverFaceId: string | null
+  })[]
 
-  return rows.map((row) => {
-    const coverPhotoPath = row.coverFaceId
-      ? ((
-          getDb()
-            .prepare('SELECT photo_path FROM photo_faces WHERE id = ?')
-            .get(row.coverFaceId) as { photo_path: string } | undefined
-        )?.photo_path ?? null)
-      : null
-    return { ...row, coverPhotoPath }
+  return rows.map(({ explicitCoverFaceId, ...row }) => {
+    const explicitCoverValid =
+      explicitCoverFaceId !== null &&
+      getDb()
+        .prepare('SELECT 1 FROM photo_faces WHERE id = ? AND person_id = ?')
+        .get(explicitCoverFaceId, row.id) !== undefined
+    const coverFaceId = explicitCoverValid ? explicitCoverFaceId : computeBestMatchFaceId(row.id)
+
+    const { photoPath: coverPhotoPath, box: coverFaceBox } = coverFaceId
+      ? resolveFaceCover(coverFaceId)
+      : { photoPath: null, box: null }
+    return { ...row, coverFaceId, coverPhotoPath, coverFaceBox }
   })
 }
 
@@ -171,22 +207,33 @@ export function getHiddenPeople(): PersonRecord[] {
   return getPeopleWhere(1)
 }
 
+/** A face's own photo path + crop box, for rendering it as a person's cover. */
+function resolveFaceCover(faceId: string): { photoPath: string | null; box: FaceBox | null } {
+  const row = getDb()
+    .prepare('SELECT photo_path, box_x, box_y, box_w, box_h FROM photo_faces WHERE id = ?')
+    .get(faceId) as
+    { photo_path: string; box_x: number; box_y: number; box_w: number; box_h: number } | undefined
+  if (!row) return { photoPath: null, box: null }
+  return {
+    photoPath: row.photo_path,
+    box: { x: row.box_x, y: row.box_y, w: row.box_w, h: row.box_h }
+  }
+}
+
 export function createPerson(coverFaceId: string | null = null): PersonRecord {
   const id = crypto.randomUUID()
   getDb()
     .prepare('INSERT INTO people (id, name, cover_face_id, created_at) VALUES (?, NULL, ?, ?)')
     .run(id, coverFaceId, Date.now())
-  const coverPhotoPath = coverFaceId
-    ? ((
-        getDb().prepare('SELECT photo_path FROM photo_faces WHERE id = ?').get(coverFaceId) as
-          { photo_path: string } | undefined
-      )?.photo_path ?? null)
-    : null
+  const { photoPath: coverPhotoPath, box: coverFaceBox } = coverFaceId
+    ? resolveFaceCover(coverFaceId)
+    : { photoPath: null, box: null }
   return {
     id,
     name: null,
     coverFaceId,
     coverPhotoPath,
+    coverFaceBox,
     faceCount: coverFaceId ? 1 : 0,
     description: null
   }
@@ -264,6 +311,30 @@ export function deletePerson(id: string): void {
     'UPDATE photo_faces SET person_id = NULL, person_id_pinned = 0 WHERE person_id = ?'
   ).run(id)
   db.prepare('DELETE FROM people WHERE id = ?').run(id)
+}
+
+/** Deletes any person left with zero faces — e.g. after a re-cluster moves
+ * all of their faces to a different (matched or newly created) person, or a
+ * manual unassign/merge empties them out. There's no UI path to create or
+ * intentionally keep an empty person, so this is always safe cleanup, never
+ * data loss. */
+export function pruneEmptyPeople(): void {
+  getDb()
+    .prepare(
+      `DELETE FROM people
+       WHERE id NOT IN (SELECT DISTINCT person_id FROM photo_faces WHERE person_id IS NOT NULL)`
+    )
+    .run()
+}
+
+/** Wipes every detected face and person — used when the user disables face
+ * detection, so it's a genuine reset rather than a paused state: re-enabling
+ * later starts a completely fresh scan instead of resuming from whatever was
+ * left over (which is what fed the orphaned-people bug this replaced). */
+export function clearAllFaceData(): void {
+  const db = getDb()
+  db.prepare('DELETE FROM photo_faces').run()
+  db.prepare('DELETE FROM people').run()
 }
 
 export function deleteFacesForPhoto(photoPath: string): void {

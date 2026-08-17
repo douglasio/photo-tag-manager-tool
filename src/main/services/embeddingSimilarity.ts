@@ -20,6 +20,17 @@ export function cosineSimilarity(a: ArrayLike<number>, b: ArrayLike<number>): nu
   return dot / (Math.sqrt(normA) * Math.sqrt(normB))
 }
 
+// Shared by faceClustering (person centroids for re-cluster matching) and
+// faceRepository (best-match cover photo selection)
+export function averageEmbedding(embeddings: ArrayLike<number>[]): number[] {
+  const dims = embeddings[0].length
+  const sum = new Array<number>(dims).fill(0)
+  for (const embedding of embeddings) {
+    for (let i = 0; i < dims; i++) sum[i] += embedding[i]
+  }
+  return sum.map((v) => v / embeddings.length)
+}
+
 // Union-find — shared by duplicatePhotoService and throwbackService, both of
 // which merge items whose embeddings are similarity-linked
 export class DisjointSet {

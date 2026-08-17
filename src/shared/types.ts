@@ -237,6 +237,9 @@ export interface PersonRecord {
   // People panel doesn't need a separate face-lookup round trip just to
   // render a representative thumbnail.
   coverPhotoPath: string | null
+  // The cover face's own crop box within coverPhotoPath — lets the UI show a
+  // face-zoomed crop (via FaceCropThumbnail) instead of the full photo.
+  coverFaceBox: FaceBox | null
   faceCount: number
   // Same free-text pattern as tag_metadata.description.
   description: string | null

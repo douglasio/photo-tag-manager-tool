@@ -4,45 +4,11 @@ import { useDraggable } from '@dnd-kit/core'
 import { Box, Group, Menu, Stack, Text } from '@mantine/core'
 import { IconUserSquare } from '@tabler/icons-react'
 
-import { SectionTitle } from '@components'
-import { toThumbProtocolUrl } from '@shared/protocolUrls'
+import { FaceCropThumbnail, SectionTitle } from '@components'
 import type { FaceRecord } from '@shared/types'
 import { type DisplayPhotoRecord, usePhotoLibrary } from '@state'
 
 const THUMB_SIZE = 56
-
-interface FaceCropThumbnailProps {
-  thumbnailKey: string
-  box: FaceRecord['box']
-}
-
-// Crops a face out of the photo's own thumbnail purely with CSS (percentage
-// width/height/offset relative to the crop box) — no separate per-face
-// image file exists, so this reuses the same thumbnail every face on this
-// photo shares.
-function FaceCropThumbnail({ thumbnailKey, box }: FaceCropThumbnailProps): ReactElement {
-  return (
-    <Box
-      w={THUMB_SIZE}
-      h={THUMB_SIZE}
-      bdrs="sm"
-      style={{ overflow: 'hidden', position: 'relative' }}
-    >
-      <img
-        src={toThumbProtocolUrl(thumbnailKey)}
-        alt=""
-        style={{
-          position: 'absolute',
-          width: `${100 / box.w}%`,
-          height: `${100 / box.h}%`,
-          left: `${(-100 * box.x) / box.w}%`,
-          top: `${(-100 * box.y) / box.h}%`,
-          maxWidth: 'none'
-        }}
-      />
-    </Box>
-  )
-}
 
 interface FaceItemProps {
   face: FaceRecord
@@ -70,7 +36,12 @@ function FaceItem({ face, thumbnailKey }: FaceItemProps): ReactElement {
             opacity={isDragging ? 0.4 : undefined}
             style={{ cursor: 'pointer' }}
           >
-            <FaceCropThumbnail thumbnailKey={thumbnailKey} box={face.box} />
+            <FaceCropThumbnail
+              thumbnailKey={thumbnailKey}
+              box={face.box}
+              size={THUMB_SIZE}
+              radius="sm"
+            />
           </Box>
         </Menu.Target>
         <Menu.Dropdown>

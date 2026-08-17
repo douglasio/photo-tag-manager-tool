@@ -21,6 +21,11 @@ export interface SidebarLibraryState {
   people: PersonRecord[]
   personPhotoAssignments: Map<string, Set<string>>
   faceDetectionEnabled: boolean
+  // Derived boolean, not the raw faceScanProgress object — that only flips
+  // twice per scan (start/end) instead of on every progress tick, so it
+  // doesn't reintroduce the per-tick re-renders this context deliberately
+  // excludes faceScanProgress itself to avoid (see the comment above).
+  faceScanInProgress: boolean
   peoplePanelGridView: boolean
   tagsPanelGridView: boolean
   tagGroups: TagGroup[]

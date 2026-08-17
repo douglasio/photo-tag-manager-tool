@@ -1877,6 +1877,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     ]
   )
 
+  const faceScanInProgress = state.faceScanProgress !== null
   const sidebarState: SidebarLibraryState = useMemo(
     () => ({
       folders: state.folders,
@@ -1892,6 +1893,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       people: state.people,
       personPhotoAssignments: state.personPhotoAssignments,
       faceDetectionEnabled: state.faceDetectionEnabled,
+      faceScanInProgress,
       peoplePanelGridView: state.peoplePanelGridView,
       tagsPanelGridView: state.tagsPanelGridView,
       tagGroups: state.tagGroups,
@@ -1915,6 +1917,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       state.people,
       state.personPhotoAssignments,
       state.faceDetectionEnabled,
+      faceScanInProgress,
       state.peoplePanelGridView,
       state.tagsPanelGridView,
       state.tagGroups,

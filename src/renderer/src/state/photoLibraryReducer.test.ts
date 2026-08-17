@@ -459,6 +459,38 @@ describe('photoLibraryReducer', () => {
       expect(repeated).toBe(enabled)
     })
 
+    it('SET_FACE_DETECTION_ENABLED(false) clears people, assignments, and the person filter', () => {
+      const people = [
+        {
+          id: 'p1',
+          name: 'Jamie',
+          coverFaceId: 'f1',
+          coverPhotoPath: '/a.jpg',
+          coverFaceBox: null,
+          faceCount: 2,
+          description: null
+        }
+      ]
+      const assignments = new Map([['p1', new Set(['/a.jpg', '/b.jpg'])]])
+      let state = photoLibraryReducer(initialState, {
+        type: 'SET_FACE_DETECTION_ENABLED',
+        value: true
+      })
+      state = photoLibraryReducer(state, { type: 'SET_PEOPLE', people })
+      state = photoLibraryReducer(state, { type: 'SET_PERSON_PHOTO_ASSIGNMENTS', assignments })
+      state = photoLibraryReducer(state, { type: 'SET_PERSON_FILTER', personId: 'p1' })
+      expect(state.selectedPerson).toBe('p1')
+
+      const disabled = photoLibraryReducer(state, {
+        type: 'SET_FACE_DETECTION_ENABLED',
+        value: false
+      })
+      expect(disabled.faceDetectionEnabled).toBe(false)
+      expect(disabled.people).toEqual([])
+      expect(disabled.personPhotoAssignments.size).toBe(0)
+      expect(disabled.selectedPerson).toBeNull()
+    })
+
     it('sets the face scan progress', () => {
       const progress = { phase: 'detecting' as const, done: 3, total: 10 }
       const state = photoLibraryReducer(initialState, {
@@ -481,6 +513,7 @@ describe('photoLibraryReducer', () => {
           name: 'Jamie',
           coverFaceId: 'f1',
           coverPhotoPath: '/a.jpg',
+          coverFaceBox: null,
           faceCount: 2,
           description: null
         }

@@ -205,6 +205,7 @@ describe('PhotoContextMenu person filter', () => {
         name: 'Jamie',
         coverFaceId: null,
         coverPhotoPath: null,
+        coverFaceBox: null,
         faceCount: 1,
         description: null
       }
@@ -232,6 +233,7 @@ describe('PhotoContextMenu person filter', () => {
         name: null,
         coverFaceId: null,
         coverPhotoPath: null,
+        coverFaceBox: null,
         faceCount: 1,
         description: null
       }
@@ -253,6 +255,7 @@ describe('PhotoContextMenu person filter', () => {
         name: 'Jamie',
         coverFaceId: null,
         coverPhotoPath: null,
+        coverFaceBox: null,
         faceCount: 2,
         description: null
       }

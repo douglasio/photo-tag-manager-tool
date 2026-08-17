@@ -19,6 +19,7 @@ import {
   RollingNumber,
   Scroller,
   Slider,
+  Stack,
   Text,
   Title,
   Tooltip
@@ -31,11 +32,13 @@ import {
   IconLibraryPhoto,
   IconPhoto,
   IconStack2,
+  IconUsers,
   IconX
 } from '@tabler/icons-react'
 import { Grid } from 'react-window'
 
 import {
+  FaceCropThumbnail,
   PersonDescriptionField,
   ScanProgressIndicator,
   TagDeleteButton,
@@ -68,6 +71,7 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
   const {
     addFolder,
     visiblePhotos: photos,
+    activePhotosByPath,
     state,
     selectPhoto,
     toggleSelectPhoto,
@@ -207,6 +211,9 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
     : undefined
   const selectedPersonName = isPersonView ? (selectedPerson?.name ?? 'Unnamed person') : null
   const personDescription = isPersonView ? (selectedPerson?.description ?? '') : ''
+  const selectedPersonCoverThumbnailKey = selectedPerson?.coverPhotoPath
+    ? (activePhotosByPath.get(selectedPerson.coverPhotoPath)?.thumbnailKey ?? null)
+    : null
 
   const galleryTitle = state.untaggedFilterActive
     ? 'untagged'
@@ -227,44 +234,72 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
       {galleryTitle && (
         <Box px="md" py="sm" miw={0} style={{ flexShrink: 0 }}>
           <Group justify="space-between" wrap="nowrap" align="center" gap="sm">
-            <Group gap={4} wrap="nowrap" align="center" flex={1} miw={0}>
-              <Title
-                order={2}
-                flex={1}
-                miw={0}
-                style={{
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-              >
-                {galleryTitle}
-              </Title>
-              {isPureTagView && (
-                <Group gap={4} c="dimmed" wrap="nowrap" style={{ flexShrink: 0 }}>
-                  <IconEye size={16} />
-                  <RollingNumber value={tagViewCounts.get(state.selectedTag!) ?? 0} fz="sm" />
-                </Group>
-              )}
-              {isPureTagView && (
-                <TagDeleteButton
-                  tag={state.selectedTag!}
-                  count={tagCounts.get(state.selectedTag!) ?? 0}
-                  onDelete={() => deleteTag(state.selectedTag!)}
+            <Group gap="sm" wrap="nowrap" align="center" flex={1} miw={0}>
+              {isPersonView && selectedPersonCoverThumbnailKey && selectedPerson?.coverFaceBox && (
+                <FaceCropThumbnail
+                  thumbnailKey={selectedPersonCoverThumbnailKey}
+                  box={selectedPerson.coverFaceBox}
+                  size={64}
+                  radius="md"
                 />
               )}
-              {isPersonView && (
-                <Tooltip label="Clear person filter">
-                  <ActionIcon
-                    variant="subtle"
-                    onClick={() => setPersonFilter(null)}
-                    aria-label="Clear person filter"
-                    style={{ flexShrink: 0 }}
+              <Stack gap={2} flex={1} miw={0}>
+                <Group gap={4} wrap="nowrap" align="center">
+                  <Title
+                    order={2}
+                    flex={1}
+                    miw={0}
+                    style={{
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
                   >
-                    <IconX size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
+                    {galleryTitle}
+                  </Title>
+                  {isPureTagView && (
+                    <Group gap={4} c="dimmed" wrap="nowrap" style={{ flexShrink: 0 }}>
+                      <IconEye size={16} />
+                      <RollingNumber value={tagViewCounts.get(state.selectedTag!) ?? 0} fz="sm" />
+                    </Group>
+                  )}
+                  {isPureTagView && (
+                    <TagDeleteButton
+                      tag={state.selectedTag!}
+                      count={tagCounts.get(state.selectedTag!) ?? 0}
+                      onDelete={() => deleteTag(state.selectedTag!)}
+                    />
+                  )}
+                  {isPersonView && (
+                    <Tooltip label="Clear person filter">
+                      <ActionIcon
+                        variant="subtle"
+                        onClick={() => setPersonFilter(null)}
+                        aria-label="Clear person filter"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <IconX size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+                {isPureTagView && (
+                  <TagDescriptionField
+                    description={tagDescription}
+                    onSave={(description) =>
+                      void setTagDescription(state.selectedTag!, description)
+                    }
+                  />
+                )}
+                {isPersonView && (
+                  <PersonDescriptionField
+                    description={personDescription}
+                    onSave={(description) =>
+                      void setPersonDescription(state.selectedPerson!, description)
+                    }
+                  />
+                )}
+              </Stack>
             </Group>
             <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
               {state.selectedPaths.size > 0 && (
@@ -329,20 +364,6 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
               </ActionIcon.Group>
             </Group>
           </Group>
-          {isPureTagView && (
-            <TagDescriptionField
-              description={tagDescription}
-              onSave={(description) => void setTagDescription(state.selectedTag!, description)}
-            />
-          )}
-          {isPersonView && (
-            <PersonDescriptionField
-              description={personDescription}
-              onSave={(description) =>
-                void setPersonDescription(state.selectedPerson!, description)
-              }
-            />
-          )}
           {state.selectedFolder && (folderTags.length > 0 || folderHasUntagged) && (
             <Scroller mt="xs">
               <Pill.Group style={{ flexWrap: 'nowrap' }}>
@@ -398,6 +419,28 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
           <Center h="100%">
             {state.status === 'scanning' ? (
               <ScanProgressIndicator percent={null} label="Scanning for photos…" />
+            ) : state.selectedPerson ? (
+              <Box
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <EmptyState
+                  icon={<IconUsers size={32} />}
+                  title="No photos for this person"
+                  description="This person doesn't have any matching photos in your library right now."
+                >
+                  <EmptyState.Actions>
+                    <Button variant="default" onClick={() => setPersonFilter(null)}>
+                      Clear filter
+                    </Button>
+                  </EmptyState.Actions>
+                </EmptyState>
+              </Box>
             ) : (
               <Box
                 style={{

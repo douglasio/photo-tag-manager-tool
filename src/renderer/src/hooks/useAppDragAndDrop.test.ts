@@ -59,7 +59,15 @@ function makeDragEnd(
 }
 
 function makePerson(id: string, name: string | null): PersonRecord {
-  return { id, name, coverFaceId: null, coverPhotoPath: null, faceCount: 0, description: null }
+  return {
+    id,
+    name,
+    coverFaceId: null,
+    coverPhotoPath: null,
+    coverFaceBox: null,
+    faceCount: 0,
+    description: null
+  }
 }
 
 beforeEach(() => {

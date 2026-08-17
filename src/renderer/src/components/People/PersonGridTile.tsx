@@ -1,15 +1,16 @@
-import { AspectRatio, BackgroundImage, Box, Stack, Text, UnstyledButton } from '@mantine/core'
+import { AspectRatio, Box, Stack, Text, UnstyledButton } from '@mantine/core'
 import type { ReactElement } from 'react'
 
-import { PhotoGradientOverlay } from '@components'
+import { FaceCropThumbnail, PhotoGradientOverlay } from '@components'
 import { RADIUS_SIZE } from '@renderer/theme'
-import { toThumbProtocolUrl } from '@shared/protocolUrls'
+import type { FaceBox } from '@shared/types'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
 interface PersonGridTileProps {
   name: string
   faceCount: number
   coverThumbnailKey: string | null | undefined
+  coverFaceBox: FaceBox | null
   isActive: boolean
   onSelect: () => void
 }
@@ -23,10 +24,11 @@ export function PersonGridTile({
   name,
   faceCount,
   coverThumbnailKey,
+  coverFaceBox,
   isActive,
   onSelect
 }: PersonGridTileProps): ReactElement {
-  const hasThumbnail = Boolean(coverThumbnailKey)
+  const hasThumbnail = Boolean(coverThumbnailKey && coverFaceBox)
 
   const label = (
     <Stack gap={0} pos="absolute" bottom={0} left={0} right={0} p="xs" style={{ zIndex: 2 }}>
@@ -58,12 +60,10 @@ export function PersonGridTile({
     >
       <AspectRatio ratio={1}>
         {hasThumbnail ? (
-          <BackgroundImage
-            src={toThumbProtocolUrl(coverThumbnailKey!)}
-            className="dashboard-photo-frame"
-          >
+          <Box className="dashboard-photo-frame">
+            <FaceCropThumbnail thumbnailKey={coverThumbnailKey!} box={coverFaceBox!} />
             <PhotoGradientOverlay />
-          </BackgroundImage>
+          </Box>
         ) : (
           <Box bg="var(--mantine-primary-color-light)" />
         )}

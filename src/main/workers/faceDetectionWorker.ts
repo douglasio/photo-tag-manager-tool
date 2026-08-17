@@ -17,18 +17,31 @@ function post(message: WorkerResponse): void {
 
 const YUNET_INPUT_SIZE = 640
 const YUNET_STRIDES = [8, 16, 32]
-const SCORE_THRESHOLD = 0.6
+// OpenCV's own FaceDetectorYN default (score_threshold=0.9) — raised from an
+// earlier, more permissive 0.6 that was letting non-face regions through as
+// detected "faces".
+const SCORE_THRESHOLD = 0.9
 const NMS_THRESHOLD = 0.3
 
 let yunetSession: ort.InferenceSession | null = null
 let sfaceSession: ort.InferenceSession | null = null
 let modelsPromise: Promise<void> | null = null
 
+// Faces are detected one photo at a time in a tight sequential loop, so
+// letting each inference call spread across every CPU core (onnxruntime's
+// default) repeatedly saturates the machine and starves the renderer's
+// compositor thread, causing visible UI stutter during a scan — capping
+// threads trades some raw scan throughput for a responsive UI.
+const SESSION_OPTIONS: ort.InferenceSession.SessionOptions = {
+  intraOpNumThreads: 1,
+  interOpNumThreads: 1
+}
+
 function loadModels(yunetPath: string, sfacePath: string): Promise<void> {
   if (!modelsPromise) {
     modelsPromise = Promise.all([
-      ort.InferenceSession.create(yunetPath),
-      ort.InferenceSession.create(sfacePath)
+      ort.InferenceSession.create(yunetPath, SESSION_OPTIONS),
+      ort.InferenceSession.create(sfacePath, SESSION_OPTIONS)
     ]).then(([yunet, sface]) => {
       yunetSession = yunet
       sfaceSession = sface
