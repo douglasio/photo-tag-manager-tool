@@ -1,7 +1,8 @@
 import { type ReactElement, useState } from 'react'
 
-import { Group, Text, Tooltip } from '@mantine/core'
+import { Group, Text } from '@mantine/core'
 
+import { DELEGATED_TOOLTIP_ATTR } from '@components'
 import { splitFileName, validateFileNameBase } from '@utils'
 
 import { EditableText } from './EditableText'
@@ -56,7 +57,12 @@ export function FileNameField({
   const isPanel = variant === 'panel'
 
   const field = (
-    <Group gap={2} wrap="nowrap" align={isPanel ? 'flex-start' : 'center'}>
+    <Group
+      gap={2}
+      wrap="nowrap"
+      align={isPanel ? 'flex-start' : 'center'}
+      {...{ [DELEGATED_TOOLTIP_ATTR]: !isPanel && !editing ? fileName : undefined }}
+    >
       <EditableText
         value={fileName}
         draft={draft}
@@ -81,7 +87,7 @@ export function FileNameField({
 
   return (
     <InlineEditField editing={editing} onStartEdit={onStartEdit} fill={!isPanel}>
-      {isPanel || editing ? field : <Tooltip label={fileName}>{field}</Tooltip>}
+      {field}
     </InlineEditField>
   )
 }

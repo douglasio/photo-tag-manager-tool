@@ -38,6 +38,7 @@ import {
 import { Grid } from 'react-window'
 
 import {
+  DelegatedTooltip,
   FaceCropThumbnail,
   PersonDescriptionField,
   ScanProgressIndicator,
@@ -495,6 +496,7 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
           </Box>
         )}
       </Box>
+      <DelegatedTooltip containerRef={containerRef} />
       {photos.length > 0 && state.galleryViewMode === 'grid' && (
         <Group gap="xs" wrap="nowrap" justify="flex-end" px="md" py="xs" style={{ flexShrink: 0 }}>
           <ActionIcon onClick={() => stepToMark(-1)} aria-label="Decrease thumbnail size">

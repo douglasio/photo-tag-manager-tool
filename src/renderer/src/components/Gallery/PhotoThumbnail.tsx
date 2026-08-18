@@ -5,9 +5,7 @@ import {
   Center,
   Flex,
   Image,
-  Kbd,
   RollingNumber,
-  Tooltip,
   UnstyledButton,
   useMantineTheme
 } from '@mantine/core'
@@ -20,7 +18,7 @@ import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { PREVIEW_TRIGGER_KEY, PREVIEW_TRIGGER_KEY_LABEL } from '@utils'
+import { PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { GalleryHoverPreview } from './GalleryHoverPreview'
 
@@ -83,91 +81,82 @@ export function PhotoThumbnail({
   })
 
   return (
-    <Tooltip
-      label={
-        <>Hold {<Kbd>{PREVIEW_TRIGGER_KEY_LABEL}</Kbd>} to preview, and scroll to zoom in or out</>
-      }
-      openDelay={5000}
-      // Hidden once the preview itself is showing, so the hint doesn't overlap it.
-      disabled={previewTriggerHeld || photo.thumbnailStatus !== 'ready'}
+    <Box
+      {...rest}
+      {...attributes}
+      {...listeners}
+      ref={setNodeRef}
+      opacity={isDragging ? 0.4 : undefined}
+      className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${!selected && multiSelected ? ' photo-thumbnail--multi-selected' : ''}${className ? ` ${className}` : ''}`}
     >
-      <Box
-        {...rest}
-        {...attributes}
-        {...listeners}
-        ref={setNodeRef}
-        opacity={isDragging ? 0.4 : undefined}
-        className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${!selected && multiSelected ? ' photo-thumbnail--multi-selected' : ''}${className ? ` ${className}` : ''}`}
+      <UnstyledButton
+        className="photo-thumbnail__select-button"
+        onClick={(event) => onSelect(photo.filePath, event)}
+        onDoubleClick={() => openPhotoTab(photo.filePath)}
+        // Space is the preview trigger (handled globally via useKeyHeld)
+        onKeyDown={(event) => {
+          if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+        }}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+        w="100%"
+        style={{ cursor: canPreview ? 'zoom-in' : undefined }}
       >
-        <UnstyledButton
-          className="photo-thumbnail__select-button"
-          onClick={(event) => onSelect(photo.filePath, event)}
-          onDoubleClick={() => openPhotoTab(photo.filePath)}
-          // Space is the preview trigger (handled globally via useKeyHeld)
-          onKeyDown={(event) => {
-            if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
-          }}
-          onMouseMove={onMouseMove}
-          onMouseLeave={onMouseLeave}
-          w="100%"
-          style={{ cursor: canPreview ? 'zoom-in' : undefined }}
-        >
-          {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
-            <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
-              <Image
-                src={toThumbProtocolUrl(photo.thumbnailKey)}
-                alt={photo.fileName}
-                fit="cover"
-                loading="lazy"
-                w="100%"
-                h="100%"
+        {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
+          <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
+            <Image
+              src={toThumbProtocolUrl(photo.thumbnailKey)}
+              alt={photo.fileName}
+              fit="cover"
+              loading="lazy"
+              w="100%"
+              h="100%"
+            />
+          </AspectRatio>
+        ) : (
+          <Center
+            className="photo-thumbnail__placeholder"
+            c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}
+          >
+            {photo.thumbnailStatus === 'error' ? (
+              <IconAlertTriangle size={theme.spacing.xl} />
+            ) : (
+              <IconPhoto size={theme.spacing.xl} />
+            )}
+          </Center>
+        )}
+      </UnstyledButton>
+      <GalleryHoverPreview
+        photo={photo}
+        position={canPreview ? position : null}
+        scale={previewScale}
+        motionEnabled={motionEnabled}
+      />
+      {(() => {
+        const filenameVisible = showFilename || renaming
+        const viewCountVisible = showViewCount && !renaming
+        if (!filenameVisible && !viewCountVisible) return null
+        return (
+          <Flex>
+            {filenameVisible && (
+              <FileNameField
+                fileName={photo.fileName}
+                editing={renaming}
+                onStartEdit={onStartRename}
+                onStopEdit={onStopRename}
+                onRename={onRename}
+                variant="grid"
               />
-            </AspectRatio>
-          ) : (
-            <Center
-              className="photo-thumbnail__placeholder"
-              c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}
-            >
-              {photo.thumbnailStatus === 'error' ? (
-                <IconAlertTriangle size={theme.spacing.xl} />
-              ) : (
-                <IconPhoto size={theme.spacing.xl} />
-              )}
-            </Center>
-          )}
-        </UnstyledButton>
-        <GalleryHoverPreview
-          photo={photo}
-          position={canPreview ? position : null}
-          scale={previewScale}
-          motionEnabled={motionEnabled}
-        />
-        {(() => {
-          const filenameVisible = showFilename || renaming
-          const viewCountVisible = showViewCount && !renaming
-          if (!filenameVisible && !viewCountVisible) return null
-          return (
-            <Flex>
-              {filenameVisible && (
-                <FileNameField
-                  fileName={photo.fileName}
-                  editing={renaming}
-                  onStartEdit={onStartRename}
-                  onStopEdit={onStopRename}
-                  onRename={onRename}
-                  variant="grid"
-                />
-              )}
-              {viewCountVisible && (
-                <Flex c="dimmed" gap={2} style={{ transform: 'translateY(5px)' }}>
-                  <IconEye size={15} />
-                  <RollingNumber value={photo.viewCount} fz="sm" />
-                </Flex>
-              )}
-            </Flex>
-          )
-        })()}
-      </Box>
-    </Tooltip>
+            )}
+            {viewCountVisible && (
+              <Flex c="dimmed" gap={2} style={{ transform: 'translateY(5px)' }}>
+                <IconEye size={15} />
+                <RollingNumber value={photo.viewCount} fz="sm" />
+              </Flex>
+            )}
+          </Flex>
+        )
+      })()}
+    </Box>
   )
 }
