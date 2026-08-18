@@ -40,7 +40,6 @@ export function DetailPanelQuickTag({ photo, onClose }: DetailPanelQuickTagProps
       <SuggestedTagsRow
         suggestions={suggestions}
         loading={loading}
-        size="large"
         onAccept={(tag) => void updateTags(photo.filePath, [...photo.tags, tag])}
       />
 

@@ -50,10 +50,7 @@ export function DetailPanelDuplicates({ photo }: DetailPanelDuplicatesProps): Re
 
   return (
     <Stack gap="xs">
-      <Group gap={4}>
-        <IconStack2 size={14} />
-        <SectionTitle>Potential Duplicates</SectionTitle>
-      </Group>
+      <SectionTitle icon={IconStack2}>Potential Duplicates</SectionTitle>
       <Group gap="xs">
         {matches.map((match) => {
           const matchPhoto = state.photosByPath.get(match.filePath)

@@ -109,10 +109,7 @@ export function DetailPanelFaces({ photo }: DetailPanelFacesProps): ReactElement
 
   return (
     <Stack gap="xs">
-      <Group gap={4}>
-        <IconUserSquare size={14} />
-        <SectionTitle>Faces</SectionTitle>
-      </Group>
+      <SectionTitle icon={IconUserSquare}>Faces</SectionTitle>
       <Group gap="xs" align="flex-start">
         {faces.map((face) => (
           <FaceItem key={face.id} face={face} thumbnailKey={thumbnailKey} />

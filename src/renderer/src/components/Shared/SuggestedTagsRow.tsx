@@ -1,18 +1,17 @@
-import { Badge, Group, Skeleton, Stack, Title } from '@mantine/core'
+import { Badge, Group, Skeleton, Stack } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { IconSparkles } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { ReactElement } from 'react'
 
-import { ACTION_ICONS } from '@renderer/utils'
 import type { TagSuggestion } from '@shared/types'
 
+import { SectionTitle } from './SectionTitle'
 import { TagHoverCard } from './TagHoverCard'
 
 interface SuggestedTagsRowProps {
   suggestions: TagSuggestion[]
   loading: boolean
-  size?: 'small' | 'large'
   onAccept: (tag: string) => void
 }
 
@@ -22,7 +21,6 @@ interface SuggestedTagsRowProps {
 export function SuggestedTagsRow({
   suggestions,
   loading,
-  size = 'small',
   onAccept
 }: SuggestedTagsRowProps): ReactElement | null {
   const motionEnabled = !useReducedMotion()
@@ -31,12 +29,7 @@ export function SuggestedTagsRow({
 
   return (
     <Stack gap="md" mt="xs">
-      <Group gap="xs" wrap="nowrap">
-        <IconSparkles size={ACTION_ICONS.ICON_SIZE} color="var(--mantine-color-dimmed)" />
-        <Title order={5} size={size === 'large' ? 'h6' : 'sm'} c="dimmed" tt="uppercase" fw="bold">
-          Suggested
-        </Title>
-      </Group>
+      <SectionTitle icon={IconSparkles}>Suggested</SectionTitle>
       {loading ? (
         <Group gap="xs">
           <Skeleton height={22} width={70} radius="xl" />
@@ -58,9 +51,7 @@ export function SuggestedTagsRow({
                     component="button"
                     variant="gradient"
                     size="lg"
-                    // size={size === 'large' ? 'xl' : 'lg'}
                     tt="none"
-                    // fs={size === 'large' ? 'md' : 'xl'}
                     style={{
                       cursor: 'pointer'
                     }}

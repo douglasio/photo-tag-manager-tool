@@ -106,7 +106,6 @@ export function TagThisPhotoWidget(): ReactElement {
               <SuggestedTagsRow
                 suggestions={suggestions}
                 loading={loadingSuggestions}
-                size="large"
                 onAccept={(tag) =>
                   void updateTags(currentPhoto.filePath, [...currentPhoto.tags, tag])
                 }
