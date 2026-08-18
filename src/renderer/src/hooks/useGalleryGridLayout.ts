@@ -1,28 +1,17 @@
 import { type RefObject, useEffect, useRef, useState } from 'react'
 
 const DEFAULT_CELL_WIDTH = 168
-// The filename label below each thumbnail takes roughly this much extra
-// vertical space regardless of thumbnail size, so cell height tracks width
-// with a constant offset rather than a fixed aspect ratio.
-const CELL_LABEL_HEIGHT = 28
+// Extra vertical space the filename/view-count row + its padding need,
+// added to cell height. Too small and the card overlaps the row below it.
+const CELL_LABEL_HEIGHT = 38
 const MIN_CELL_WIDTH = 100
-// Stays under thumbnailService's THUMBNAIL_LONG_EDGE (640px) so the largest
-// setting still displays a natively-generated thumbnail rather than upscaling it.
+// Stays under thumbnailService's THUMBNAIL_LONG_EDGE (640px) to avoid upscaling.
 const MAX_CELL_WIDTH = 600
-// react-window's Grid renders its own vertical scrollbar inside the width we
-// give it, so column math needs to leave room for it — otherwise the last
-// column overflows the scrollbar's width and the grid gains an unwanted
-// horizontal scrollbar.
+// react-window's own scrollbar eats into the width we give it; without this
+// the last column overflows and the grid gains a horizontal scrollbar too.
 const SCROLLBAR_RESERVE_PX = 16
-// The gallery stays mounted (just hidden) while a photo tab is active —
-// Mantine's Tabs keeps inactive panels around via React's Activity API —
-// so returning to it re-expands the AppShell Navbar/Aside via their own CSS
-// transition while this grid is already visible. Without debouncing, the
-// ResizeObserver below would fire on every frame of that transition,
-// reflowing thumbnails into new column counts live. A debounce (rather than
-// a fixed delay guessed to match the transition's duration) waits for
-// resize events to actually stop before committing a size, so it self-
-// corrects regardless of how long any given transition takes.
+// Debounces the ResizeObserver below so the AppShell's panel-collapse CSS
+// transition doesn't reflow thumbnails into new column counts every frame.
 const RESIZE_SETTLE_MS = 100
 
 function clampCellWidth(value: number): number {
@@ -62,9 +51,7 @@ interface UseGalleryGridLayoutResult {
   stepToMark: (delta: number) => void
 }
 
-// Owns GalleryGrid's container measurement (debounced against AppShell
-// transitions) and thumbnail-size state (persisted, with the +/- buttons and
-// slider both landing exactly on SIZE_MARK_VALUES).
+// Owns GalleryGrid's container measurement and persisted thumbnail-size state.
 export function useGalleryGridLayout({
   photoCount,
   showFilenames,
@@ -105,18 +92,16 @@ export function useGalleryGridLayout({
     void window.api.setGalleryCellWidth(clamped)
   }
 
-  // Pick the column count closest to the target cell width, then stretch each
-  // column to exactly fill the available width — avoids a leftover sliver of
-  // empty space on the right that a plain floor-division would leave behind.
+  // Nearest column count to the target width, stretched to fill exactly —
+  // avoids a leftover sliver of empty space on the right.
   const availableWidth = Math.max(size.width - SCROLLBAR_RESERVE_PX, 0)
   const columnCount = Math.max(1, Math.round(availableWidth / cellWidth))
   const actualCellWidth = availableWidth > 0 ? availableWidth / columnCount : cellWidth
   const cellHeight = actualCellWidth + (showFilenames || showViewCounts ? CELL_LABEL_HEIGHT : 0)
   const rowCount = Math.ceil(photoCount / columnCount)
 
-  // The +/- buttons jump between the slider's own SIZE_MARK_VALUES rather
-  // than stepping by a fixed pixel amount, so they always land exactly on a
-  // mark instead of somewhere between two of them.
+  // Jumps between SIZE_MARK_VALUES rather than a fixed pixel step, so the
+  // +/- buttons always land exactly on a mark.
   const stepToMark = (delta: number): void => {
     const closestIndex = SIZE_MARK_VALUES.reduce(
       (closest, value, index) =>

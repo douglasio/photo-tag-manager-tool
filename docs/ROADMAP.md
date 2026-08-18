@@ -16,36 +16,19 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Corrupt photo finder
 
-5. I want a global way to "ignore" a folder from appearing in the various features, including AI features. Ex. If there's a folder called "test", I should be able to right click it in the folder tree and say "Exclude from features" or something like that. Let's nail down the exact wording that would make sense to users. If they mark a folder as ignored, it should not show up basically anywhere except in the folder tree. Photos within it should not show up in tags, be factored into tag suggestions, timeline, featured widgets, duplicates, etc. All tag-ignored folders should show up in the Settings Menu under a new subsection in the Library tab where they can be un-ignored.
+5. Search -- implement spotlight search. searchable fields should include tags, filename, comments. As a future enhancement, maybe an AI-based search that can match to photo contents or faces.
 
-6. Search -- implement spotlight search. searchable fields should include tags, filename, comments. As a future enhancement, maybe an AI-based search that can match to photo contents or faces.
+6. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
 
-7. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
+7. Make all 'Enable AI features' buttons use the gradient variant.
 
-8. Make all 'Enable AI features' buttons use the gradient variant.
-
-9. Video support?
+8. Video support?
 
 ## Onboarding
 
 1. Installation guide?
 
 ## AI
-
-1. Face detection?
-
-2. Disabling AI should actually uninstall the models, not just hide the features from the UI.
-3.
-4. Enabling AI features needs to be cleaned up -- inconsistent dialogs, nonfunctional cancel button behavior, app slowdown while installation is happening, etc.
-
-5. There may be corrupt or improperly tagged photos in libraries — AI scans (tag suggestions, duplicate detection, Time Warp) should silently skip photos that fail to process instead of erroring out the whole request, and add a note on the photo that it's corrupted/unsupported and may not work with AI features.
-
-6. Face detection follow-ups (deferred out of the initial build):
-   - Download the YuNet/SFace models on demand (like the CLIP models already do via `@huggingface/transformers`, cached to `userData`) instead of bundling them in `resources/models/` — right now every install pays their ~37MB regardless of whether face detection is ever turned on, which is backwards for what's meant to be the more optional/heavier of the two AI features. Would need its own download/cache/checksum-verification path (no Hub-hosted `pipeline()`-compatible checkpoint to piggyback on) plus the corresponding "downloading" progress phase in the enable/scan flow.
-   - Crop the People panel's cover thumbnail to the actual face region instead of showing the full photo — DetailPanelFaces already does this via a CSS crop, PeoplePanel's cover doesn't yet.
-   - Filter the gallery by person, the same way tag filtering works today.
-   - Centroid refinement: once a person has a few manually-confirmed faces, average their embeddings into a refined match target for future auto-clustering passes, instead of relying solely on the raw DBSCAN cluster centroid.
-   -
 
 ## Dashboard
 
@@ -57,7 +40,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Top Viewed photos should have an onboarding process similar to Featured Tag to guide users until they've view 5 photos.
 
-5. Featured Person widget -- roughly the same as the Featured Tag widget except with a person's face and other stats like
+5. Featured Person widget -- roughly the same as the Featured Tag widget except with a person's face and other stats like view count and
 
 6. The top
 

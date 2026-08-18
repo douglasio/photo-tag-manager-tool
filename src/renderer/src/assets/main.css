@@ -12,16 +12,13 @@ button {
   cursor: pointer;
 }
 
+/* Interaction/layout wrapper only — drag wiring and cell sizing live here,
+   while all of the thumbnail's visuals belong to __card below. */
 .photo-thumbnail {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
   width: 100%;
   height: 100%;
-  border: 2px solid transparent;
-  border-radius: var(--mantine-radius-default);
-  padding: 6px;
   /* Without this, holding Shift (for range-select) and moving the mouse
      primes Chromium's native text-selection ("rubber-band") behavior, which
      visually outlines selectable elements like <img> caught in the region —
@@ -31,18 +28,33 @@ button {
   user-select: none;
 }
 
-.photo-thumbnail:hover {
+.photo-thumbnail__card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* No height: 100% here on purpose — Card.Section is display: block with no
+     flex-grow, so a forced full height just leaves unfilled space below the
+     last section instead of the card shrinking to fit its actual content.
+     Any gap between a shorter card and the cell's reserved height (from
+     useGalleryGridLayout's CELL_LABEL_HEIGHT) is then blank space below the
+     card rather than dead space inside it. */
+  border: 2px solid transparent;
+  /* Clips the edge-to-edge Card.Section image to the card's own radius. */
+  overflow: hidden;
+}
+
+.photo-thumbnail__card:hover {
   background-color: var(--mantine-color-default-hover);
 }
 
-.photo-thumbnail--selected {
+.photo-thumbnail__card[data-selected] {
   border-color: var(--mantine-primary-color-filled);
   background-color: var(--mantine-color-default-hover);
 }
 
 /* Part of an active multi-selection, but not the DetailPanel-primary photo —
-   a lighter tint so it's distinguishable from --selected. */
-.photo-thumbnail--multi-selected {
+   a lighter tint so it's distinguishable from [data-selected]. */
+.photo-thumbnail__card[data-multi-selected] {
   border-color: var(--mantine-primary-color-light-hover);
   background-color: var(--mantine-primary-color-light);
 }

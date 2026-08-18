@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import {
   AspectRatio,
   Box,
+  Card,
   Center,
   Flex,
   Image,
@@ -18,7 +19,7 @@ import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { PREVIEW_TRIGGER_KEY } from '@utils'
+import { ACTION_ICONS, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { GalleryHoverPreview } from './GalleryHoverPreview'
 
@@ -80,6 +81,9 @@ export function PhotoThumbnail({
     data: { paths: dragPaths }
   })
 
+  const filenameVisible = showFilename || renaming
+  const viewCountVisible = showViewCount && !renaming
+
   return (
     <Box
       {...rest}
@@ -87,76 +91,83 @@ export function PhotoThumbnail({
       {...listeners}
       ref={setNodeRef}
       opacity={isDragging ? 0.4 : undefined}
-      className={`photo-thumbnail${selected ? ' photo-thumbnail--selected' : ''}${!selected && multiSelected ? ' photo-thumbnail--multi-selected' : ''}${className ? ` ${className}` : ''}`}
+      className={className ? `photo-thumbnail ${className}` : 'photo-thumbnail'}
     >
-      <UnstyledButton
-        className="photo-thumbnail__select-button"
-        onClick={(event) => onSelect(photo.filePath, event)}
-        onDoubleClick={() => openPhotoTab(photo.filePath)}
-        // Space is the preview trigger (handled globally via useKeyHeld)
-        onKeyDown={(event) => {
-          if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
-        }}
-        onMouseMove={onMouseMove}
-        onMouseLeave={onMouseLeave}
-        w="100%"
-        style={{ cursor: canPreview ? 'zoom-in' : undefined }}
+      <Card
+        className="photo-thumbnail__card"
+        padding="xs"
+        data-selected={selected || undefined}
+        data-multi-selected={(!selected && multiSelected) || undefined}
       >
-        {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
-          <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
-            <Image
-              src={toThumbProtocolUrl(photo.thumbnailKey)}
-              alt={photo.fileName}
-              fit="cover"
-              loading="lazy"
-              w="100%"
-              h="100%"
-            />
-          </AspectRatio>
-        ) : (
-          <Center
-            className="photo-thumbnail__placeholder"
-            c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}
+        <Card.Section>
+          <UnstyledButton
+            className="photo-thumbnail__select-button"
+            onClick={(event) => onSelect(photo.filePath, event)}
+            onDoubleClick={() => openPhotoTab(photo.filePath)}
+            // Space is the preview trigger (handled globally via useKeyHeld)
+            onKeyDown={(event) => {
+              if (event.key === PREVIEW_TRIGGER_KEY) event.preventDefault()
+            }}
+            onMouseMove={onMouseMove}
+            onMouseLeave={onMouseLeave}
+            w="100%"
+            style={{ cursor: canPreview ? 'zoom-in' : undefined }}
           >
-            {photo.thumbnailStatus === 'error' ? (
-              <IconAlertTriangle size={theme.spacing.xl} />
+            {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
+              <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
+                <Image
+                  src={toThumbProtocolUrl(photo.thumbnailKey)}
+                  alt={photo.fileName}
+                  fit="cover"
+                  loading="lazy"
+                  w="100%"
+                  h="100%"
+                  style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
+                />
+              </AspectRatio>
             ) : (
-              <IconPhoto size={theme.spacing.xl} />
+              <Center
+                className="photo-thumbnail__placeholder"
+                c={photo.thumbnailStatus === 'error' ? 'red' : 'dimmed'}
+              >
+                {photo.thumbnailStatus === 'error' ? (
+                  <IconAlertTriangle size={theme.spacing.xl} />
+                ) : (
+                  <IconPhoto size={theme.spacing.xl} />
+                )}
+              </Center>
             )}
-          </Center>
-        )}
-      </UnstyledButton>
+          </UnstyledButton>
+        </Card.Section>
+        <Card.Section inheritPadding pb="xs">
+          {(filenameVisible || viewCountVisible) && (
+            <Flex>
+              {filenameVisible && (
+                <FileNameField
+                  fileName={photo.fileName}
+                  editing={renaming}
+                  onStartEdit={onStartRename}
+                  onStopEdit={onStopRename}
+                  onRename={onRename}
+                  variant="grid"
+                />
+              )}
+              {viewCountVisible && (
+                <Flex c="dimmed" gap={2} mt={2}>
+                  <IconEye size={ACTION_ICONS.ICON_SIZE} />
+                  <RollingNumber value={photo.viewCount} fz="sm" mt="3" />
+                </Flex>
+              )}
+            </Flex>
+          )}
+        </Card.Section>
+      </Card>
       <GalleryHoverPreview
         photo={photo}
         position={canPreview ? position : null}
         scale={previewScale}
         motionEnabled={motionEnabled}
       />
-      {(() => {
-        const filenameVisible = showFilename || renaming
-        const viewCountVisible = showViewCount && !renaming
-        if (!filenameVisible && !viewCountVisible) return null
-        return (
-          <Flex>
-            {filenameVisible && (
-              <FileNameField
-                fileName={photo.fileName}
-                editing={renaming}
-                onStartEdit={onStartRename}
-                onStopEdit={onStopRename}
-                onRename={onRename}
-                variant="grid"
-              />
-            )}
-            {viewCountVisible && (
-              <Flex c="dimmed" gap={2} style={{ transform: 'translateY(5px)' }}>
-                <IconEye size={15} />
-                <RollingNumber value={photo.viewCount} fz="sm" />
-              </Flex>
-            )}
-          </Flex>
-        )
-      })()}
     </Box>
   )
 }
