@@ -1,9 +1,10 @@
-import { Button, Group, Stack } from '@mantine/core'
+import { ActionIcon, Group, Stack } from '@mantine/core'
 import { IconTagPlus } from '@tabler/icons-react'
 import type { ReactElement } from 'react'
 
 import { SectionTitle, SuggestedTagsRow, TagList } from '@components'
 import { useTagSuggestions } from '@hooks'
+import { ACTION_ICONS } from '@renderer/utils'
 import { type DisplayPhotoRecord, usePhotoLibrary } from '@state'
 
 interface DetailPanelTagsProps {
@@ -23,9 +24,12 @@ export function DetailPanelTags({ photo, onOpenQuickTag }: DetailPanelTagsProps)
     <Stack>
       <Group justify="space-between" wrap="nowrap">
         <SectionTitle>Tags</SectionTitle>
-        <Button variant="outline" size="compact-sm" title="quick tag" onClick={onOpenQuickTag}>
-          <IconTagPlus size={14} />
-        </Button>
+        <ActionIcon variant="filled" aria-label="Quick tag" onClick={onOpenQuickTag}>
+          <IconTagPlus size={ACTION_ICONS.ICON_SIZE} />
+        </ActionIcon>
+        {/* <Button variant="outline" size="compact-sm" title="quick tag" >
+
+        </Button> */}
       </Group>
       <SuggestedTagsRow
         suggestions={suggestions}

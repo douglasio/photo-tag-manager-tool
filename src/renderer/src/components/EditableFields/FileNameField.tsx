@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { Group, Text } from '@mantine/core'
+import { Group, Text, Tooltip } from '@mantine/core'
 
 import { DELEGATED_TOOLTIP_ATTR } from '@components'
 import { splitFileName, validateFileNameBase } from '@utils'
@@ -75,7 +75,7 @@ export function FileNameField({
         fz={isPanel ? FILENAME_FONT_SIZE : undefined}
         fw={isPanel ? 700 : undefined}
         ta={isPanel ? undefined : 'center'}
-        truncate={!isPanel}
+        truncate
       />
       {isPanel && editing && extension && (
         <Text c="dimmed" fw={700} fz={FILENAME_FONT_SIZE} pt={2} style={{ flexShrink: 0 }}>
@@ -87,7 +87,13 @@ export function FileNameField({
 
   return (
     <InlineEditField editing={editing} onStartEdit={onStartEdit} fill={!isPanel}>
-      {field}
+      {isPanel ? (
+        <Tooltip label={fileName} disabled={editing}>
+          {field}
+        </Tooltip>
+      ) : (
+        field
+      )}
     </InlineEditField>
   )
 }
