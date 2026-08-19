@@ -6,6 +6,7 @@ import { IconHistory, IconHome2, IconLibraryPhoto, IconTags, IconUsers } from '@
 import {
   FeaturedPersonWidget,
   FeaturedTagWidget,
+  NameThisPersonWidget,
   PhotosFromYearWidget,
   RecentlyAddedWidget,
   ScanProgressIndicator,
@@ -92,7 +93,19 @@ export const DashboardView = memo(function DashboardView(): React.JSX.Element {
       title: 'People',
       icon: IconUsers,
       widgets: [
-        { id: 'featuredPerson', title: 'Featured Person', component: <FeaturedPersonWidget /> }
+        { id: 'featuredPerson', title: 'Featured Person', component: <FeaturedPersonWidget /> },
+        // Card only exists when there's actually someone to name — an empty
+        // one would just be dead space, unlike the onboarding-timeline
+        // widgets, which always have something to show.
+        ...(state.people.some((person) => person.name === null)
+          ? [
+              {
+                id: 'nameThisPerson',
+                title: 'Name This Person',
+                component: <NameThisPersonWidget />
+              }
+            ]
+          : [])
       ]
     },
     {

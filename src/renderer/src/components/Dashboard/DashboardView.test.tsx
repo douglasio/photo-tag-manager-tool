@@ -13,7 +13,7 @@ vi.mock('@state', () => ({
   usePhotoLibrary: () => ({
     activePhotosByPath: mockPhotosByPath,
     addFolder: mockAddFolder,
-    state: { status: mockStatus }
+    state: { status: mockStatus, people: [] }
   })
 }))
 
@@ -24,6 +24,7 @@ vi.mock('@state', () => ({
 vi.mock('@components', () => ({
   FeaturedPersonWidget: () => <div>FeaturedPersonWidget</div>,
   FeaturedTagWidget: () => <div>FeaturedTagWidget</div>,
+  NameThisPersonWidget: () => <div>NameThisPersonWidget</div>,
   PhotosFromYearWidget: () => <div>PhotosFromYearWidget</div>,
   RecentlyAddedWidget: () => <div>RecentlyAddedWidget</div>,
   ScanProgressIndicator: ({ label }: { label?: string }) => <div>{label}</div>,
