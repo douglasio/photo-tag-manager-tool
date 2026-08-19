@@ -40,9 +40,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 4. Top Viewed photos should have an onboarding process similar to Featured Tag to guide users until they've view 5 photos.
 
-5. Featured Person widget -- roughly the same as the Featured Tag widget except with a person's face and other stats like view count and
+5. ~~Featured Person widget -- roughly the same as the Featured Tag widget except with a few photos of the person and other stats like total view count, total number of photos, and person's description if available~~ Fixed. New "People" dashboard section with `FeaturedPersonWidget`, mirroring `FeaturedTagWidget`'s carousel/onboarding pattern — named people with 3+ photos are eligible; shows photo count, view count, and description; onboarding Timeline walks through enabling face detection and naming someone until one qualifies.
 
-6. The top
+6. Add a "name this person" widget that appears if there are any people with the default name (unnamed person)
 
 ## Gallery View
 

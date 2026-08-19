@@ -1,9 +1,10 @@
 import { memo, type ReactElement } from 'react'
 
 import { Box, Button, Divider, EmptyState, Group, SimpleGrid, Stack, Title } from '@mantine/core'
-import { IconHistory, IconHome2, IconLibraryPhoto, IconTags } from '@tabler/icons-react'
+import { IconHistory, IconHome2, IconLibraryPhoto, IconTags, IconUsers } from '@tabler/icons-react'
 
 import {
+  FeaturedPersonWidget,
   FeaturedTagWidget,
   PhotosFromYearWidget,
   RecentlyAddedWidget,
@@ -22,26 +23,18 @@ import { usePhotoLibrary } from '@state'
 // minmax (not 1fr) — rows match by default, but can grow for tall content
 // (e.g. Throwback's Timeline), with the page scrolling instead of clipping.
 const SECTION_ROW_HEIGHT = 'minmax(340px, auto)'
-// A flat (not minmax/auto) height, roughly a third of the viewport — unlike
-// auto+overflow:hidden, this gives every h="100%" descendant (e.g.
-// BarChart) a real height to resolve against instead of clipping after the fact.
-const SECTION_MAX_HEIGHT = '33vh'
 
 interface DashboardSectionData {
   id: string
   title: string
   icon: typeof IconHome2
   widgets: Widget[]
-  // Off by default — History's Throwback widget is allowed to grow past a
-  // fixed bound (a big Timeline needs the room), page scrolling instead.
-  capped?: boolean
 }
 
 function DashboardSection({
   title,
   icon: Icon,
-  widgets,
-  capped
+  widgets
 }: Omit<DashboardSectionData, 'id'>): ReactElement {
   return (
     <Stack gap="sm">
@@ -52,7 +45,7 @@ function DashboardSection({
         </Title>
       </Group>
       <Divider />
-      <SimpleGrid cols={3} spacing="lg" autoRows={capped ? SECTION_MAX_HEIGHT : SECTION_ROW_HEIGHT}>
+      <SimpleGrid cols={3} spacing="lg" autoRows={SECTION_ROW_HEIGHT}>
         {widgets.map((widget) => (
           <DashboardWidget key={widget.id} {...widget} />
         ))}
@@ -72,7 +65,6 @@ export const DashboardView = memo(function DashboardView(): React.JSX.Element {
       id: 'home',
       title: 'Home',
       icon: IconHome2,
-      capped: true,
       widgets: [
         { id: 'welcome', title: 'Welcome', component: <WelcomeWidget /> },
         { id: 'topViewed', title: 'Top Viewed Photos', component: <TopViewedWidget /> },
@@ -83,17 +75,24 @@ export const DashboardView = memo(function DashboardView(): React.JSX.Element {
       id: 'tags',
       title: 'Tags',
       icon: IconTags,
-      capped: true,
       widgets: [
         { id: 'taggingProgress', title: 'Tagging Progress', component: <TaggingProgressWidget /> },
         {
           id: 'tagThisPhoto',
           title: 'Tag This Photo',
           component: <TagThisPhotoWidget />,
-          colSpan: 2
+          colSpan: 1
         },
         { id: 'featuredTag', title: 'Featured Tag', component: <FeaturedTagWidget /> },
         { id: 'topTags', title: 'Top Tags', component: <TopTagsWidget /> }
+      ]
+    },
+    {
+      id: 'people',
+      title: 'People',
+      icon: IconUsers,
+      widgets: [
+        { id: 'featuredPerson', title: 'Featured Person', component: <FeaturedPersonWidget /> }
       ]
     },
     {
@@ -152,7 +151,6 @@ export const DashboardView = memo(function DashboardView(): React.JSX.Element {
             title={section.title}
             icon={section.icon}
             widgets={section.widgets}
-            capped={section.capped}
           />
         ))}
       </Stack>

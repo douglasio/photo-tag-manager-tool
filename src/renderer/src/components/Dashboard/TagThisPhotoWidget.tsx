@@ -39,10 +39,6 @@ export function TagThisPhotoWidget(): ReactElement {
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
   const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
 
-  // Locked in (lazy init, then again on "Tag another"/"Skip") rather than
-  // recomputed on every render — re-resolved against the live photo map
-  // below so tags applied via TagList show immediately without the widget
-  // swapping to a different photo out from under the user mid-edit.
   const [currentPath, setCurrentPath] = useState<string | null>(() =>
     pickUntagged(activePhotosByPath, null)
   )

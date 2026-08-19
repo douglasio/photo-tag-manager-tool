@@ -22,6 +22,7 @@ vi.mock('@state', () => ({
 // each is stubbed to a trivial placeholder instead of dragging in its own
 // usePhotoLibrary requirements.
 vi.mock('@components', () => ({
+  FeaturedPersonWidget: () => <div>FeaturedPersonWidget</div>,
   FeaturedTagWidget: () => <div>FeaturedTagWidget</div>,
   PhotosFromYearWidget: () => <div>PhotosFromYearWidget</div>,
   RecentlyAddedWidget: () => <div>RecentlyAddedWidget</div>,
