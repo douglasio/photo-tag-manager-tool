@@ -8,6 +8,7 @@ import { getFolders, getWindowState } from './db/settingsRepository'
 import { registerAiHandlers } from './ipc/aiHandlers'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
 import { registerFaceHandlers } from './ipc/faceHandlers'
+import { registerFolderHandlers } from './ipc/folderHandlers'
 import { registerLibraryDataHandlers } from './ipc/libraryDataHandlers'
 import { registerPhotoHandlers } from './ipc/photoHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
@@ -109,6 +110,7 @@ if (!app.requestSingleInstanceLock()) {
     registerShellHandlers()
     registerScanHandlers()
     registerSettingsHandlers()
+    registerFolderHandlers()
     registerTagHandlers()
     registerAiHandlers()
     registerFaceHandlers()

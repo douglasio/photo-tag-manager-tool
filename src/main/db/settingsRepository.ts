@@ -360,6 +360,7 @@ export function getAllSettings(): AppSettings {
     artGalleryName: getArtGalleryName(),
     navbarSplitSizes: getNavbarSplitSizes(),
     navbarWidth: getNavbarWidth(),
+    galleryCellWidth: getGalleryCellWidth(),
     navbarCollapsedPanels: getNavbarCollapsedPanels(),
     excludePatterns: getExcludePatterns(),
     excludedFolders: getExcludedFolders()

@@ -81,6 +81,7 @@ export interface LibraryActions {
   getHiddenPeople: () => Promise<PersonRecord[]>
   setNavbarSplitSizes: (sizes: number[]) => void
   setNavbarWidth: (width: number) => void
+  setGalleryCellWidth: (width: number) => void
   setNavbarCollapsedPanels: (panels: Record<string, boolean>) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void

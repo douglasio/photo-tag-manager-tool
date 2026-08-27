@@ -1,22 +1,19 @@
 import { type RefObject, useEffect, useRef, useState } from 'react'
 
-const DEFAULT_CELL_WIDTH = 168
+// Imported from the module rather than the @state barrel: these are plain
+// constants, and the barrel is mocked wholesale in most component tests,
+// which would leave them undefined wherever this hook renders.
+import { clampCellWidth, MAX_CELL_WIDTH, MIN_CELL_WIDTH } from '@renderer/state/photoLibraryReducer'
+
 // Extra vertical space the filename/view-count row + its padding need,
 // added to cell height. Too small and the card overlaps the row below it.
 const CELL_LABEL_HEIGHT = 38
-const MIN_CELL_WIDTH = 100
-// Stays under thumbnailService's THUMBNAIL_LONG_EDGE (640px) to avoid upscaling.
-const MAX_CELL_WIDTH = 600
 // react-window's own scrollbar eats into the width we give it; without this
 // the last column overflows and the grid gains a horizontal scrollbar too.
 const SCROLLBAR_RESERVE_PX = 16
 // Debounces the ResizeObserver below so the AppShell's panel-collapse CSS
 // transition doesn't reflow thumbnails into new column counts every frame.
 const RESIZE_SETTLE_MS = 100
-
-function clampCellWidth(value: number): number {
-  return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, value))
-}
 
 // Evenly spaced tick marks spanning the slider's actual min/max range, so
 // they land at real, reachable cell-width values rather than arbitrary points.
@@ -33,6 +30,13 @@ interface UseGalleryGridLayoutOptions {
   // Shares the filename's label row rather than adding its own, so the
   // height budget below only needs reserving once either is on.
   showViewCounts: boolean
+  // The committed (persisted) thumbnail width, from the batched startup
+  // settings load — already correct on first render, so the grid no longer
+  // lays out at a default and then reflows once an IPC read resolves.
+  persistedCellWidth: number
+  // Commits a released slider value to state + persistence. Kept out of this
+  // hook so the live drag stays local; see galleryCellWidth in the reducer.
+  onCommitCellWidth: (width: number) => void
 }
 
 interface UseGalleryGridLayoutResult {
@@ -55,11 +59,16 @@ interface UseGalleryGridLayoutResult {
 export function useGalleryGridLayout({
   photoCount,
   showFilenames,
-  showViewCounts
+  showViewCounts,
+  persistedCellWidth,
+  onCommitCellWidth
 }: UseGalleryGridLayoutOptions): UseGalleryGridLayoutResult {
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
-  const [cellWidth, setCellWidth] = useState(DEFAULT_CELL_WIDTH)
+  // Null except mid-drag, when it overrides the committed width — the same
+  // live-local/commit-on-release split NavbarResizeHandle uses.
+  const [liveCellWidth, setLiveCellWidth] = useState<number | null>(null)
+  const cellWidth = liveCellWidth ?? persistedCellWidth
 
   useEffect(() => {
     const el = containerRef.current
@@ -80,16 +89,14 @@ export function useGalleryGridLayout({
     }
   }, [])
 
-  useEffect(() => {
-    window.api.getGalleryCellWidth().then((width) => {
-      if (width !== null) setCellWidth(clampCellWidth(width))
-    })
-  }, [])
+  const setCellWidth = (width: number): void => setLiveCellWidth(clampCellWidth(width))
 
+  // Commits first, then drops the live override — both land in the same
+  // batched update, so the grid never renders a frame at the old committed
+  // width in between.
   const setCellWidthPersisted = (width: number): void => {
-    const clamped = clampCellWidth(width)
-    setCellWidth(clamped)
-    void window.api.setGalleryCellWidth(clamped)
+    onCommitCellWidth(clampCellWidth(width))
+    setLiveCellWidth(null)
   }
 
   // Nearest column count to the target width, stretched to fill exactly —

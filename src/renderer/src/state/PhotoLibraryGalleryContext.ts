@@ -24,6 +24,7 @@ export interface GalleryLibraryState {
   sortOrder: GallerySortOrder
   galleryViewMode: GalleryViewMode
   galleryAnimationsEnabled: boolean
+  galleryCellWidth: number
   showFilenames: boolean
   showViewCounts: boolean
   defaultView: DefaultView

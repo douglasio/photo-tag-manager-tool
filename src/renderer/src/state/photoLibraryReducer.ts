@@ -38,6 +38,18 @@ export function clampNavbarWidth(width: number): number {
   return Math.min(MAX_NAVBAR_WIDTH, Math.max(MIN_NAVBAR_WIDTH, Math.round(width)))
 }
 
+// Gallery thumbnail size. The maximum stays under thumbnailService's
+// THUMBNAIL_LONG_EDGE (640px) so cells never upscale past the cached
+// thumbnail. Lives here rather than in useGalleryGridLayout so the reducer
+// can clamp a persisted value on load, same as the navbar width above.
+export const DEFAULT_CELL_WIDTH = 168
+export const MIN_CELL_WIDTH = 100
+export const MAX_CELL_WIDTH = 600
+
+export function clampCellWidth(width: number): number {
+  return Math.min(MAX_CELL_WIDTH, Math.max(MIN_CELL_WIDTH, width))
+}
+
 // Order-independent so opening the same set twice reuses the same tab.
 export function compareTabId(paths: string[]): string {
   return `compare:${[...paths].sort().join('::')}`
@@ -103,6 +115,10 @@ export interface PhotoLibraryState {
   // The sidebar's overall width in px, distinct from navbarSplitSizes above
   // (which only divides the panes within it). Drives AppShell's navbar width.
   navbarWidth: number
+  // Target thumbnail width for the gallery grid. Holds the committed value
+  // only — the live value during a slider drag stays local to
+  // useGalleryGridLayout, so dragging doesn't re-render every context consumer.
+  galleryCellWidth: number
   // Accordion-style collapse for the same panes, keyed by a stable panel id
   // ('tags' | 'people' | 'folders') rather than index — missing key means expanded.
   navbarCollapsedPanels: Record<string, boolean>
@@ -170,6 +186,7 @@ export const initialState: PhotoLibraryState = {
   showViewCounts: false,
   navbarSplitSizes: [50, 50],
   navbarWidth: DEFAULT_NAVBAR_WIDTH,
+  galleryCellWidth: DEFAULT_CELL_WIDTH,
   navbarCollapsedPanels: {},
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
@@ -226,6 +243,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_SHOW_VIEW_COUNTS'; value: boolean }
   | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: number[] }
   | { type: 'SET_NAVBAR_WIDTH'; width: number }
+  | { type: 'SET_GALLERY_CELL_WIDTH'; width: number }
   | { type: 'SET_NAVBAR_COLLAPSED_PANELS'; panels: Record<string, boolean> }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
@@ -288,13 +306,15 @@ export function photoLibraryReducer(
     // Batched startup settings load — gallerySort/navbarSplitSizes only
     // override when persisted (non-null), same as SET_SORT/SET_NAVBAR_SPLIT_SIZES.
     case 'SETTINGS_LOADED': {
-      const { gallerySort, navbarSplitSizes, navbarWidth, ...rest } = action.settings
+      const { gallerySort, navbarSplitSizes, navbarWidth, galleryCellWidth, ...rest } =
+        action.settings
       return {
         ...state,
         ...rest,
         ...(gallerySort ? { sortBy: gallerySort.sortBy, sortOrder: gallerySort.sortOrder } : {}),
         ...(navbarSplitSizes ? { navbarSplitSizes } : {}),
-        ...(navbarWidth ? { navbarWidth: clampNavbarWidth(navbarWidth) } : {})
+        ...(navbarWidth ? { navbarWidth: clampNavbarWidth(navbarWidth) } : {}),
+        ...(galleryCellWidth ? { galleryCellWidth: clampCellWidth(galleryCellWidth) } : {})
       }
     }
     case 'FOLDER_ADDED':
@@ -620,6 +640,8 @@ export function photoLibraryReducer(
       return { ...state, navbarSplitSizes: action.sizes }
     case 'SET_NAVBAR_WIDTH':
       return { ...state, navbarWidth: clampNavbarWidth(action.width) }
+    case 'SET_GALLERY_CELL_WIDTH':
+      return { ...state, galleryCellWidth: clampCellWidth(action.width) }
     case 'SET_NAVBAR_COLLAPSED_PANELS':
       return { ...state, navbarCollapsedPanels: action.panels }
     case 'SET_MAGAZINE_TITLE':

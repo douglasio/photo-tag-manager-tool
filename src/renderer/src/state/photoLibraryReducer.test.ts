@@ -41,6 +41,7 @@ function makeGroup(overrides: Partial<TagGroup> & { id: string }): TagGroup {
 function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
     gallerySort: null,
+    galleryCellWidth: null,
     defaultView: 'gallery',
     showEmptyFolders: true,
     tagsPanelGridView: true,

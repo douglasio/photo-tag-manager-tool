@@ -91,7 +91,8 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
     renameFile,
     openCompareTab,
     openDuplicatesTab,
-    setGalleryViewMode
+    setGalleryViewMode,
+    setGalleryCellWidth
   } = usePhotoLibrary()
 
   // Only set once the selected folder actually has subfolders — a leaf
@@ -142,7 +143,9 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
   } = useGalleryGridLayout({
     photoCount: photos.length,
     showFilenames: state.showFilenames,
-    showViewCounts: state.showViewCounts
+    showViewCounts: state.showViewCounts,
+    persistedCellWidth: state.galleryCellWidth,
+    onCommitCellWidth: setGalleryCellWidth
   })
   const { previewTriggerHeld, previewScale } = useGalleryPreviewZoom(containerRef)
 

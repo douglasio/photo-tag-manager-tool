@@ -131,6 +131,7 @@ export interface AppSettings {
   artGalleryName: string
   navbarSplitSizes: number[] | null
   navbarWidth: number | null
+  galleryCellWidth: number | null
   navbarCollapsedPanels: Record<string, boolean>
   excludePatterns: string[]
   excludedFolders: string[]

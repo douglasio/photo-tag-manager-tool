@@ -62,32 +62,20 @@ const api = {
   // isn't thrown, since the caller still needs to know which ones landed.
   deletePhotos: (filePaths: string[]): Promise<string[]> =>
     ipcRenderer.invoke('photo:delete', filePaths),
-  getGalleryCellWidth: (): Promise<number | null> =>
-    ipcRenderer.invoke('settings:getGalleryCellWidth'),
   setGalleryCellWidth: (width: number): Promise<void> =>
     ipcRenderer.invoke('settings:setGalleryCellWidth', width),
-  getGallerySort: (): Promise<GallerySort | null> => ipcRenderer.invoke('settings:getGallerySort'),
   setGallerySort: (sort: GallerySort): Promise<void> =>
     ipcRenderer.invoke('settings:setGallerySort', sort),
-  getDefaultView: (): Promise<DefaultView> => ipcRenderer.invoke('settings:getDefaultView'),
   setDefaultView: (value: DefaultView): Promise<void> =>
     ipcRenderer.invoke('settings:setDefaultView', value),
-  getShowEmptyFolders: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowEmptyFolders'),
   setShowEmptyFolders: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowEmptyFolders', value),
-  getTagsPanelGridView: (): Promise<boolean> => ipcRenderer.invoke('settings:getTagsPanelGridView'),
   setTagsPanelGridView: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setTagsPanelGridView', value),
-  getPeoplePanelGridView: (): Promise<boolean> =>
-    ipcRenderer.invoke('settings:getPeoplePanelGridView'),
   setPeoplePanelGridView: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setPeoplePanelGridView', value),
-  getGalleryViewMode: (): Promise<GalleryViewMode> =>
-    ipcRenderer.invoke('settings:getGalleryViewMode'),
   setGalleryViewMode: (value: GalleryViewMode): Promise<void> =>
     ipcRenderer.invoke('settings:setGalleryViewMode', value),
-  getAiTagSuggestionsEnabled: (): Promise<boolean> =>
-    ipcRenderer.invoke('settings:getAiTagSuggestionsEnabled'),
   setAiTagSuggestionsEnabled: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setAiTagSuggestionsEnabled', value),
   suggestTags: (filePath: string, candidateLabels: string[]): Promise<TagSuggestion[]> =>
@@ -102,8 +90,6 @@ const api = {
     ipcRenderer.invoke('ai:findSimilarPhotos', filePath, limit),
   dismissDuplicateGroup: (filePaths: string[]): Promise<void> =>
     ipcRenderer.invoke('ai:dismissDuplicateGroup', filePaths),
-  getFaceDetectionEnabled: (): Promise<boolean> =>
-    ipcRenderer.invoke('settings:getFaceDetectionEnabled'),
   setFaceDetectionEnabled: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setFaceDetectionEnabled', value),
   getFacesForPhoto: (filePath: string): Promise<FaceRecord[]> =>
@@ -138,47 +124,30 @@ const api = {
     ipcRenderer.invoke('throwback:getYearSample'),
   getThrowbackPreview: (): Promise<ThrowbackEntry[] | null> =>
     ipcRenderer.invoke('throwback:getPreview'),
-  getDetailsPanelCollapsed: (): Promise<boolean> =>
-    ipcRenderer.invoke('settings:getDetailsPanelCollapsed'),
   setDetailsPanelCollapsed: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setDetailsPanelCollapsed', value),
-  getGalleryAnimationsEnabled: (): Promise<boolean> =>
-    ipcRenderer.invoke('settings:getGalleryAnimationsEnabled'),
   setGalleryAnimationsEnabled: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setGalleryAnimationsEnabled', value),
-  getShowFilenames: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowFilenames'),
   setShowFilenames: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowFilenames', value),
-  getShowViewCounts: (): Promise<boolean> => ipcRenderer.invoke('settings:getShowViewCounts'),
   setShowViewCounts: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('settings:setShowViewCounts', value),
-  getMagazineTitle: (): Promise<string> => ipcRenderer.invoke('settings:getMagazineTitle'),
   setMagazineTitle: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setMagazineTitle', value),
-  getNewspaperTitle: (): Promise<string> => ipcRenderer.invoke('settings:getNewspaperTitle'),
   setNewspaperTitle: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setNewspaperTitle', value),
-  getDvdStudioName: (): Promise<string> => ipcRenderer.invoke('settings:getDvdStudioName'),
   setDvdStudioName: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setDvdStudioName', value),
-  getArtGalleryName: (): Promise<string> => ipcRenderer.invoke('settings:getArtGalleryName'),
   setArtGalleryName: (value: string): Promise<void> =>
     ipcRenderer.invoke('settings:setArtGalleryName', value),
-  getNavbarSplitSizes: (): Promise<number[] | null> =>
-    ipcRenderer.invoke('settings:getNavbarSplitSizes'),
   setNavbarSplitSizes: (sizes: number[]): Promise<void> =>
     ipcRenderer.invoke('settings:setNavbarSplitSizes', sizes),
-  getNavbarWidth: (): Promise<number | null> => ipcRenderer.invoke('settings:getNavbarWidth'),
   setNavbarWidth: (width: number): Promise<void> =>
     ipcRenderer.invoke('settings:setNavbarWidth', width),
-  getNavbarCollapsedPanels: (): Promise<Record<string, boolean>> =>
-    ipcRenderer.invoke('settings:getNavbarCollapsedPanels'),
   setNavbarCollapsedPanels: (value: Record<string, boolean>): Promise<void> =>
     ipcRenderer.invoke('settings:setNavbarCollapsedPanels', value),
-  getExcludePatterns: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludePatterns'),
   setExcludePatterns: (patterns: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludePatterns', patterns),
-  getExcludedFolders: (): Promise<string[]> => ipcRenderer.invoke('settings:getExcludedFolders'),
   setExcludedFolders: (folders: string[]): Promise<void> =>
     ipcRenderer.invoke('settings:setExcludedFolders', folders),
   addFolder: (folder: string): Promise<void> => ipcRenderer.invoke('settings:addFolder', folder),

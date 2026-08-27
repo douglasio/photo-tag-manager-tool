@@ -232,6 +232,7 @@ interface PhotoLibraryContextValue {
   getHiddenPeople: () => Promise<PersonRecord[]>
   setNavbarSplitSizes: (sizes: number[]) => void
   setNavbarWidth: (width: number) => void
+  setGalleryCellWidth: (width: number) => void
   setNavbarCollapsedPanels: (panels: Record<string, boolean>) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -1352,6 +1353,13 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setNavbarWidth(width)
   }, [])
 
+  // Called once the slider is released, never per drag frame — the live width
+  // is local to useGalleryGridLayout until then.
+  const setGalleryCellWidth = useCallback((width: number) => {
+    dispatch({ type: 'SET_GALLERY_CELL_WIDTH', width })
+    void window.api.setGalleryCellWidth(width)
+  }, [])
+
   const setNavbarCollapsedPanels = useCallback((panels: Record<string, boolean>) => {
     dispatch({ type: 'SET_NAVBAR_COLLAPSED_PANELS', panels })
     void window.api.setNavbarCollapsedPanels(panels)
@@ -1761,6 +1769,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       getHiddenPeople,
       setNavbarSplitSizes,
       setNavbarWidth,
+      setGalleryCellWidth,
       setNavbarCollapsedPanels,
       setSettingsModalOpened,
       setDetailsPanelCollapsed,
@@ -1856,6 +1865,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       getHiddenPeople,
       setNavbarSplitSizes,
       setNavbarWidth,
+      setGalleryCellWidth,
       setNavbarCollapsedPanels,
       setSettingsModalOpened,
       setDetailsPanelCollapsed,
@@ -1987,6 +1997,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       sortOrder: state.sortOrder,
       galleryViewMode: state.galleryViewMode,
       galleryAnimationsEnabled: state.galleryAnimationsEnabled,
+      galleryCellWidth: state.galleryCellWidth,
       showFilenames: state.showFilenames,
       showViewCounts: state.showViewCounts,
       defaultView: state.defaultView,
@@ -2016,6 +2027,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       state.sortOrder,
       state.galleryViewMode,
       state.galleryAnimationsEnabled,
+      state.galleryCellWidth,
       state.showFilenames,
       state.showViewCounts,
       state.defaultView,
