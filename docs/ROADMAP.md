@@ -10,25 +10,47 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Shell
 
-2. Implement MenuBar?
+1. Add a message on the opening loading screen if new photos are detected / being imported, to alert users that opening the app may take a little longer.
 
-3. Add a message on the opening loading screen if new photos are detected / being imported, to alert users that opening the app may take a little longer.
+2. Corrupt photo finder
 
-4. Corrupt photo finder
+3. Search -- implement spotlight search using Mantine `Spotlight`. Searchable fields should include tags, filename, and comments. Notes toward a plan:
+   - Storage: SQLite FTS5 virtual table in the main process, kept in sync by triggers (or by the existing ingest/tag-write paths), rather than filtering in the renderer — the renderer only holds `photosByPath` for the current session, and scanning it per keystroke won't hold up on a large library.
+   - Needs a schema migration in `db/database.ts` plus a backfill for existing libraries.
+   - Results should be grouped by kind (photo / tag / person / folder) and selecting one should drive the existing selection actions, not a new navigation path.
+   - As a future enhancement, an AI-based search that can match photo contents or faces — see AI #1, which is designed to slot into the same Spotlight UI.
 
-5. Search -- implement spotlight search. searchable fields should include tags, filename, comments. As a future enhancement, maybe an AI-based search that can match to photo contents or faces.
+4. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
 
-6. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
+5. Make all 'Enable AI features' buttons use the gradient variant.
 
-7. Make all 'Enable AI features' buttons use the gradient variant.
+6. Video support?
 
-8. Video support?
+## Application Management
 
-## Onboarding
+Making Tag Me feel like a real installable desktop app rather than a dev build.
 
-1. Installation guide?
+1. Application MenuBar. Native menus for the actions currently reachable only through in-app UI (add folder, preferences, rescan, view switching, zoom, window). Worth doing early-ish: `main/index.ts` currently sets `autoHideMenuBar: true` and leans on Electron's default menu, and PhotoView already had to work around the default menu's Ctrl/Cmd+Plus/Minus zoom accelerators. An explicit menu makes those bindings ours instead of fought against.
+
+2. Installation guide. Packaging/signing story per platform (macOS notarization, Windows installer), plus a first-run doc.
+
+3. Uninstall guide. Needs an inventory of everything the app writes outside its own bundle — the SQLite DB, thumbnail cache, and downloaded AI model weights all live in `userData` and none of it is currently documented or removable from inside the app. A "remove all app data" affordance in Settings is probably the honest companion to this.
+
+4. Help documentation. In-app help for the non-obvious features (tag groups, exclusions, face detection's reset-on-disable behavior, preview trigger key, compare view).
 
 ## AI
+
+1. Natural-language semantic search over the existing CLIP embeddings ("dog on a beach"). The embedding table and the similarity worker already exist for duplicate detection and Throwback — this reuses them by embedding the query text instead of a photo. Highest-leverage AI item because it shares the Spotlight UI from Shell #3.
+
+2. Auto-album / event clustering. Group photos into events by combining capture time gaps with embedding similarity — closer to Picasa's implicit "shoots" than the current folder-only grouping.
+
+3. Smarter tag suggestions. Today suggestions score against a fixed candidate label set; scoring against the user's own existing tag vocabulary would make them fit the library instead of a generic ontology.
+
+4. Best-of-burst selection. Rank near-duplicate groups (already detected) by sharpness/exposure/eyes-open so the Duplicates view can recommend which to keep rather than only which are similar.
+
+5. OCR pass for photos containing text (signs, documents, screenshots), feeding the same search index as Shell #3.
+
+Note: any new face/vision model needs a license check first — InsightFace's SCRFD/ArcFace weights are non-commercial-only and were already ruled out once.
 
 ## Dashboard
 
@@ -39,10 +61,6 @@ To-dos, tasks, and features loosely grouped by feature segment.
 3. Featured Tag onboarding progress should show toasts each time an action is taken that "ticks a box" until the entire task is completed, with a button to bring you back to the Dashboard view.
 
 4. Top Viewed photos should have an onboarding process similar to Featured Tag to guide users until they've view 5 photos.
-
-5. ~~Featured Person widget -- roughly the same as the Featured Tag widget except with a few photos of the person and other stats like total view count, total number of photos, and person's description if available~~ Fixed. New "People" dashboard section with `FeaturedPersonWidget`, mirroring `FeaturedTagWidget`'s carousel/onboarding pattern — named people with 3+ photos are eligible; shows photo count, view count, and description; onboarding Timeline walks through enabling face detection and naming someone until one qualifies.
-
-6. Add a "name this person" widget that appears if there are any people with the default name (unnamed person)
 
 ## Gallery View
 
@@ -58,41 +76,38 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 6. Full-tab views for each left panel section?
 
-7. ~~Make the left sidebar wider by default.~~ Fixed. The sidebar is now drag-resizable (`NavbarResizeHandle`) with the width persisted (`navbarWidth`), plus a larger 300px default, double-click-to-reset, and arrow-key resizing.
+7. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated — the settings layer is now ~26 setting triplets across repository/IPC/preload; see Codebase #5.)
 
-8. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated)
-
-9. ~~Make the breadcrumb section headers sticky so it's easier to tell what section you're in~~ Fixed. `GalleryFolderSections` now tracks scroll position and overlays the current section's breadcrumb at the top of the list once its real header row has scrolled out of view, with a subtle "handoff" push as the next section's header arrives.
-
-10. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
+8. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
 
 ### People
 
 ## Tools
 
-2. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.
+1. Undo/redo for tag operations — a toast with an "Undo" action after a batch add/delete/merge, given these can touch many files' actual EXIF data at once.
 
-3. Reset view counts
+2. Reset view counts
 
-4. Removing folders should not delete photo data
+3. Removing folders should not delete photo data
 
-5. Collage?
+4. Collage?
 
-6. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
+5. Color-sorted rainbow - sort/lay out by dominant hue for a gradient wall effect; striking and cheap (just needs a dominant-color extraction pass, no ML needed).
 
 ## Tags
 
-2. Selecting multiple photos from the gallery should open the taglist to batch add or remove tags to the entire selection.
+1. Selecting multiple photos from the gallery should open the taglist to batch add or remove tags to the entire selection.
 
 ## Photo view
 
 1. Refactor Compare view to use Mantine Compare plugin instead of Splitter. I'm okay if this means removing the ability to compare >2 images for now.
 
-2. Adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
+2. Photo editing — adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
    - `onSave` returns base64/canvas, not a file — original EXIF (GPS, date-taken, camera info) is lost on re-encode unless explicitly restored. Plan: base64 → IPC → decode → copy original tags via exiftool-vendored → write via sharp → same `ingestFile`/thumbnail-regen path the current rotate handler uses.
    - No Mantine integration — it's a standalone widget with its own `theme` object (reskinnable to match), dropped in a Mantine `Modal`. Pulls in `react-konva` + `styled-components` as new deps.
    - No plugin API for custom tools/tabs — can only show/hide/reorder the built-in tool set (adjust, filters, rotate, crop, resize, watermark, shapes, text). The DVD/magazine/newspaper visualizations would stay separate, not foldable into its toolbar.
    - Takes a URL or `HTMLImageElement` as source — fits the existing `toFileProtocolUrl` pattern directly.
+   - Open question worth settling before building: edit in place, or write a copy and keep the original? Picasa kept originals and stored edits separately; destructive in-place editing is the riskier default.
 
 ### Visualizations
 
@@ -106,13 +121,9 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
-## Shell (follow-ups)
-
-1. ~~Persist the window's size and position. `main/index.ts` always opens at 80% of the primary display, centered, so every relaunch forgets whatever the user last set. `electron-window-state` is the conventional library, or a manual save-on-resize/move into the existing settings table.~~ Done, via the settings table rather than `electron-window-state` (unmaintained since 2019, and a separate JSON file wouldn't travel with database export/import). `services/windowStateService.ts` — debounced save on move/resize/maximize with a synchronous flush on close, and a pure `resolveWindowBounds` that discards a saved position whose display is gone or that overlaps the screen too marginally to grab.
-
 ## Optimization
 
-1. Virtualize the Tags panel list (and People panel, same shape). Follow-up from Gallery View #7: with hundreds of tags, every row mounts a `useDroppable`/`useDraggable` registration, so dnd-kit's `DroppableContainersMap` iterating all of them costs ~550ms at drag start and again at drop. Severity scales with tag count — a library with a few dozen tags likely won't notice this at all, so it's worth confirming it's still felt before investing in the redesign below. `react-window` is already a dependency and `GalleryGrid` uses its `Grid`. Complication worth planning around: the panel renders inside a Mantine `Accordion` when tag groups exist, so a naive per-panel virtualizer doesn't fit — likely wants a single flat virtualized list of (group header | tag) rows instead.
+1. Virtualize the Tags panel list (and People panel, same shape). With hundreds of tags, every row mounts a `useDroppable`/`useDraggable` registration, so dnd-kit's `DroppableContainersMap` iterating all of them costs ~550ms at drag start and again at drop. Severity scales with tag count — a library with a few dozen tags likely won't notice this at all, so it's worth confirming it's still felt before investing in the redesign below. `react-window` is already a dependency and `GalleryGrid` uses its `Grid`. Complication worth planning around: the panel renders inside a Mantine `Accordion` when tag groups exist, so a naive per-panel virtualizer doesn't fit — likely wants a single flat virtualized list of (group header | tag) rows instead.
 
 2. Profile the production build, never dev, for any renderer perf work. React 19 DEV calls `console.createTask` for every element (Owner Stacks) and StrictMode double-renders everything; in a dev trace that machinery was ~28% of samples and app code measured 0.02%, which is actively misleading. `npm run build && npm run preview`.
 
@@ -128,11 +139,11 @@ See VIDEO_PLAN.md
 
 3. Update all deps
 
-4. ~~Centralize the repeated `photo.thumbnailStatus === 'ready' && photo.thumbnailKey` check (inline in ~13 places across Dashboard widgets, Gallery, and Tags) into a shared `isPhotoDisplayable(photo)`-style helper.~~ Fixed. `isPhotoDisplayable` in `utils/functions.ts` (a type guard, so `thumbnailKey` needs no non-null assertion after it), replacing all 14 inline occurrences.
+4. Take a full pass to reduce comments to 1-2 lines
 
-5. ~~Dashboard widgets each call `useKeyHeld(PREVIEW_TRIGGER_KEY)` independently (6 separate window keydown/keyup listener pairs for the same key). Fold `previewTriggerHeld` into the shared `DashboardPreviewZoomContext` (already built for per-widget preview zoom) so it's one listener instead of six.~~ Fixed (broader than scoped: `useGalleryPreviewZoom` also registered one per widget provider). App-wide `PreviewTriggerProvider`/`usePreviewTriggerHeld` in `state/PreviewTriggerContext.tsx` — one listener trio total, consumed by all widgets, DuplicatesView, and both preview hooks.
+5. Collapse the settings boilerplate. Each setting currently costs five coordinated edits — `shared/types.ts`, a repository get/set pair, the `getAllSettings` composition, an IPC handler, and a preload wrapper — for what is almost always a key/value read and write. A declarative registry (key, codec, default) could generate the accessors, the batch composition, and the handler registration from one entry. Related to Gallery View #7's "reassess persisted settings approach."
 
-6. Take a full pass to reduce comments to 1-2 lines
+6. `@state` barrel is mocked wholesale in ~15 component test files, so anything newly exported from it is `undefined` in those tests and breaks them at import time. Plain constants are currently imported from their defining module to sidestep this. Worth deciding on a real convention (partial mocks via `importOriginal`, or a constants module outside the barrel) before it bites again.
 
 ### Performance
 
