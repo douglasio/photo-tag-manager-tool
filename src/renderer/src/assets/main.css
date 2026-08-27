@@ -165,3 +165,29 @@ button {
   flex: 1;
   min-height: 0;
 }
+
+/* Panel splitter handles in the navbar, matching NavbarResizeHandle's
+   affordance: the divider highlights while hovered or dragged. Overrides
+   Mantine's --splitter-handle-color on the handle itself (the handleColor
+   prop sets it on the Splitter root, so this wins by proximity). :active
+   covers the drag, since data-active lives on the thumb, which these
+   splitters don't render (withHandle={false}). */
+.navbar-splitter-handle {
+  transition: background-color 150ms ease;
+}
+
+.navbar-splitter-handle:hover,
+.navbar-splitter-handle:active {
+  --splitter-handle-color: var(--mantine-primary-color-filled);
+}
+
+/* Widens the grab target past the thin visible line without adding layout
+   height, so the handle is as easy to catch as the sidebar's own. */
+.navbar-splitter-handle::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  bottom: -3px;
+}

@@ -22,6 +22,7 @@ import {
   getMagazineTitle,
   getNavbarCollapsedPanels,
   getNavbarSplitSizes,
+  getNavbarWidth,
   getNewspaperTitle,
   getPeoplePanelGridView,
   getShowEmptyFolders,
@@ -44,6 +45,7 @@ import {
   setMagazineTitle,
   setNavbarCollapsedPanels,
   setNavbarSplitSizes,
+  setNavbarWidth,
   setNewspaperTitle,
   setPeoplePanelGridView,
   setShowEmptyFolders,
@@ -212,6 +214,12 @@ export function registerSettingsHandlers(): void {
 
   ipcMain.handle('settings:setNavbarSplitSizes', (_event, sizes: number[]): void => {
     setNavbarSplitSizes(sizes)
+  })
+
+  ipcMain.handle('settings:getNavbarWidth', (): number | null => getNavbarWidth())
+
+  ipcMain.handle('settings:setNavbarWidth', (_event, width: number): void => {
+    setNavbarWidth(width)
   })
 
   ipcMain.handle('settings:getNavbarCollapsedPanels', (): Record<string, boolean> =>

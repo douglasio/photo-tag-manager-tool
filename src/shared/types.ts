@@ -130,6 +130,7 @@ export interface AppSettings {
   dvdStudioName: string
   artGalleryName: string
   navbarSplitSizes: number[] | null
+  navbarWidth: number | null
   navbarCollapsedPanels: Record<string, boolean>
   excludePatterns: string[]
   excludedFolders: string[]

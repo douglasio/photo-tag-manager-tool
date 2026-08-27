@@ -231,6 +231,7 @@ interface PhotoLibraryContextValue {
   unhidePerson: (id: string) => Promise<void>
   getHiddenPeople: () => Promise<PersonRecord[]>
   setNavbarSplitSizes: (sizes: number[]) => void
+  setNavbarWidth: (width: number) => void
   setNavbarCollapsedPanels: (panels: Record<string, boolean>) => void
   setSettingsModalOpened: (value: boolean) => void
   setDetailsPanelCollapsed: (value: boolean) => void
@@ -1346,6 +1347,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     void window.api.setNavbarSplitSizes(sizes)
   }, [])
 
+  const setNavbarWidth = useCallback((width: number) => {
+    dispatch({ type: 'SET_NAVBAR_WIDTH', width })
+    void window.api.setNavbarWidth(width)
+  }, [])
+
   const setNavbarCollapsedPanels = useCallback((panels: Record<string, boolean>) => {
     dispatch({ type: 'SET_NAVBAR_COLLAPSED_PANELS', panels })
     void window.api.setNavbarCollapsedPanels(panels)
@@ -1754,6 +1760,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       unhidePerson,
       getHiddenPeople,
       setNavbarSplitSizes,
+      setNavbarWidth,
       setNavbarCollapsedPanels,
       setSettingsModalOpened,
       setDetailsPanelCollapsed,
@@ -1848,6 +1855,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       unhidePerson,
       getHiddenPeople,
       setNavbarSplitSizes,
+      setNavbarWidth,
       setNavbarCollapsedPanels,
       setSettingsModalOpened,
       setDetailsPanelCollapsed,
@@ -1910,6 +1918,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       tagDescriptions: state.tagDescriptions,
       recentTags: state.recentTags,
       navbarSplitSizes: state.navbarSplitSizes,
+      navbarWidth: state.navbarWidth,
       navbarCollapsedPanels: state.navbarCollapsedPanels
     }),
     [
@@ -1934,6 +1943,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       state.tagDescriptions,
       state.recentTags,
       state.navbarSplitSizes,
+      state.navbarWidth,
       state.navbarCollapsedPanels
     ]
   )

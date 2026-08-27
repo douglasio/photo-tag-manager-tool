@@ -168,6 +168,9 @@ const api = {
     ipcRenderer.invoke('settings:getNavbarSplitSizes'),
   setNavbarSplitSizes: (sizes: number[]): Promise<void> =>
     ipcRenderer.invoke('settings:setNavbarSplitSizes', sizes),
+  getNavbarWidth: (): Promise<number | null> => ipcRenderer.invoke('settings:getNavbarWidth'),
+  setNavbarWidth: (width: number): Promise<void> =>
+    ipcRenderer.invoke('settings:setNavbarWidth', width),
   getNavbarCollapsedPanels: (): Promise<Record<string, boolean>> =>
     ipcRenderer.invoke('settings:getNavbarCollapsedPanels'),
   setNavbarCollapsedPanels: (value: Record<string, boolean>): Promise<void> =>

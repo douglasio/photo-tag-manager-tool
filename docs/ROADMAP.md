@@ -58,7 +58,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 6. Full-tab views for each left panel section?
 
-7. Make the left sidebar wider by default.
+7. ~~Make the left sidebar wider by default.~~ Fixed. The sidebar is now drag-resizable (`NavbarResizeHandle`) with the width persisted (`navbarWidth`), plus a larger 300px default, double-click-to-reset, and arrow-key resizing.
 
 8. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated)
 
@@ -106,6 +106,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. I want to be able to reset the view counts globally from the settings menu. This can go under a new section in the settings menu called Photos. I also want to be able reset view count per-image. A little "reset" icon should appear next to the view count on hover (similar to the pencil edit icon), with a tooltip that says "Reset view counter." There should be a warning that this action is irreversible / are you sure, following the same pattern as deleting a folder in the settings menu.
 
+## Shell (follow-ups)
+
+1. Persist the window's size and position. `main/index.ts` always opens at 80% of the primary display, centered, so every relaunch forgets whatever the user last set. `electron-window-state` is the conventional library, or a manual save-on-resize/move into the existing settings table.
+
 ## Optimization
 
 1. Virtualize the Tags panel list (and People panel, same shape). Follow-up from Gallery View #7: with hundreds of tags, every row mounts a `useDroppable`/`useDraggable` registration, so dnd-kit's `DroppableContainersMap` iterating all of them costs ~550ms at drag start and again at drop. Severity scales with tag count — a library with a few dozen tags likely won't notice this at all, so it's worth confirming it's still felt before investing in the redesign below. `react-window` is already a dependency and `GalleryGrid` uses its `Grid`. Complication worth planning around: the panel renders inside a Mantine `Accordion` when tag groups exist, so a naive per-panel virtualizer doesn't fit — likely wants a single flat virtualized list of (group header | tag) rows instead.
@@ -131,3 +135,5 @@ See VIDEO_PLAN.md
 6. Take a full pass to reduce comments to 1-2 lines
 
 ### Performance
+
+1. `GalleryListView`'s rows now avoid per-row context subscriptions, but `CompareView`, the PhotoView visualization themes, and several DetailPanel sections still call `usePhotoLibrary()` deep in their trees. Worth a pass with the production build (see Optimization #2) to see which actually cost anything before refactoring.

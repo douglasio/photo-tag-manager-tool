@@ -33,6 +33,7 @@ export interface SidebarLibraryState {
   tagDescriptions: Map<string, string>
   recentTags: string[]
   navbarSplitSizes: number[]
+  navbarWidth: number
   navbarCollapsedPanels: Record<string, boolean>
 }
 

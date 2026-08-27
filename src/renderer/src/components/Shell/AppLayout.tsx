@@ -16,6 +16,7 @@ import { useAppDragAndDrop, useAppKeyboardShortcuts } from '@hooks'
 import { ActiveDragContext } from '@renderer/state/ActiveDragContext'
 import { useLibraryActions } from '@renderer/state/PhotoLibraryActionsContext'
 import { useGalleryLibrary } from '@renderer/state/PhotoLibraryGalleryContext'
+import { useSidebarLibrary } from '@renderer/state/PhotoLibrarySidebarContext'
 
 import {
   DRAG_PREVIEW_SIZE,
@@ -26,6 +27,7 @@ import {
   TagDragPreview
 } from './AppDragPreviews'
 import { AppTabBar } from './AppTabBar'
+import { NavbarResizeHandle } from './NavbarResizeHandle'
 import { NavbarSplitter } from './NavbarSplitter'
 
 const HEADER_HEIGHT = 50
@@ -33,6 +35,7 @@ const HEADER_HEIGHT = 50
 // Split out from App since a component can't read a context it also renders the Provider for.
 export function AppLayout(): React.JSX.Element {
   const { state, openTabEntries } = useGalleryLibrary()
+  const { state: sidebarState } = useSidebarLibrary()
   const { setActiveTab } = useLibraryActions()
 
   useAppKeyboardShortcuts()
@@ -72,7 +75,7 @@ export function AppLayout(): React.JSX.Element {
           <AppShell
             header={{ height: HEADER_HEIGHT }}
             navbar={{
-              width: 260,
+              width: sidebarState.navbarWidth,
               breakpoint: 0,
               collapsed: { desktop: isPhotoTabActive, mobile: isPhotoTabActive }
             }}
@@ -102,6 +105,7 @@ export function AppLayout(): React.JSX.Element {
               <AppShell.Section component={UntaggedRow} />
               <Divider />
               <NavbarSplitter />
+              <NavbarResizeHandle />
             </AppShell.Navbar>
             <AppShell.Main>
               <Box

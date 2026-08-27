@@ -271,6 +271,19 @@ export function setNavbarSplitSizes(sizes: number[]): void {
   setSetting('navbarSplitSizes', JSON.stringify(sizes))
 }
 
+// The sidebar's overall width in px, distinct from navbarSplitSizes above
+// (which only divides the Tags/People/Folders panes within it). Clamping to
+// the usable range is the renderer's job, same as galleryCellWidth.
+export function getNavbarWidth(): number | null {
+  const raw = getSetting('navbarWidth')
+  const parsed = raw ? Number(raw) : NaN
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export function setNavbarWidth(width: number): void {
+  setSetting('navbarWidth', String(width))
+}
+
 // Keyed by a stable panel id ('tags' | 'people' | 'folders'), not pane
 // index — index would silently mean something different if the panes are
 // ever reordered again. Missing key means expanded (the default).
@@ -310,6 +323,7 @@ export function getAllSettings(): AppSettings {
     dvdStudioName: getDvdStudioName(),
     artGalleryName: getArtGalleryName(),
     navbarSplitSizes: getNavbarSplitSizes(),
+    navbarWidth: getNavbarWidth(),
     navbarCollapsedPanels: getNavbarCollapsedPanels(),
     excludePatterns: getExcludePatterns(),
     excludedFolders: getExcludedFolders()

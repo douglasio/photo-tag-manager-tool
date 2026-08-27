@@ -57,6 +57,7 @@ function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
     dvdStudioName: 'Custom Studio',
     artGalleryName: 'Custom Gallery',
     navbarSplitSizes: null,
+    navbarWidth: null,
     navbarCollapsedPanels: { tags: true },
     excludePatterns: ['*.tmp'],
     excludedFolders: ['/skip'],

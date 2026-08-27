@@ -347,6 +347,13 @@ export function PhotoView({ photo }: PhotoViewProps): ReactElement {
             alt=""
             aria-hidden="true"
             pos="absolute"
+            // Mantine's Image defaults to width: 100% of its parent — maw/mah
+            // only cap max-width/max-height, they don't cancel that base
+            // width, so without w/h="auto" this probe was silently measuring
+            // the *container's* width instead of the photo's real rendered
+            // size, throwing off zoomToFit/zoomToNativeSize below.
+            w="auto"
+            h="auto"
             maw="none"
             mah="none"
             style={{ visibility: 'hidden' }}

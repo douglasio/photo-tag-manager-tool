@@ -61,6 +61,7 @@ export const NavbarSplitter = memo(function NavbarSplitter(): React.JSX.Element 
         orientation="vertical"
         withHandle={false}
         handleColor="var(--mantine-color-default-border)"
+        classNames={{ handle: 'navbar-splitter-handle' }}
         sizes={navbarSizes}
         onResizeStart={() => setIsResizingNavbar(true)}
         onResizeEnd={() => {

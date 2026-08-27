@@ -27,6 +27,17 @@ export const RECENT_TAGS_LIMIT = 3
 export const MAX_COMPARE_PHOTOS = 4
 export const MIN_COMPARE_PHOTOS = 2
 
+// Sidebar width bounds. The minimum keeps the folder tree's own indentation
+// plus row controls usable; the maximum stops the sidebar from crowding out
+// the gallery on smaller windows.
+export const DEFAULT_NAVBAR_WIDTH = 300
+export const MIN_NAVBAR_WIDTH = 200
+export const MAX_NAVBAR_WIDTH = 600
+
+export function clampNavbarWidth(width: number): number {
+  return Math.min(MAX_NAVBAR_WIDTH, Math.max(MIN_NAVBAR_WIDTH, Math.round(width)))
+}
+
 // Order-independent so opening the same set twice reuses the same tab.
 export function compareTabId(paths: string[]): string {
   return `compare:${[...paths].sort().join('::')}`
@@ -89,6 +100,9 @@ export interface PhotoLibraryState {
   // Percentage split of the navbar's Splitter panes — [tags, people, folders]
   // when People is shown, [tags, folders] otherwise; App.tsx defaults on mismatch.
   navbarSplitSizes: number[]
+  // The sidebar's overall width in px, distinct from navbarSplitSizes above
+  // (which only divides the panes within it). Drives AppShell's navbar width.
+  navbarWidth: number
   // Accordion-style collapse for the same panes, keyed by a stable panel id
   // ('tags' | 'people' | 'folders') rather than index — missing key means expanded.
   navbarCollapsedPanels: Record<string, boolean>
@@ -155,6 +169,7 @@ export const initialState: PhotoLibraryState = {
   showFilenames: true,
   showViewCounts: false,
   navbarSplitSizes: [50, 50],
+  navbarWidth: DEFAULT_NAVBAR_WIDTH,
   navbarCollapsedPanels: {},
   magazineTitle: 'TAG ME',
   newspaperTitle: 'The Tag Me Times',
@@ -210,6 +225,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_SHOW_FILENAMES'; value: boolean }
   | { type: 'SET_SHOW_VIEW_COUNTS'; value: boolean }
   | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: number[] }
+  | { type: 'SET_NAVBAR_WIDTH'; width: number }
   | { type: 'SET_NAVBAR_COLLAPSED_PANELS'; panels: Record<string, boolean> }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
@@ -272,12 +288,13 @@ export function photoLibraryReducer(
     // Batched startup settings load — gallerySort/navbarSplitSizes only
     // override when persisted (non-null), same as SET_SORT/SET_NAVBAR_SPLIT_SIZES.
     case 'SETTINGS_LOADED': {
-      const { gallerySort, navbarSplitSizes, ...rest } = action.settings
+      const { gallerySort, navbarSplitSizes, navbarWidth, ...rest } = action.settings
       return {
         ...state,
         ...rest,
         ...(gallerySort ? { sortBy: gallerySort.sortBy, sortOrder: gallerySort.sortOrder } : {}),
-        ...(navbarSplitSizes ? { navbarSplitSizes } : {})
+        ...(navbarSplitSizes ? { navbarSplitSizes } : {}),
+        ...(navbarWidth ? { navbarWidth: clampNavbarWidth(navbarWidth) } : {})
       }
     }
     case 'FOLDER_ADDED':
@@ -601,6 +618,8 @@ export function photoLibraryReducer(
       return { ...state, showViewCounts: action.value }
     case 'SET_NAVBAR_SPLIT_SIZES':
       return { ...state, navbarSplitSizes: action.sizes }
+    case 'SET_NAVBAR_WIDTH':
+      return { ...state, navbarWidth: clampNavbarWidth(action.width) }
     case 'SET_NAVBAR_COLLAPSED_PANELS':
       return { ...state, navbarCollapsedPanels: action.panels }
     case 'SET_MAGAZINE_TITLE':
