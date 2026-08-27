@@ -1,7 +1,8 @@
+import { memo, type ReactElement } from 'react'
+
 import { Badge, Blockquote, Box, Center, Group, Image, Stack, Text } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 import { IconAlertTriangle, IconMessage, IconPhoto } from '@tabler/icons-react'
-import type { ReactElement } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { RowComponentProps } from 'react-window'
 
@@ -9,7 +10,7 @@ import { GalleryHoverPreview, TagHoverCard } from '@components'
 import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useLibraryActions } from '@state'
 import { formatDateTaken, isPhotoDisplayable } from '@utils'
 
 import { PhotoContextMenu } from './PhotoContextMenu'
@@ -21,15 +22,45 @@ export interface GalleryListRowProps {
   onSelect: (path: string, event: ReactMouseEvent) => void
   previewTriggerHeld: boolean
   previewScale: number
+  // Passed as a prop (not read from context) so rows carry no gallery-context
+  // subscription — same reasoning as PhotoThumbnail's props.
+  animationsEnabled: boolean
 }
 
 const THUMB_SIZE = 140
 const COMMENT_COLUMN_WIDTH = 260
 
+// Mirrors GalleryPhotoCell's comparator: a selection change or single-photo
+// write re-renders only the affected rows, not every visible one.
+function rowPropsAreEqual(
+  prev: RowComponentProps<GalleryListRowProps>,
+  next: RowComponentProps<GalleryListRowProps>
+): boolean {
+  if (
+    prev.index !== next.index ||
+    prev.onSelect !== next.onSelect ||
+    prev.previewTriggerHeld !== next.previewTriggerHeld ||
+    prev.previewScale !== next.previewScale ||
+    prev.animationsEnabled !== next.animationsEnabled ||
+    prev.style.height !== next.style.height ||
+    prev.style.transform !== next.style.transform
+  ) {
+    return false
+  }
+  const photo = prev.photos[prev.index]
+  if (photo !== next.photos[next.index]) return false
+  const filePath = photo?.filePath
+  return (
+    (filePath === prev.selectedPath) === (filePath === next.selectedPath) &&
+    (filePath !== undefined && prev.selectedPaths.has(filePath)) ===
+      (filePath !== undefined && next.selectedPaths.has(filePath))
+  )
+}
+
 /** react-window row renderer for GalleryListView — one photo per row, as a
  * read-only summary (filename, comment, tags, date taken). Editing happens
  * by opening the photo itself, not inline here. */
-export function GalleryListRow({
+function GalleryListRowImpl({
   index,
   style,
   photos,
@@ -37,11 +68,12 @@ export function GalleryListRow({
   selectedPaths,
   onSelect,
   previewTriggerHeld,
-  previewScale
+  previewScale,
+  animationsEnabled
 }: RowComponentProps<GalleryListRowProps>): ReactElement {
-  const { state, openPhotoTab } = usePhotoLibrary()
+  const { openPhotoTab } = useLibraryActions()
   const prefersReducedMotion = useReducedMotion()
-  const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
+  const motionEnabled = animationsEnabled && !prefersReducedMotion
 
   const photo = photos[index]
   const canPreview = Boolean(previewTriggerHeld && photo && photo.thumbnailStatus === 'ready')
@@ -146,3 +178,9 @@ export function GalleryListRow({
     </div>
   )
 }
+
+// react-window's rowComponent type expects a plain function component — cast
+// back to that shape, same as GalleryPhotoCell.
+export const GalleryListRow = memo(GalleryListRowImpl, rowPropsAreEqual) as unknown as (
+  props: RowComponentProps<GalleryListRowProps>
+) => ReactElement

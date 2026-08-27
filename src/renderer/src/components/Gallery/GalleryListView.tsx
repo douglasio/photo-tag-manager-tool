@@ -59,7 +59,8 @@ export function GalleryListView({ photos }: GalleryListViewProps): ReactElement 
       selectedPaths: state.selectedPaths,
       onSelect: handleSelect,
       previewTriggerHeld,
-      previewScale
+      previewScale,
+      animationsEnabled: state.galleryAnimationsEnabled
     }),
     [
       photos,
@@ -67,7 +68,8 @@ export function GalleryListView({ photos }: GalleryListViewProps): ReactElement 
       state.selectedPaths,
       handleSelect,
       previewTriggerHeld,
-      previewScale
+      previewScale,
+      state.galleryAnimationsEnabled
     ]
   )
 
