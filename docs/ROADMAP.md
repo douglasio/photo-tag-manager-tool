@@ -14,17 +14,15 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 2. Corrupt photo finder
 
-3. Search -- implement spotlight search using Mantine `Spotlight`. Searchable fields should include tags, filename, and comments. Notes toward a plan:
-   - Storage: SQLite FTS5 virtual table in the main process, kept in sync by triggers (or by the existing ingest/tag-write paths), rather than filtering in the renderer — the renderer only holds `photosByPath` for the current session, and scanning it per keystroke won't hold up on a large library.
-   - Needs a schema migration in `db/database.ts` plus a backfill for existing libraries.
-   - Results should be grouped by kind (photo / tag / person / folder) and selecting one should drive the existing selection actions, not a new navigation path.
-   - As a future enhancement, an AI-based search that can match photo contents or faces — see AI #1, which is designed to slot into the same Spotlight UI.
+3. Search -- implement faceted spotlight search using Mantine `Spotlight`. See **SEARCH_PLAN.md** for the full plan (revised after review: **index-free scan engine, no FTS5/triggers/migration in v1** — the corpus is small enough to scan per keystroke, benchmarked at ~50ms even at 100k photos; FTS5 is a documented escalation path behind the same repository seam). Entry: header search icon + `Cmd/Ctrl+F`. Facets: filename/comment/folder as substring text, `tag:`/`person:` as exact set filters, plus date/camera/views/`is:untagged` structured filters — typed flags and UI chips drive the same parsed state. Includes "Show all results in Gallery" (Picasa-style grid filtering), since a 7-row modal is no home for 400 matches. Repeated `person:` flags intersect, so "person:joe person:mary before:2020" already works in v1. Commands and search history deliberately held out.
 
-4. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
+4. Compound facet search — Graph-search-style composition beyond v1's conjunctions. v1 already handles AND-of-facets ("photos of Joe and Mary before 2020"); what remains is OR/grouping (AST becomes an expression tree — cheap under the scan engine, which evaluates JS predicates rather than building query strings), facet-count-aware ranking, and a natural-language layer that lowers onto the same AST. See SEARCH_PLAN.md's "Compound facet search" section.
 
-5. Make all 'Enable AI features' buttons use the gradient variant.
+5. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
 
-6. Video support?
+6. Make all 'Enable AI features' buttons use the gradient variant.
+
+7. Video support?
 
 ## Application Management
 
@@ -40,15 +38,15 @@ Making Tag Me feel like a real installable desktop app rather than a dev build.
 
 ## AI
 
-1. Natural-language semantic search over the existing CLIP embeddings ("dog on a beach"). The embedding table and the similarity worker already exist for duplicate detection and Throwback — this reuses them by embedding the query text instead of a photo. Highest-leverage AI item because it shares the Spotlight UI from Shell #3.
+1. Natural-language semantic search over the existing CLIP embeddings ("dog on a beach"). The embedding table and the similarity worker already exist for duplicate detection and Throwback — this reuses them by embedding the query text instead of a photo. Highest-leverage AI item because it slots behind Shell #3's search repository seam as another result source, sharing the same Spotlight UI.
 
 2. Auto-album / event clustering. Group photos into events by combining capture time gaps with embedding similarity — closer to Picasa's implicit "shoots" than the current folder-only grouping.
 
-3. Smarter tag suggestions. Today suggestions score against a fixed candidate label set; scoring against the user's own existing tag vocabulary would make them fit the library instead of a generic ontology.
+3. Tag suggestion cold start. Suggestions already score against the user's own vocabulary (`useTagSuggestions` passes `allTags` as the candidate labels), which is the right default — but it means the feature can only ever re-suggest tags that already exist, and does nothing at all until the library has some. Worth a seed vocabulary, or a way to propose genuinely new tags, for a library that hasn't been tagged yet.
 
 4. Best-of-burst selection. Rank near-duplicate groups (already detected) by sharpness/exposure/eyes-open so the Duplicates view can recommend which to keep rather than only which are similar.
 
-5. OCR pass for photos containing text (signs, documents, screenshots), feeding the same search index as Shell #3.
+5. OCR pass for photos containing text (signs, documents, screenshots), stored as a new `ocrText` column on photos and scanned by Shell #3's search engine like any other text field.
 
 Note: any new face/vision model needs a license check first — InsightFace's SCRFD/ArcFace weights are non-commercial-only and were already ruled out once.
 
