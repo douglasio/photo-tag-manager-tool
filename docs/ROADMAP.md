@@ -108,7 +108,7 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Shell (follow-ups)
 
-1. Persist the window's size and position. `main/index.ts` always opens at 80% of the primary display, centered, so every relaunch forgets whatever the user last set. `electron-window-state` is the conventional library, or a manual save-on-resize/move into the existing settings table.
+1. ~~Persist the window's size and position. `main/index.ts` always opens at 80% of the primary display, centered, so every relaunch forgets whatever the user last set. `electron-window-state` is the conventional library, or a manual save-on-resize/move into the existing settings table.~~ Done, via the settings table rather than `electron-window-state` (unmaintained since 2019, and a separate JSON file wouldn't travel with database export/import). `services/windowStateService.ts` — debounced save on move/resize/maximize with a synchronous flush on close, and a pure `resolveWindowBounds` that discards a saved position whose display is gone or that overlaps the screen too marginally to grab.
 
 ## Optimization
 

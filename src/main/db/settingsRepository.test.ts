@@ -211,3 +211,28 @@ describe('getAllSettings', () => {
     expect(all.excludePatterns).toEqual([])
   })
 })
+
+describe('getWindowState', () => {
+  it('round-trips a full window state, defaulting to null when unset', () => {
+    createFakeDb()
+    expect(settings.getWindowState()).toBeNull()
+
+    const state = { x: 10, y: 20, width: 1600, height: 1000, maximized: true }
+    settings.setWindowState(state)
+    expect(settings.getWindowState()).toEqual(state)
+  })
+
+  it('rejects malformed or partial state rather than restoring a broken window', () => {
+    const { store } = createFakeDb()
+
+    store.set('windowState', 'not json')
+    expect(settings.getWindowState()).toBeNull()
+
+    // Missing height — enough to open a window with an undefined dimension.
+    store.set('windowState', JSON.stringify({ x: 1, y: 2, width: 3, maximized: false }))
+    expect(settings.getWindowState()).toBeNull()
+
+    store.set('windowState', JSON.stringify({ x: 1, y: 2, width: 3, height: 4 }))
+    expect(settings.getWindowState()).toBeNull()
+  })
+})

@@ -4,7 +4,7 @@ import { join } from 'path'
 
 // eslint-disable-next-line no-restricted-imports -- resources/ lives outside src/, so no alias covers it
 import icon from '../../resources/icon.png?asset'
-import { getFolders } from './db/settingsRepository'
+import { getFolders, getWindowState } from './db/settingsRepository'
 import { registerAiHandlers } from './ipc/aiHandlers'
 import { registerDialogHandlers } from './ipc/dialogHandlers'
 import { registerFaceHandlers } from './ipc/faceHandlers'
@@ -22,6 +22,12 @@ import {
 } from './protocols/thumbProtocol'
 import { shutdownExifTool } from './services/metadataService'
 import { setWatchTarget, unwatchAllFolders, watchFolder } from './services/watchManager'
+import {
+  MIN_WINDOW_HEIGHT,
+  MIN_WINDOW_WIDTH,
+  resolveWindowBounds,
+  trackWindowState
+} from './services/windowStateService'
 
 app.setName('Tag Me')
 
@@ -34,12 +40,14 @@ if (!app.requestSingleInstanceLock()) {
   let mainWindow: BrowserWindow | null = null
 
   function createWindow(): void {
-    const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
+    const { maximized, ...bounds } = resolveWindowBounds(
+      getWindowState(),
+      screen.getPrimaryDisplay().workArea,
+      screen.getAllDisplays().map((display) => display.workArea)
+    )
 
     mainWindow = new BrowserWindow({
-      width: Math.round(screenWidth * 0.8),
-      height: Math.round(screenHeight * 0.8),
-      center: true,
+      ...bounds,
       show: false,
       autoHideMenuBar: true,
       ...(process.platform === 'linux' ? { icon } : {}),
@@ -49,7 +57,11 @@ if (!app.requestSingleInstanceLock()) {
       }
     })
 
-    mainWindow.setMinimumSize(1100, 780)
+    mainWindow.setMinimumSize(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
+    // Maximize before first paint so the window never flashes at its restored
+    // size on the way to full screen.
+    if (maximized) mainWindow.maximize()
+    trackWindowState(mainWindow)
 
     mainWindow.on('ready-to-show', () => {
       mainWindow?.show()

@@ -136,6 +136,17 @@ export interface AppSettings {
   excludedFolders: string[]
 }
 
+// The main window's persisted geometry. Deliberately absent from AppSettings
+// above — the renderer never reads or writes it; the main process restores it
+// before the window exists and saves it as the user drags/resizes.
+export interface WindowState {
+  x: number
+  y: number
+  width: number
+  height: number
+  maximized: boolean
+}
+
 export interface MoveProgressEvent {
   completed: number
   total: number

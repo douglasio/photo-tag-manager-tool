@@ -1,4 +1,10 @@
-import type { AppSettings, DefaultView, GallerySort, GalleryViewMode } from '@shared/types'
+import type {
+  AppSettings,
+  DefaultView,
+  GallerySort,
+  GalleryViewMode,
+  WindowState
+} from '@shared/types'
 
 import { getDb } from './database'
 
@@ -282,6 +288,36 @@ export function getNavbarWidth(): number | null {
 
 export function setNavbarWidth(width: number): void {
   setSetting('navbarWidth', String(width))
+}
+
+// The main window's last position/size, so a relaunch reopens where the user
+// left it. Stored here rather than in a separate file (the `electron-window-
+// state` convention) so it travels with the existing settings table through
+// database export/import. Whether the saved rect is still usable — the
+// display it was on may be gone — is decided at launch by
+// resolveWindowBounds, not here.
+export function getWindowState(): WindowState | null {
+  const raw = getSetting('windowState')
+  if (!raw) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return isWindowState(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+export function setWindowState(state: WindowState): void {
+  setSetting('windowState', JSON.stringify(state))
+}
+
+function isWindowState(value: unknown): value is WindowState {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Record<string, unknown>
+  return (
+    ['x', 'y', 'width', 'height'].every((key) => Number.isFinite(candidate[key])) &&
+    typeof candidate.maximized === 'boolean'
+  )
 }
 
 // Keyed by a stable panel id ('tags' | 'people' | 'folders'), not pane
