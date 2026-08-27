@@ -5,11 +5,10 @@ import { Stack, Text } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 
 import { GalleryHoverPreview } from '@components'
-import { useKeyHeld } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { useGalleryLibrary, useLibraryActions } from '@state'
-import { PREVIEW_TRIGGER_KEY } from '@utils'
+import { useGalleryLibrary, useLibraryActions, usePreviewTriggerHeld } from '@state'
+import { isPhotoDisplayable } from '@utils'
 
 import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
 
@@ -133,7 +132,7 @@ export function makeImageBarShape(
 export function TopViewedWidget(): ReactElement {
   const { state, activePhotosByPath } = useGalleryLibrary()
   const { openPhotoTab } = useLibraryActions()
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
   const [hover, setHover] = useState<HoverState | null>(null)
@@ -166,9 +165,7 @@ export function TopViewedWidget(): ReactElement {
   const viewedPhotos = useMemo(
     () =>
       Array.from(activePhotosByPath.values())
-        .filter(
-          (photo) => photo.viewCount > 0 && photo.thumbnailStatus === 'ready' && photo.thumbnailKey
-        )
+        .filter((photo) => photo.viewCount > 0 && isPhotoDisplayable(photo))
         .sort((a, b) => b.viewCount - a.viewCount)
         .slice(0, TOP_COUNT),
     [activePhotosByPath]

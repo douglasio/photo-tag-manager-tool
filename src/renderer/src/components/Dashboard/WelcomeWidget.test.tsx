@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 const mockSetActiveTab = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     setActiveTab: mockSetActiveTab
   })

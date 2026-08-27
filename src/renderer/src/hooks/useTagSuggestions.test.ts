@@ -5,6 +5,7 @@ let mockAllTags: string[]
 const mockSuggestTags = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     allTags: mockAllTags,
     suggestTags: mockSuggestTags

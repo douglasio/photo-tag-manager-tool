@@ -111,7 +111,12 @@ if (!app.requestSingleInstanceLock()) {
     }
 
     app.on('activate', function () {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow()
+        // Watcher events were pointed at the previous (now destroyed)
+        // window's webContents — re-target them at the new one.
+        if (mainWindow) setWatchTarget(mainWindow.webContents)
+      }
     })
   })
 

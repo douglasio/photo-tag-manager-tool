@@ -183,7 +183,8 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
       previewTriggerHeld,
       previewScale,
       showFilenames: state.showFilenames,
-      showViewCounts: state.showViewCounts
+      showViewCounts: state.showViewCounts,
+      animationsEnabled: state.galleryAnimationsEnabled
     }),
     [
       photos,
@@ -196,7 +197,8 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
       previewTriggerHeld,
       previewScale,
       state.showFilenames,
-      state.showViewCounts
+      state.showViewCounts,
+      state.galleryAnimationsEnabled
     ]
   )
 

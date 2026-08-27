@@ -6,11 +6,11 @@ import { IconArrowRight } from '@tabler/icons-react'
 import { AnimatePresence, motion } from 'motion/react'
 
 import { GalleryHoverPreview, PhotoGradientOverlay, SuggestedTagsRow, TagList } from '@components'
-import { useHoverPreview, useKeyHeld, useTagSuggestions } from '@hooks'
+import { useHoverPreview, useTagSuggestions } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
-import { pickRandom, PREVIEW_TRIGGER_KEY } from '@utils'
+import { usePhotoLibrary, usePreviewTriggerHeld } from '@state'
+import { isPhotoDisplayable, pickRandom } from '@utils'
 
 import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
 
@@ -24,10 +24,7 @@ function pickUntagged(
 ): string | null {
   const candidates = Array.from(photosByPath.values()).filter(
     (photo) =>
-      photo.tags.length === 0 &&
-      photo.thumbnailStatus === 'ready' &&
-      photo.thumbnailKey &&
-      photo.filePath !== excludePath
+      photo.tags.length === 0 && isPhotoDisplayable(photo) && photo.filePath !== excludePath
   )
   if (candidates.length === 0) return null
   return pickRandom(candidates).filePath
@@ -37,12 +34,20 @@ export function TagThisPhotoWidget(): ReactElement {
   const { state, activePhotosByPath, allTags, updateTags } = usePhotoLibrary()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
 
   const [currentPath, setCurrentPath] = useState<string | null>(() =>
     pickUntagged(activePhotosByPath, null)
   )
   const currentPhoto = currentPath ? (activePhotosByPath.get(currentPath) ?? null) : null
+  // Re-pick during render whenever there's no showable photo but an untagged
+  // candidate exists — photos streaming in after mount (startup scan, folder
+  // watcher) or the current pick being deleted would otherwise leave the
+  // widget stuck on its empty message. Mirrors FeaturedTagWidget's pattern.
+  if (!currentPhoto) {
+    const picked = pickUntagged(activePhotosByPath, currentPath)
+    if (picked) setCurrentPath(picked)
+  }
   const canPreview = previewTriggerHeld && currentPhoto?.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
   const previewScale = useDashboardPreviewScale()

@@ -6,10 +6,9 @@ import { useReducedMotion } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { IconEye } from '@tabler/icons-react'
 
-import { useKeyHeld } from '@hooks'
 import type { PersonRecord, PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
-import { pickRandom, PREVIEW_TRIGGER_KEY, shuffle } from '@utils'
+import { usePhotoLibrary, usePreviewTriggerHeld } from '@state'
+import { isPhotoDisplayable, pickRandom, shuffle } from '@utils'
 
 import { PhotoCollageTile } from './PhotoCollageTile'
 
@@ -53,10 +52,7 @@ function pickRandomCollagePaths(
 ): string[] {
   const candidates = Array.from(photoPaths ?? [])
     .map((path) => photosByPath.get(path))
-    .filter(
-      (photo): photo is PhotoRecord =>
-        photo != null && photo.thumbnailStatus === 'ready' && !!photo.thumbnailKey
-    )
+    .filter((photo): photo is PhotoRecord => photo != null && isPhotoDisplayable(photo))
   return shuffle(candidates)
     .slice(0, count)
     .map((photo) => photo.filePath)
@@ -88,7 +84,7 @@ export function FeaturedPersonWidget(): ReactElement {
     setActiveTab,
     setSettingsModalOpened
   } = usePhotoLibrary()
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
@@ -159,7 +155,6 @@ export function FeaturedPersonWidget(): ReactElement {
       if (!hasShownReadyToastRef.current) {
         hasShownReadyToastRef.current = true
         notifications.show({
-          allowClose: true,
           autoClose: 10000,
           color: 'teal',
           message: `${person.name} now has enough photos to be featured on the Dashboard!`,
@@ -190,7 +185,7 @@ export function FeaturedPersonWidget(): ReactElement {
       })
     }
     lastActiveIndexRef.current = activeIndex
-  }, [activeIndex, person, state.activeTab, setActiveTab])
+  }, [activeIndex, person, setActiveTab])
 
   if (person) {
     return (

@@ -7,6 +7,7 @@ import { IconEye, IconPhoto } from '@tabler/icons-react'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { useSidebarLibrary } from '@state'
+import { isPhotoDisplayable } from '@utils'
 
 const HOVER_DELAY_MS = 700
 const CARD_WIDTH = 320
@@ -39,7 +40,7 @@ export function TagHoverCardBody({
   photoCount,
   viewCount
 }: TagHoverCardBodyProps): ReactElement {
-  const hasCoverImage = coverPhoto?.thumbnailStatus === 'ready' && !!coverPhoto.thumbnailKey
+  const hasCoverImage = coverPhoto != null && isPhotoDisplayable(coverPhoto)
 
   return (
     <Card w={CARD_WIDTH} padding="sm">

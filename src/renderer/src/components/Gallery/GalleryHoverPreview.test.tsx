@@ -6,6 +6,7 @@ import type { PhotoRecord } from '@shared/types'
 
 const mockIncrementViewCount = vi.fn()
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({ incrementViewCount: mockIncrementViewCount })
 }))
 

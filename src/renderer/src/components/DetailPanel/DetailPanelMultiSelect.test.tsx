@@ -13,6 +13,7 @@ const mockAddTagsToSelection = vi.fn()
 const mockRemoveTagsFromSelection = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     state: {
       photosByPath: mockPhotosByPath,

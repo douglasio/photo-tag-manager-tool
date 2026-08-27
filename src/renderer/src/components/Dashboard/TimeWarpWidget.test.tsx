@@ -14,11 +14,11 @@ const mockEnableAiFeatures = vi.fn()
 const mockOpenPhotoTab = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     state: {
       photosByPath: mockPhotosByPath,
       aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled,
-      aiScanProgress: mockAiScanProgress,
       excludedFolders: mockExcludedFolders
     },
     activePhotosByPath: mockPhotosByPath,
@@ -26,7 +26,8 @@ vi.mock('@state', () => ({
     getThrowbackPreview: mockGetThrowbackPreview,
     enableAiFeatures: mockEnableAiFeatures,
     openPhotoTab: mockOpenPhotoTab
-  })
+  }),
+  useScanProgress: () => ({ aiScanProgress: mockAiScanProgress, faceScanProgress: null })
 }))
 
 import { TimeWarpWidget } from './TimeWarpWidget'

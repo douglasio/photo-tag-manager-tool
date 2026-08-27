@@ -18,8 +18,8 @@ import { FileNameField } from '@components'
 import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
-import { ACTION_ICONS, PREVIEW_TRIGGER_KEY } from '@utils'
+import { useLibraryActions } from '@state'
+import { ACTION_ICONS, isPhotoDisplayable, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { GalleryHoverPreview } from './GalleryHoverPreview'
 
@@ -27,6 +27,12 @@ interface PhotoThumbnailProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onS
   photo: PhotoRecord
   selected: boolean
   multiSelected: boolean
+  // The full multi-selection set, for the drag payload below. Passed as a
+  // prop (not read from context) so this component has no gallery-context
+  // subscription — per-cell subscriptions defeat GalleryPhotoCell's memo.
+  selectedPaths: Set<string>
+  // Gallery animations setting, passed down for the same no-subscription reason.
+  animationsEnabled: boolean
   onSelect: (path: string, event: MouseEvent) => void
   renaming: boolean
   onStartRename: () => void
@@ -48,6 +54,8 @@ export function PhotoThumbnail({
   photo,
   selected,
   multiSelected,
+  selectedPaths,
+  animationsEnabled,
   onSelect,
   renaming,
   onStartRename,
@@ -61,17 +69,17 @@ export function PhotoThumbnail({
   ...rest
 }: PhotoThumbnailProps): ReactElement {
   const theme = useMantineTheme()
-  const { openPhotoTab, state } = usePhotoLibrary()
+  const { openPhotoTab } = useLibraryActions()
   const prefersReducedMotion = useReducedMotion()
-  const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
+  const motionEnabled = animationsEnabled && !prefersReducedMotion
   const canPreview = previewTriggerHeld && photo.thumbnailStatus === 'ready'
   const { position, onMouseMove, onMouseLeave } = useHoverPreview(canPreview)
 
   // Drag carries the whole multi-selection if this photo is part of it,
   // otherwise just this one — same convention as the right-click menu.
   const dragPaths =
-    state.selectedPaths.has(photo.filePath) && state.selectedPaths.size > 1
-      ? Array.from(state.selectedPaths)
+    selectedPaths.has(photo.filePath) && selectedPaths.size > 1
+      ? Array.from(selectedPaths)
       : [photo.filePath]
 
   // Pointer-based (not native HTML5 drag), so the ghost that follows the
@@ -113,7 +121,7 @@ export function PhotoThumbnail({
             w="100%"
             style={{ cursor: canPreview ? 'zoom-in' : undefined }}
           >
-            {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
+            {isPhotoDisplayable(photo) ? (
               <AspectRatio ratio={1} style={{ overflow: 'hidden' }}>
                 <Image
                   src={toThumbProtocolUrl(photo.thumbnailKey)}

@@ -10,7 +10,7 @@ import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { formatDateTaken } from '@utils'
+import { formatDateTaken, isPhotoDisplayable } from '@utils'
 
 import { PhotoContextMenu } from './PhotoContextMenu'
 
@@ -54,7 +54,7 @@ export function GalleryListRow({
 
   return (
     <div style={style}>
-      <PhotoContextMenu photo={photo} onRename={() => openPhotoTab(photo.filePath)}>
+      <PhotoContextMenu photo={photo}>
         <Box
           p="md"
           bg={
@@ -76,7 +76,7 @@ export function GalleryListRow({
               onMouseMove={onMouseMove}
               onMouseLeave={onMouseLeave}
             >
-              {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
+              {isPhotoDisplayable(photo) ? (
                 <Image
                   src={toThumbProtocolUrl(photo.thumbnailKey)}
                   alt={photo.fileName}

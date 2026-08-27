@@ -30,7 +30,7 @@ import {
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, TagGroup } from '@shared/types'
 import { useActiveDragKind, useLibraryActions, useSidebarLibrary } from '@state'
-import { activeHoverBackground, PREVIEW_TRIGGER_KEY } from '@utils'
+import { activeHoverBackground, isPhotoDisplayable, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { TagContextMenu } from './TagContextMenu'
 import { TagDeleteDialog } from './TagDeleteDialog'
@@ -273,8 +273,8 @@ const TagListItemView = memo(function TagListItemView({
             }
           }}
           leftSection={
-            coverPhoto?.thumbnailStatus === 'ready' &&
-            coverPhoto.thumbnailKey && (
+            coverPhoto != null &&
+            isPhotoDisplayable(coverPhoto) && (
               <AspectRatio ratio={1 / 1}>
                 <Image
                   src={toThumbProtocolUrl(coverPhoto.thumbnailKey)}
@@ -289,7 +289,11 @@ const TagListItemView = memo(function TagListItemView({
             <>
               {!editing && (
                 <Tooltip label="Rename tag">
+                  {/* div, not a nested <button> — this sits inside the row's
+                      Button, and button-in-button is invalid HTML */}
                   <ActionIcon
+                    component="div"
+                    role="button"
                     opacity={hovered ? 0.7 : 0}
                     style={{ flexShrink: 0 }}
                     onClick={(event) => {

@@ -13,6 +13,7 @@ const mockUpdateTags = vi.fn()
 const mockSuggestTags = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     state: {
       photosByPath: mockPhotosByPath,
@@ -133,14 +134,30 @@ describe('TagThisPhotoWidget', () => {
     expect(screen.getByText('Every photo is tagged — nice work!')).toBeInTheDocument()
   })
 
-  it('falls back to the empty state after skipping the only untagged photo', async () => {
+  it('re-shows the only untagged photo after skipping it, rather than claiming all are tagged', async () => {
     const user = userEvent.setup()
     setLibrary([makePhoto('/a.jpg', { tags: [] })])
     renderWidget()
 
     await user.click(screen.getByRole('button', { name: 'Skip' }))
 
-    expect(screen.getByText('Every photo is tagged — nice work!')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
+    expect(screen.queryByText('Every photo is tagged — nice work!')).not.toBeInTheDocument()
+  })
+
+  it('picks up an untagged photo that arrives after mount (e.g. startup scan streaming in)', () => {
+    setLibrary([])
+    const { rerender } = renderWidget()
+    expect(screen.getByText('Add some photos to start tagging!')).toBeInTheDocument()
+
+    mockPhotosByPath = new Map([['/late.jpg', makePhoto('/late.jpg', { tags: [] })]])
+    rerender(
+      <MantineProvider>
+        <TagThisPhotoWidget />
+      </MantineProvider>
+    )
+
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument()
   })
 
   it('swaps Skip for "Tag another" once the current photo picks up a tag', () => {

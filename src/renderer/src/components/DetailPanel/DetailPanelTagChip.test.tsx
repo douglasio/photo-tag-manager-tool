@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 // Rendered via the real TagHoverCard (not mocked) — it just needs a
 // tagDescriptions map to read from.
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     state: { tagDescriptions: new Map() },
     tagCounts: new Map(),

@@ -6,7 +6,7 @@ import { PhotoGradientOverlay, TagHoverCard } from '@components'
 import { RADIUS_SIZE } from '@renderer/theme'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { PREVIEW_TRIGGER_KEY } from '@utils'
+import { isPhotoDisplayable, PREVIEW_TRIGGER_KEY } from '@utils'
 
 interface TagGridTileProps {
   tag: string
@@ -31,7 +31,7 @@ export function TagGridTile({
   draggable,
   onSelect
 }: TagGridTileProps): ReactElement {
-  const hasThumbnail = coverPhoto?.thumbnailStatus === 'ready' && coverPhoto.thumbnailKey
+  const hasThumbnail = coverPhoto != null && isPhotoDisplayable(coverPhoto)
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `tag-drag:${tag}`,
     data: { tag },

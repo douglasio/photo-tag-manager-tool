@@ -10,6 +10,7 @@ const mockSetUntaggedFilter = vi.fn()
 const mockSetActiveTab = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     activePhotosByPath: mockPhotosByPath,
     untaggedCount: Array.from(mockPhotosByPath.values()).filter((photo) => photo.tags.length === 0)

@@ -2,6 +2,7 @@ import { AppLayout, StartupLoadingScreen } from '@components'
 
 import { PhotoLibraryProvider } from './state/PhotoLibraryContext'
 import { useGalleryLibrary } from './state/PhotoLibraryGalleryContext'
+import { PreviewTriggerProvider } from './state/PreviewTriggerContext'
 
 // Kept separate from AppLayout so its hooks (keyboard shortcuts, drag sensors) are never
 // conditionally skipped when initialLoadComplete flips.
@@ -13,7 +14,9 @@ export function AppGate(): React.JSX.Element {
 function App(): React.JSX.Element {
   return (
     <PhotoLibraryProvider>
-      <AppGate />
+      <PreviewTriggerProvider>
+        <AppGate />
+      </PreviewTriggerProvider>
     </PhotoLibraryProvider>
   )
 }

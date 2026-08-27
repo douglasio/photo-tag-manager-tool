@@ -199,7 +199,11 @@ const PersonRow = memo(function PersonRow({
             <>
               {!editing && (
                 <Tooltip label="Rename person">
+                  {/* div, not a nested <button> — this sits inside the row's
+                      Button, and button-in-button is invalid HTML */}
                   <ActionIcon
+                    component="div"
+                    role="button"
                     opacity={hovered ? 0.7 : 0}
                     style={{ flexShrink: 0 }}
                     onClick={(event) => {

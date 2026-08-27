@@ -16,6 +16,7 @@ const mockSetActiveTab = vi.fn()
 const mockSetSettingsModalOpened = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     state: { photosByPath: mockPhotosByPath, tagDescriptions: mockTagDescriptions },
     activePhotosByPath: mockPhotosByPath,

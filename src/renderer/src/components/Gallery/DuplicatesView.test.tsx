@@ -14,10 +14,10 @@ const mockOpenPhotoTab = vi.fn()
 const mockShowItemInFolder = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     state: {
       aiTagSuggestionsEnabled: mockAiTagSuggestionsEnabled,
-      aiScanProgress: null,
       galleryAnimationsEnabled: false,
       photosByPath: mockPhotosByPath
     },
@@ -28,7 +28,8 @@ vi.mock('@state', () => ({
     dismissDuplicateGroup: mockDismissDuplicateGroup,
     deletePhotos: mockDeletePhotos,
     incrementViewCount: vi.fn()
-  })
+  }),
+  useScanProgress: () => ({ aiScanProgress: null, faceScanProgress: null })
 }))
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {

@@ -14,6 +14,7 @@ const mockGetFacesForPhoto = vi.fn<() => Promise<FaceRecord[]>>().mockResolvedVa
 const mockUnassignFace = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     openPhotoTab: vi.fn(),
     allTags: [],

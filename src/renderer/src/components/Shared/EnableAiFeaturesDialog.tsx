@@ -4,7 +4,7 @@ import { Progress, Stack, Text } from '@mantine/core'
 
 import { ConfirmDialog } from '@components'
 import type { AiScanResult } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { useScanProgress } from '@state'
 
 interface EnableAiFeaturesDialogProps {
   opened: boolean
@@ -23,9 +23,9 @@ export function EnableAiFeaturesDialog({
   onCancel,
   onConfirm
 }: EnableAiFeaturesDialogProps): ReactElement {
-  const { state } = usePhotoLibrary()
+  const { aiScanProgress } = useScanProgress()
   const [error, setError] = useState<string | null>(null)
-  const downloading = state.aiScanProgress?.phase === 'downloading'
+  const downloading = aiScanProgress?.phase === 'downloading'
   // Tracks whether *this* dialog actually kicked off a download, so the
   // close-on-transition effect below can't fire the instant the dialog
   // opens (when aiScanProgress is still null from a previous, unrelated
@@ -83,11 +83,11 @@ export function EnableAiFeaturesDialog({
         This downloads a small on-device model (~50-90MB) the first time, then scans your library.
         It may take a while. AI features can be disabled at any time from the Settings menu.
       </Text>
-      {downloading && state.aiScanProgress && (
+      {downloading && aiScanProgress && (
         <Stack gap={4} mt="sm">
-          <Progress value={state.aiScanProgress.done} animated />
+          <Progress value={aiScanProgress.done} animated />
           <Text size="xs" c="dimmed">
-            Downloading model… {Math.round(state.aiScanProgress.done)}%
+            Downloading model… {Math.round(aiScanProgress.done)}%
           </Text>
         </Stack>
       )}

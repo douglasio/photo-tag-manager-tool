@@ -4,11 +4,11 @@ import { Image, SimpleGrid, Text, UnstyledButton } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
 
 import { GalleryHoverPreview, PhotoGradientOverlay } from '@components'
-import { useHoverPreview, useKeyHeld } from '@hooks'
+import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
-import { useGalleryLibrary, useLibraryActions } from '@state'
-import { PREVIEW_TRIGGER_KEY } from '@utils'
+import { useGalleryLibrary, useLibraryActions, usePreviewTriggerHeld } from '@state'
+import { isPhotoDisplayable, PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
 
@@ -74,16 +74,14 @@ function RecentTile({
 export function RecentlyAddedWidget(): ReactElement {
   const { state, activePhotosByPath } = useGalleryLibrary()
   const { openPhotoTab } = useLibraryActions()
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
   const recentPhotos = useMemo(
     () =>
       Array.from(activePhotosByPath.values())
-        .filter(
-          (photo) => photo.thumbnailStatus === 'ready' && photo.thumbnailKey && photo.firstSeenAt
-        )
+        .filter((photo) => isPhotoDisplayable(photo) && photo.firstSeenAt)
         .sort((a, b) => (b.firstSeenAt ?? 0) - (a.firstSeenAt ?? 0))
         .slice(0, RECENT_COUNT),
     [activePhotosByPath]

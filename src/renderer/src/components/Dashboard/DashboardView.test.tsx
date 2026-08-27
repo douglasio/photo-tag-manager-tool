@@ -10,6 +10,7 @@ let mockStatus: string
 const mockAddFolder = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     activePhotosByPath: mockPhotosByPath,
     addFolder: mockAddFolder,

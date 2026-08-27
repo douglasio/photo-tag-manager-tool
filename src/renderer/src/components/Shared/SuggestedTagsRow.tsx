@@ -43,7 +43,7 @@ export function SuggestedTagsRow({
               <motion.div
                 key={suggestion.tag}
                 layout={motionEnabled}
-                exit={motionEnabled ? { scale: 2, opacity: 0, filter: 'blur(5)' } : undefined}
+                exit={motionEnabled ? { scale: 2, opacity: 0, filter: 'blur(5px)' } : undefined}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
               >
                 <TagHoverCard tag={suggestion.tag}>

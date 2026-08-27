@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 const mockSetPeoplePanelGridView = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   useSidebarLibrary: () => ({
     state: { peoplePanelGridView: false }
   }),

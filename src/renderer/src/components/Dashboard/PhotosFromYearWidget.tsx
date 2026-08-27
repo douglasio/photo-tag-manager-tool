@@ -14,10 +14,10 @@ import {
 import { useReducedMotion } from '@mantine/hooks'
 
 import { GalleryHoverPreview } from '@components'
-import { useHoverPreview, useKeyHeld } from '@hooks'
+import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, ThrowbackYearSample } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { usePhotoLibrary, usePreviewTriggerHeld } from '@state'
 import { PREVIEW_TRIGGER_KEY } from '@utils'
 
 import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
@@ -87,7 +87,7 @@ function YearTile({
 // whether AI features (and Time Warp's cross-year similarity) are enabled.
 export function PhotosFromYearWidget(): ReactElement {
   const { state, activePhotosByPath, getThrowbackYearSample, openPhotoTab } = usePhotoLibrary()
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
   const [loading, setLoading] = useState(true)

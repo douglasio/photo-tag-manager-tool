@@ -27,9 +27,6 @@ export function DetailPanelTags({ photo, onOpenQuickTag }: DetailPanelTagsProps)
         <ActionIcon variant="filled" aria-label="Quick tag" onClick={onOpenQuickTag}>
           <IconTagPlus size={ACTION_ICONS.ICON_SIZE} />
         </ActionIcon>
-        {/* <Button variant="outline" size="compact-sm" title="quick tag" >
-
-        </Button> */}
       </Group>
       <SuggestedTagsRow
         suggestions={suggestions}

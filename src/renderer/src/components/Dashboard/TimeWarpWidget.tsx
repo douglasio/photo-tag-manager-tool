@@ -16,11 +16,10 @@ import {
 import { useReducedMotion } from '@mantine/hooks'
 
 import { EnableAiFeaturesDialog, GalleryHoverPreview } from '@components'
-import { useHoverPreview, useKeyHeld } from '@hooks'
+import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord, ThrowbackEntry } from '@shared/types'
-import { usePhotoLibrary } from '@state'
-import { PREVIEW_TRIGGER_KEY } from '@utils'
+import { usePhotoLibrary, usePreviewTriggerHeld, useScanProgress } from '@state'
 
 import { useDashboardPreviewScale } from './DashboardPreviewZoomContext'
 
@@ -80,7 +79,7 @@ function TimelinePhotoTile({
 // a vertical Timeline doesn't stretch oddly across the widget's full width.
 function ThrowbackTimeline({ entries }: ThrowbackTimelineProps): ReactElement {
   const { state, activePhotosByPath, openPhotoTab } = usePhotoLibrary()
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
@@ -124,7 +123,7 @@ export function TimeWarpWidget(): ReactElement {
   const [previewEntries, setPreviewEntries] = useState<ThrowbackEntry[] | null>(null)
   const [enableAiOpened, setEnableAiOpened] = useState(false)
   const hasLoadedOnceRef = useRef(false)
-  const scanning = state.aiScanProgress !== null
+  const scanning = useScanProgress().aiScanProgress !== null
   // Tracks the `scanning` value and excludedFolders reference as of the
   // last actual fetch, so a Dashboard tab revisit (which re-runs this
   // effect without either truly changing) can be told apart from a genuine

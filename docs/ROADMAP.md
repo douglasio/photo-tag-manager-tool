@@ -124,9 +124,9 @@ See VIDEO_PLAN.md
 
 3. Update all deps
 
-4. Centralize the repeated `photo.thumbnailStatus === 'ready' && photo.thumbnailKey` check (inline in ~13 places across Dashboard widgets, Gallery, and Tags) into a shared `isPhotoDisplayable(photo)`-style helper.
+4. ~~Centralize the repeated `photo.thumbnailStatus === 'ready' && photo.thumbnailKey` check (inline in ~13 places across Dashboard widgets, Gallery, and Tags) into a shared `isPhotoDisplayable(photo)`-style helper.~~ Fixed. `isPhotoDisplayable` in `utils/functions.ts` (a type guard, so `thumbnailKey` needs no non-null assertion after it), replacing all 14 inline occurrences.
 
-5. Dashboard widgets each call `useKeyHeld(PREVIEW_TRIGGER_KEY)` independently (6 separate window keydown/keyup listener pairs for the same key). Fold `previewTriggerHeld` into the shared `DashboardPreviewZoomContext` (already built for per-widget preview zoom) so it's one listener instead of six.
+5. ~~Dashboard widgets each call `useKeyHeld(PREVIEW_TRIGGER_KEY)` independently (6 separate window keydown/keyup listener pairs for the same key). Fold `previewTriggerHeld` into the shared `DashboardPreviewZoomContext` (already built for per-widget preview zoom) so it's one listener instead of six.~~ Fixed (broader than scoped: `useGalleryPreviewZoom` also registered one per widget provider). App-wide `PreviewTriggerProvider`/`usePreviewTriggerHeld` in `state/PreviewTriggerContext.tsx` — one listener trio total, consumed by all widgets, DuplicatesView, and both preview hooks.
 
 6. Take a full pass to reduce comments to 1-2 lines
 

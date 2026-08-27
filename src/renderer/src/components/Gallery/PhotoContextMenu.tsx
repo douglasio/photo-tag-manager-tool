@@ -19,7 +19,9 @@ import { isMac } from '@utils'
 
 interface PhotoContextMenuProps {
   photo: PhotoRecord
-  onRename: () => void
+  // Omitted where no inline rename exists (e.g. the list view) — the
+  // Rename item is hidden rather than wired to something unrelated.
+  onRename?: () => void
   children: ReactNode
 }
 
@@ -132,9 +134,11 @@ export function PhotoContextMenu({
                 >
                   Open
                 </Menu.Item>
-                <Menu.Item leftSection={<IconEdit size={14} />} onClick={onRename}>
-                  Rename
-                </Menu.Item>
+                {onRename && (
+                  <Menu.Item leftSection={<IconEdit size={14} />} onClick={onRename}>
+                    Rename
+                  </Menu.Item>
+                )}
               </>
             )}
             <Menu.Item

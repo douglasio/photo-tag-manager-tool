@@ -38,12 +38,13 @@ interface ExpandToggleProps {
   onToggle: () => void
 }
 
+// Rendered polymorphically as a div — this sits inside the row's Button,
+// and a real <button> nested in a <button> is invalid HTML (React 19 warns).
 function ExpandToggle({ hasChildren, expanded, onToggle }: ExpandToggleProps): ReactElement {
-  const { ref } = useHover<HTMLButtonElement>()
-
   return (
     <ActionIcon
-      ref={ref}
+      component="div"
+      role="button"
       c="dimmed"
       variant="transparent"
       onClick={(event) => {
@@ -174,7 +175,10 @@ const TreeRow = memo(function TreeRow({
                 </Tooltip>
               )}
               <Tooltip label="Rename folder">
+                {/* div, not a nested <button> — see ExpandToggle above */}
                 <ActionIcon
+                  component="div"
+                  role="button"
                   opacity={hovered ? 0.7 : 0}
                   style={{ flexShrink: 0 }}
                   onClick={(event) => {

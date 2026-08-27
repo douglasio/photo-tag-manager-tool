@@ -1,13 +1,6 @@
 import { createContext, useContext } from 'react'
 
-import type {
-  AiScanProgress,
-  DefaultView,
-  FaceScanProgress,
-  GalleryViewMode,
-  PhotoRecord,
-  ScanCompleteEvent
-} from '@shared/types'
+import type { DefaultView, GalleryViewMode, PhotoRecord, ScanCompleteEvent } from '@shared/types'
 
 import type { DisplayPhotoRecord, OpenTabEntry } from './PhotoLibraryContext'
 import type { GallerySortBy, GallerySortOrder, ScanStatus } from './photoLibraryReducer'
@@ -35,8 +28,6 @@ export interface GalleryLibraryState {
   showViewCounts: boolean
   defaultView: DefaultView
   aiTagSuggestionsEnabled: boolean
-  aiScanProgress: AiScanProgress | null
-  faceScanProgress: FaceScanProgress | null
   settingsModalOpened: boolean
   detailsPanelCollapsed: boolean
   magazineTitle: string

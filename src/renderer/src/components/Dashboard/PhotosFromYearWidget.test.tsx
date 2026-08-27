@@ -11,6 +11,7 @@ const mockGetThrowbackYearSample = vi.fn()
 const mockOpenPhotoTab = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     state: {
       photosByPath: mockPhotosByPath,

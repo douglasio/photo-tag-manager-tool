@@ -5,10 +5,9 @@ import { Anchor, Badge, Button, Group, Stack, Text, Timeline } from '@mantine/co
 import { useReducedMotion } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 
-import { useKeyHeld } from '@hooks'
 import type { PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
-import { pickRandom, PREVIEW_TRIGGER_KEY, shuffle } from '@utils'
+import { usePhotoLibrary, usePreviewTriggerHeld } from '@state'
+import { isPhotoDisplayable, pickRandom, shuffle } from '@utils'
 
 import { PhotoCollageTile } from './PhotoCollageTile'
 
@@ -46,7 +45,7 @@ function pickRandomCollagePaths(
   count: number
 ): string[] {
   const candidates = Array.from(photosByPath.values()).filter(
-    (photo) => photo.tags.includes(tag) && photo.thumbnailStatus === 'ready' && photo.thumbnailKey
+    (photo) => photo.tags.includes(tag) && isPhotoDisplayable(photo)
   )
   return shuffle(candidates)
     .slice(0, count)
@@ -74,7 +73,7 @@ export function FeaturedTagWidget(): ReactElement {
     setActiveTab,
     setSettingsModalOpened
   } = usePhotoLibrary()
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
@@ -129,11 +128,10 @@ export function FeaturedTagWidget(): ReactElement {
       if (!hasShownReadyToastRef.current) {
         hasShownReadyToastRef.current = true
         notifications.show({
-          allowClose: true,
           autoClose: 10000,
           color: 'teal',
           message: `#${selectedTag} now has enough photos to be featured on the Dashboard!`,
-          onClick: () => state.activeTab === 'dashboard',
+          onClick: () => setActiveTab('dashboard'),
           withCloseButton: true
         })
       }

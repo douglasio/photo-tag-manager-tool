@@ -42,6 +42,7 @@ let mockState: {
 }
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   useSidebarLibrary: () => ({
     state: mockState,
     personCoverPhotos: new Map()

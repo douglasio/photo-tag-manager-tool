@@ -18,6 +18,7 @@ let mockVisiblePhotos: PhotoRecord[] = []
 let mockActiveTab = ''
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   usePhotoLibrary: () => ({
     state: {
       activeTab: mockActiveTab,

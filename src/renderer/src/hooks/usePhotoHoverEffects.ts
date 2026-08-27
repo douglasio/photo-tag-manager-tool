@@ -2,9 +2,7 @@ import { type MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
 
 import { useMotionTemplate, useMotionValue, useSpring } from 'motion/react'
 
-import { PREVIEW_TRIGGER_KEY } from '@utils'
-
-import { useKeyHeld } from './useKeyHeld'
+import { usePreviewTriggerHeld } from '@renderer/state/PreviewTriggerContext'
 
 // Hover saturates a soft, cursor-centered, feathered circle (a saturated
 // image copy masked by a radial gradient) rather than zooming.
@@ -42,7 +40,7 @@ export function usePhotoHoverEffects(motionEnabled: boolean): UsePhotoHoverEffec
   const springMaskOpacity = useSpring(maskOpacity, SATURATION_SPRING)
   const maskImage = useMotionTemplate`radial-gradient(circle ${SATURATION_RADIUS_PX}px at ${maskX}px ${maskY}px, black 0%, black 35%, transparent 100%)`
 
-  const triggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const triggerHeld = usePreviewTriggerHeld()
   const [isHovering, setIsHovering] = useState(false)
   const [zoomOrigin, setZoomOrigin] = useState('center center')
   const zoomScale = useMotionValue(1)

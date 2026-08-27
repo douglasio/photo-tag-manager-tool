@@ -22,6 +22,7 @@ export interface GalleryCellProps {
   previewScale: number
   showFilenames: boolean
   showViewCounts: boolean
+  animationsEnabled: boolean
 }
 
 export interface GalleryThumbnailCellProps {
@@ -37,6 +38,7 @@ export interface GalleryThumbnailCellProps {
   previewScale: number
   showFilenames: boolean
   showViewCounts: boolean
+  animationsEnabled: boolean
 }
 
 // Shared by both the virtualized GalleryPhotoCell below and the
@@ -53,7 +55,8 @@ export function GalleryThumbnailCell({
   previewTriggerHeld,
   previewScale,
   showFilenames,
-  showViewCounts
+  showViewCounts,
+  animationsEnabled
 }: GalleryThumbnailCellProps): ReactElement {
   return (
     <PhotoContextMenu photo={photo} onRename={() => onStartRename(photo.filePath)}>
@@ -61,6 +64,8 @@ export function GalleryThumbnailCell({
         photo={photo}
         selected={photo.filePath === selectedPath}
         multiSelected={selectedPaths.has(photo.filePath)}
+        selectedPaths={selectedPaths}
+        animationsEnabled={animationsEnabled}
         onSelect={onSelect}
         renaming={renamingPath === photo.filePath}
         onStartRename={() => onStartRename(photo.filePath)}
@@ -84,7 +89,6 @@ function cellPropsAreEqual(
     prev.rowIndex !== next.rowIndex ||
     prev.columnIndex !== next.columnIndex ||
     prev.columnCount !== next.columnCount ||
-    prev.photos !== next.photos ||
     prev.onSelect !== next.onSelect ||
     prev.onStartRename !== next.onStartRename ||
     prev.onStopRename !== next.onStopRename ||
@@ -93,6 +97,7 @@ function cellPropsAreEqual(
     prev.previewScale !== next.previewScale ||
     prev.showFilenames !== next.showFilenames ||
     prev.showViewCounts !== next.showViewCounts ||
+    prev.animationsEnabled !== next.animationsEnabled ||
     prev.style.transform !== next.style.transform ||
     prev.style.width !== next.style.width ||
     prev.style.height !== next.style.height
@@ -100,13 +105,23 @@ function cellPropsAreEqual(
     return false
   }
 
-  const photo = prev.photos[prev.rowIndex * prev.columnCount + prev.columnIndex]
+  // Compare this cell's own photo, not the array's identity — a metadata
+  // batch or single-photo write (tag edit, view-count bump) replaces the
+  // array every time, but only the affected cells' photo objects change.
+  const index = prev.rowIndex * prev.columnCount + prev.columnIndex
+  const photo = prev.photos[index]
+  if (photo !== next.photos[index]) return false
   const filePath = photo?.filePath
+
+  const inPrevSelection = filePath !== undefined && prev.selectedPaths.has(filePath)
+  const inNextSelection = filePath !== undefined && next.selectedPaths.has(filePath)
+  // A cell that stays in a changed multi-selection must still re-render:
+  // its drag payload (PhotoThumbnail's dragPaths) carries the whole set.
+  if (inPrevSelection && inNextSelection && prev.selectedPaths !== next.selectedPaths) return false
 
   return (
     (filePath === prev.selectedPath) === (filePath === next.selectedPath) &&
-    (filePath !== undefined && prev.selectedPaths.has(filePath)) ===
-      (filePath !== undefined && next.selectedPaths.has(filePath)) &&
+    inPrevSelection === inNextSelection &&
     (filePath === prev.renamingPath) === (filePath === next.renamingPath)
   )
 }

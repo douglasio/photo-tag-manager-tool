@@ -8,7 +8,7 @@ import { useLazyFonts, usePannableZoom } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 import { usePhotoLibrary } from '@state'
-import { formatDateTaken } from '@utils'
+import { formatDateTaken, isPhotoDisplayable } from '@utils'
 
 import { CoverLoadingPlaceholder } from './CoverLoadingPlaceholder'
 
@@ -133,7 +133,7 @@ export function ArtGalleryView({
   const dateDisplay = photo.metadata.dateTaken ? formatDateTaken(photo.metadata.dateTaken) : null
 
   const otherPhotos = visiblePhotos
-    .filter((p) => p.filePath !== photo.filePath && p.thumbnailStatus === 'ready' && p.thumbnailKey)
+    .filter((p) => p.filePath !== photo.filePath && isPhotoDisplayable(p))
     .slice(0, 2)
 
   if (!fontsLoaded) return <CoverLoadingPlaceholder />

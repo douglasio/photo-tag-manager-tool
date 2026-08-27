@@ -74,7 +74,7 @@ describe('watchManager', () => {
     vi.clearAllMocks()
     mockGetExcludePatterns.mockReturnValue([])
     send = vi.fn()
-    setWatchTarget({ send } as never)
+    setWatchTarget({ send, isDestroyed: () => false } as never)
   })
 
   it('watchFolder registers file/dir handlers with the current exclude patterns', () => {

@@ -52,6 +52,10 @@ import {
   type PhotoLibraryState
 } from './photoLibraryReducer'
 import {
+  PhotoLibraryScanProgressContext,
+  type PhotoLibraryScanProgressValue
+} from './PhotoLibraryScanProgressContext'
+import {
   PhotoLibrarySidebarContext,
   type PhotoLibrarySidebarValue,
   type SidebarLibraryState,
@@ -139,8 +143,13 @@ function toPersonPhotoAssignments(
   return assignments
 }
 
+// Scan progress is deliberately absent from this back-compat state shape —
+// it lives in its own high-churn context (useScanProgress), so consuming it
+// here would re-render every usePhotoLibrary consumer on each progress tick.
+type PhotoLibraryComposedState = Omit<PhotoLibraryState, 'aiScanProgress' | 'faceScanProgress'>
+
 interface PhotoLibraryContextValue {
-  state: PhotoLibraryState
+  state: PhotoLibraryComposedState
   photos: PhotoRecord[]
   visiblePhotos: PhotoRecord[]
   // The library-wide "feature" photo set (excludes excluded-folder photos
@@ -1972,8 +1981,6 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       showViewCounts: state.showViewCounts,
       defaultView: state.defaultView,
       aiTagSuggestionsEnabled: state.aiTagSuggestionsEnabled,
-      aiScanProgress: state.aiScanProgress,
-      faceScanProgress: state.faceScanProgress,
       settingsModalOpened: state.settingsModalOpened,
       detailsPanelCollapsed: state.detailsPanelCollapsed,
       magazineTitle: state.magazineTitle,
@@ -2003,8 +2010,6 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       state.showViewCounts,
       state.defaultView,
       state.aiTagSuggestionsEnabled,
-      state.aiScanProgress,
-      state.faceScanProgress,
       state.settingsModalOpened,
       state.detailsPanelCollapsed,
       state.magazineTitle,
@@ -2029,11 +2034,24 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     [galleryState, photos, visiblePhotos, activePhotosByPath, selectedPhoto, openTabEntries]
   )
 
+  // Own context (not part of galleryState) — progress ticks every ~150ms
+  // during a scan, and publishing them through the Gallery bucket made the
+  // entire visible UI re-render on each tick for the whole scan.
+  const scanProgressValue: PhotoLibraryScanProgressValue = useMemo(
+    () => ({
+      aiScanProgress: state.aiScanProgress,
+      faceScanProgress: state.faceScanProgress
+    }),
+    [state.aiScanProgress, state.faceScanProgress]
+  )
+
   return (
     <PhotoLibraryActionsContext.Provider value={actions}>
       <PhotoLibrarySidebarContext.Provider value={sidebarValue}>
         <PhotoLibraryGalleryContext.Provider value={galleryValue}>
-          {children}
+          <PhotoLibraryScanProgressContext.Provider value={scanProgressValue}>
+            {children}
+          </PhotoLibraryScanProgressContext.Provider>
         </PhotoLibraryGalleryContext.Provider>
       </PhotoLibrarySidebarContext.Provider>
     </PhotoLibraryActionsContext.Provider>
@@ -2051,7 +2069,7 @@ export function usePhotoLibrary(): PhotoLibraryContextValue {
   const gallery = useGalleryLibrary()
   return {
     ...actions,
-    state: { ...sidebar.state, ...gallery.state } as PhotoLibraryState,
+    state: { ...sidebar.state, ...gallery.state } as PhotoLibraryComposedState,
     photos: gallery.photos,
     visiblePhotos: gallery.visiblePhotos,
     activePhotosByPath: gallery.activePhotosByPath,

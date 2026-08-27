@@ -25,11 +25,11 @@ import {
   GalleryHoverPreview,
   ScanProgressIndicator
 } from '@components'
-import { useHoverPreview, useKeyHeld } from '@hooks'
+import { useHoverPreview } from '@hooks'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { DuplicateGroup, PhotoRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
-import { aiScanStepLabel, formatDateModified, isMac, PREVIEW_TRIGGER_KEY } from '@utils'
+import { usePhotoLibrary, usePreviewTriggerHeld, useScanProgress } from '@state'
+import { aiScanStepLabel, formatDateModified, isMac, isPhotoDisplayable } from '@utils'
 
 const THUMB_SIZE = 96
 
@@ -83,7 +83,7 @@ function DuplicatePhotoRow({
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
       >
-        {photo.thumbnailStatus === 'ready' && photo.thumbnailKey && (
+        {isPhotoDisplayable(photo) && (
           <Image
             src={toThumbProtocolUrl(photo.thumbnailKey)}
             alt={photo.fileName}
@@ -165,6 +165,7 @@ export function DuplicatesView(): ReactElement {
     openPhotoTab,
     dismissDuplicateGroup
   } = usePhotoLibrary()
+  const { aiScanProgress } = useScanProgress()
   const [groups, setGroups] = useState<DuplicateGroup[] | null>(cachedResult?.groups ?? null)
   const [error, setError] = useState<string | null>(null)
   const [canceled, setCanceled] = useState(cachedResult?.canceled ?? false)
@@ -173,7 +174,7 @@ export function DuplicatesView(): ReactElement {
   // suggestions and Time Warp — gated the same way, rather than silently
   // downloading the model in the background the moment this tab opens.
   const [enableAiOpened, setEnableAiOpened] = useState(false)
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
   const prefersReducedMotion = useReducedMotion()
   const motionEnabled = state.galleryAnimationsEnabled && !prefersReducedMotion
 
@@ -259,7 +260,7 @@ export function DuplicatesView(): ReactElement {
     )
   }
 
-  const progress = state.aiScanProgress
+  const progress = aiScanProgress
   const loading = groups === null && !error
 
   return (

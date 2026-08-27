@@ -10,6 +10,7 @@ const mockSetTagFilter = vi.fn()
 const mockSetActiveTab = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   useGalleryLibrary: () => ({ activePhotosByPath: mockPhotosByPath }),
   useSidebarLibrary: () => ({ tagCounts: mockTagCounts }),
   useLibraryActions: () => ({

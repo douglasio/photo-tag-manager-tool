@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 const mockDeleteTag = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   useSidebarLibrary: () => ({
     allTags: ['vacation'],
     tagCounts: new Map([['vacation', 2]]),

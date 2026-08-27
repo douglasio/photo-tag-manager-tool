@@ -4,7 +4,7 @@ import { Button, Group, Kbd, Radio, Stack, Switch, Text, TextInput } from '@mant
 
 import { ConfirmDialog } from '@components'
 import type { DefaultView, PersonRecord } from '@shared/types'
-import { usePhotoLibrary } from '@state'
+import { usePhotoLibrary, useScanProgress } from '@state'
 
 import SettingsTabSection from './SettingsTabSection'
 
@@ -37,6 +37,9 @@ function AutoSaveTextInput({ label, value, onSave }: AutoSaveTextInputProps): Re
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false)
+        // Only a real change saves (and flashes "Saved") — tabbing through
+        // the field untouched shouldn't rewrite the setting.
+        if (draft.trim() === value) return
         onSave(draft.trim())
         setShowSaved(true)
         setSaveCount((count) => count + 1)
@@ -152,7 +155,7 @@ function VisualizationsSection(): ReactElement {
 function TagsSection(): ReactElement {
   const { state, setAiTagSuggestionsEnabled, enableAiFeatures } = usePhotoLibrary()
   const [error, setError] = useState<string | null>(null)
-  const scanning = state.aiScanProgress !== null
+  const scanning = useScanProgress().aiScanProgress !== null
 
   const handleToggle = async (checked: boolean): Promise<void> => {
     setError(null)
@@ -249,7 +252,7 @@ function PeopleSection(): ReactElement {
   const { state, setFaceDetectionEnabled, enableFaceDetection, rescanFaces } = usePhotoLibrary()
   const [error, setError] = useState<string | null>(null)
   const [confirmingDisable, setConfirmingDisable] = useState(false)
-  const scanning = state.faceScanProgress !== null
+  const scanning = useScanProgress().faceScanProgress !== null
 
   const handleToggle = async (checked: boolean): Promise<void> => {
     setError(null)

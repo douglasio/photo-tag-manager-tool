@@ -52,7 +52,8 @@ const thumbnailProps = {
   previewTriggerHeld: false,
   previewScale: 1,
   showFilenames: false,
-  showViewCounts: false
+  showViewCounts: false,
+  animationsEnabled: false
 }
 
 function renderSections(sections: string[], photosBySection: Map<string, PhotoRecord[]>): void {

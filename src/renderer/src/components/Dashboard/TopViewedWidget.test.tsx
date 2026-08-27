@@ -8,6 +8,7 @@ let mockPhotosByPath: Map<string, PhotoRecord>
 const mockOpenPhotoTab = vi.fn()
 
 vi.mock('@state', () => ({
+  usePreviewTriggerHeld: () => false,
   useGalleryLibrary: () => ({
     state: { photosByPath: mockPhotosByPath },
     activePhotosByPath: mockPhotosByPath

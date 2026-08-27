@@ -5,7 +5,7 @@ import { DEFAULT_THEME, Text } from '@mantine/core'
 
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import { useGalleryLibrary, useLibraryActions, useSidebarLibrary } from '@state'
-import { shuffle } from '@utils'
+import { isPhotoDisplayable, shuffle } from '@utils'
 
 const TOP_TAG_COUNT = 5
 // Reserved space for the tag-name column
@@ -169,10 +169,7 @@ export function TopTagsWidget(): ReactElement {
   if (missingTag) {
     const candidates = shuffle(
       Array.from(activePhotosByPath.values()).filter(
-        (photo) =>
-          photo.tags.includes(missingTag.tag) &&
-          photo.thumbnailStatus === 'ready' &&
-          photo.thumbnailKey
+        (photo) => photo.tags.includes(missingTag.tag) && isPhotoDisplayable(photo)
       )
     )
       .slice(0, MAX_CANDIDATE_PHOTOS)

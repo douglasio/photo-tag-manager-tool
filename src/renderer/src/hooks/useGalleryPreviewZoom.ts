@@ -1,8 +1,6 @@
 import { type RefObject, useEffect, useRef, useState } from 'react'
 
-import { PREVIEW_TRIGGER_KEY } from '@utils'
-
-import { useKeyHeld } from './useKeyHeld'
+import { usePreviewTriggerHeld } from '@renderer/state/PreviewTriggerContext'
 
 const MIN_PREVIEW_SCALE = 0.5
 const MAX_PREVIEW_SCALE = 6
@@ -26,7 +24,7 @@ interface UseGalleryPreviewZoomResult {
 export function useGalleryPreviewZoom(
   containerRef: RefObject<HTMLDivElement | null>
 ): UseGalleryPreviewZoomResult {
-  const previewTriggerHeld = useKeyHeld(PREVIEW_TRIGGER_KEY)
+  const previewTriggerHeld = usePreviewTriggerHeld()
   // A ref mirror of previewTriggerHeld so the native wheel listener below
   // (attached once) always reads the latest value without needing to
   // re-subscribe.

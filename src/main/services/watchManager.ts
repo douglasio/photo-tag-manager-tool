@@ -28,6 +28,13 @@ export function setWatchTarget(target: WebContents): void {
   watchTarget = target
 }
 
+// send() on a destroyed WebContents throws (closing the window on macOS
+// leaves the app and its watchers running) — drop the event instead; the
+// next window's startup scan reconciles anything missed while closed.
+function sendToTarget(channel: string, payload: unknown): void {
+  if (watchTarget && !watchTarget.isDestroyed()) watchTarget.send(channel, payload)
+}
+
 // watcher should ignore programmatic file operations (e.g. a rename) caused by the app
 const suppressedPaths = new Set<string>()
 const SUPPRESSION_TIMEOUT_MS = 5000
@@ -43,7 +50,7 @@ async function handleUpsert(filePath: string, changeType: 'add' | 'change'): Pro
     // Both 'add' and 'change' can affect group membership
     reconcileTagGroups()
     const payload: WatchPhotoUpsertedEvent = { photo, changeType }
-    watchTarget?.send('watch:photo-upserted', payload)
+    sendToTarget('watch:photo-upserted', payload)
   } catch (err) {
     console.error(`failed to ingest watched file ${filePath}`, err)
   }
@@ -53,7 +60,7 @@ async function handleRemove(filePath: string): Promise<void> {
   const thumbnailKey = removePhoto(filePath)
   if (thumbnailKey) await deleteThumbnail(thumbnailKey)
   const payload: WatchPhotoRemovedEvent = { filePath }
-  watchTarget?.send('watch:photo-removed', payload)
+  sendToTarget('watch:photo-removed', payload)
 }
 
 export function watchFolder(rootPath: string): void {
@@ -68,10 +75,10 @@ export function watchFolder(rootPath: string): void {
       onDirEvent: (type, dirPath) => {
         if (type === 'addDir') {
           const payload: WatchFolderAddedEvent = { folderPath: dirPath }
-          watchTarget?.send('watch:folder-added', payload)
+          sendToTarget('watch:folder-added', payload)
         } else {
           const payload: WatchFolderRemovedEvent = { folderPath: dirPath }
-          watchTarget?.send('watch:folder-removed', payload)
+          sendToTarget('watch:folder-removed', payload)
         }
       }
     },

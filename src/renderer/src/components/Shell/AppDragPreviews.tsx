@@ -4,7 +4,7 @@ import { Badge, Box, Center, Image, Paper, Text } from '@mantine/core'
 import { IconPhoto } from '@tabler/icons-react'
 
 import { RADIUS_SIZE } from '@renderer/theme'
-import { ACTION_ICONS } from '@renderer/utils'
+import { ACTION_ICONS, isPhotoDisplayable } from '@renderer/utils'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import type { PhotoRecord } from '@shared/types'
 
@@ -50,7 +50,7 @@ export function DragPreview({
           cursor: 'grabbing'
         }}
       >
-        {photo.thumbnailStatus === 'ready' && photo.thumbnailKey ? (
+        {isPhotoDisplayable(photo) ? (
           <Image
             src={toThumbProtocolUrl(photo.thumbnailKey)}
             w={DRAG_PREVIEW_SIZE}
