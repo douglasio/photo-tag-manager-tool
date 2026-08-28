@@ -4,6 +4,8 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
+- Sluggish spotlight opening animation
+
 # Features
 
 To-dos, tasks, and features loosely grouped by feature segment.
