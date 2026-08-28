@@ -38,15 +38,13 @@ Making Tag Me feel like a real installable desktop app rather than a dev build.
 
 ## AI
 
-1. Natural-language semantic search over the existing CLIP embeddings ("dog on a beach"). The embedding table and the similarity worker already exist for duplicate detection and Throwback — this reuses them by embedding the query text instead of a photo. Highest-leverage AI item because it slots behind Shell #3's search repository seam as another result source, sharing the same Spotlight UI.
+1. Auto-album / event clustering. Group photos into events by combining capture time gaps with embedding similarity — closer to Picasa's implicit "shoots" than the current folder-only grouping.
 
-2. Auto-album / event clustering. Group photos into events by combining capture time gaps with embedding similarity — closer to Picasa's implicit "shoots" than the current folder-only grouping.
+2. Tag suggestion cold start. Suggestions already score against the user's own vocabulary (`useTagSuggestions` passes `allTags` as the candidate labels), which is the right default — but it means the feature can only ever re-suggest tags that already exist, and does nothing at all until the library has some. Worth a seed vocabulary, or a way to propose genuinely new tags, for a library that hasn't been tagged yet.
 
-3. Tag suggestion cold start. Suggestions already score against the user's own vocabulary (`useTagSuggestions` passes `allTags` as the candidate labels), which is the right default — but it means the feature can only ever re-suggest tags that already exist, and does nothing at all until the library has some. Worth a seed vocabulary, or a way to propose genuinely new tags, for a library that hasn't been tagged yet.
+3. Best-of-burst selection. Rank near-duplicate groups (already detected) by sharpness/exposure/eyes-open so the Duplicates view can recommend which to keep rather than only which are similar.
 
-4. Best-of-burst selection. Rank near-duplicate groups (already detected) by sharpness/exposure/eyes-open so the Duplicates view can recommend which to keep rather than only which are similar.
-
-5. OCR pass for photos containing text (signs, documents, screenshots), stored as a new `ocrText` column on photos and scanned by Shell #3's search engine like any other text field.
+4. OCR pass for photos containing text (signs, documents, screenshots), stored as a new `ocrText` column on photos and scanned by Shell #3's search engine like any other text field.
 
 Note: any new face/vision model needs a license check first — InsightFace's SCRFD/ArcFace weights are non-commercial-only and were already ruled out once.
 

@@ -140,7 +140,8 @@ export interface AppSettings {
 export interface SearchHit {
   filePath: string
   fileName: string
-  /** Relevance score from searchRepository's weighted heuristic. */
+  /** Relevance score — searchRepository's weighted heuristic, or cosine
+   * similarity for semantic hits. Not comparable across the two sources. */
   score: number
   thumbnailKey: string | null
 }
@@ -152,6 +153,16 @@ export interface SearchResult {
   total: number
   /** Every matching path in rank order, for filtering the gallery grid. */
   paths: string[]
+}
+
+export interface SemanticSearchResult {
+  /** CLIP-similarity-ranked hits, already thresholded and capped. */
+  hits: SearchHit[]
+  /** Photos with a cached embedding to search against. */
+  indexedCount: number
+  /** Photos that could have one (AI scan has processed them) — the gap
+   * between this and indexedCount is photos the AI scan hasn't reached yet. */
+  totalReadyCount: number
 }
 
 // The main window's persisted geometry. Deliberately absent from AppSettings

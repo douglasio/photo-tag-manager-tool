@@ -8,6 +8,7 @@ export type WorkerRequest =
   | { type: 'init'; cacheDir: string }
   | { type: 'classify'; requestId: number; imagePath: string; candidateLabels: string[] }
   | { type: 'embed'; requestId: number; imagePath: string }
+  | { type: 'embedText'; requestId: number; text: string }
 
 export type WorkerResponse =
   | { type: 'downloadProgress'; progress: number }
@@ -17,3 +18,5 @@ export type WorkerResponse =
   | { type: 'classifyError'; requestId: number; message: string }
   | { type: 'embedResult'; requestId: number; embedding: number[] }
   | { type: 'embedError'; requestId: number; message: string }
+  | { type: 'embedTextResult'; requestId: number; embedding: number[] }
+  | { type: 'embedTextError'; requestId: number; message: string }

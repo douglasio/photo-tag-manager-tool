@@ -1,4 +1,9 @@
-import { env, pipeline } from '@huggingface/transformers'
+import {
+  AutoTokenizer,
+  CLIPTextModelWithProjection,
+  env,
+  pipeline
+} from '@huggingface/transformers'
 import { parentPort } from 'node:worker_threads'
 
 import type { WorkerRequest, WorkerResponse } from './tagSuggestionProtocol'
@@ -15,6 +20,14 @@ let classifierPromise: Promise<Classifier> | null = null
 
 type Embedder = Awaited<ReturnType<typeof pipeline<'image-feature-extraction'>>>
 let embedderPromise: Promise<Embedder> | null = null
+
+// The text tower for semantic search — loaded lazily on the first embedText
+// request rather than during init, since most sessions never use it and it's
+// an extra ~60MB download the first time they do.
+let textTokenizerPromise: Promise<
+  Awaited<ReturnType<typeof AutoTokenizer.from_pretrained>>
+> | null = null
+let textModelPromise: Promise<CLIPTextModelWithProjection> | null = null
 
 // Memoized — the model only needs downloading/loading once per worker
 // lifetime; every request after the first reuses this same promise.
@@ -51,7 +64,56 @@ function loadEmbedder(cacheDir: string): Promise<Embedder> {
   return embedderPromise
 }
 
+// Same joint embedding space as loadEmbedder's image_embeds (both are the
+// projected head, not the raw hidden state) — see docs/SEARCH_PLAN.md's
+// semantic search section for why that distinction matters.
+function loadTextTokenizer(): Promise<Awaited<ReturnType<typeof AutoTokenizer.from_pretrained>>> {
+  if (!textTokenizerPromise) {
+    textTokenizerPromise = AutoTokenizer.from_pretrained('Xenova/clip-vit-base-patch32')
+  }
+  return textTokenizerPromise
+}
+
+function loadTextModel(): Promise<CLIPTextModelWithProjection> {
+  if (!textModelPromise) {
+    textModelPromise = CLIPTextModelWithProjection.from_pretrained('Xenova/clip-vit-base-patch32', {
+      dtype: 'q8',
+      device: 'cpu',
+      progress_callback: (info) => {
+        if (info.status === 'progress_total')
+          post({ type: 'downloadProgress', progress: info.progress })
+      }
+    })
+  }
+  return textModelPromise
+}
+
 port.on('message', (message: WorkerRequest) => {
+  if (message.type === 'embedText') {
+    Promise.all([loadTextTokenizer(), loadTextModel()])
+      .then(async ([tokenizer, textModel]) => {
+        const inputs = tokenizer(message.text, { padding: true, truncation: true })
+        const { text_embeds: embeds } = await textModel(inputs)
+        post({
+          type: 'embedTextResult',
+          requestId: message.requestId,
+          embedding: Array.from(embeds.data as ArrayLike<number>)
+        })
+      })
+      .catch((err: unknown) => {
+        // Reset so a transient failure (e.g. the download dropping) can be
+        // retried on the next query rather than wedging permanently.
+        textTokenizerPromise = null
+        textModelPromise = null
+        post({
+          type: 'embedTextError',
+          requestId: message.requestId,
+          message: err instanceof Error ? err.message : String(err)
+        })
+      })
+    return
+  }
+
   if (message.type === 'init') {
     Promise.all([loadClassifier(message.cacheDir), loadEmbedder(message.cacheDir)])
       .then(() => post({ type: 'ready' }))

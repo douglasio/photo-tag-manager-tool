@@ -115,9 +115,36 @@ Steps 1–2 land as self-contained, heavily tested commits before any UI. **No s
 - **Fuzzy/typo matching** — substring matching already covers much of what fuse.js would add; revisit only if real use shows misses.
 - **Search history / saved searches** — cheap later via the settings table; noted on roadmap.
 
-## Follow-on: semantic (pixel-content) search
+## Semantic (pixel-content) search — AI #1 design
 
-Unchanged from the original plan, and unaffected by the engine change — it sits behind the same repository seam as another result source. Embed query text with the CLIP text encoder already shipped in `tagSuggestionWorker` (`Xenova/clip-vit-base-patch32`), cosine against the cached `photo_embeddings`. Own labeled result group (cosine has no natural cutoff — tuned threshold + top-N), gated on AI features, distinct from person search ("Mom" hits the people index, not CLIP). No content restrictions: CLIP is a local embedding model with no safety classifier or refusal path. Expect broad-gist strength, weakness on fine distinctions/counting/text-in-images/proper nouns.
+Slots behind the same repository seam as another result source. Two facts verified up front make this cheap:
+
+- **Stored embeddings are already text-comparable.** transformers.js's `image-feature-extraction` pipeline returns CLIP's `image_embeds` — the 512-dim _projected shared space_, not the vision tower's raw 768-dim hidden state. Everything cached in `photo_embeddings` compares directly against a text embedding; no library re-embed.
+- **Only the text tower is missing.** `tagSuggestionWorker` loads the zero-shot classifier and the image embedder, but exposes no text-embed API (the classifier holds a text tower internally, but the pipeline API doesn't surface it). Add `AutoTokenizer` + `CLIPTextModelWithProjection` for the same model id/cache dir — one extra ~60MB q8 ONNX download, lazily on first semantic query — and a new `embedText` request/response pair in the worker protocol mirroring `embed`.
+
+### Fusion: don't
+
+Facet scores (field weights + match bonuses) and CLIP cosine (~0.2–0.35 for good matches) are incomparable spaces; normalizing-and-blending is fragile to tune. Instead:
+
+- **Separate "Visual matches" Spotlight group** below the text/facet groups, ranked purely by cosine, cut at a tuned threshold (~0.2 to start) and capped (~8 in the modal).
+- **Facets filter, similarity ranks.** With flags present (`person:joe beach sunset`), predicates narrow the candidate set first; cosine orders what remains. This is the compound "photos of Joe that look like a beach sunset" behavior for free.
+- **Runs automatically** (decided): any query with free-text terms gets the semantic pass when AI features are enabled. Flags-only queries have no text to embed and skip it. No new syntax in v1; an opt-out flag can come later if it ever produces noise.
+- **Gallery included** (decided): "Show all in Gallery" merges semantic hits into the `searchResults` path Set, ordered after exact matches.
+
+### Latency: never block the text scan
+
+Per-query cost is trivial once loaded (text encode tens of ms; cosine over 10k × 512 dims is single-digit ms, and `getAllEmbeddings()` already caches deserialized blobs). The cliff is the _first_ query: worker spawn + model load, possibly a one-time download.
+
+- Fire the semantic IPC request alongside the text scan; text results render immediately, the Visual matches group streams in when its response lands.
+- First use shows a lightweight "warming up" row in the group's slot; download progress reuses the existing `downloadProgress` plumbing if it's the very first AI feature used.
+- Stale-response protection reuses `usePhotoSearch`'s existing requestId guard — semantic responses carry the serialized query they answered, and late arrivals for a superseded query are dropped.
+- Cache the query-text embedding (small LRU) so backspacing/retyping a recent query skips the encode.
+
+### Honest limitations
+
+- Photos have embeddings only if the AI scan produced them; recall degrades silently on partially-scanned libraries. Show "N photos not yet indexed" in the group when the embedding count trails the ready-photo count.
+- Broad-gist strength; weak on fine distinctions, counting, text-in-images, proper nouns. "Mom" is the people index's job (`person:`), not CLIP's.
+- No content restrictions: CLIP is a local embedding model with no safety classifier or refusal path — it matches whatever it matches.
 
 ## Follow-on: compound facet search (Shell #4)
 

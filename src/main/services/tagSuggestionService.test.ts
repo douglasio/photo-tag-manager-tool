@@ -33,6 +33,7 @@ vi.mock('worker_threads', () => ({
 import {
   disposeTagSuggestionWorker,
   embedImage,
+  embedText,
   ensureModelReady,
   suggestTags
 } from './tagSuggestionService'
@@ -181,6 +182,50 @@ describe('tagSuggestionService', () => {
     })
 
     await expect(promise).rejects.toThrow('embedding failed')
+  })
+
+  it('embedText waits for the model, then resolves with the embedding', async () => {
+    const promise = embedText('a dog on a beach')
+    workerTracker.current!.emit('message', { type: 'ready' })
+    await flush()
+
+    const embedTextMessage = workerTracker.current!.posted.find((m) => m.type === 'embedText')
+    expect(embedTextMessage).toMatchObject({ type: 'embedText', text: 'a dog on a beach' })
+
+    workerTracker.current!.emit('message', {
+      type: 'embedTextResult',
+      requestId: embedTextMessage!.requestId,
+      embedding: [0.4, 0.5]
+    })
+
+    await expect(promise).resolves.toEqual([0.4, 0.5])
+  })
+
+  it('embedText rejects when the worker reports an embedText error', async () => {
+    const promise = embedText('beach')
+    workerTracker.current!.emit('message', { type: 'ready' })
+    await flush()
+
+    const embedTextMessage = workerTracker.current!.posted.find((m) => m.type === 'embedText')
+    workerTracker.current!.emit('message', {
+      type: 'embedTextError',
+      requestId: embedTextMessage!.requestId,
+      message: 'text tower failed'
+    })
+
+    await expect(promise).rejects.toThrow('text tower failed')
+  })
+
+  it('disposeTagSuggestionWorker rejects a pending embedText request', async () => {
+    const promise = embedText('beach')
+    workerTracker.current!.emit('message', { type: 'ready' })
+    await flush()
+    const worker = workerTracker.current!
+
+    await disposeTagSuggestionWorker()
+
+    expect(worker.terminate).toHaveBeenCalledOnce()
+    await expect(promise).rejects.toThrow()
   })
 
   it('classify and embed requests track independently by requestId', async () => {

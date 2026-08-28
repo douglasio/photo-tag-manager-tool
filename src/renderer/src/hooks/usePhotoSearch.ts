@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { parseSearchQuery, type SearchQuery } from '@shared/searchQuery'
-import type { SearchResult } from '@shared/types'
+import { parseSearchQuery, type Predicate, type SearchQuery } from '@shared/searchQuery'
+import type { SearchResult, SemanticSearchResult } from '@shared/types'
 
 // Enough to feel instant while collapsing a burst of keystrokes into one
 // round trip.
@@ -9,6 +9,21 @@ const DEBOUNCE_MS = 150
 const SPOTLIGHT_LIMIT = 30
 
 const EMPTY_RESULT: SearchResult = { hits: [], total: 0, paths: [] }
+const EMPTY_SEMANTIC_RESULT: SemanticSearchResult = {
+  hits: [],
+  indexedCount: 0,
+  totalReadyCount: 0
+}
+
+// Semantic search only has something to embed when the query has actual
+// words in it — flags-only queries (`person:joe year:2020`) skip the round
+// trip entirely rather than asking the main process to embed an empty string.
+function hasFreeText(predicates: Predicate[]): boolean {
+  return predicates.some(
+    (predicate) =>
+      predicate.kind === 'text' && !predicate.negated && predicate.value.trim().length > 0
+  )
+}
 
 export interface UsePhotoSearchResult {
   text: string
@@ -16,13 +31,12 @@ export interface UsePhotoSearchResult {
   query: SearchQuery
   result: SearchResult
   loading: boolean
+  semanticResult: SemanticSearchResult
+  semanticLoading: boolean
   includeExcluded: boolean
   setIncludeExcluded: (value: boolean) => void
 }
 
-// Owns the search box's text, its parsed form, and the debounced query. The
-// parse is shared with the main process, so both sides agree on what the text
-// means without the renderer re-implementing any matching.
 export function usePhotoSearch(): UsePhotoSearchResult {
   const [text, setText] = useState('')
   const [includeExcluded, setIncludeExcluded] = useState(false)
@@ -32,9 +46,14 @@ export function usePhotoSearch(): UsePhotoSearchResult {
     query: '',
     data: EMPTY_RESULT
   })
+  const [answeredSemantic, setAnsweredSemantic] = useState<{
+    query: string
+    data: SemanticSearchResult
+  }>({ query: '', data: EMPTY_SEMANTIC_RESULT })
 
   const query = parseSearchQuery(text, includeExcluded)
   const hasPredicates = query.predicates.length > 0
+  const queryHasFreeText = hasFreeText(query.predicates)
   const serialized = JSON.stringify(query)
 
   // Monotonic request id. Bumped in cleanup too, so a response for a query the
@@ -58,6 +77,21 @@ export function usePhotoSearch(): UsePhotoSearchResult {
             setAnswered({ query: serialized, data: EMPTY_RESULT })
           }
         })
+
+      if (hasFreeText(parsed.predicates)) {
+        window.api
+          .semanticSearchPhotos(parsed)
+          .then((data) => {
+            if (latestRequest.current === requestId)
+              setAnsweredSemantic({ query: serialized, data })
+          })
+          .catch((error: unknown) => {
+            console.error('semantic search failed', error)
+            if (latestRequest.current === requestId) {
+              setAnsweredSemantic({ query: serialized, data: EMPTY_SEMANTIC_RESULT })
+            }
+          })
+      }
     }, DEBOUNCE_MS)
 
     return () => {
@@ -74,6 +108,8 @@ export function usePhotoSearch(): UsePhotoSearchResult {
     // blanking the list on every keystroke reads as flicker.
     result: hasPredicates ? answered.data : EMPTY_RESULT,
     loading: hasPredicates && answered.query !== serialized,
+    semanticResult: queryHasFreeText ? answeredSemantic.data : EMPTY_SEMANTIC_RESULT,
+    semanticLoading: queryHasFreeText && answeredSemantic.query !== serialized,
     includeExcluded,
     setIncludeExcluded
   }

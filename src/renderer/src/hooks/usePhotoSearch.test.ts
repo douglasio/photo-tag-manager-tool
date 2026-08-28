@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { SearchResult } from '@shared/types'
+import type { SearchResult, SemanticSearchResult } from '@shared/types'
 
 import { usePhotoSearch } from './usePhotoSearch'
 
@@ -28,14 +28,32 @@ function makeResult(paths: string[]): SearchResult {
   }
 }
 
+function makeSemanticResult(paths: string[]): SemanticSearchResult {
+  return {
+    hits: paths.map((filePath) => ({
+      filePath,
+      fileName: filePath.split('/').pop() ?? filePath,
+      score: 0.3,
+      thumbnailKey: null
+    })),
+    indexedCount: paths.length,
+    totalReadyCount: paths.length
+  }
+}
+
+const EMPTY_SEMANTIC = makeSemanticResult([])
+
 const searchPhotos = vi.fn()
+const semanticSearchPhotos = vi.fn()
 
 beforeEach(() => {
   vi.useFakeTimers()
   searchPhotos.mockReset()
   searchPhotos.mockResolvedValue(makeResult([]))
-  // @ts-expect-error - partial window.api stub, only searchPhotos is exercised
-  window.api = { searchPhotos }
+  semanticSearchPhotos.mockReset()
+  semanticSearchPhotos.mockResolvedValue(EMPTY_SEMANTIC)
+  // @ts-expect-error - partial window.api stub, only these two are exercised
+  window.api = { searchPhotos, semanticSearchPhotos }
 })
 
 afterEach(() => {
@@ -138,5 +156,82 @@ describe('usePhotoSearch', () => {
     expect(result.current.loading).toBe(false)
     expect(result.current.result.total).toBe(0)
     consoleError.mockRestore()
+  })
+
+  describe('semantic search', () => {
+    it('fires alongside the facet query for free-text terms', async () => {
+      semanticSearchPhotos.mockResolvedValue(makeSemanticResult(['/beach.jpg']))
+      const { result } = renderHook(() => usePhotoSearch())
+
+      act(() => result.current.setText('beach'))
+      await flushSearch()
+
+      expect(semanticSearchPhotos).toHaveBeenCalledTimes(1)
+      expect(result.current.semanticResult.hits[0].filePath).toBe('/beach.jpg')
+    })
+
+    it('skips the round trip for flags-only queries with no free text', async () => {
+      const { result } = renderHook(() => usePhotoSearch())
+
+      act(() => result.current.setText('tag:beach person:joe'))
+      await flushSearch()
+
+      expect(searchPhotos).toHaveBeenCalledTimes(1)
+      expect(semanticSearchPhotos).not.toHaveBeenCalled()
+    })
+
+    it('does not block facet results on a slow semantic response', async () => {
+      searchPhotos.mockResolvedValue(makeResult(['/exact.jpg']))
+      semanticSearchPhotos.mockImplementation(() => new Promise(() => undefined))
+      const { result } = renderHook(() => usePhotoSearch())
+
+      act(() => result.current.setText('beach'))
+      await flushSearch()
+
+      expect(result.current.result.paths).toEqual(['/exact.jpg'])
+      expect(result.current.loading).toBe(false)
+      expect(result.current.semanticLoading).toBe(true)
+    })
+
+    it('drops a stale semantic response the same way the facet query does', async () => {
+      let resolveSlow: ((value: SemanticSearchResult) => void) | undefined
+      semanticSearchPhotos.mockImplementationOnce(
+        () =>
+          new Promise<SemanticSearchResult>((resolve) => {
+            resolveSlow = resolve
+          })
+      )
+      semanticSearchPhotos.mockResolvedValueOnce(makeSemanticResult(['/fast.jpg']))
+
+      const { result } = renderHook(() => usePhotoSearch())
+
+      act(() => result.current.setText('slow'))
+      await flushSearch()
+
+      act(() => result.current.setText('fast'))
+      await flushSearch()
+      expect(result.current.semanticResult.hits.map((hit) => hit.filePath)).toEqual(['/fast.jpg'])
+
+      await act(async () => {
+        resolveSlow?.(makeSemanticResult(['/slow.jpg']))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(result.current.semanticResult.hits.map((hit) => hit.filePath)).toEqual(['/fast.jpg'])
+    })
+
+    it('recovers from a failed semantic query instead of hanging in a loading state', async () => {
+      semanticSearchPhotos.mockRejectedValue(new Error('boom'))
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { result } = renderHook(() => usePhotoSearch())
+
+      act(() => result.current.setText('beach'))
+      await flushSearch()
+
+      expect(result.current.semanticLoading).toBe(false)
+      expect(result.current.semanticResult.hits).toEqual([])
+      consoleError.mockRestore()
+    })
   })
 })

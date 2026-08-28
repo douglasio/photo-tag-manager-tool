@@ -21,6 +21,10 @@ const pendingEmbed = new Map<
   number,
   { resolve: (embedding: number[]) => void; reject: (err: Error) => void }
 >()
+const pendingEmbedText = new Map<
+  number,
+  { resolve: (embedding: number[]) => void; reject: (err: Error) => void }
+>()
 
 function getWorker(): Worker {
   if (worker) return worker
@@ -39,11 +43,18 @@ function getWorker(): Worker {
     } else if (message.type === 'embedError') {
       pendingEmbed.get(message.requestId)?.reject(new Error(message.message))
       pendingEmbed.delete(message.requestId)
+    } else if (message.type === 'embedTextResult') {
+      pendingEmbedText.get(message.requestId)?.resolve(message.embedding)
+      pendingEmbedText.delete(message.requestId)
+    } else if (message.type === 'embedTextError') {
+      pendingEmbedText.get(message.requestId)?.reject(new Error(message.message))
+      pendingEmbedText.delete(message.requestId)
     }
   })
   worker.on('error', (err: Error) => {
     rejectAllPending(pendingClassify, err)
     rejectAllPending(pendingEmbed, err)
+    rejectAllPending(pendingEmbedText, err)
   })
   return worker
 }
@@ -105,6 +116,19 @@ export async function embedImage(imagePath: string): Promise<number[]> {
   })
 }
 
+// Text-side counterpart of embedImage — projects a search phrase into the
+// same joint CLIP space as the cached photo embeddings, for semantic search.
+// Reuses ensureModelReady() so the worker is up; the text tower itself loads
+// lazily inside the worker on the first call, not during ensureModelReady().
+export async function embedText(text: string): Promise<number[]> {
+  await ensureModelReady()
+  const requestId = nextRequestId++
+  return new Promise<number[]>((resolve, reject) => {
+    pendingEmbedText.set(requestId, { resolve, reject })
+    send({ type: 'embedText', requestId, text })
+  })
+}
+
 // Frees the worker's memory (model weights, ONNX runtime sessions) when the
 // feature is turned off — the next request transparently respawns it.
 export async function disposeTagSuggestionWorker(): Promise<void> {
@@ -117,5 +141,6 @@ export async function disposeTagSuggestionWorker(): Promise<void> {
   readyReject = null
   rejectAllPending(pendingClassify, disposedError)
   rejectAllPending(pendingEmbed, disposedError)
+  rejectAllPending(pendingEmbedText, disposedError)
   await w.terminate()
 }

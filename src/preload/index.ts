@@ -21,6 +21,7 @@ import type {
   ScanProgressEvent,
   ScanStartResult,
   SearchResult,
+  SemanticSearchResult,
   SimilarPhoto,
   TagGroup,
   TagSuggestion,
@@ -159,6 +160,8 @@ const api = {
     ipcRenderer.invoke('settings:renameFolder', folder, newBaseName),
   searchPhotos: (query: SearchQuery, limit: number): Promise<SearchResult> =>
     ipcRenderer.invoke('search:query', query, limit),
+  semanticSearchPhotos: (query: SearchQuery): Promise<SemanticSearchResult> =>
+    ipcRenderer.invoke('search:semantic', query),
   exportDatabase: (): Promise<boolean> => ipcRenderer.invoke('library:exportDatabase'),
   importDatabase: (): Promise<void> => ipcRenderer.invoke('library:importDatabase'),
   clearLibrary: (): Promise<void> => ipcRenderer.invoke('library:clearLibrary'),

@@ -2,7 +2,7 @@ import { MantineProvider } from '@mantine/core'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { SearchResult } from '@shared/types'
+import type { SearchResult, SemanticSearchResult } from '@shared/types'
 
 const {
   mockClose,
@@ -12,7 +12,8 @@ const {
   mockSetFolderTagFilter,
   mockSetPersonFilter,
   mockSetSearchResults,
-  mockSearchPhotos
+  mockSearchPhotos,
+  mockSemanticSearchPhotos
 } = vi.hoisted(() => ({
   mockClose: vi.fn(),
   mockSelectPhoto: vi.fn(),
@@ -21,7 +22,8 @@ const {
   mockSetFolderTagFilter: vi.fn(),
   mockSetPersonFilter: vi.fn(),
   mockSetSearchResults: vi.fn(),
-  mockSearchPhotos: vi.fn()
+  mockSearchPhotos: vi.fn(),
+  mockSemanticSearchPhotos: vi.fn()
 }))
 
 // Stands in for Mantine's Spotlight so the modal renders inline, without the
@@ -107,6 +109,19 @@ function makeResult(paths: string[], total = paths.length): SearchResult {
   }
 }
 
+function makeSemanticResult(paths: string[]): SemanticSearchResult {
+  return {
+    hits: paths.map((filePath) => ({
+      filePath,
+      fileName: filePath.split('/').pop() ?? filePath,
+      score: 0.3,
+      thumbnailKey: null
+    })),
+    indexedCount: paths.length,
+    totalReadyCount: paths.length
+  }
+}
+
 function renderSpotlight(): void {
   render(
     <MantineProvider>
@@ -131,8 +146,9 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.clearAllMocks()
   mockSearchPhotos.mockResolvedValue(makeResult([]))
-  // @ts-expect-error - partial window.api stub; only searchPhotos is exercised
-  window.api = { searchPhotos: mockSearchPhotos }
+  mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResult([]))
+  // @ts-expect-error - partial window.api stub; only these two are exercised
+  window.api = { searchPhotos: mockSearchPhotos, semanticSearchPhotos: mockSemanticSearchPhotos }
 })
 
 afterEach(() => {
@@ -264,6 +280,55 @@ describe('facet chips', () => {
 
     const last = mockSearchPhotos.mock.calls.at(-1)![0]
     expect(last.includeExcluded).toBe(true)
+  })
+})
+
+describe('visual matches', () => {
+  it('opens a semantic hit the same way an exact hit opens', async () => {
+    mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResult(['/photos/sunset.jpg']))
+    renderSpotlight()
+    await search('beach')
+
+    act(() => screen.getByText('sunset.jpg').closest('button')!.click())
+
+    expect(mockOpenPhotoTab).toHaveBeenCalledWith('/photos/sunset.jpg')
+    expect(mockClose).toHaveBeenCalled()
+  })
+
+  // A photo already found by the exact scan isn't a distinct visual finding
+  // — it should only ever appear once, under Photos.
+  it('excludes a photo already present in the exact facet matches', async () => {
+    mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
+    mockSemanticSearchPhotos.mockResolvedValue(
+      makeSemanticResult(['/photos/a.jpg', '/photos/b.jpg'])
+    )
+    renderSpotlight()
+    await search('beach')
+
+    expect(screen.getByText('Visual matches')).toBeInTheDocument()
+    expect(screen.getByText('b.jpg')).toBeInTheDocument()
+    expect(screen.queryAllByText('a.jpg')).toHaveLength(1)
+  })
+
+  it('appends semantic-only paths after the exact matches in Show all in Gallery', async () => {
+    mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
+    mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResult(['/photos/b.jpg']))
+    renderSpotlight()
+    await search('beach')
+
+    act(() => screen.getByText('Show these results in Gallery').closest('button')!.click())
+
+    expect(mockSetSearchResults).toHaveBeenCalledWith({
+      paths: ['/photos/a.jpg', '/photos/b.jpg'],
+      label: 'beach'
+    })
+  })
+
+  it('never queries semantic search for a flags-only query', async () => {
+    renderSpotlight()
+    await search('tag:beach person:joe')
+
+    expect(mockSemanticSearchPhotos).not.toHaveBeenCalled()
   })
 })
 
