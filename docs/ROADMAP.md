@@ -12,17 +12,19 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 1. Add a message on the opening loading screen if new photos are detected / being imported, to alert users that opening the app may take a little longer.
 
-2. Corrupt photo finder
+2. Corrupt photo finder w/ delete all (move to recycle bin?)
 
-3. Search -- implement faceted spotlight search using Mantine `Spotlight`. See **SEARCH_PLAN.md** for the full plan (revised after review: **index-free scan engine, no FTS5/triggers/migration in v1** — the corpus is small enough to scan per keystroke, benchmarked at ~50ms even at 100k photos; FTS5 is a documented escalation path behind the same repository seam). Entry: header search icon + `Cmd/Ctrl+F`. Facets: filename/comment/folder as substring text, `tag:`/`person:` as exact set filters, plus date/camera/views/`is:untagged` structured filters — typed flags and UI chips drive the same parsed state. Includes "Show all results in Gallery" (Picasa-style grid filtering), since a 7-row modal is no home for 400 matches. Repeated `person:` flags intersect, so "person:joe person:mary before:2020" already works in v1. Commands and search history deliberately held out.
+3. Make all 'Enable AI features' buttons use the gradient variant.
+
+### Video
+
+1. Create a Videos tab if videos exist in the library. This should be a YouTube-but-just-for-my-videos sort of experience. Additional features will depend on what metadata is available for videos. Change "Gallery" tab to "Photos" and change the quick navigation shortcuts -- p for photos and v for videos. Use Mantine Video for the player (new dependency). Displayed field can include "display name" -- defaults to video filename, but overwritable without touching the filename. Filename itself (editable, following existing inline edit patterns). Extension. Duration. Watch count. Video date (also editable).
+
+### Search
 
 4. Compound facet search — Graph-search-style composition beyond v1's conjunctions. v1 already handles AND-of-facets ("photos of Joe and Mary before 2020"); what remains is OR/grouping (AST becomes an expression tree — cheap under the scan engine, which evaluates JS predicates rather than building query strings), facet-count-aware ranking, and a natural-language layer that lowers onto the same AST. See SEARCH_PLAN.md's "Compound facet search" section.
 
 5. Initial state -- use Mantine EmptyState to improve the how the app looks before any photos have been added. I think maybe some placeholder elements are warranted to show how the app is meant to look after photos have been added. And we need more features like the Featured Tag onboarding process for other widgets and areas of the app to guide users on how to get things populated.
-
-6. Make all 'Enable AI features' buttons use the gradient variant.
-
-7. Video support?
 
 ## Application Management
 
