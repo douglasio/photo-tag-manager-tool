@@ -1,4 +1,4 @@
-import { type ReactElement, useMemo } from 'react'
+import { memo, type ReactElement, useMemo } from 'react'
 
 import { Badge, Chip, Group, Image, Text } from '@mantine/core'
 import { Spotlight, spotlight } from '@mantine/spotlight'
@@ -22,7 +22,7 @@ const FACET_CHIPS = [
   { label: 'Has comment', predicate: { kind: 'flag', field: 'comment-present', negated: false } }
 ] as const
 
-export function SearchSpotlight(): ReactElement {
+export const SearchSpotlight = memo(function SearchSpotlight(): ReactElement {
   const { text, setText, query, result, loading, includeExcluded, setIncludeExcluded } =
     usePhotoSearch()
   const { state, allTags } = useSidebarLibrary()
@@ -82,6 +82,8 @@ export function SearchSpotlight(): ReactElement {
       shortcut="mod + F"
       scrollable
       maxHeight={420}
+      // Mantine defaults this overlay to blur: 7 which causes lagginess due to rendering over a long virtualized gallery
+      overlayProps={{ blur: 2, backgroundOpacity: 0.5 }}
     >
       <Spotlight.Search placeholder="Search photos, tags, people…" leftSection={<IconSearch />} />
 
@@ -222,4 +224,4 @@ export function SearchSpotlight(): ReactElement {
       )}
     </Spotlight.Root>
   )
-}
+})

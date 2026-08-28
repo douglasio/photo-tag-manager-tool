@@ -30,12 +30,11 @@ export default defineConfig(
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
       ...eslintPluginReactRefresh.configs.vite.rules,
-      // @typescript-eslint/no-unused-vars (from tseslint.configs.recommended
-      // above) only reports unused imports, it can't remove them via --fix —
-      // this plugin's rule does, so it takes over that half of the job.
-      '@typescript-eslint/no-unused-vars': 'off',
       'unused-imports/no-unused-imports': 'error',
-      'unused-imports/no-unused-vars': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }
+      ],
       'simple-import-sort/imports': [
         'error',
         {
