@@ -1035,3 +1035,134 @@ describe('photoLibraryReducer', () => {
     expect(next).toBe(initialState)
   })
 })
+
+describe('search results filter', () => {
+  it('stores matched paths as a set with its label', () => {
+    const state = photoLibraryReducer(initialState, {
+      type: 'SET_SEARCH_RESULTS',
+      paths: ['/a.jpg', '/b.jpg'],
+      label: 'beach'
+    })
+
+    expect(state.searchResults?.label).toBe('beach')
+    expect(state.searchResults?.paths.has('/a.jpg')).toBe(true)
+    expect(state.searchResults?.paths.size).toBe(2)
+  })
+
+  // Search is a primary filter, so it and the folder/tag/person filters
+  // replace one another rather than stacking into an unreachable combination.
+  it('clears the other primary filters when applied', () => {
+    const filtered: PhotoLibraryState = {
+      ...initialState,
+      selectedFolder: '/root',
+      selectedTag: 'beach',
+      selectedPerson: 'p1',
+      untaggedFilterActive: true
+    }
+
+    const state = photoLibraryReducer(filtered, {
+      type: 'SET_SEARCH_RESULTS',
+      paths: ['/a.jpg'],
+      label: 'beach'
+    })
+
+    expect(state.selectedFolder).toBeNull()
+    expect(state.selectedTag).toBeNull()
+    expect(state.selectedPerson).toBeNull()
+    expect(state.untaggedFilterActive).toBe(false)
+  })
+
+  it.each([
+    ['SET_FOLDER_FILTER', { type: 'SET_FOLDER_FILTER', folder: '/root' }],
+    ['SET_TAG_FILTER', { type: 'SET_TAG_FILTER', tag: 'beach' }],
+    ['SET_PERSON_FILTER', { type: 'SET_PERSON_FILTER', personId: 'p1' }],
+    ['SET_UNTAGGED_FILTER', { type: 'SET_UNTAGGED_FILTER', active: true }]
+  ] as const)('is cleared by %s', (_label, action) => {
+    const searching = photoLibraryReducer(initialState, {
+      type: 'SET_SEARCH_RESULTS',
+      paths: ['/a.jpg'],
+      label: 'beach'
+    })
+
+    expect(photoLibraryReducer(searching, action).searchResults).toBeNull()
+  })
+
+  it('clears on demand', () => {
+    const searching = photoLibraryReducer(initialState, {
+      type: 'SET_SEARCH_RESULTS',
+      paths: ['/a.jpg'],
+      label: 'beach'
+    })
+
+    expect(
+      photoLibraryReducer(searching, { type: 'CLEAR_SEARCH_RESULTS' }).searchResults
+    ).toBeNull()
+  })
+})
+
+describe('search results survive renames', () => {
+  function searching(...paths: string[]): PhotoLibraryState {
+    return photoLibraryReducer(
+      { ...initialState, folders: ['/root'] },
+      { type: 'SET_SEARCH_RESULTS', paths, label: 'beach' }
+    )
+  }
+
+  // searchResults is path-shaped state, so it has to be rewritten alongside
+  // selectedPath/openTabs — otherwise renaming silently empties the results.
+  it('rewrites matched paths when a folder is renamed', () => {
+    const state = photoLibraryReducer(searching('/root/old/a.jpg', '/root/keep/b.jpg'), {
+      type: 'FOLDER_RENAMED',
+      oldFolder: '/root/old',
+      newFolder: '/root/new'
+    })
+
+    expect(state.searchResults?.paths.has('/root/new/a.jpg')).toBe(true)
+    expect(state.searchResults?.paths.has('/root/old/a.jpg')).toBe(false)
+    expect(state.searchResults?.paths.has('/root/keep/b.jpg')).toBe(true)
+  })
+
+  it('repoints a renamed photo, with no tab open for it', () => {
+    const state = photoLibraryReducer(searching('/root/a.jpg'), {
+      type: 'RENAME_PHOTO_TAB',
+      oldPath: '/root/a.jpg',
+      newPath: '/root/b.jpg'
+    })
+
+    expect(state.searchResults?.paths.has('/root/b.jpg')).toBe(true)
+    expect(state.searchResults?.paths.has('/root/a.jpg')).toBe(false)
+  })
+
+  it('repoints a renamed photo that does have a tab open', () => {
+    let state = searching('/root/a.jpg')
+    state = photoLibraryReducer(state, { type: 'OPEN_PHOTO_TAB', filePath: '/root/a.jpg' })
+    state = photoLibraryReducer(state, {
+      type: 'RENAME_PHOTO_TAB',
+      oldPath: '/root/a.jpg',
+      newPath: '/root/b.jpg'
+    })
+
+    expect(state.searchResults?.paths.has('/root/b.jpg')).toBe(true)
+    expect(state.openTabs).toEqual(['/root/b.jpg'])
+  })
+
+  it('leaves state untouched when the rename affects neither tabs nor results', () => {
+    const state = searching('/root/a.jpg')
+    expect(
+      photoLibraryReducer(state, {
+        type: 'RENAME_PHOTO_TAB',
+        oldPath: '/root/other.jpg',
+        newPath: '/root/renamed.jpg'
+      })
+    ).toBe(state)
+  })
+
+  it('keeps the label across a rename', () => {
+    const state = photoLibraryReducer(searching('/root/old/a.jpg'), {
+      type: 'FOLDER_RENAMED',
+      oldFolder: '/root/old',
+      newFolder: '/root/new'
+    })
+    expect(state.searchResults?.label).toBe('beach')
+  })
+})

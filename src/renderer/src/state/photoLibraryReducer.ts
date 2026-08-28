@@ -72,6 +72,10 @@ export interface PhotoLibraryState {
   selectedFolder: string | null
   selectedTag: string | null
   selectedPerson: string | null
+  // An active search filtering the gallery, from Spotlight's "show all in
+  // Gallery". Holds the matched paths rather than the query, so the grid
+  // filters without re-running the search on every render.
+  searchResults: { paths: Set<string>; label: string } | null
   // Every (photo, person) pairing, keyed by personId — lets the gallery filter
   // by person synchronously, same as tags (which live directly on PhotoRecord).
   personPhotoAssignments: Map<string, Set<string>>
@@ -162,6 +166,7 @@ export const initialState: PhotoLibraryState = {
   selectedFolder: null,
   selectedTag: null,
   selectedPerson: null,
+  searchResults: null,
   personPhotoAssignments: new Map(),
   untaggedFilterActive: false,
   sortBy: 'name',
@@ -244,6 +249,8 @@ export type PhotoLibraryAction =
   | { type: 'SET_NAVBAR_SPLIT_SIZES'; sizes: number[] }
   | { type: 'SET_NAVBAR_WIDTH'; width: number }
   | { type: 'SET_GALLERY_CELL_WIDTH'; width: number }
+  | { type: 'SET_SEARCH_RESULTS'; paths: string[]; label: string }
+  | { type: 'CLEAR_SEARCH_RESULTS' }
   | { type: 'SET_NAVBAR_COLLAPSED_PANELS'; panels: Record<string, boolean> }
   | { type: 'SET_MAGAZINE_TITLE'; value: string }
   | { type: 'SET_NEWSPAPER_TITLE'; value: string }
@@ -410,6 +417,9 @@ export function photoLibraryReducer(
       const selectedPaths = new Set(Array.from(state.selectedPaths, rewrite))
       const openTabs = state.openTabs.map(rewrite)
       const activeTab = rewrite(state.activeTab)
+      const searchResults = state.searchResults
+        ? { ...state.searchResults, paths: new Set(Array.from(state.searchResults.paths, rewrite)) }
+        : null
 
       return {
         ...state,
@@ -422,7 +432,8 @@ export function photoLibraryReducer(
         selectedPath,
         selectedPaths,
         openTabs,
-        activeTab
+        activeTab,
+        searchResults
       }
     }
     case 'SCAN_STARTED':
@@ -537,7 +548,8 @@ export function photoLibraryReducer(
         selectedFolder: action.folder,
         selectedTag: null,
         selectedPerson: null,
-        untaggedFilterActive: false
+        untaggedFilterActive: false,
+        searchResults: null
       }
     case 'SET_TAG_FILTER':
       return {
@@ -545,7 +557,8 @@ export function photoLibraryReducer(
         selectedTag: action.tag,
         selectedFolder: null,
         selectedPerson: null,
-        untaggedFilterActive: false
+        untaggedFilterActive: false,
+        searchResults: null
       }
     // Unlike SET_TAG_FILTER, keeps selectedFolder intact — for the
     // per-folder tag pills that narrow within a folder rather than replace it.
@@ -562,8 +575,22 @@ export function photoLibraryReducer(
         untaggedFilterActive: action.active,
         selectedTag: null,
         selectedFolder: null,
-        selectedPerson: null
+        selectedPerson: null,
+        searchResults: null
       }
+    // Search behaves as another primary filter: it replaces folder/tag/person
+    // (and they replace it, above), rather than stacking with them.
+    case 'SET_SEARCH_RESULTS':
+      return {
+        ...state,
+        searchResults: { paths: new Set(action.paths), label: action.label },
+        selectedTag: null,
+        selectedFolder: null,
+        selectedPerson: null,
+        untaggedFilterActive: false
+      }
+    case 'CLEAR_SEARCH_RESULTS':
+      return { ...state, searchResults: null }
     // Like SET_FOLDER_TAG_FILTER, keeps selectedFolder intact — the folder
     // pill row's own "Untagged" entry narrows within the folder rather than
     // replacing it with the global (folder-agnostic) untagged view.
@@ -583,7 +610,8 @@ export function photoLibraryReducer(
         selectedPerson: action.personId,
         selectedFolder: null,
         selectedTag: null,
-        untaggedFilterActive: false
+        untaggedFilterActive: false,
+        searchResults: null
       }
     case 'SET_PERSON_PHOTO_ASSIGNMENTS':
       return { ...state, personPhotoAssignments: action.assignments }
@@ -878,14 +906,31 @@ export function photoLibraryReducer(
     // Repoints a renamed photo's tab (and active-tab pointer) at its new
     // path, instead of letting PHOTO_REMOVED prune it as if deleted.
     case 'RENAME_PHOTO_TAB': {
-      if (!state.openTabs.includes(action.oldPath)) return state
+      // Also repoints an active search result set: this is dispatched on every
+      // photo rename (before PHOTO_REMOVED/PHOTO_UPSERTED) and is the only
+      // place that sees both paths, so a renamed photo stays in the results
+      // instead of silently vanishing from them.
+      const searchResults =
+        state.searchResults && state.searchResults.paths.has(action.oldPath)
+          ? {
+              ...state.searchResults,
+              paths: new Set(
+                Array.from(state.searchResults.paths, (path) =>
+                  path === action.oldPath ? action.newPath : path
+                )
+              )
+            }
+          : state.searchResults
+      if (!state.openTabs.includes(action.oldPath)) {
+        return searchResults === state.searchResults ? state : { ...state, searchResults }
+      }
       // newPath may already be open elsewhere (e.g. arrow-key navigation
       // landing on it) — drop that occurrence instead of duplicating the tab.
       const openTabs = state.openTabs
         .filter((path) => path === action.oldPath || path !== action.newPath)
         .map((path) => (path === action.oldPath ? action.newPath : path))
       const activeTab = state.activeTab === action.oldPath ? action.newPath : state.activeTab
-      return { ...state, openTabs, activeTab }
+      return { ...state, openTabs, activeTab, searchResults }
     }
     case 'REORDER_PHOTO_TABS':
       return { ...state, openTabs: action.openTabs }

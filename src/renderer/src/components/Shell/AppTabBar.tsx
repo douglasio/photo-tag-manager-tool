@@ -10,12 +10,14 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove, horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable'
 import { ActionIcon, Group, Kbd, Scroller, Tabs, Tooltip } from '@mantine/core'
+import { spotlight } from '@mantine/spotlight'
 import {
   IconColumns2,
   IconLayoutDashboard,
   IconLayoutSidebarRightCollapse,
   IconLayoutSidebarRightExpand,
   IconLibraryPhoto,
+  IconSearch,
   IconStack2,
   IconX
 } from '@tabler/icons-react'
@@ -23,7 +25,7 @@ import {
 import { CompareTabLabel, ScanProgressBar, SettingsModal, SortableTab, TabLabel } from '@components'
 import { useLibraryActions } from '@renderer/state/PhotoLibraryActionsContext'
 import { useGalleryLibrary } from '@renderer/state/PhotoLibraryGalleryContext'
-import { ACTION_ICONS } from '@renderer/utils'
+import { ACTION_ICONS, isMac } from '@renderer/utils'
 
 const TAB_ICON_SIZE = 20
 
@@ -136,6 +138,17 @@ export const AppTabBar = memo(function AppTabBar(): React.JSX.Element {
             </ActionIcon>
           </Tooltip>
         )}
+        <Tooltip
+          label={
+            <Group gap={6}>
+              Search <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd> <Kbd>F</Kbd>
+            </Group>
+          }
+        >
+          <ActionIcon variant="subtle" aria-label="Search" onClick={spotlight.open}>
+            <IconSearch size={ACTION_ICONS.ICON_SIZE} />
+          </ActionIcon>
+        </Tooltip>
         <ScanProgressBar />
         {!(isCompareTabActive || isDashboardTabActive || isDuplicatesTabActive) && (
           <Tooltip

@@ -10,6 +10,7 @@ import {
   GalleryGrid,
   PersonMergeDialog,
   PhotoView,
+  SearchSpotlight,
   UntaggedRow
 } from '@components'
 import { useAppDragAndDrop, useAppKeyboardShortcuts } from '@hooks'
@@ -100,6 +101,7 @@ export function AppLayout(): React.JSX.Element {
             <AppShell.Header h="auto">
               <AppTabBar />
             </AppShell.Header>
+            <SearchSpotlight />
             <AppShell.Navbar display="flex" style={{ flexDirection: 'column' }}>
               <AppShell.Section component={AllPhotosRow} />
               <AppShell.Section component={UntaggedRow} />

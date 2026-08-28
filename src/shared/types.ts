@@ -137,6 +137,23 @@ export interface AppSettings {
   excludedFolders: string[]
 }
 
+export interface SearchHit {
+  filePath: string
+  fileName: string
+  /** Relevance score from searchRepository's weighted heuristic. */
+  score: number
+  thumbnailKey: string | null
+}
+
+export interface SearchResult {
+  /** Top-ranked hits, capped by the request's limit. */
+  hits: SearchHit[]
+  /** Every match, regardless of limit — drives the "show all N" affordance. */
+  total: number
+  /** Every matching path in rank order, for filtering the gallery grid. */
+  paths: string[]
+}
+
 // The main window's persisted geometry. Deliberately absent from AppSettings
 // above — the renderer never reads or writes it; the main process restores it
 // before the window exists and saves it as the user drags/resizes.

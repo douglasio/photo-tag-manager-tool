@@ -12,6 +12,7 @@ import { registerFolderHandlers } from './ipc/folderHandlers'
 import { registerLibraryDataHandlers } from './ipc/libraryDataHandlers'
 import { registerPhotoHandlers } from './ipc/photoHandlers'
 import { registerScanHandlers } from './ipc/scanHandlers'
+import { registerSearchHandlers } from './ipc/searchHandlers'
 import { registerSettingsHandlers } from './ipc/settingsHandlers'
 import { registerShellHandlers } from './ipc/shellHandlers'
 import { registerTagHandlers } from './ipc/tagHandlers'
@@ -111,6 +112,7 @@ if (!app.requestSingleInstanceLock()) {
     registerScanHandlers()
     registerSettingsHandlers()
     registerFolderHandlers()
+    registerSearchHandlers()
     registerTagHandlers()
     registerAiHandlers()
     registerFaceHandlers()

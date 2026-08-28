@@ -92,7 +92,8 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
     openCompareTab,
     openDuplicatesTab,
     setGalleryViewMode,
-    setGalleryCellWidth
+    setGalleryCellWidth,
+    clearSearchResults
   } = usePhotoLibrary()
 
   // Only set once the selected folder actually has subfolders — a leaf
@@ -221,17 +222,19 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
     ? (activePhotosByPath.get(selectedPerson.coverPhotoPath)?.thumbnailKey ?? null)
     : null
 
-  const galleryTitle = state.untaggedFilterActive
-    ? 'untagged'
-    : isPureTagView
-      ? `#${state.selectedTag}`
-      : isPersonView
-        ? selectedPersonName
-        : state.selectedFolder
-          ? basename(state.selectedFolder)
-          : state.folders.length > 0
-            ? 'All Photos'
-            : null
+  const galleryTitle = state.searchResults
+    ? `Search: ${state.searchResults.label}`
+    : state.untaggedFilterActive
+      ? 'untagged'
+      : isPureTagView
+        ? `#${state.selectedTag}`
+        : isPersonView
+          ? selectedPersonName
+          : state.selectedFolder
+            ? basename(state.selectedFolder)
+            : state.folders.length > 0
+              ? 'All Photos'
+              : null
 
   const tagDescription = isPureTagView ? (state.tagDescriptions.get(state.selectedTag!) ?? '') : ''
 
@@ -282,6 +285,18 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
                         variant="subtle"
                         onClick={() => setPersonFilter(null)}
                         aria-label="Clear person filter"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <IconX size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  {state.searchResults && (
+                    <Tooltip label="Clear search">
+                      <ActionIcon
+                        variant="subtle"
+                        onClick={clearSearchResults}
+                        aria-label="Clear search"
                         style={{ flexShrink: 0 }}
                       >
                         <IconX size={16} />

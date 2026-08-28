@@ -186,6 +186,8 @@ interface PhotoLibraryContextValue {
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
   setPersonFilter: (personId: string | null) => void
+  setSearchResults: (results: { paths: string[]; label: string }) => void
+  clearSearchResults: () => void
   setUntaggedFilter: (active: boolean) => void
   setFolderUntaggedFilter: (active: boolean) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
@@ -728,6 +730,17 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
 
   const setUntaggedFilter = useCallback((active: boolean) => {
     dispatch({ type: 'SET_UNTAGGED_FILTER', active })
+  }, [])
+
+  // Applies a finished search to the gallery grid. Takes the resolved paths
+  // rather than the query, so the grid never re-runs the search itself.
+  const setSearchResults = useCallback(({ paths, label }: { paths: string[]; label: string }) => {
+    dispatch({ type: 'SET_SEARCH_RESULTS', paths, label })
+    dispatch({ type: 'SET_ACTIVE_TAB', tab: 'gallery' })
+  }, [])
+
+  const clearSearchResults = useCallback(() => {
+    dispatch({ type: 'CLEAR_SEARCH_RESULTS' })
   }, [])
 
   const setFolderUntaggedFilter = useCallback((active: boolean) => {
@@ -1461,6 +1474,11 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
         (photo) => !isUnderExcludedFolder(photo.filePath, state.excludedFolders)
       )
     }
+    // Search is a primary filter (the reducer clears the others when it's
+    // set), so it short-circuits the rest of the chain.
+    if (state.searchResults) {
+      return result.filter((photo) => state.searchResults!.paths.has(photo.filePath))
+    }
     if (state.selectedFolder) {
       result = result.filter((photo) => isPhotoInFolder(photo.filePath, state.selectedFolder!))
     }
@@ -1479,6 +1497,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     return result
   }, [
     photos,
+    state.searchResults,
     state.selectedFolder,
     state.selectedTag,
     state.selectedPerson,
@@ -1732,6 +1751,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       setTagFilter,
       setFolderTagFilter,
       setPersonFilter,
+      setSearchResults,
+      clearSearchResults,
       setUntaggedFilter,
       setFolderUntaggedFilter,
       setSort,
@@ -1828,6 +1849,8 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       setTagFilter,
       setFolderTagFilter,
       setPersonFilter,
+      setSearchResults,
+      clearSearchResults,
       setUntaggedFilter,
       setFolderUntaggedFilter,
       setSort,
@@ -1998,6 +2021,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       galleryViewMode: state.galleryViewMode,
       galleryAnimationsEnabled: state.galleryAnimationsEnabled,
       galleryCellWidth: state.galleryCellWidth,
+      searchResults: state.searchResults,
       showFilenames: state.showFilenames,
       showViewCounts: state.showViewCounts,
       defaultView: state.defaultView,
@@ -2028,6 +2052,7 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       state.galleryViewMode,
       state.galleryAnimationsEnabled,
       state.galleryCellWidth,
+      state.searchResults,
       state.showFilenames,
       state.showViewCounts,
       state.defaultView,

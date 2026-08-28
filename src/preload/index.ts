@@ -1,6 +1,7 @@
 import { electronAPI } from '@electron-toolkit/preload'
 import { contextBridge, ipcRenderer } from 'electron'
 
+import type { SearchQuery } from '@shared/searchQuery'
 import type {
   AiScanProgress,
   AiScanResult,
@@ -19,6 +20,7 @@ import type {
   ScanCompleteEvent,
   ScanProgressEvent,
   ScanStartResult,
+  SearchResult,
   SimilarPhoto,
   TagGroup,
   TagSuggestion,
@@ -155,6 +157,8 @@ const api = {
     ipcRenderer.invoke('settings:removeFolder', folder),
   renameFolder: (folder: string, newBaseName: string): Promise<string> =>
     ipcRenderer.invoke('settings:renameFolder', folder, newBaseName),
+  searchPhotos: (query: SearchQuery, limit: number): Promise<SearchResult> =>
+    ipcRenderer.invoke('search:query', query, limit),
   exportDatabase: (): Promise<boolean> => ipcRenderer.invoke('library:exportDatabase'),
   importDatabase: (): Promise<void> => ipcRenderer.invoke('library:importDatabase'),
   clearLibrary: (): Promise<void> => ipcRenderer.invoke('library:clearLibrary'),

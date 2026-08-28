@@ -25,6 +25,7 @@ export interface GalleryLibraryState {
   galleryViewMode: GalleryViewMode
   galleryAnimationsEnabled: boolean
   galleryCellWidth: number
+  searchResults: { paths: Set<string>; label: string } | null
   showFilenames: boolean
   showViewCounts: boolean
   defaultView: DefaultView

@@ -44,6 +44,8 @@ export interface LibraryActions {
   setTagFilter: (tag: string | null) => void
   setFolderTagFilter: (tag: string | null) => void
   setPersonFilter: (personId: string | null) => void
+  setSearchResults: (results: { paths: string[]; label: string }) => void
+  clearSearchResults: () => void
   setUntaggedFilter: (active: boolean) => void
   setFolderUntaggedFilter: (active: boolean) => void
   setSort: (sortBy: GallerySortBy, sortOrder: GallerySortOrder) => void
