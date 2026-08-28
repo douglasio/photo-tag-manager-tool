@@ -1,6 +1,9 @@
 import { ipcMain } from 'electron'
 import { rename, stat } from 'fs/promises'
-import { dirname, join } from 'path'
+// path/posix (not the platform-default path module), since every folder path
+// in this app is stored and compared as forward-slash regardless of OS —
+// plain `join`/`dirname` would emit backslash separators on Windows.
+import { dirname, join } from 'path/posix'
 
 import { pruneMissing, renamePhotoPathPrefix } from '@main/db/photoRepository'
 import { getFolders, setFolders } from '@main/db/settingsRepository'

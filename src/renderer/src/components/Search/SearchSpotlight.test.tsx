@@ -59,15 +59,33 @@ vi.mock('@mantine/spotlight', () => ({
         {children}
       </div>
     ),
+    // Real Spotlight.Root defaults closeOnActionTrigger to true, so every
+    // Action closes the spotlight on click unless it opts out — mirrored
+    // here so a component that forgets closeSpotlightOnTrigger={false} on a
+    // non-closing action (e.g. "View all", "Back") fails a test instead of
+    // only failing in the real app.
     Action: ({
       label,
       children,
-      onClick
+      onClick,
+      closeSpotlightOnTrigger = true,
+      ...rest
     }: {
       label?: string
       children?: React.ReactNode
       onClick?: () => void
-    }) => <button onClick={onClick}>{children ?? label}</button>,
+      closeSpotlightOnTrigger?: boolean
+    } & Record<string, unknown>) => (
+      <button
+        onClick={() => {
+          onClick?.()
+          if (closeSpotlightOnTrigger) mockClose()
+        }}
+        {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+      >
+        {children ?? label}
+      </button>
+    ),
     Empty: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
   }
 }))
@@ -124,7 +142,10 @@ function makeSemanticResult(paths: string[]): SemanticSearchResult {
 
 function renderSpotlight(): void {
   render(
-    <MantineProvider>
+    // env="test" makes Mantine's Transition (used for the row/expanded-list
+    // slide animation) render synchronously instead of through its real
+    // timer-driven animation state machine, which fake timers can't drive.
+    <MantineProvider env="test">
       <SearchSpotlight />
     </MantineProvider>
   )
@@ -164,7 +185,7 @@ describe('photo results', () => {
     renderSpotlight()
     await search('a.jpg')
 
-    act(() => screen.getByText('a.jpg').closest('button')!.click())
+    act(() => screen.getByLabelText('a.jpg').click())
 
     expect(mockOpenPhotoTab).toHaveBeenCalledWith('/photos/a.jpg')
     expect(mockSelectPhoto).toHaveBeenCalledWith('/photos/a.jpg')
@@ -197,15 +218,44 @@ describe('show all in gallery', () => {
     expect(mockClose).toHaveBeenCalled()
   })
 
-  it('hands over every matched path, not just the ones the modal rendered', async () => {
+  it('hands over every matched path, not just the ones the row rendered', async () => {
     const paths = Array.from({ length: 20 }, (_, index) => `/photos/${index}.jpg`)
     mockSearchPhotos.mockResolvedValue(makeResult(paths))
     renderSpotlight()
     await search('beach')
 
-    act(() => screen.getByText('Show all 20 results in Gallery').closest('button')!.click())
+    // Beyond the 7-thumbnail row, the gallery action only appears after
+    // expanding to the full list via "View all" — which renders every hit,
+    // so the expanded view's own count matches the total exactly. Both
+    // buttons split their number into a <strong>, so getByRole (which
+    // flattens descendant text into the accessible name) is used instead of
+    // getByText (which only matches a single text node).
+    act(() => screen.getByRole('button', { name: 'View all 20' }).click())
+    act(() => screen.getByRole('button', { name: 'Show 20 results in gallery' }).click())
 
     expect(mockSetSearchResults.mock.calls[0][0].paths).toHaveLength(20)
+  })
+
+  // Regression: Spotlight.Root defaults closeOnActionTrigger to true, so
+  // without closeSpotlightOnTrigger={false} on the "View all" action, Mantine
+  // closed the whole dropdown right after the click — the row never expanded
+  // and clicking looked like it did nothing at all.
+  it('expands the row in place instead of closing the dropdown', async () => {
+    const paths = Array.from({ length: 20 }, (_, index) => `/photos/${index}.jpg`)
+    mockSearchPhotos.mockResolvedValue(makeResult(paths))
+    renderSpotlight()
+    await search('beach')
+
+    act(() => screen.getByRole('button', { name: 'View all 20' }).click())
+
+    expect(mockClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Back')).toBeInTheDocument()
+    expect(screen.getByLabelText('19.jpg')).toBeInTheDocument()
+
+    act(() => screen.getByText('Back').closest('button')!.click())
+
+    expect(mockClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'View all 20' })).toBeInTheDocument()
   })
 })
 
@@ -247,7 +297,7 @@ describe('facet chips', () => {
     await search('beach')
 
     await act(async () => {
-      screen.getByText('Untagged').click()
+      screen.getByText('untagged').click()
     })
 
     expect(screen.getByLabelText('Search input')).toHaveValue('beach is:untagged')
@@ -258,7 +308,7 @@ describe('facet chips', () => {
     await search('beach is:untagged')
 
     await act(async () => {
-      screen.getByText('Untagged').click()
+      screen.getByText('untagged').click()
     })
 
     expect(screen.getByLabelText('Search input')).toHaveValue('beach')
@@ -270,7 +320,7 @@ describe('facet chips', () => {
     expect(mockSearchPhotos.mock.calls[0][0].includeExcluded).toBe(false)
 
     await act(async () => {
-      screen.getByText('Include excluded folders').click()
+      screen.getByText('excluded folders').click()
     })
     await act(async () => {
       vi.advanceTimersByTime(200)
@@ -284,19 +334,21 @@ describe('facet chips', () => {
 })
 
 describe('visual matches', () => {
-  it('opens a semantic hit the same way an exact hit opens', async () => {
+  it('opens a semantic hit the same way an exact hit opens, mixed into Photos', async () => {
     mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResult(['/photos/sunset.jpg']))
     renderSpotlight()
     await search('beach')
 
-    act(() => screen.getByText('sunset.jpg').closest('button')!.click())
+    // No separate section — the semantic hit renders inline under Photos.
+    expect(screen.getByText('Photos (1)')).toBeInTheDocument()
+    act(() => screen.getByLabelText('sunset.jpg').click())
 
     expect(mockOpenPhotoTab).toHaveBeenCalledWith('/photos/sunset.jpg')
     expect(mockClose).toHaveBeenCalled()
   })
 
   // A photo already found by the exact scan isn't a distinct visual finding
-  // — it should only ever appear once, under Photos.
+  // — it should only ever appear once.
   it('excludes a photo already present in the exact facet matches', async () => {
     mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
     mockSemanticSearchPhotos.mockResolvedValue(
@@ -305,12 +357,13 @@ describe('visual matches', () => {
     renderSpotlight()
     await search('beach')
 
-    expect(screen.getByText('Visual matches')).toBeInTheDocument()
-    expect(screen.getByText('b.jpg')).toBeInTheDocument()
-    expect(screen.queryAllByText('a.jpg')).toHaveLength(1)
+    // 1 exact + 1 distinct semantic hit, not 1 exact + 2 semantic.
+    expect(screen.getByText('Photos (2)')).toBeInTheDocument()
+    expect(screen.getByLabelText('b.jpg')).toBeInTheDocument()
+    expect(screen.queryAllByLabelText('a.jpg')).toHaveLength(1)
   })
 
-  it('appends semantic-only paths after the exact matches in Show all in Gallery', async () => {
+  it('folds semantic-only paths into the single gallery action', async () => {
     mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
     mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResult(['/photos/b.jpg']))
     renderSpotlight()
@@ -320,6 +373,26 @@ describe('visual matches', () => {
 
     expect(mockSetSearchResults).toHaveBeenCalledWith({
       paths: ['/photos/a.jpg', '/photos/b.jpg'],
+      label: 'beach'
+    })
+  })
+
+  it('drops semantic hits from the list and the gallery action when the chip is off', async () => {
+    mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
+    mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResult(['/photos/b.jpg']))
+    renderSpotlight()
+    await search('beach')
+
+    expect(screen.getByText('Photos (2)')).toBeInTheDocument()
+
+    act(() => screen.getByText('visual matches').click())
+
+    expect(screen.getByText('Photos (1)')).toBeInTheDocument()
+    expect(screen.queryByLabelText('b.jpg')).not.toBeInTheDocument()
+
+    act(() => screen.getByText('Show these results in Gallery').closest('button')!.click())
+    expect(mockSetSearchResults).toHaveBeenCalledWith({
+      paths: ['/photos/a.jpg'],
       label: 'beach'
     })
   })

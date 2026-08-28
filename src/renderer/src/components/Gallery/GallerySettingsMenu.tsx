@@ -24,7 +24,7 @@ export function GallerySettingsMenu(): ReactElement {
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Label>Gallery</Menu.Label>
+        <Menu.Label>Photos</Menu.Label>
         <Switch
           m="xs"
           label="Show filenames"

@@ -4,6 +4,10 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
+1. "scan again" on face detection in the settings panel crashes the app
+
+2. ~~Clicking View all N in the spotlight dropdown just closes the dropdown without doing anything.~~ (Done — Spotlight.Action now opts out of Mantine's default close-on-trigger, and "View all" expands the row in place instead.)
+
 # Features
 
 To-dos, tasks, and features loosely grouped by feature segment.
@@ -15,6 +19,10 @@ To-dos, tasks, and features loosely grouped by feature segment.
 2. Corrupt photo finder w/ delete all (move to recycle bin?)
 
 3. Make all 'Enable AI features' buttons use the gradient variant.
+
+### Profiles
+
+1. Introduce ability to create profiles with a username and assignable icon. Profiles should be fully separated -- separate db tables for gallery, tags, metadata, etc. The only thing persisted between profiles should be basic stuff like window positioning / panel sizing etc. There should be an option to password-protect a profile so it can't be accessed without a password, and optional session timeout so if the app is idle for a while, it locks. Basically mimic iOS Photo's hidden folder mechanism.
 
 ### Video
 
@@ -62,21 +70,25 @@ Note: any new face/vision model needs a license check first — InsightFace's SC
 
 ## Gallery View
 
-1. Select tag thumbnail photo
+1. Rename the Gallery tab to "Photos" and change the shortcut from g to p. Change naming conventions throughout the app only where they're essential, if there are some leftover variables or functions that still reference "gallery" or "gallery view" don't worry about them.
 
-2. Cursor multi-select
+2. Make the detail view resizeable as the left panel already is. Display the selected photo at the top of the detail view panel.
 
-3. The next view should be...
+3. Select tag thumbnail photo
 
-4. Contact sheet?
+4. Cursor multi-select
 
-5. For Tags and People, make it possible to select a "cover photo." Today we default to the most recent photo from the tag or person, we should be able to manually select one. I would imagine this will be under the right-click menu on gallery view items. Initially I thought it should only appear when a tag or person is selected and filtered (Make cover photo for [tag / person name]). But if the gallery isn't filtered, I think right-clicking a photo should show a Make Cover Photo for [ person in this photo ], and "Make Cover Photo for [ tag on this photo ] with a flyout showing other tags on the photo. That's a lot, so ask for clarification if anything is ambiguous.
+5. The next view should be...
 
-6. Full-tab views for each left panel section?
+6. Contact sheet?
 
-7. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated — the settings layer is now ~26 setting triplets across repository/IPC/preload; see Codebase #5.)
+7. For Tags and People, make it possible to select a "cover photo." Today we default to the most recent photo from the tag or person, we should be able to manually select one. I would imagine this will be under the right-click menu on gallery view items. Initially I thought it should only appear when a tag or person is selected and filtered (Make cover photo for [tag / person name]). But if the gallery isn't filtered, I think right-clicking a photo should show a Make Cover Photo for [ person in this photo ], and "Make Cover Photo for [ tag on this photo ] with a flyout showing other tags on the photo. That's a lot, so ask for clarification if anything is ambiguous.
 
-8. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
+8. Full-tab views for each left panel section?
+
+9. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated — the settings layer is now ~26 setting triplets across repository/IPC/preload; see Codebase #5.)
+
+10. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
 
 ### People
 
@@ -100,12 +112,17 @@ Note: any new face/vision model needs a license check first — InsightFace's SC
 
 1. Refactor Compare view to use Mantine Compare plugin instead of Splitter. I'm okay if this means removing the ability to compare >2 images for now.
 
-2. Photo editing — adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
-   - `onSave` returns base64/canvas, not a file — original EXIF (GPS, date-taken, camera info) is lost on re-encode unless explicitly restored. Plan: base64 → IPC → decode → copy original tags via exiftool-vendored → write via sharp → same `ingestFile`/thumbnail-regen path the current rotate handler uses.
-   - No Mantine integration — it's a standalone widget with its own `theme` object (reskinnable to match), dropped in a Mantine `Modal`. Pulls in `react-konva` + `styled-components` as new deps.
-   - No plugin API for custom tools/tabs — can only show/hide/reorder the built-in tool set (adjust, filters, rotate, crop, resize, watermark, shapes, text). The DVD/magazine/newspaper visualizations would stay separate, not foldable into its toolbar.
-   - Takes a URL or `HTMLImageElement` as source — fits the existing `toFileProtocolUrl` pattern directly.
-   - Open question worth settling before building: edit in place, or write a copy and keep the original? Picasa kept originals and stored edits separately; destructive in-place editing is the riskier default.
+2. In Photo view, enable pan (with click and drag) after zooming. Scroll wheel should also zoom the image.
+
+3. Move the floating controls at the bottom of the photo view to a dedicated row that doesn't overlap with the photo itself.
+
+X. Photo editing — adopt `react-filerobot-image-editor` for crop/straighten/filters (not a replacement for the existing EXIF-only rotate — keep that as-is, it's lossless and cheap). Notes from research:
+
+- `onSave` returns base64/canvas, not a file — original EXIF (GPS, date-taken, camera info) is lost on re-encode unless explicitly restored. Plan: base64 → IPC → decode → copy original tags via exiftool-vendored → write via sharp → same `ingestFile`/thumbnail-regen path the current rotate handler uses.
+- No Mantine integration — it's a standalone widget with its own `theme` object (reskinnable to match), dropped in a Mantine `Modal`. Pulls in `react-konva` + `styled-components` as new deps.
+- No plugin API for custom tools/tabs — can only show/hide/reorder the built-in tool set (adjust, filters, rotate, crop, resize, watermark, shapes, text). The DVD/magazine/newspaper visualizations would stay separate, not foldable into its toolbar.
+- Takes a URL or `HTMLImageElement` as source — fits the existing `toFileProtocolUrl` pattern directly.
+- Open question worth settling before building: edit in place, or write a copy and keep the original? Picasa kept originals and stored edits separately; destructive in-place editing is the riskier default.
 
 ### Visualizations
 
