@@ -101,7 +101,6 @@ async function readRawRgb(imagePath: string): Promise<RawImage> {
 async function detectFaces(imagePath: string): Promise<DetectedFace[]> {
   if (!yunetSession || !sfaceSession) throw new Error('Face models not initialized')
 
-  const full = await readRawRgb(imagePath)
   const { data: resizedData } = await sharp(imagePath)
     .rotate()
     .toColourspace('srgb')
@@ -127,6 +126,12 @@ async function detectFaces(imagePath: string): Promise<DetectedFace[]> {
   })
 
   const decoded = decodeYuNetOutputs(strideOutputs, SCORE_THRESHOLD, NMS_THRESHOLD)
+  // Only the 640x640 resize above is needed to find faces; the full-resolution
+  // decode below costs ~3 bytes/pixel (70MB+ for a 24MP photo) and is used
+  // solely to crop them, so it must not happen for a photo with no faces.
+  if (decoded.length === 0) return []
+
+  const full = await readRawRgb(imagePath)
   const scaleX = full.width / YUNET_INPUT_SIZE
   const scaleY = full.height / YUNET_INPUT_SIZE
 

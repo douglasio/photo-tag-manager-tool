@@ -4,9 +4,13 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
-1. "scan again" on face detection in the settings panel crashes the app
+1. ~~"scan again" on face detection in the settings panel crashes the app~~ (Done — the detection worker was decoding every photo at full resolution before knowing whether it contained a face, and a rescan re-ran that over every faceless photo. Detection now moved to a paced background indexer with its own progress toast.)
 
-2. ~~Clicking View all N in the spotlight dropdown just closes the dropdown without doing anything.~~ (Done — Spotlight.Action now opts out of Mantine's default close-on-trigger, and "View all" expands the row in place instead.)
+2. The tag entry field (in the details panel for both gallery and photo view) should blur after hitting "enter" so you don't get focus-trapped.
+
+3. I tried batch-selecting a large number of photos and applying a new tag to all of them. Nothing seemed to happen. There needs to be some kind of progress indicator if applying a batch edit is going to take a while so the user isn't confused and doesn't accidentally mess up in-progress writes.
+
+4. Orphaned thumbnails leak on every photo modification. `thumbnailKeyFor` hashes `path:mtime:size:longEdge`, so editing a photo externally (or rotating it in-app) produces a new key and a new cache file, but nothing deletes the file the old key pointed at — `updateThumbnail` just overwrites the DB column. `deleteThumbnail` is only wired to deletion paths (`pruneMissing`, remove-folder, delete-photo, watcher `unlink`), never to modification. Not a correctness bug, but the thumbnail cache grows without bound for anyone who edits photos in place. Fix is probably to read the existing `thumbnailKey` in `updateThumbnail` and delete its file when the key actually changes — note that's a sync DB function calling into async `deleteThumbnail`, so the cleanup likely belongs in `ingestThumbnail` (its only real caller) instead. Pairs with Application Management #3's "what does this app write outside its bundle" inventory.
 
 # Features
 
@@ -89,6 +93,23 @@ Note: any new face/vision model needs a license check first — InsightFace's SC
 9. Tag folder open/closed state should be persisted. (Reassess overall persisted settings approach to see if this could be optimized or consolidated — the settings layer is now ~26 setting triplets across repository/IPC/preload; see Codebase #5.)
 
 10. Give the container for photo thumbnails in the gallery a dark background so when you're scrolling quickly through the gallery, you still see the box where the photos will render in.
+
+11. Clicking the random sort button should re-randomize on each click
+
+12. Leave "show filenames in gallery" setting off by default, and move the view count in the gallery thumbnails to be overlaid on the image itself rather than below. This view count should also be toggled off by default.
+
+## Detail Panel
+
+1. Make the "Suggested" header smaller so it appears as a subheader within "Tags" as expected.
+
+2. Make the Metadata section collapsible.
+
+3. In the same style and location as the view count, include additional user-friendly info about the photo based on the metadata. Omit fields if the information can't be parsed.
+
+- (Date icon) Date, in X years/months/days ago (use native Mantine/dayjs date conversion if available rather than rolling your own parsing)
+- (Camera icon) the camera used
+
+Before beginning, suggest other possible info we could display here with the data available. AI description or detected features, etc.
 
 ### People
 

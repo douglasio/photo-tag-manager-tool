@@ -127,6 +127,8 @@ function createMockApi(): {
     }),
     cancelFaceScan: vi.fn().mockResolvedValue(undefined),
     onFaceScanProgress: onMethod('onFaceScanProgress'),
+    getFaceIndexStatus: vi.fn().mockResolvedValue(null),
+    onFaceIndexProgress: onMethod('onFaceIndexProgress'),
     renamePerson: vi.fn().mockResolvedValue(undefined),
     assignFaceToPerson: vi.fn().mockResolvedValue(undefined),
     splitFaceAsNewPerson: vi
@@ -311,6 +313,19 @@ describe('PhotoLibraryContext', () => {
 
       act(() => subscriptions.onEmbeddingIndexProgress(null))
       expect(result.current.embeddingIndexProgress).toBeNull()
+    })
+
+    it('seeds and updates faceIndexProgress the same way', async () => {
+      mockApi.getFaceIndexStatus.mockResolvedValue({ done: 2, total: 8 })
+      const { result } = setupScanProgress()
+
+      await waitFor(() => expect(result.current.faceIndexProgress).toEqual({ done: 2, total: 8 }))
+
+      act(() => subscriptions.onFaceIndexProgress({ done: 5, total: 8 }))
+      expect(result.current.faceIndexProgress).toEqual({ done: 5, total: 8 })
+
+      act(() => subscriptions.onFaceIndexProgress(null))
+      expect(result.current.faceIndexProgress).toBeNull()
     })
   })
 

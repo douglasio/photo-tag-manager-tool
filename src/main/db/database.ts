@@ -141,6 +141,17 @@ export function getDb(): Database.Database {
     db.exec('ALTER TABLE photos ADD COLUMN firstSeenAt INTEGER')
     db.exec('UPDATE photos SET firstSeenAt = lastScannedAt WHERE firstSeenAt IS NULL')
   }
+  // When face detection last ran for this photo. Needed because a photo with
+  // zero faces leaves no photo_faces rows, so it is otherwise indistinguishable
+  // from a never-scanned one and gets fully re-detected on every scan.
+  // Backfilled for photos that already have faces; the rest are re-detected once.
+  if (!photoColumns.some((column) => column.name === 'faceScannedAt')) {
+    db.exec('ALTER TABLE photos ADD COLUMN faceScannedAt INTEGER')
+    db.exec(
+      `UPDATE photos SET faceScannedAt = lastScannedAt
+       WHERE path IN (SELECT DISTINCT photo_path FROM photo_faces)`
+    )
+  }
 
   // group_id is used now (tag groups); position/hidden/coverPhotoPath are
   // reserved for later tag features (custom ordering, hiding from the UI, a

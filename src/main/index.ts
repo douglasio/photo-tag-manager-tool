@@ -23,6 +23,7 @@ import {
   registerThumbProtocolScheme
 } from './protocols/thumbProtocol'
 import { kickIndexer, setIndexTarget } from './services/embeddingIndexService'
+import { kickFaceIndexer, setFaceIndexTarget } from './services/faceIndexService'
 import { shutdownExifTool } from './services/metadataService'
 import { setWatchTarget, unwatchAllFolders, watchFolder } from './services/watchManager'
 import {
@@ -125,12 +126,14 @@ if (!app.requestSingleInstanceLock()) {
     if (mainWindow) {
       setWatchTarget(mainWindow.webContents)
       setIndexTarget(mainWindow.webContents)
+      setFaceIndexTarget(mainWindow.webContents)
       getFolders().forEach(watchFolder)
-      // Drains any embedding backlog left over from photos ingested since
-      // the last full AI scan — separate from the renderer's interrupted-scan
-      // resume (PhotoLibraryContext's wasAiScanInterrupted check), which only
-      // re-clusters a scan that was itself cut short, not this kind of gap.
+      // Drains any embedding/face backlog left over from photos ingested
+      // since the last full scan — separate from the renderer's
+      // interrupted-scan resume (PhotoLibraryContext's wasAiScanInterrupted
+      // check), which only re-clusters a scan that was itself cut short.
       kickIndexer()
+      kickFaceIndexer()
     }
 
     app.on('activate', function () {
@@ -141,6 +144,7 @@ if (!app.requestSingleInstanceLock()) {
         if (mainWindow) {
           setWatchTarget(mainWindow.webContents)
           setIndexTarget(mainWindow.webContents)
+          setFaceIndexTarget(mainWindow.webContents)
         }
       }
     })

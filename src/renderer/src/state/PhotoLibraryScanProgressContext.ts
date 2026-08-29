@@ -1,17 +1,18 @@
 import { createContext, useContext } from 'react'
 
-import type { AiScanProgress, EmbeddingIndexProgress, FaceScanProgress } from '@shared/types'
+import type {
+  AiScanProgress,
+  EmbeddingIndexProgress,
+  FaceIndexProgress,
+  FaceScanProgress
+} from '@shared/types'
 
-// AI/face scan progress, split out of the Gallery bucket — progress ticks
-// arrive every ~150ms for the whole duration of a scan, and keeping them in
-// GalleryLibraryState made every gallery/dashboard consumer re-render on
-// each tick. Only the few components that actually render progress (the
-// Settings toggles, DuplicatesView, TimeWarpWidget, EnableAiFeaturesDialog)
-// should subscribe here.
+// AI/face scan progress
 export interface PhotoLibraryScanProgressValue {
   aiScanProgress: AiScanProgress | null
   embeddingIndexProgress: EmbeddingIndexProgress | null
   faceScanProgress: FaceScanProgress | null
+  faceIndexProgress: FaceIndexProgress | null
 }
 
 export const PhotoLibraryScanProgressContext = createContext<PhotoLibraryScanProgressValue | null>(

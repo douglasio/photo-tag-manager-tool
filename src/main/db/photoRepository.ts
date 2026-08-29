@@ -198,6 +198,36 @@ export function findReadyPhotosWithoutEmbeddings(): { filePath: string; thumbnai
     .map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
 }
 
+/** Every thumbnail-ready photo outside an excluded folder that face detection
+ * hasn't run over yet — the background face indexer's work queue. Keyed off
+ * faceScannedAt rather than the presence of photo_faces rows, so a photo that
+ * genuinely contains no faces is skipped next time instead of re-detected
+ * forever. */
+export function findReadyPhotosWithoutFaceScan(): { filePath: string; thumbnailKey: string }[] {
+  const excludedFolders = getExcludedFolders()
+  const rows = getDb()
+    .prepare(
+      `SELECT path, thumbnailKey FROM photos
+       WHERE thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL AND faceScannedAt IS NULL`
+    )
+    .all() as { path: string; thumbnailKey: string }[]
+  return rows
+    .filter((row) => !isUnderExcludedFolder(row.path, excludedFolders))
+    .map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
+}
+
+/** Records that face detection has run over this photo, whether or not it
+ * found anything. */
+export function markFaceScanned(filePath: string): void {
+  getDb().prepare('UPDATE photos SET faceScannedAt = ? WHERE path = ?').run(Date.now(), filePath)
+}
+
+/** Clears every photo's face-scan marker — paired with clearAllFaceData so
+ * disabling and re-enabling face detection is a genuine fresh scan. */
+export function clearAllFaceScanMarks(): void {
+  getDb().prepare('UPDATE photos SET faceScannedAt = NULL').run()
+}
+
 /** Every thumbnail-ready photo with a known dateTaken, outside an excluded
  * folder — used to group photos by year for the Throwback widget. */
 export function findAllReadyPhotosWithDate(): {
@@ -231,18 +261,23 @@ export function findByThumbnailKey(thumbnailKey: string): { filePath: string } |
   return row ? { filePath: row.path } : null
 }
 
-// A regenerated thumbnail (e.g. after rotate) means the pixels underneath
-// any cached embedding changed too, so that embedding is stale — deleting it
-// here lets it recompute lazily next time something needs it.
+// A regenerated thumbnail (e.g. after rotate) means the pixels underneath any
+// cached embedding changed too, so that embedding is stale — deleting it here
+// lets it recompute lazily next time something needs it. Faces are dropped and
+// faceScannedAt cleared for the same reason: re-queueing detection without
+// first clearing the old rows would double up this photo's faces.
 export function updateThumbnail(
   filePath: string,
   thumbnailKey: string,
   status: 'ready' | 'error'
 ): void {
   getDb()
-    .prepare('UPDATE photos SET thumbnailKey = ?, thumbnailStatus = ? WHERE path = ?')
+    .prepare(
+      'UPDATE photos SET thumbnailKey = ?, thumbnailStatus = ?, faceScannedAt = NULL WHERE path = ?'
+    )
     .run(thumbnailKey, status, filePath)
   deleteEmbedding(filePath)
+  deleteFacesForPhoto(filePath)
 }
 
 /** Deletes a single photo row (used by the folder watcher on file removal). Returns its thumbnailKey, if any, so the caller can clean up the thumbnail file. */

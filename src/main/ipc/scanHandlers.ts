@@ -6,6 +6,7 @@ import { pruneMissing } from '@main/db/photoRepository'
 import { getExcludePatterns } from '@main/db/settingsRepository'
 import { scanAllFolders, scanDirectory } from '@main/services/directoryScanner'
 import { kickIndexer } from '@main/services/embeddingIndexService'
+import { kickFaceIndexer } from '@main/services/faceIndexService'
 import { ingestMetadata, ingestThumbnail } from '@main/services/photoIngest'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import type {
@@ -189,8 +190,9 @@ async function runScan(
     // against a set that DB-side deliberately left unapplied.
     filePaths: state.cancelled ? null : filePaths
   }
-  // Newly-ready photos need embedding for visual search — nothing else
-  // follows up on that outside an explicit AI scan/rescan.
+  // Newly-ready photos need embedding for visual search and face detection —
+  // nothing else follows up on either outside an explicit scan/rescan.
   kickIndexer()
+  kickFaceIndexer()
   sender.send('scan:complete', completeEvent)
 }

@@ -12,6 +12,7 @@ import type {
 } from '@shared/types'
 
 import { kickIndexer } from './embeddingIndexService'
+import { kickFaceIndexer } from './faceIndexService'
 import { startWatching, stopAllWatchers, stopWatching } from './folderWatcher'
 import { ingestFile } from './photoIngest'
 import { deleteThumbnail } from './thumbnailService'
@@ -53,6 +54,7 @@ async function handleUpsert(filePath: string, changeType: 'add' | 'change'): Pro
     const payload: WatchPhotoUpsertedEvent = { photo, changeType }
     sendToTarget('watch:photo-upserted', payload)
     kickIndexer()
+    kickFaceIndexer()
   } catch (err) {
     console.error(`failed to ingest watched file ${filePath}`, err)
   }

@@ -53,6 +53,7 @@ interface FakeRow {
   lastScannedAt: number
   viewCount: number
   firstSeenAt: number | null
+  faceScannedAt: number | null
 }
 
 // Mimics just enough of better-sqlite3 to exercise photoRepository's actual
@@ -93,7 +94,8 @@ function createFakeDb(): { rows: Map<string, FakeRow>; embeddedPaths: Set<string
               thumbnailStatus: p.thumbnailStatus as string,
               lastScannedAt: p.lastScannedAt as number,
               viewCount: existing?.viewCount ?? 0,
-              firstSeenAt: existing?.firstSeenAt ?? (p.firstSeenAt as number)
+              firstSeenAt: existing?.firstSeenAt ?? (p.firstSeenAt as number),
+              faceScannedAt: existing?.faceScannedAt ?? null
             })
           }
         }
@@ -113,6 +115,32 @@ function createFakeDb(): { rows: Map<string, FakeRow>; embeddedPaths: Set<string
               (r) => r.thumbnailStatus === 'ready' && r.thumbnailKey && r.tags.includes(needle)
             )
             return matches[Symbol.iterator]()
+          }
+        }
+      }
+      // Checked before the findAllReadyPhotos handler below — both queries
+      // share the same prefix, so the more specific one has to win.
+      if (s.includes('faceScannedAt IS NULL') && s.startsWith('SELECT')) {
+        return {
+          all: () =>
+            Array.from(rows.values())
+              .filter((r) => r.thumbnailStatus === 'ready' && r.thumbnailKey)
+              .filter((r) => r.faceScannedAt === null)
+              .map((r) => ({ path: r.path, thumbnailKey: r.thumbnailKey }))
+        }
+      }
+      if (s.startsWith('UPDATE photos SET faceScannedAt = ? WHERE path = ?')) {
+        return {
+          run: (at: number, path: string) => {
+            const row = rows.get(path)
+            if (row) row.faceScannedAt = at
+          }
+        }
+      }
+      if (s.startsWith('UPDATE photos SET faceScannedAt = NULL')) {
+        return {
+          run: () => {
+            for (const row of rows.values()) row.faceScannedAt = null
           }
         }
       }
@@ -154,6 +182,7 @@ function createFakeDb(): { rows: Map<string, FakeRow>; embeddedPaths: Set<string
             if (row) {
               row.thumbnailKey = key
               row.thumbnailStatus = status
+              row.faceScannedAt = null
             }
           }
         }
@@ -353,6 +382,84 @@ describe('findReadyPhotosWithoutEmbeddings', () => {
 
     expect(photoRepository.findReadyPhotosWithoutEmbeddings()).toEqual([])
     expect(embeddedPaths.size).toBe(0)
+  })
+})
+
+describe('face scan queue', () => {
+  // Regression: this used to key off "does this photo have any photo_faces
+  // rows", which can't tell "scanned, no faces in it" apart from "never
+  // scanned" — so every faceless photo was fully re-detected on every scan.
+  it('drops a photo from the queue once it is marked scanned, even with no faces found', () => {
+    createFakeDb()
+    photoRepository.upsertPhoto(
+      makeRecord('/a.jpg', { thumbnailStatus: 'ready', thumbnailKey: 'k1' }),
+      1,
+      1
+    )
+    photoRepository.upsertPhoto(
+      makeRecord('/b.jpg', { thumbnailStatus: 'ready', thumbnailKey: 'k2' }),
+      1,
+      1
+    )
+    expect(photoRepository.findReadyPhotosWithoutFaceScan()).toHaveLength(2)
+
+    photoRepository.markFaceScanned('/a.jpg')
+
+    expect(photoRepository.findReadyPhotosWithoutFaceScan()).toEqual([
+      { filePath: '/b.jpg', thumbnailKey: 'k2' }
+    ])
+  })
+
+  it('excludes non-ready photos and photos under an excluded folder', () => {
+    createFakeDb()
+    mockGetExcludedFolders.mockReturnValue(['/skip'])
+    photoRepository.upsertPhoto(makeRecord('/pending.jpg', { thumbnailStatus: 'pending' }), 1, 1)
+    photoRepository.upsertPhoto(
+      makeRecord('/skip/a.jpg', { thumbnailStatus: 'ready', thumbnailKey: 'k1' }),
+      1,
+      1
+    )
+
+    expect(photoRepository.findReadyPhotosWithoutFaceScan()).toEqual([])
+  })
+
+  it('clearAllFaceScanMarks re-queues everything, for a disable/re-enable reset', () => {
+    createFakeDb()
+    photoRepository.upsertPhoto(
+      makeRecord('/a.jpg', { thumbnailStatus: 'ready', thumbnailKey: 'k1' }),
+      1,
+      1
+    )
+    photoRepository.markFaceScanned('/a.jpg')
+    expect(photoRepository.findReadyPhotosWithoutFaceScan()).toEqual([])
+
+    photoRepository.clearAllFaceScanMarks()
+
+    expect(photoRepository.findReadyPhotosWithoutFaceScan()).toEqual([
+      { filePath: '/a.jpg', thumbnailKey: 'k1' }
+    ])
+  })
+
+  // A regenerated thumbnail means the pixels changed, so any earlier face
+  // result for this photo is stale — same reasoning as the embedding it drops.
+  // The old face rows must go with it: re-queueing detection while they're
+  // still there would double up this photo's faces on the next pass.
+  it('re-queues a photo whose thumbnail was regenerated, dropping its stale faces', () => {
+    createFakeDb()
+    photoRepository.upsertPhoto(
+      makeRecord('/a.jpg', { thumbnailStatus: 'ready', thumbnailKey: 'k1' }),
+      1,
+      1
+    )
+    photoRepository.markFaceScanned('/a.jpg')
+
+    photoRepository.updateThumbnail('/a.jpg', 'k1-new', 'ready')
+
+    expect(photoRepository.findReadyPhotosWithoutFaceScan()).toEqual([
+      { filePath: '/a.jpg', thumbnailKey: 'k1-new' }
+    ])
+    expect(mockDeleteEmbedding).toHaveBeenCalledWith('/a.jpg')
+    expect(mockDeleteFacesForPhoto).toHaveBeenCalledWith('/a.jpg')
   })
 })
 

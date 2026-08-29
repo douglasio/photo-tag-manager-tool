@@ -12,7 +12,8 @@ const {
   mockRemovePhoto,
   mockGetExcludePatterns,
   mockReconcileTagGroups,
-  mockKickIndexer
+  mockKickIndexer,
+  mockKickFaceIndexer
 } = vi.hoisted(() => ({
   mockStartWatching: vi.fn(),
   mockStopWatching: vi.fn().mockResolvedValue(undefined),
@@ -22,10 +23,12 @@ const {
   mockRemovePhoto: vi.fn(),
   mockGetExcludePatterns: vi.fn().mockReturnValue([]),
   mockReconcileTagGroups: vi.fn(),
-  mockKickIndexer: vi.fn()
+  mockKickIndexer: vi.fn(),
+  mockKickFaceIndexer: vi.fn()
 }))
 
 vi.mock('./embeddingIndexService', () => ({ kickIndexer: mockKickIndexer }))
+vi.mock('./faceIndexService', () => ({ kickFaceIndexer: mockKickFaceIndexer }))
 vi.mock('./folderWatcher', () => ({
   startWatching: mockStartWatching,
   stopWatching: mockStopWatching,
@@ -113,8 +116,9 @@ describe('watchManager', () => {
         photo: expect.objectContaining({ filePath: '/root/a.jpg' }),
         changeType: 'add'
       })
-      // A newly-ready photo needs embedding for visual search.
+      // A newly-ready photo needs both embedding and face detection.
       expect(mockKickIndexer).toHaveBeenCalled()
+      expect(mockKickFaceIndexer).toHaveBeenCalled()
     })
 
     it('removes the photo and its thumbnail for an unlink event', async () => {

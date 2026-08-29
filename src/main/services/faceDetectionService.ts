@@ -35,6 +35,14 @@ function getWorker(): Worker {
     }
   })
   worker.on('error', (err: Error) => {
+    // A worker that dies during init (bad model path, native load failure)
+    // would otherwise leave ensureFaceModelReady's promise pending forever,
+    // hanging the scan with a spinner that never resolves. Clearing
+    // readyPromise also lets a later attempt rebuild the worker.
+    readyReject?.(err)
+    readyReject = null
+    readyPromise = null
+    worker = null
     rejectAllPending(pendingDetect, err)
   })
   return worker

@@ -14,6 +14,7 @@ import { notifications } from '@mantine/notifications'
 import {
   AiScanProgressToast,
   EmbeddingIndexProgressToast,
+  FaceIndexProgressToast,
   FaceScanProgressToast,
   MoveProgressToast
 } from '@components'
@@ -83,6 +84,7 @@ const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
 const AI_SCAN_NOTIFICATION_ID = 'ai-scan'
 const FACE_SCAN_NOTIFICATION_ID = 'face-scan'
 const EMBEDDING_INDEX_NOTIFICATION_ID = 'embedding-index'
+const FACE_INDEX_NOTIFICATION_ID = 'face-index'
 
 // Which arrow key drove a photo-to-photo navigation — 'right' means the
 // photo being navigated to should visually enter from the right (the user
@@ -154,7 +156,7 @@ function toPersonPhotoAssignments(
 // here would re-render every usePhotoLibrary consumer on each progress tick.
 type PhotoLibraryComposedState = Omit<
   PhotoLibraryState,
-  'aiScanProgress' | 'embeddingIndexProgress' | 'faceScanProgress'
+  'aiScanProgress' | 'embeddingIndexProgress' | 'faceScanProgress' | 'faceIndexProgress'
 >
 
 interface PhotoLibraryContextValue {
@@ -1417,6 +1419,53 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     }
   }, [state.embeddingIndexProgress, state.aiScanProgress])
 
+  // Same ambient-subscription shape as the embedding indexer above.
+  useEffect(() => {
+    let cancelled = false
+    window.api.getFaceIndexStatus().then((progress) => {
+      if (!cancelled) dispatch({ type: 'SET_FACE_INDEX_PROGRESS', progress })
+    })
+    const unsubscribe = window.api.onFaceIndexProgress((progress) => {
+      dispatch({ type: 'SET_FACE_INDEX_PROGRESS', progress })
+    })
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
+
+  // Suppressed while the full face-scan toast is up, for the same reason as
+  // the embedding indexer's: the two can't run concurrently (faceIndexService
+  // pauses for a scan's duration), so showing both would just be noise.
+  const faceIndexToastShownRef = useRef(false)
+  useEffect(() => {
+    const progress = state.faceIndexProgress
+    if (state.faceScanProgress || !progress) {
+      if (faceIndexToastShownRef.current) {
+        notifications.hide(FACE_INDEX_NOTIFICATION_ID)
+        faceIndexToastShownRef.current = false
+      }
+      return
+    }
+    if (!faceIndexToastShownRef.current) {
+      faceIndexToastShownRef.current = true
+      notifications.show({
+        id: FACE_INDEX_NOTIFICATION_ID,
+        autoClose: false,
+        withCloseButton: true,
+        onClose: () => {
+          faceIndexToastShownRef.current = false
+        },
+        message: <FaceIndexProgressToast progress={progress} />
+      })
+    } else {
+      notifications.update({
+        id: FACE_INDEX_NOTIFICATION_ID,
+        message: <FaceIndexProgressToast progress={progress} />
+      })
+    }
+  }, [state.faceIndexProgress, state.faceScanProgress])
+
   const setNavbarSplitSizes = useCallback((sizes: number[]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     void window.api.setNavbarSplitSizes(sizes)
@@ -2149,9 +2198,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     () => ({
       aiScanProgress: state.aiScanProgress,
       embeddingIndexProgress: state.embeddingIndexProgress,
-      faceScanProgress: state.faceScanProgress
+      faceScanProgress: state.faceScanProgress,
+      faceIndexProgress: state.faceIndexProgress
     }),
-    [state.aiScanProgress, state.embeddingIndexProgress, state.faceScanProgress]
+    [
+      state.aiScanProgress,
+      state.embeddingIndexProgress,
+      state.faceScanProgress,
+      state.faceIndexProgress
+    ]
   )
 
   return (

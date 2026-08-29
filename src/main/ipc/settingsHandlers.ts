@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 
 import { clearAllFaceData } from '@main/db/faceRepository'
+import { clearAllFaceScanMarks } from '@main/db/photoRepository'
 import {
   getAllSettings,
   getFolders,
@@ -31,6 +32,7 @@ import { cancelAiScan } from '@main/services/aiScanService'
 import { disposeDuplicateClusterWorker } from '@main/services/duplicatePhotoService'
 import { disposeFaceClusterWorker } from '@main/services/faceClustering'
 import { disposeFaceDetectionWorker } from '@main/services/faceDetectionService'
+import { resumeFaceIndexer, stopFaceIndexer } from '@main/services/faceIndexService'
 import { cancelFaceScan } from '@main/services/faceScanService'
 import { disposeTagSuggestionWorker } from '@main/services/tagSuggestionService'
 import { disposeThrowbackSimilarityWorker } from '@main/services/throwbackService'
@@ -97,8 +99,12 @@ export function registerSettingsHandlers(): void {
       setFaceDetectionEnabled(value)
       if (!value) {
         cancelFaceScan()
+        await stopFaceIndexer()
         await Promise.all([disposeFaceDetectionWorker(), disposeFaceClusterWorker()])
         clearAllFaceData()
+        clearAllFaceScanMarks()
+      } else {
+        resumeFaceIndexer()
       }
     }
   )

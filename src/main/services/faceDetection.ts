@@ -1,5 +1,5 @@
-import { hasFacesForPhoto, insertFace } from '@main/db/faceRepository'
-import { findAllReadyPhotos } from '@main/db/photoRepository'
+import { insertFace } from '@main/db/faceRepository'
+import { findReadyPhotosWithoutFaceScan, markFaceScanned } from '@main/db/photoRepository'
 
 import { detectFacesInImage } from './faceDetectionService'
 
@@ -10,7 +10,7 @@ export async function detectAllReadyPhotoFaces(
   onProgress?: (done: number, total: number) => void,
   isCancelled?: () => boolean
 ): Promise<{ photosScanned: number; facesDetected: number }> {
-  const photos = findAllReadyPhotos()
+  const photos = findReadyPhotosWithoutFaceScan()
   let lastProgressAt = 0
   let photosScanned = 0
   let facesDetected = 0
@@ -19,20 +19,21 @@ export async function detectAllReadyPhotoFaces(
     if (isCancelled?.()) break
     const { filePath } = photos[i]
 
-    if (!hasFacesForPhoto(filePath)) {
-      try {
-        const faces = await detectFacesInImage(filePath)
-        for (const face of faces) {
-          insertFace({
-            photoPath: filePath,
-            box: face.box,
-            embedding: Float32Array.from(face.embedding)
-          })
-          facesDetected++
-        }
-      } catch (err) {
-        console.error(`Face detection failed for ${filePath}`, err)
+    try {
+      const faces = await detectFacesInImage(filePath)
+      for (const face of faces) {
+        insertFace({
+          photoPath: filePath,
+          box: face.box,
+          embedding: Float32Array.from(face.embedding)
+        })
+        facesDetected++
       }
+      // Marked only on success — a photo that threw stays queued so a later
+      // pass retries it, rather than being silently skipped forever.
+      markFaceScanned(filePath)
+    } catch (err) {
+      console.error(`Face detection failed for ${filePath}`, err)
     }
 
     photosScanned++

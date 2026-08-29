@@ -256,6 +256,14 @@ export interface EmbeddingIndexProgress {
   total: number
 }
 
+// The background face indexer's status — same ambient, single-phase shape as
+// EmbeddingIndexProgress (clustering runs at the end of a pass but is fast
+// enough not to warrant its own phase, unlike FaceScanProgress).
+export interface FaceIndexProgress {
+  done: number
+  total: number
+}
+
 // Normalized 0..1 against the photo's own dimensions, not raw pixels — keeps
 // this independent of which resolution the box was detected against.
 export interface FaceBox {

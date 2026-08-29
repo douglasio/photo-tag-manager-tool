@@ -3,6 +3,7 @@ import type {
   AppSettings,
   DefaultView,
   EmbeddingIndexProgress,
+  FaceIndexProgress,
   FaceScanProgress,
   GalleryViewMode,
   PersonRecord,
@@ -109,6 +110,10 @@ export interface PhotoLibraryState {
   // Session-only, same reasoning as aiScanProgress — spans the whole
   // detect-then-cluster face scan regardless of which component triggered it.
   faceScanProgress: FaceScanProgress | null
+  // Session-only — null when the background face indexer is idle. Ambient
+  // rather than tied to a user-triggered request, same as
+  // embeddingIndexProgress.
+  faceIndexProgress: FaceIndexProgress | null
   // People (labeled/unlabeled face clusters) — loaded once face detection is
   // enabled and refreshed after any scan or manual assign/merge/split.
   people: PersonRecord[]
@@ -190,6 +195,7 @@ export const initialState: PhotoLibraryState = {
   embeddingIndexProgress: null,
   faceDetectionEnabled: false,
   faceScanProgress: null,
+  faceIndexProgress: null,
   people: [],
   settingsModalOpened: false,
   detailsPanelCollapsed: false,
@@ -248,6 +254,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_EMBEDDING_INDEX_PROGRESS'; progress: EmbeddingIndexProgress | null }
   | { type: 'SET_FACE_DETECTION_ENABLED'; value: boolean }
   | { type: 'SET_FACE_SCAN_PROGRESS'; progress: FaceScanProgress | null }
+  | { type: 'SET_FACE_INDEX_PROGRESS'; progress: FaceIndexProgress | null }
   | { type: 'SET_PEOPLE'; people: PersonRecord[] }
   | { type: 'SET_SETTINGS_MODAL_OPENED'; value: boolean }
   | { type: 'SET_DETAILS_PANEL_COLLAPSED'; value: boolean }
@@ -662,6 +669,8 @@ export function photoLibraryReducer(
           }
     case 'SET_FACE_SCAN_PROGRESS':
       return { ...state, faceScanProgress: action.progress }
+    case 'SET_FACE_INDEX_PROGRESS':
+      return { ...state, faceIndexProgress: action.progress }
     case 'SET_PEOPLE':
       return { ...state, people: action.people }
     case 'SET_SETTINGS_MODAL_OPENED':

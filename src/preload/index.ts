@@ -8,6 +8,7 @@ import type {
   AppSettings,
   DefaultView,
   EmbeddingIndexProgress,
+  FaceIndexProgress,
   FaceRecord,
   FaceScanProgress,
   FaceScanResult,
@@ -112,6 +113,10 @@ const api = {
   cancelFaceScan: (): Promise<void> => ipcRenderer.invoke('faces:cancelScan'),
   onFaceScanProgress: (callback: (progress: FaceScanProgress) => void): (() => void) =>
     subscribe('faces:scanProgress', callback),
+  getFaceIndexStatus: (): Promise<FaceIndexProgress | null> =>
+    ipcRenderer.invoke('faces:getIndexStatus'),
+  onFaceIndexProgress: (callback: (progress: FaceIndexProgress | null) => void): (() => void) =>
+    subscribe('faces:indexProgress', callback),
   renamePerson: (id: string, name: string): Promise<void> =>
     ipcRenderer.invoke('faces:renamePerson', id, name),
   assignFaceToPerson: (faceId: string, personId: string): Promise<void> =>

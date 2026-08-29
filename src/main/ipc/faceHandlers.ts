@@ -15,12 +15,13 @@ import {
   unassignFace,
   unhidePerson
 } from '@main/db/faceRepository'
+import { getFaceIndexStatus } from '@main/services/faceIndexService'
 import {
   cancelFaceScan,
   enableFaceDetectionAndScan,
   runFullFaceScan
 } from '@main/services/faceScanService'
-import type { FaceRecord, FaceScanResult, PersonRecord } from '@shared/types'
+import type { FaceIndexProgress, FaceRecord, FaceScanResult, PersonRecord } from '@shared/types'
 
 export function registerFaceHandlers(): void {
   ipcMain.handle('faces:getForPhoto', (_event, filePath: string): FaceRecord[] =>
@@ -52,6 +53,11 @@ export function registerFaceHandlers(): void {
   ipcMain.handle('faces:cancelScan', (): void => {
     cancelFaceScan()
   })
+
+  // Seeds the renderer's initial state on mount — a subscriber to
+  // faces:indexProgress that mounts mid-pass would otherwise see nothing
+  // until the next progress tick.
+  ipcMain.handle('faces:getIndexStatus', (): FaceIndexProgress | null => getFaceIndexStatus())
 
   ipcMain.handle('faces:renamePerson', (_event, id: string, name: string): void => {
     renamePerson(id, name)

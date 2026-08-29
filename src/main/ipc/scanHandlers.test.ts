@@ -12,7 +12,8 @@ const {
   mockIngestMetadata,
   mockIngestThumbnail,
   mockDeleteThumbnail,
-  mockKickIndexer
+  mockKickIndexer,
+  mockKickFaceIndexer
 } = vi.hoisted(() => ({
   mockHandle: vi.fn(),
   mockPruneMissing: vi.fn().mockReturnValue([]),
@@ -22,7 +23,8 @@ const {
   mockIngestMetadata: vi.fn(),
   mockIngestThumbnail: vi.fn(),
   mockDeleteThumbnail: vi.fn().mockResolvedValue(undefined),
-  mockKickIndexer: vi.fn()
+  mockKickIndexer: vi.fn(),
+  mockKickFaceIndexer: vi.fn()
 }))
 
 vi.mock('electron', () => ({ ipcMain: { handle: mockHandle } }))
@@ -33,6 +35,7 @@ vi.mock('@main/services/directoryScanner', () => ({
   scanAllFolders: mockScanAllFolders
 }))
 vi.mock('@main/services/embeddingIndexService', () => ({ kickIndexer: mockKickIndexer }))
+vi.mock('@main/services/faceIndexService', () => ({ kickFaceIndexer: mockKickFaceIndexer }))
 vi.mock('@main/services/photoIngest', () => ({
   ingestMetadata: mockIngestMetadata,
   ingestThumbnail: mockIngestThumbnail
@@ -128,8 +131,9 @@ describe('runScan happy path', () => {
 
     const complete = sender.send.mock.calls.find(([channel]) => channel === 'scan:complete')
     expect(complete?.[1]).toMatchObject({ totalScanned: 2, cacheHits: 1, errors: [] })
-    // Newly-ready photos need embedding for visual search.
+    // Newly-ready photos need both embedding (visual search) and face detection.
     expect(mockKickIndexer).toHaveBeenCalled()
+    expect(mockKickFaceIndexer).toHaveBeenCalled()
 
     const batches = sender.send.mock.calls.filter(([channel]) => channel === 'scan:metadata-batch')
     const batchedPaths = batches

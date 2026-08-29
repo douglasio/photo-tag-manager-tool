@@ -4,6 +4,7 @@ import { findReadyPhotosWithoutEmbeddings } from '@main/db/photoRepository'
 import { getAiTagSuggestionsEnabled } from '@main/db/settingsRepository'
 import type { EmbeddingIndexProgress } from '@shared/types'
 
+import { enterLane, exitLane, isLaneBusy } from './backgroundIndexLane'
 import { getOrComputeEmbedding } from './photoEmbedding'
 
 // Coalesces a burst of triggers (scan complete, several watcher upserts in a
@@ -43,6 +44,7 @@ export function getIndexStatus(): EmbeddingIndexProgress | null {
 
 async function runPass(): Promise<void> {
   running = true
+  enterLane()
   try {
     let photos = findReadyPhotosWithoutEmbeddings()
     while (photos.length > 0 && !suspended) {
@@ -67,6 +69,7 @@ async function runPass(): Promise<void> {
       photos = findReadyPhotosWithoutEmbeddings()
     }
   } finally {
+    exitLane()
     running = false
     broadcastProgress(null)
   }
@@ -88,6 +91,11 @@ export function kickIndexer(): void {
   debounceTimer = setTimeout(() => {
     debounceTimer = null
     if (suspended || !getAiTagSuggestionsEnabled()) return
+    // The other indexer holds the lane — re-arm rather than run alongside it.
+    if (isLaneBusy()) {
+      kickIndexer()
+      return
+    }
     inFlightPass = runPass().finally(() => {
       inFlightPass = null
     })
