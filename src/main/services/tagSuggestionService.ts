@@ -26,6 +26,31 @@ const pendingEmbedText = new Map<
   { resolve: (embedding: number[]) => void; reject: (err: Error) => void }
 >()
 
+// Query text repeats a lot in an interactive search box (backspace-and-retype,
+// re-running a recent search) — small enough that 20 entries of 512 floats is
+// noise, but skips a worker round trip on every hit.
+const TEXT_EMBEDDING_CACHE_SIZE = 20
+const textEmbeddingCache = new Map<string, number[]>()
+
+function getCachedTextEmbedding(text: string): number[] | undefined {
+  const cached = textEmbeddingCache.get(text)
+  if (cached) {
+    // Re-insert to bump recency — Map iteration order is insertion order, so
+    // the first key is always the least-recently-used one.
+    textEmbeddingCache.delete(text)
+    textEmbeddingCache.set(text, cached)
+  }
+  return cached
+}
+
+function cacheTextEmbedding(text: string, embedding: number[]): void {
+  textEmbeddingCache.set(text, embedding)
+  if (textEmbeddingCache.size > TEXT_EMBEDDING_CACHE_SIZE) {
+    const oldest = textEmbeddingCache.keys().next().value
+    if (oldest !== undefined) textEmbeddingCache.delete(oldest)
+  }
+}
+
 function getWorker(): Worker {
   if (worker) return worker
   const workerPath = join(__dirname, 'tagSuggestionWorker.js')
@@ -119,14 +144,38 @@ export async function embedImage(imagePath: string): Promise<number[]> {
 // Text-side counterpart of embedImage — projects a search phrase into the
 // same joint CLIP space as the cached photo embeddings, for semantic search.
 // Reuses ensureModelReady() so the worker is up; the text tower itself loads
-// lazily inside the worker on the first call, not during ensureModelReady().
-export async function embedText(text: string): Promise<number[]> {
+// lazily inside the worker on the first call, not during ensureModelReady() —
+// so onProgress here is for that lazy text-tower download specifically, not
+// the classifier/embedder init ensureModelReady() already covers.
+export async function embedText(
+  text: string,
+  onProgress?: (progress: number) => void
+): Promise<number[]> {
+  const cached = getCachedTextEmbedding(text)
+  if (cached) return cached
+
   await ensureModelReady()
   const requestId = nextRequestId++
-  return new Promise<number[]>((resolve, reject) => {
-    pendingEmbedText.set(requestId, { resolve, reject })
-    send({ type: 'embedText', requestId, text })
-  })
+  const w = getWorker()
+
+  // Only relevant on the very first call in a session (the worker memoizes
+  // the text tower's load promise), but harmless to attach every time —
+  // downloadProgress simply never fires again once it's cached to disk.
+  const handleProgress = (message: WorkerResponse): void => {
+    if (message.type === 'downloadProgress') onProgress?.(message.progress)
+  }
+  if (onProgress) w.on('message', handleProgress)
+
+  try {
+    const embedding = await new Promise<number[]>((resolve, reject) => {
+      pendingEmbedText.set(requestId, { resolve, reject })
+      send({ type: 'embedText', requestId, text })
+    })
+    cacheTextEmbedding(text, embedding)
+    return embedding
+  } finally {
+    if (onProgress) w.off('message', handleProgress)
+  }
 }
 
 // Frees the worker's memory (model weights, ONNX runtime sessions) when the
@@ -142,5 +191,6 @@ export async function disposeTagSuggestionWorker(): Promise<void> {
   rejectAllPending(pendingClassify, disposedError)
   rejectAllPending(pendingEmbed, disposedError)
   rejectAllPending(pendingEmbedText, disposedError)
+  textEmbeddingCache.clear()
   await w.terminate()
 }

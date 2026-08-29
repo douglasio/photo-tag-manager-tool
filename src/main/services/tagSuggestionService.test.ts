@@ -228,6 +228,74 @@ describe('tagSuggestionService', () => {
     await expect(promise).rejects.toThrow()
   })
 
+  describe('embedText caching', () => {
+    // Resolves the most recently sent embedText request with the given
+    // embedding — assumes ensureModelReady has already resolved.
+    async function resolvePending(embedding: number[]): Promise<void> {
+      await flush()
+      const message = workerTracker.current!.posted.filter((m) => m.type === 'embedText').at(-1)!
+      workerTracker.current!.emit('message', {
+        type: 'embedTextResult',
+        requestId: message.requestId,
+        embedding
+      })
+    }
+
+    it('caches a text embedding and skips the worker entirely on a repeated query', async () => {
+      const first = embedText('beach')
+      workerTracker.current!.emit('message', { type: 'ready' })
+      await resolvePending([0.7, 0.8])
+      await expect(first).resolves.toEqual([0.7, 0.8])
+
+      const postedBefore = workerTracker.current!.posted.length
+      await expect(embedText('beach')).resolves.toEqual([0.7, 0.8])
+      expect(workerTracker.current!.posted).toHaveLength(postedBefore)
+    })
+
+    it('evicts the least-recently-used entry once the cache exceeds its capacity', async () => {
+      const first = embedText('query-0')
+      workerTracker.current!.emit('message', { type: 'ready' })
+      await resolvePending([0])
+      await first
+
+      // Fill the cache to capacity (20) with queries 1-19.
+      for (let i = 1; i < 20; i++) {
+        const promise = embedText(`query-${i}`)
+        await resolvePending([i])
+        await promise
+      }
+
+      // One more distinct query evicts the least-recently-used entry —
+      // query-0, never touched again since its first call.
+      const overflow = embedText('query-20')
+      await resolvePending([20])
+      await overflow
+
+      const postedBefore = workerTracker.current!.posted.length
+      const requeried = embedText('query-0')
+      await resolvePending([0])
+      await requeried
+      expect(workerTracker.current!.posted.length).toBeGreaterThan(postedBefore)
+    })
+
+    it('forwards downloadProgress to onProgress while in flight, and stops listening once resolved', async () => {
+      const onProgress = vi.fn()
+      const promise = embedText('desert', onProgress)
+      workerTracker.current!.emit('message', { type: 'ready' })
+      await flush()
+
+      workerTracker.current!.emit('message', { type: 'downloadProgress', progress: 10 })
+      expect(onProgress).toHaveBeenCalledExactlyOnceWith(10)
+
+      await resolvePending([0.1])
+      await promise
+
+      onProgress.mockClear()
+      workerTracker.current!.emit('message', { type: 'downloadProgress', progress: 100 })
+      expect(onProgress).not.toHaveBeenCalled()
+    })
+  })
+
   it('classify and embed requests track independently by requestId', async () => {
     const classifyPromise = suggestTags('/thumb-a.jpg', ['a'])
     const embedPromise = embedImage('/thumb-b.jpg')

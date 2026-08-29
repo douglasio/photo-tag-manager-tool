@@ -34,7 +34,10 @@ function freeTextPhrase(predicates: Predicate[]): string {
 // predicates are deliberately not applied as filters here — a literal
 // substring miss on "beach" shouldn't block a photo that visually *is* a
 // beach, which is the entire point of this feature.
-export async function semanticSearchPhotos(query: SearchQuery): Promise<SemanticSearchResult> {
+export async function semanticSearchPhotos(
+  query: SearchQuery,
+  onModelDownloadProgress?: (progress: number) => void
+): Promise<SemanticSearchResult> {
   const empty: SemanticSearchResult = { hits: [], indexedCount: 0, totalReadyCount: 0 }
   // Gated here rather than by the renderer, so the Spotlight component
   // doesn't need to subscribe to AI-settings state just to decide whether to
@@ -55,7 +58,7 @@ export async function semanticSearchPhotos(query: SearchQuery): Promise<Semantic
     candidatePaths = new Set(filtered.paths)
   }
 
-  const queryEmbedding = await embedText(phrase)
+  const queryEmbedding = await embedText(phrase, onModelDownloadProgress)
 
   // Always respects excluded folders regardless of the includeExcluded
   // toggle — getAllEmbeddings has no override, and this feature is new

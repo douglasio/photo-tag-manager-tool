@@ -87,7 +87,15 @@ describe('semanticSearchPhotos', () => {
 
     await semanticSearchPhotos(parseSearchQuery('beach tag:sunset -"night shots"'))
 
-    expect(mockEmbedText).toHaveBeenCalledWith('beach')
+    expect(mockEmbedText).toHaveBeenCalledWith('beach', undefined)
+  })
+
+  it('forwards the onModelDownloadProgress callback through to embedText', async () => {
+    const onModelDownloadProgress = vi.fn()
+
+    await semanticSearchPhotos(parseSearchQuery('beach'), onModelDownloadProgress)
+
+    expect(mockEmbedText).toHaveBeenCalledWith('beach', onModelDownloadProgress)
   })
 
   it('ranks by cosine similarity, thresholds, and caps at 8', async () => {

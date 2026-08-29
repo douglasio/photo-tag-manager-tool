@@ -94,6 +94,16 @@ vi.mock('@mantine/spotlight', () => ({
   }
 }))
 
+// Captures the subscription callback so tests can simulate a
+// search:semanticModelProgress push from the main process.
+let progressCallback: ((progress: number) => void) | null = null
+const mockOnSemanticModelProgress = vi.fn((callback: (progress: number) => void) => {
+  progressCallback = callback
+  return () => {
+    if (progressCallback === callback) progressCallback = null
+  }
+})
+
 vi.mock('@renderer/state/PhotoLibraryActionsContext', () => ({
   useLibraryActions: () => ({
     selectPhoto: mockSelectPhoto,
@@ -176,8 +186,13 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockSearchPhotos.mockResolvedValue(makeResult([]))
   mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResult([]))
-  // @ts-expect-error - partial window.api stub; only these two are exercised
-  window.api = { searchPhotos: mockSearchPhotos, semanticSearchPhotos: mockSemanticSearchPhotos }
+  progressCallback = null
+  // @ts-expect-error - partial window.api stub; only these three are exercised
+  window.api = {
+    searchPhotos: mockSearchPhotos,
+    semanticSearchPhotos: mockSemanticSearchPhotos,
+    onSemanticModelProgress: mockOnSemanticModelProgress
+  }
   mockScanProgress.embeddingIndexProgress = null
 })
 
@@ -443,6 +458,20 @@ describe('embedding index status', () => {
 
     expect(screen.getByText('Indexing for visual search… 4 of 10')).toBeInTheDocument()
     expect(screen.queryByText(/not yet indexed/)).not.toBeInTheDocument()
+  })
+
+  // Regression: the worker emits downloadProgress for the text tower's
+  // one-time download, but nothing surfaced it — a first-time semantic
+  // search just sat there with no signal while the model downloaded.
+  it('shows model download progress ahead of the indexing/shortfall line', async () => {
+    mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
+    mockSemanticSearchPhotos.mockImplementation(() => new Promise(() => undefined))
+    renderSpotlight()
+    await search('beach')
+
+    act(() => progressCallback?.(37))
+
+    expect(screen.getByText('Downloading visual search model… 37%')).toBeInTheDocument()
   })
 
   it('hides the line entirely once nothing is unindexed and the indexer is idle', async () => {

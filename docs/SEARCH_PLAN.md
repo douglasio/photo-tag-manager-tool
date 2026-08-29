@@ -136,9 +136,9 @@ Facet scores (field weights + match bonuses) and CLIP cosine (~0.2–0.35 for go
 Per-query cost is trivial once loaded (text encode tens of ms; cosine over 10k × 512 dims is single-digit ms, and `getAllEmbeddings()` already caches deserialized blobs). The cliff is the _first_ query: worker spawn + model load, possibly a one-time download.
 
 - Fire the semantic IPC request alongside the text scan; text results render immediately, the Visual matches group streams in when its response lands.
-- First use shows a lightweight "warming up" row in the group's slot; download progress reuses the existing `downloadProgress` plumbing if it's the very first AI feature used.
+- The worker's `downloadProgress` messages (fired while the text tower loads, first semantic search of the session only) are forwarded through `embedText`'s `onProgress` param → `semanticSearchPhotos` → a dedicated `search:semanticModelProgress` push channel → `usePhotoSearch`'s `modelDownloadProgress`, surfaced in the Spotlight ahead of the indexing/shortfall line ("Downloading visual search model… N%").
 - Stale-response protection reuses `usePhotoSearch`'s existing requestId guard — semantic responses carry the serialized query they answered, and late arrivals for a superseded query are dropped.
-- Cache the query-text embedding (small LRU) so backspacing/retyping a recent query skips the encode.
+- The query-text embedding is cached (a 20-entry LRU keyed on the exact phrase, in `tagSuggestionService.embedText`) so backspacing/retyping a recent query skips both the worker round trip and the encode.
 
 ### Honest limitations
 

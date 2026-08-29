@@ -173,6 +173,8 @@ const api = {
     ipcRenderer.invoke('search:query', query, limit),
   semanticSearchPhotos: (query: SearchQuery): Promise<SemanticSearchResult> =>
     ipcRenderer.invoke('search:semantic', query),
+  onSemanticModelProgress: (callback: (progress: number) => void): (() => void) =>
+    subscribe('search:semanticModelProgress', callback),
   exportDatabase: (): Promise<boolean> => ipcRenderer.invoke('library:exportDatabase'),
   importDatabase: (): Promise<void> => ipcRenderer.invoke('library:importDatabase'),
   clearLibrary: (): Promise<void> => ipcRenderer.invoke('library:clearLibrary'),

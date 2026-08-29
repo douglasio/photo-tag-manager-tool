@@ -6,7 +6,7 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 1. There's no gap between photos within subfolder sections in the gallery and the divider line.
 
-2. . The tag entry field (in the details panel for both gallery and photo view) should blur after hitting "enter" so you don't get focus-trapped.
+2. The tag entry field (in the details panel for both gallery and photo view) should blur after hitting "enter" so you don't get focus-trapped.
 
 3. I tried batch-selecting a large number of photos and applying a new tag to all of them. Nothing seemed to happen. There needs to be some kind of progress indicator if applying a batch edit is going to take a while so the user isn't confused and doesn't accidentally mess up in-progress writes.
 

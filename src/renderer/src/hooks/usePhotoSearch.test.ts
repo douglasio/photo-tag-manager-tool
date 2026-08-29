@@ -46,14 +46,27 @@ const EMPTY_SEMANTIC = makeSemanticResult([])
 const searchPhotos = vi.fn()
 const semanticSearchPhotos = vi.fn()
 
+// Captures the hook's subscription callback so tests can simulate a push
+// event from the main process, the same way window.api's real subscribe
+// helper delivers ai:indexProgress-style events.
+let progressCallback: ((progress: number) => void) | null = null
+const onSemanticModelProgress = vi.fn((callback: (progress: number) => void) => {
+  progressCallback = callback
+  return () => {
+    if (progressCallback === callback) progressCallback = null
+  }
+})
+
 beforeEach(() => {
   vi.useFakeTimers()
   searchPhotos.mockReset()
   searchPhotos.mockResolvedValue(makeResult([]))
   semanticSearchPhotos.mockReset()
   semanticSearchPhotos.mockResolvedValue(EMPTY_SEMANTIC)
-  // @ts-expect-error - partial window.api stub, only these two are exercised
-  window.api = { searchPhotos, semanticSearchPhotos }
+  onSemanticModelProgress.mockClear()
+  progressCallback = null
+  // @ts-expect-error - partial window.api stub, only these three are exercised
+  window.api = { searchPhotos, semanticSearchPhotos, onSemanticModelProgress }
 })
 
 afterEach(() => {
@@ -232,6 +245,58 @@ describe('usePhotoSearch', () => {
       expect(result.current.semanticLoading).toBe(false)
       expect(result.current.semanticResult.hits).toEqual([])
       consoleError.mockRestore()
+    })
+  })
+
+  describe('model download progress', () => {
+    it('subscribes once on mount and surfaces a pushed progress value', () => {
+      const { result } = renderHook(() => usePhotoSearch())
+
+      expect(onSemanticModelProgress).toHaveBeenCalledTimes(1)
+      expect(result.current.modelDownloadProgress).toBeNull()
+
+      act(() => progressCallback?.(42))
+
+      expect(result.current.modelDownloadProgress).toBe(42)
+    })
+
+    it('clears the progress once the semantic query it belongs to settles', async () => {
+      let resolveSemantic: ((value: SemanticSearchResult) => void) | undefined
+      semanticSearchPhotos.mockImplementation(
+        () =>
+          new Promise<SemanticSearchResult>((resolve) => {
+            resolveSemantic = resolve
+          })
+      )
+      const { result } = renderHook(() => usePhotoSearch())
+
+      act(() => result.current.setText('beach'))
+      await flushSearch()
+      act(() => progressCallback?.(75))
+      expect(result.current.modelDownloadProgress).toBe(75)
+
+      await act(async () => {
+        resolveSemantic?.(EMPTY_SEMANTIC)
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(result.current.modelDownloadProgress).toBeNull()
+    })
+
+    it('resets stale progress from an abandoned query when a new one starts', async () => {
+      semanticSearchPhotos.mockImplementation(() => new Promise(() => undefined))
+      const { result } = renderHook(() => usePhotoSearch())
+
+      act(() => result.current.setText('slow'))
+      await flushSearch()
+      act(() => progressCallback?.(30))
+      expect(result.current.modelDownloadProgress).toBe(30)
+
+      act(() => result.current.setText('fast'))
+      await flushSearch()
+
+      expect(result.current.modelDownloadProgress).toBeNull()
     })
   })
 })

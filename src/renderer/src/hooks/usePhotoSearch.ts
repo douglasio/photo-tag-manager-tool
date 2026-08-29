@@ -33,10 +33,24 @@ export interface UsePhotoSearchResult {
   loading: boolean
   semanticResult: SemanticSearchResult
   semanticLoading: boolean
+  // Non-null only while the text tower's one-time model download is in
+  // flight — set on every session's first-ever semantic search, never again
+  // after (the worker memoizes the download). 0-100, matching AiScanProgress.
+  modelDownloadProgress: number | null
   includeExcluded: boolean
   setIncludeExcluded: (value: boolean) => void
 }
 
+// Owns the search box's text, its parsed form, and the debounced query. The
+// parse is shared with the main process, so both sides agree on what the text
+// means without the renderer re-implementing any matching.
+//
+// Facet and semantic results are fetched independently: they're rendered as
+// separate Spotlight groups (see SearchSpotlight and docs/SEARCH_PLAN.md's
+// semantic search section — the two score spaces aren't comparable), and the
+// facet scan is instant while the semantic pass may still be loading its
+// model, so blocking one on the other would make every search feel as slow
+// as the model's first cold start.
 export function usePhotoSearch(): UsePhotoSearchResult {
   const [text, setText] = useState('')
   const [includeExcluded, setIncludeExcluded] = useState(false)
@@ -50,6 +64,7 @@ export function usePhotoSearch(): UsePhotoSearchResult {
     query: string
     data: SemanticSearchResult
   }>({ query: '', data: EMPTY_SEMANTIC_RESULT })
+  const [modelDownloadProgress, setModelDownloadProgress] = useState<number | null>(null)
 
   const query = parseSearchQuery(text, includeExcluded)
   const hasPredicates = query.predicates.length > 0
@@ -59,6 +74,11 @@ export function usePhotoSearch(): UsePhotoSearchResult {
   // Monotonic request id. Bumped in cleanup too, so a response for a query the
   // user has already moved on from can never overwrite a newer one.
   const latestRequest = useRef(0)
+
+  // Fires at most once per app session in practice (the worker memoizes the
+  // text tower's download), but subscribing once here rather than per-query
+  // is simplest and costs nothing extra.
+  useEffect(() => window.api.onSemanticModelProgress(setModelDownloadProgress), [])
 
   useEffect(() => {
     const parsed: SearchQuery = JSON.parse(serialized)
@@ -79,16 +99,20 @@ export function usePhotoSearch(): UsePhotoSearchResult {
         })
 
       if (hasFreeText(parsed.predicates)) {
+        setModelDownloadProgress(null)
         window.api
           .semanticSearchPhotos(parsed)
           .then((data) => {
-            if (latestRequest.current === requestId)
+            if (latestRequest.current === requestId) {
               setAnsweredSemantic({ query: serialized, data })
+              setModelDownloadProgress(null)
+            }
           })
           .catch((error: unknown) => {
             console.error('semantic search failed', error)
             if (latestRequest.current === requestId) {
               setAnsweredSemantic({ query: serialized, data: EMPTY_SEMANTIC_RESULT })
+              setModelDownloadProgress(null)
             }
           })
       }
@@ -110,6 +134,7 @@ export function usePhotoSearch(): UsePhotoSearchResult {
     loading: hasPredicates && answered.query !== serialized,
     semanticResult: queryHasFreeText ? answeredSemantic.data : EMPTY_SEMANTIC_RESULT,
     semanticLoading: queryHasFreeText && answeredSemantic.query !== serialized,
+    modelDownloadProgress,
     includeExcluded,
     setIncludeExcluded
   }

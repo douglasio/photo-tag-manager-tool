@@ -9,7 +9,12 @@ export function registerSearchHandlers(): void {
   ipcMain.handle('search:query', (_event, query: SearchQuery, limit: number): SearchResult =>
     searchPhotos(query, { limit })
   )
-  ipcMain.handle('search:semantic', (_event, query: SearchQuery): Promise<SemanticSearchResult> =>
-    semanticSearchPhotos(query)
+  // The progress callback only ever fires anything on the very first
+  // semantic search in a session (the text tower's download is memoized
+  // after that) — see tagSuggestionService.embedText.
+  ipcMain.handle('search:semantic', (event, query: SearchQuery): Promise<SemanticSearchResult> =>
+    semanticSearchPhotos(query, (progress) =>
+      event.sender.send('search:semanticModelProgress', progress)
+    )
   )
 }

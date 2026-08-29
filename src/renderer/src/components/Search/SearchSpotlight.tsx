@@ -70,6 +70,7 @@ export const SearchSpotlight = memo(function SearchSpotlight(): ReactElement {
     loading,
     semanticResult,
     semanticLoading,
+    modelDownloadProgress,
     includeExcluded,
     setIncludeExcluded
   } = usePhotoSearch()
@@ -281,15 +282,20 @@ export const SearchSpotlight = memo(function SearchSpotlight(): ReactElement {
                       </Spotlight.Action>
                     )
                   )}
-                  {includeVisualMatches && (embeddingIndexProgress || unindexedCount > 0) && (
-                    <Group px="md" py="xs" gap="xs" wrap="nowrap">
-                      <Text size="xs" c="dimmed">
-                        {embeddingIndexProgress
-                          ? `Indexing for visual search… ${embeddingIndexProgress.done} of ${embeddingIndexProgress.total}`
-                          : `${unindexedCount} photo${unindexedCount === 1 ? '' : 's'} not yet indexed for visual search`}
-                      </Text>
-                    </Group>
-                  )}
+                  {includeVisualMatches &&
+                    (modelDownloadProgress !== null ||
+                      embeddingIndexProgress ||
+                      unindexedCount > 0) && (
+                      <Group px="md" py="xs" gap="xs" wrap="nowrap">
+                        <Text size="xs" c="dimmed">
+                          {modelDownloadProgress !== null
+                            ? `Downloading visual search model… ${modelDownloadProgress}%`
+                            : embeddingIndexProgress
+                              ? `Indexing for visual search… ${embeddingIndexProgress.done} of ${embeddingIndexProgress.total}`
+                              : `${unindexedCount} photo${unindexedCount === 1 ? '' : 's'} not yet indexed for visual search`}
+                        </Text>
+                      </Group>
+                    )}
                 </Spotlight.ActionsGroup>
               )}
 

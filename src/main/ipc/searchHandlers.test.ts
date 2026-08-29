@@ -43,9 +43,21 @@ describe('registerSearchHandlers', () => {
     const handler = getHandlers().get('search:semantic')!
     const query = parseSearchQuery('beach sunset')
 
-    await handler({}, query)
+    await handler({ sender: { send: vi.fn() } }, query)
 
-    expect(mockSemanticSearchPhotos).toHaveBeenCalledWith(query)
+    expect(mockSemanticSearchPhotos).toHaveBeenCalledWith(query, expect.any(Function))
+  })
+
+  it('forwards a semantic model-download progress tick to the requesting webContents', async () => {
+    const handler = getHandlers().get('search:semantic')!
+    const send = vi.fn()
+
+    await handler({ sender: { send } }, parseSearchQuery('beach'))
+
+    const onProgress = mockSemanticSearchPhotos.mock.calls[0][1] as (progress: number) => void
+    onProgress(42)
+
+    expect(send).toHaveBeenCalledWith('search:semanticModelProgress', 42)
   })
 
   it('passes the parsed query and limit straight through to the repository', () => {
