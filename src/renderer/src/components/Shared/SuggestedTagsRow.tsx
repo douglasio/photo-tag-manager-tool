@@ -28,8 +28,10 @@ export function SuggestedTagsRow({
   if (!loading && suggestions.length === 0) return null
 
   return (
-    <Stack gap="md" mt="xs">
-      <SectionTitle icon={IconSparkles}>Suggested</SectionTitle>
+    <Stack gap="md">
+      <SectionTitle icon={IconSparkles} sub>
+        Suggested
+      </SectionTitle>
       {loading ? (
         <Group gap="xs">
           <Skeleton height={22} width={70} radius="xl" />

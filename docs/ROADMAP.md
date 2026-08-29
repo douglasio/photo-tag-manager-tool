@@ -4,9 +4,9 @@ This document serves as a roadmap of feature to implement, generally in no parti
 
 # Bug Fixes
 
-1. ~~"scan again" on face detection in the settings panel crashes the app~~ (Done — the detection worker was decoding every photo at full resolution before knowing whether it contained a face, and a rescan re-ran that over every faceless photo. Detection now moved to a paced background indexer with its own progress toast.)
+1. There's no gap between photos within subfolder sections in the gallery and the divider line.
 
-2. The tag entry field (in the details panel for both gallery and photo view) should blur after hitting "enter" so you don't get focus-trapped.
+2. . The tag entry field (in the details panel for both gallery and photo view) should blur after hitting "enter" so you don't get focus-trapped.
 
 3. I tried batch-selecting a large number of photos and applying a new tag to all of them. Nothing seemed to happen. There needs to be some kind of progress indicator if applying a batch edit is going to take a while so the user isn't confused and doesn't accidentally mess up in-progress writes.
 
@@ -18,11 +18,11 @@ To-dos, tasks, and features loosely grouped by feature segment.
 
 ## Shell
 
-1. Add a message on the opening loading screen if new photos are detected / being imported, to alert users that opening the app may take a little longer.
+1. [LOW] Add a message on the opening loading screen if new photos are detected / being imported, to alert users that opening the app may take a little longer.
 
-2. Corrupt photo finder w/ delete all (move to recycle bin?)
+2. [LOW] Corrupt photo finder w/ delete all (move to recycle bin?)
 
-3. Make all 'Enable AI features' buttons use the gradient variant.
+3. [LOW] Make all 'Enable AI features' buttons use the gradient variant.
 
 ### Profiles
 
@@ -100,18 +100,15 @@ Note: any new face/vision model needs a license check first — InsightFace's SC
 
 ## Detail Panel
 
-1. Make the "Suggested" header smaller so it appears as a subheader within "Tags" as expected.
+1. Import GPS location as a field and display the location below the "years ago" entry if available.
 
-2. Make the Metadata section collapsible.
+2. This one's a little wacky. Add a "My Info" section to the Settings menu. I want to be able to:
+   a. give myself a name
+   b. assign a face to "me"
+   c. enter my birth date (with a note that this info isn't sent anywhere and is only used to inform app features)
+   d. display the "my age" at the time a photo was taken in the details panel, underneath the "years ago" field.
 
-3. In the same style and location as the view count, include additional user-friendly info about the photo based on the metadata. Omit fields if the information can't be parsed.
-
-- (Date icon) Date, in X years/months/days ago (use native Mantine/dayjs date conversion if available rather than rolling your own parsing)
-- (Camera icon) the camera used
-
-Before beginning, suggest other possible info we could display here with the data available. AI description or detected features, etc.
-
-### People
+   Suggest other features i could introduce if the user enters this info.
 
 ## Tools
 

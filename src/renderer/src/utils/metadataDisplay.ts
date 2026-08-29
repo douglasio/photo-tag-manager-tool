@@ -1,6 +1,9 @@
 import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
 
 import type { PhotoMetadata } from '@shared/types'
+
+dayjs.extend(relativeTime)
 
 interface MetadataField<T> {
   label: string
@@ -67,6 +70,29 @@ export function formatDateModified(
   if (value == null) return NONE_DISPLAY
   const parsed = dayjs(value)
   return parsed.isValid() ? parsed.format(DATE_TAKEN_STYLE_FORMATS[style]) : NONE_DISPLAY
+}
+
+/** "Mar 5, 2020 · 5 years ago" for the detail panel's at-a-glance row.
+ * Returns null (rather than NONE_DISPLAY) when there's no parseable date, so
+ * the caller omits the row entirely instead of rendering an empty one. */
+export function formatDateWithRelative(value: string | null): string | null {
+  if (!value) return null
+  const parsed = dayjs(value)
+  if (!parsed.isValid()) return null
+  return `${parsed.format(DATE_TAKEN_STYLE_FORMATS.dateOnly)} · ${parsed.fromNow()}`
+}
+
+/** Make + model as one readable camera name, null when neither is known.
+ * Model usually already embeds the make ("NIKON D3300"), so the make is only
+ * prefixed when it isn't redundant. */
+export function formatCamera(make: string | null, model: string | null): string | null {
+  const cleanMake = make?.trim() || null
+  const cleanModel = model?.trim() || null
+  if (!cleanModel) return cleanMake
+  if (!cleanMake) return cleanModel
+  return cleanModel.toLowerCase().startsWith(cleanMake.toLowerCase())
+    ? cleanModel
+    : `${cleanMake} ${cleanModel}`
 }
 
 // Per-field label + display formatting, kept here so DetailPanel (and any

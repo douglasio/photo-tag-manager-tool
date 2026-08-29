@@ -1,9 +1,10 @@
 import { type ReactElement, useState } from 'react'
 
-import { Box, Button, Group, RollingNumber, Stack, Tooltip } from '@mantine/core'
-import { IconEye, IconPhoto } from '@tabler/icons-react'
+import { Box, Button, Group, RollingNumber, Stack, Text, Tooltip } from '@mantine/core'
+import { IconCalendar, IconCamera, IconEye, IconPhoto } from '@tabler/icons-react'
 
 import { FileNameField } from '@components'
+import { formatCamera, formatDateWithRelative } from '@renderer/utils/metadataDisplay'
 import { type DisplayPhotoRecord, usePhotoLibrary } from '@state'
 
 interface DetailPanelHeaderProps {
@@ -20,6 +21,11 @@ export function DetailPanelHeader({ photo }: DetailPanelHeaderProps): ReactEleme
   // button is redundant there (it stays for the gallery screen, where the
   // photo is just the selection cursor, not necessarily open yet).
   const isViewingThisPhoto = state.activeTab === photo.filePath
+
+  // Both null when the photo's EXIF didn't carry them, in which case the row
+  // is dropped rather than rendered with a placeholder dash.
+  const dateLine = formatDateWithRelative(photo.metadata.dateTaken.value)
+  const cameraLine = formatCamera(photo.metadata.cameraMake.value, photo.metadata.cameraModel.value)
 
   return (
     <Stack>
@@ -43,15 +49,31 @@ export function DetailPanelHeader({ photo }: DetailPanelHeaderProps): ReactEleme
           variant="panel"
         />
       </Box>
-      <Group gap={4} c="dimmed">
-        <IconEye size={16} />
-        <RollingNumber
-          value={photo.viewCount}
-          prefix="Viewed "
-          suffix={photo.viewCount === 1 ? ' time' : ' times'}
-          fz="sm"
-        />
-      </Group>
+      <Stack gap={4}>
+        <Group gap={4} c="dimmed">
+          <IconEye size={16} />
+          <RollingNumber
+            value={photo.viewCount}
+            prefix="Viewed "
+            suffix={photo.viewCount === 1 ? ' time' : ' times'}
+            fz="sm"
+          />
+        </Group>
+        {dateLine && (
+          <Group gap={4} c="dimmed" wrap="nowrap">
+            <IconCalendar size={16} />
+            <Text fz="sm">{dateLine}</Text>
+          </Group>
+        )}
+        {cameraLine && (
+          <Group gap={4} c="dimmed" wrap="nowrap">
+            <IconCamera size={16} />
+            <Text fz="sm" truncate>
+              {cameraLine}
+            </Text>
+          </Group>
+        )}
+      </Stack>
     </Stack>
   )
 }

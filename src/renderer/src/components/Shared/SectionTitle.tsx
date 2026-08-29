@@ -8,12 +8,19 @@ interface SectionTitleProps {
   children: ReactNode
   /** Rendered before the title at a consistent size and dimmed to match it. */
   icon?: TablerIcon
+  /** Renders a step down in size, for a header nested inside another
+   * section's content (e.g. "Suggested" within "Tags") rather than beside it. */
+  sub?: boolean
 }
 
 /** Small uppercase, dimmed header used above a section's content (Settings, DetailPanel, PanelSection). */
-export function SectionTitle({ children, icon: Icon }: SectionTitleProps): ReactElement {
+export function SectionTitle({
+  children,
+  icon: Icon,
+  sub = false
+}: SectionTitleProps): ReactElement {
   const title = (
-    <Title order={6} c="dimmed" tt="uppercase" lts="0.05em">
+    <Title order={6} c="dimmed" tt="uppercase" lts="0.05em" fz={sub ? 'xs' : undefined}>
       {children}
     </Title>
   )
@@ -22,7 +29,10 @@ export function SectionTitle({ children, icon: Icon }: SectionTitleProps): React
 
   return (
     <Group gap="xs" wrap="nowrap">
-      <Icon size={ACTION_ICONS.ICON_SIZE} color="var(--mantine-color-dimmed)" />
+      <Icon
+        size={sub ? ACTION_ICONS.ICON_SIZE - 4 : ACTION_ICONS.ICON_SIZE}
+        color="var(--mantine-color-dimmed)"
+      />
       {title}
     </Group>
   )

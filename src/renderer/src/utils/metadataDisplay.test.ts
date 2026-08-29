@@ -4,10 +4,54 @@ import type { PhotoMetadata } from '@shared/types'
 
 import {
   DATE_TAKEN_FORMAT,
+  formatCamera,
   formatDateModified,
   formatDateTaken,
+  formatDateWithRelative,
   toDisplayMetadata
 } from './metadataDisplay'
+
+describe('formatDateWithRelative', () => {
+  it('pairs the absolute date with a relative age', () => {
+    const twoYearsAgo = new Date()
+    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
+
+    const result = formatDateWithRelative(twoYearsAgo.toISOString())
+
+    expect(result).toContain('2 years ago')
+    expect(result).toContain(String(twoYearsAgo.getFullYear()))
+  })
+
+  // Null (not the '—' placeholder) so the caller drops the whole row rather
+  // than rendering a dash next to a calendar icon.
+  it('returns null for a missing or unparseable date', () => {
+    expect(formatDateWithRelative(null)).toBeNull()
+    expect(formatDateWithRelative('not a date')).toBeNull()
+  })
+})
+
+describe('formatCamera', () => {
+  it('joins make and model when the model does not already name the make', () => {
+    expect(formatCamera('Canon', 'EOS 5D')).toBe('Canon EOS 5D')
+  })
+
+  // Most cameras write the brand into the model too, so joining blindly gives
+  // "NIKON NIKON D3300".
+  it('drops a redundant make already embedded in the model', () => {
+    expect(formatCamera('NIKON', 'NIKON D3300')).toBe('NIKON D3300')
+    expect(formatCamera('Canon', 'canon eos 5d')).toBe('canon eos 5d')
+  })
+
+  it('falls back to whichever half is known', () => {
+    expect(formatCamera(null, 'EOS 5D')).toBe('EOS 5D')
+    expect(formatCamera('Canon', null)).toBe('Canon')
+  })
+
+  it('returns null when neither is usable', () => {
+    expect(formatCamera(null, null)).toBeNull()
+    expect(formatCamera('  ', '')).toBeNull()
+  })
+})
 
 describe('formatDateTaken', () => {
   it('formats a valid ISO date using DATE_TAKEN_FORMAT', () => {
