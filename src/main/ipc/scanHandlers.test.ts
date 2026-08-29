@@ -11,7 +11,8 @@ const {
   mockScanAllFolders,
   mockIngestMetadata,
   mockIngestThumbnail,
-  mockDeleteThumbnail
+  mockDeleteThumbnail,
+  mockKickIndexer
 } = vi.hoisted(() => ({
   mockHandle: vi.fn(),
   mockPruneMissing: vi.fn().mockReturnValue([]),
@@ -20,7 +21,8 @@ const {
   mockScanAllFolders: vi.fn().mockResolvedValue([]),
   mockIngestMetadata: vi.fn(),
   mockIngestThumbnail: vi.fn(),
-  mockDeleteThumbnail: vi.fn().mockResolvedValue(undefined)
+  mockDeleteThumbnail: vi.fn().mockResolvedValue(undefined),
+  mockKickIndexer: vi.fn()
 }))
 
 vi.mock('electron', () => ({ ipcMain: { handle: mockHandle } }))
@@ -30,6 +32,7 @@ vi.mock('@main/services/directoryScanner', () => ({
   scanDirectory: mockScanDirectory,
   scanAllFolders: mockScanAllFolders
 }))
+vi.mock('@main/services/embeddingIndexService', () => ({ kickIndexer: mockKickIndexer }))
 vi.mock('@main/services/photoIngest', () => ({
   ingestMetadata: mockIngestMetadata,
   ingestThumbnail: mockIngestThumbnail
@@ -125,6 +128,8 @@ describe('runScan happy path', () => {
 
     const complete = sender.send.mock.calls.find(([channel]) => channel === 'scan:complete')
     expect(complete?.[1]).toMatchObject({ totalScanned: 2, cacheHits: 1, errors: [] })
+    // Newly-ready photos need embedding for visual search.
+    expect(mockKickIndexer).toHaveBeenCalled()
 
     const batches = sender.send.mock.calls.filter(([channel]) => channel === 'scan:metadata-batch')
     const batchedPaths = batches

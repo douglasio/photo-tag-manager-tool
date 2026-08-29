@@ -13,7 +13,8 @@ const {
   mockSetPersonFilter,
   mockSetSearchResults,
   mockSearchPhotos,
-  mockSemanticSearchPhotos
+  mockSemanticSearchPhotos,
+  mockScanProgress
 } = vi.hoisted(() => ({
   mockClose: vi.fn(),
   mockSelectPhoto: vi.fn(),
@@ -23,7 +24,10 @@ const {
   mockSetPersonFilter: vi.fn(),
   mockSetSearchResults: vi.fn(),
   mockSearchPhotos: vi.fn(),
-  mockSemanticSearchPhotos: vi.fn()
+  mockSemanticSearchPhotos: vi.fn(),
+  // Mutable wrapper (not a vi.fn()) — tests reassign .embeddingIndexProgress
+  // before rendering to control what useScanProgress() returns.
+  mockScanProgress: { embeddingIndexProgress: null as { done: number; total: number } | null }
 }))
 
 // Stands in for Mantine's Spotlight so the modal renders inline, without the
@@ -112,6 +116,10 @@ vi.mock('@renderer/state/PhotoLibrarySidebarContext', () => ({
   })
 }))
 
+vi.mock('@renderer/state/PhotoLibraryScanProgressContext', () => ({
+  useScanProgress: () => mockScanProgress
+}))
+
 import { SearchSpotlight } from './SearchSpotlight'
 
 function makeResult(paths: string[], total = paths.length): SearchResult {
@@ -170,6 +178,7 @@ beforeEach(() => {
   mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResult([]))
   // @ts-expect-error - partial window.api stub; only these two are exercised
   window.api = { searchPhotos: mockSearchPhotos, semanticSearchPhotos: mockSemanticSearchPhotos }
+  mockScanProgress.embeddingIndexProgress = null
 })
 
 afterEach(() => {
@@ -402,6 +411,48 @@ describe('visual matches', () => {
     await search('tag:beach person:joe')
 
     expect(mockSemanticSearchPhotos).not.toHaveBeenCalled()
+  })
+})
+
+describe('embedding index status', () => {
+  function makeSemanticResultWithGap(
+    paths: string[],
+    indexedCount: number,
+    totalReadyCount: number
+  ): SemanticSearchResult {
+    return { ...makeSemanticResult(paths), indexedCount, totalReadyCount }
+  }
+
+  it('shows the static shortfall line when idle', async () => {
+    mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
+    mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResultWithGap([], 3, 5))
+    renderSpotlight()
+    await search('beach')
+
+    expect(screen.getByText('2 photos not yet indexed for visual search')).toBeInTheDocument()
+  })
+
+  // Regression: the shortfall count used to just sit there — nothing in the
+  // dropdown showed the background indexer was actually draining it.
+  it('shows a live count instead once the background indexer is running', async () => {
+    mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
+    mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResultWithGap([], 3, 5))
+    mockScanProgress.embeddingIndexProgress = { done: 4, total: 10 }
+    renderSpotlight()
+    await search('beach')
+
+    expect(screen.getByText('Indexing for visual search… 4 of 10')).toBeInTheDocument()
+    expect(screen.queryByText(/not yet indexed/)).not.toBeInTheDocument()
+  })
+
+  it('hides the line entirely once nothing is unindexed and the indexer is idle', async () => {
+    mockSearchPhotos.mockResolvedValue(makeResult(['/photos/a.jpg']))
+    mockSemanticSearchPhotos.mockResolvedValue(makeSemanticResultWithGap([], 5, 5))
+    renderSpotlight()
+    await search('beach')
+
+    expect(screen.queryByText(/not yet indexed/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Indexing for visual search/)).not.toBeInTheDocument()
   })
 })
 

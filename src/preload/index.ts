@@ -7,6 +7,7 @@ import type {
   AiScanResult,
   AppSettings,
   DefaultView,
+  EmbeddingIndexProgress,
   FaceRecord,
   FaceScanProgress,
   FaceScanResult,
@@ -89,6 +90,11 @@ const api = {
   wasAiScanInterrupted: (): Promise<boolean> => ipcRenderer.invoke('ai:wasScanInterrupted'),
   onAiScanProgress: (callback: (progress: AiScanProgress) => void): (() => void) =>
     subscribe('ai:scanProgress', callback),
+  getEmbeddingIndexStatus: (): Promise<EmbeddingIndexProgress | null> =>
+    ipcRenderer.invoke('ai:getIndexStatus'),
+  onEmbeddingIndexProgress: (
+    callback: (progress: EmbeddingIndexProgress | null) => void
+  ): (() => void) => subscribe('ai:indexProgress', callback),
   findSimilarPhotos: (filePath: string, limit: number): Promise<SimilarPhoto[]> =>
     ipcRenderer.invoke('ai:findSimilarPhotos', filePath, limit),
   dismissDuplicateGroup: (filePaths: string[]): Promise<void> =>

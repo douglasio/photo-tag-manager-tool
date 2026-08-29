@@ -2,6 +2,7 @@ import type {
   AiScanProgress,
   AppSettings,
   DefaultView,
+  EmbeddingIndexProgress,
   FaceScanProgress,
   GalleryViewMode,
   PersonRecord,
@@ -99,6 +100,11 @@ export interface PhotoLibraryState {
   // Session-only — null when no AI scan is in flight. Spans the whole
   // download/embed/cluster flow, regardless of which component triggered it.
   aiScanProgress: AiScanProgress | null
+  // Session-only — null when the background embedding indexer is idle. Ambient
+  // rather than tied to a single user-triggered request (see
+  // embeddingIndexService), so it's seeded from a status query on mount
+  // rather than only ever set by a request's own response.
+  embeddingIndexProgress: EmbeddingIndexProgress | null
   faceDetectionEnabled: boolean
   // Session-only, same reasoning as aiScanProgress — spans the whole
   // detect-then-cluster face scan regardless of which component triggered it.
@@ -181,6 +187,7 @@ export const initialState: PhotoLibraryState = {
   galleryViewMode: 'grid',
   aiTagSuggestionsEnabled: false,
   aiScanProgress: null,
+  embeddingIndexProgress: null,
   faceDetectionEnabled: false,
   faceScanProgress: null,
   people: [],
@@ -238,6 +245,7 @@ export type PhotoLibraryAction =
   | { type: 'SET_GALLERY_VIEW_MODE'; value: GalleryViewMode }
   | { type: 'SET_AI_TAG_SUGGESTIONS_ENABLED'; value: boolean }
   | { type: 'SET_AI_SCAN_PROGRESS'; progress: AiScanProgress | null }
+  | { type: 'SET_EMBEDDING_INDEX_PROGRESS'; progress: EmbeddingIndexProgress | null }
   | { type: 'SET_FACE_DETECTION_ENABLED'; value: boolean }
   | { type: 'SET_FACE_SCAN_PROGRESS'; progress: FaceScanProgress | null }
   | { type: 'SET_PEOPLE'; people: PersonRecord[] }
@@ -635,6 +643,8 @@ export function photoLibraryReducer(
         : { ...state, aiTagSuggestionsEnabled: action.value }
     case 'SET_AI_SCAN_PROGRESS':
       return { ...state, aiScanProgress: action.progress }
+    case 'SET_EMBEDDING_INDEX_PROGRESS':
+      return { ...state, embeddingIndexProgress: action.progress }
     case 'SET_FACE_DETECTION_ENABLED':
       // Guarded for the same reason as SET_AI_TAG_SUGGESTIONS_ENABLED above.
       if (state.faceDetectionEnabled === action.value) return state

@@ -9,11 +9,17 @@ import {
   wasAiScanInterrupted
 } from '@main/services/aiScanService'
 import { findSimilarPhotos } from '@main/services/duplicatePhotoService'
+import { getIndexStatus } from '@main/services/embeddingIndexService'
 import { suggestTagsByExemplar } from '@main/services/tagExemplarService'
 import { suggestTags } from '@main/services/tagSuggestionService'
 import { thumbnailFilePath } from '@main/services/thumbnailService'
 import { computeDuplicateGroupSignature } from '@shared/duplicateGroupSignature'
-import type { AiScanResult, SimilarPhoto, TagSuggestion } from '@shared/types'
+import type {
+  AiScanResult,
+  EmbeddingIndexProgress,
+  SimilarPhoto,
+  TagSuggestion
+} from '@shared/types'
 
 export function registerAiHandlers(): void {
   // The one call that takes AI features from off to fully scanned: downloads
@@ -37,6 +43,11 @@ export function registerAiHandlers(): void {
   })
 
   ipcMain.handle('ai:wasScanInterrupted', (): boolean => wasAiScanInterrupted())
+
+  // Seeds the renderer's initial state on mount — a subscriber to
+  // ai:indexProgress that mounts mid-pass would otherwise see nothing until
+  // the next progress tick.
+  ipcMain.handle('ai:getIndexStatus', (): EmbeddingIndexProgress | null => getIndexStatus())
 
   // Blends zero-shot text matching (works from day one) with similarity to a
   // tag's own tagged photos (more personalized) — exemplar wins where both apply.

@@ -5,6 +5,7 @@ import pLimitImport from 'p-limit'
 import { pruneMissing } from '@main/db/photoRepository'
 import { getExcludePatterns } from '@main/db/settingsRepository'
 import { scanAllFolders, scanDirectory } from '@main/services/directoryScanner'
+import { kickIndexer } from '@main/services/embeddingIndexService'
 import { ingestMetadata, ingestThumbnail } from '@main/services/photoIngest'
 import { deleteThumbnail } from '@main/services/thumbnailService'
 import type {
@@ -188,5 +189,8 @@ async function runScan(
     // against a set that DB-side deliberately left unapplied.
     filePaths: state.cancelled ? null : filePaths
   }
+  // Newly-ready photos need embedding for visual search — nothing else
+  // follows up on that outside an explicit AI scan/rescan.
+  kickIndexer()
   sender.send('scan:complete', completeEvent)
 }

@@ -11,6 +11,7 @@ import type {
   WatchPhotoUpsertedEvent
 } from '@shared/types'
 
+import { kickIndexer } from './embeddingIndexService'
 import { startWatching, stopAllWatchers, stopWatching } from './folderWatcher'
 import { ingestFile } from './photoIngest'
 import { deleteThumbnail } from './thumbnailService'
@@ -51,6 +52,7 @@ async function handleUpsert(filePath: string, changeType: 'add' | 'change'): Pro
     reconcileTagGroups()
     const payload: WatchPhotoUpsertedEvent = { photo, changeType }
     sendToTarget('watch:photo-upserted', payload)
+    kickIndexer()
   } catch (err) {
     console.error(`failed to ingest watched file ${filePath}`, err)
   }

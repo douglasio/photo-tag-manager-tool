@@ -9,7 +9,9 @@ const {
   mockClusterDuplicates,
   mockEmbedAllReadyPhotos,
   mockEnsureModelReady,
-  mockDisposeTagSuggestionWorker
+  mockDisposeTagSuggestionWorker,
+  mockStopIndexer,
+  mockResumeIndexer
 } = vi.hoisted(() => ({
   mockGetAiScanInProgress: vi.fn(),
   mockGetAiTagSuggestionsEnabled: vi.fn(),
@@ -18,7 +20,9 @@ const {
   mockClusterDuplicates: vi.fn(),
   mockEmbedAllReadyPhotos: vi.fn(),
   mockEnsureModelReady: vi.fn(),
-  mockDisposeTagSuggestionWorker: vi.fn()
+  mockDisposeTagSuggestionWorker: vi.fn(),
+  mockStopIndexer: vi.fn(),
+  mockResumeIndexer: vi.fn()
 }))
 
 vi.mock('@main/db/settingsRepository', () => ({
@@ -28,6 +32,10 @@ vi.mock('@main/db/settingsRepository', () => ({
   setAiTagSuggestionsEnabled: mockSetAiTagSuggestionsEnabled
 }))
 vi.mock('./duplicatePhotoService', () => ({ clusterDuplicates: mockClusterDuplicates }))
+vi.mock('./embeddingIndexService', () => ({
+  stopIndexer: mockStopIndexer,
+  resumeIndexer: mockResumeIndexer
+}))
 vi.mock('./photoEmbedding', () => ({ embedAllReadyPhotos: mockEmbedAllReadyPhotos }))
 vi.mock('./tagSuggestionService', () => ({
   ensureModelReady: mockEnsureModelReady,
@@ -41,6 +49,7 @@ describe('runFullAiScan', () => {
     vi.clearAllMocks()
     mockEmbedAllReadyPhotos.mockResolvedValue([])
     mockClusterDuplicates.mockResolvedValue({ groups: [], canceled: false })
+    mockStopIndexer.mockResolvedValue(undefined)
   })
 
   it('marks the scan in progress and clears it when finished', async () => {
@@ -56,6 +65,27 @@ describe('runFullAiScan', () => {
     await expect(runFullAiScan()).rejects.toThrow('worker crashed')
 
     expect(mockSetAiScanInProgress).toHaveBeenLastCalledWith(false)
+  })
+
+  // Both this scan and the background indexer drive the same shared CLIP
+  // worker — the indexer must be fully stopped before the scan starts, and
+  // resumed afterward regardless of how the scan ends.
+  it('stops the background indexer before starting and resumes it after finishing', async () => {
+    await runFullAiScan()
+
+    expect(mockStopIndexer.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSetAiScanInProgress.mock.invocationCallOrder[0]
+    )
+    expect(mockResumeIndexer).toHaveBeenCalled()
+  })
+
+  it('resumes the background indexer even if clustering throws', async () => {
+    mockClusterDuplicates.mockRejectedValue(new Error('worker crashed'))
+
+    await expect(runFullAiScan()).rejects.toThrow('worker crashed')
+
+    expect(mockStopIndexer).toHaveBeenCalled()
+    expect(mockResumeIndexer).toHaveBeenCalled()
   })
 
   it('stops before clustering once cancelAiScan is called mid-embedding', async () => {
@@ -79,6 +109,7 @@ describe('enableAiFeaturesAndScan', () => {
     vi.clearAllMocks()
     mockEmbedAllReadyPhotos.mockResolvedValue([])
     mockClusterDuplicates.mockResolvedValue({ groups: [], canceled: false })
+    mockStopIndexer.mockResolvedValue(undefined)
   })
 
   it('downloads the model, enables the setting, then runs the scan', async () => {

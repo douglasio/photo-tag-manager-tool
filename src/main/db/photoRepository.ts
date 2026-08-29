@@ -178,6 +178,26 @@ export function findAllReadyPhotos(): { filePath: string; thumbnailKey: string }
     .map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
 }
 
+/** Every thumbnail-ready photo outside an excluded folder that has no cached
+ * embedding yet — the background indexer's work queue. Anti-joined against
+ * photo_embeddings directly (rather than reusing findAllReadyPhotos and
+ * relying on the caller to skip cached ones) so the indexer's progress total
+ * reflects remaining work, not whole-library size. */
+export function findReadyPhotosWithoutEmbeddings(): { filePath: string; thumbnailKey: string }[] {
+  const excludedFolders = getExcludedFolders()
+  const rows = getDb()
+    .prepare(
+      `SELECT p.path, p.thumbnailKey FROM photos p
+       LEFT JOIN photo_embeddings e ON e.path = p.path
+       WHERE p.thumbnailStatus = 'ready' AND p.thumbnailKey IS NOT NULL
+         AND e.path IS NULL`
+    )
+    .all() as { path: string; thumbnailKey: string }[]
+  return rows
+    .filter((row) => !isUnderExcludedFolder(row.path, excludedFolders))
+    .map((row) => ({ filePath: row.path, thumbnailKey: row.thumbnailKey }))
+}
+
 /** Every thumbnail-ready photo with a known dateTaken, outside an excluded
  * folder — used to group photos by year for the Throwback widget. */
 export function findAllReadyPhotosWithDate(): {

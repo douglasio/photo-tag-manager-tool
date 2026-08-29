@@ -508,6 +508,21 @@ describe('photoLibraryReducer', () => {
       expect(cleared.faceScanProgress).toBeNull()
     })
 
+    it('sets the embedding index progress', () => {
+      const progress = { done: 3, total: 10 }
+      const state = photoLibraryReducer(initialState, {
+        type: 'SET_EMBEDDING_INDEX_PROGRESS',
+        progress
+      })
+      expect(state.embeddingIndexProgress).toEqual(progress)
+
+      const cleared = photoLibraryReducer(state, {
+        type: 'SET_EMBEDDING_INDEX_PROGRESS',
+        progress: null
+      })
+      expect(cleared.embeddingIndexProgress).toBeNull()
+    })
+
     it('replaces the people list', () => {
       const people = [
         {

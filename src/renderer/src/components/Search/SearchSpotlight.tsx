@@ -15,6 +15,7 @@ import {
 
 import { usePhotoSearch } from '@renderer/hooks/usePhotoSearch'
 import { useLibraryActions } from '@renderer/state/PhotoLibraryActionsContext'
+import { useScanProgress } from '@renderer/state/PhotoLibraryScanProgressContext'
 import { useSidebarLibrary } from '@renderer/state/PhotoLibrarySidebarContext'
 import { toThumbProtocolUrl } from '@shared/protocolUrls'
 import { predicateKey, serializeSearchQuery, togglePredicate } from '@shared/searchQuery'
@@ -73,6 +74,7 @@ export const SearchSpotlight = memo(function SearchSpotlight(): ReactElement {
     setIncludeExcluded
   } = usePhotoSearch()
   const { state, allTags } = useSidebarLibrary()
+  const { embeddingIndexProgress } = useScanProgress()
   const {
     selectPhoto,
     openPhotoTab,
@@ -279,11 +281,12 @@ export const SearchSpotlight = memo(function SearchSpotlight(): ReactElement {
                       </Spotlight.Action>
                     )
                   )}
-                  {includeVisualMatches && unindexedCount > 0 && (
+                  {includeVisualMatches && (embeddingIndexProgress || unindexedCount > 0) && (
                     <Group px="md" py="xs" gap="xs" wrap="nowrap">
                       <Text size="xs" c="dimmed">
-                        {unindexedCount} photo{unindexedCount === 1 ? '' : 's'} not yet indexed for
-                        visual search
+                        {embeddingIndexProgress
+                          ? `Indexing for visual search… ${embeddingIndexProgress.done} of ${embeddingIndexProgress.total}`
+                          : `${unindexedCount} photo${unindexedCount === 1 ? '' : 's'} not yet indexed for visual search`}
                       </Text>
                     </Group>
                   )}

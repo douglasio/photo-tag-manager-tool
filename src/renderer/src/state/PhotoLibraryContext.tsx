@@ -11,7 +11,12 @@ import {
 
 import { notifications } from '@mantine/notifications'
 
-import { AiScanProgressToast, FaceScanProgressToast, MoveProgressToast } from '@components'
+import {
+  AiScanProgressToast,
+  EmbeddingIndexProgressToast,
+  FaceScanProgressToast,
+  MoveProgressToast
+} from '@components'
 import { isUnderExcludedFolder } from '@shared/folderExclusion'
 import type {
   AiScanProgress,
@@ -77,6 +82,7 @@ const WATCH_NOTIFICATION_DEBOUNCE_MS = 1500
 // time, so re-triggering updates the same toast instead of stacking a new one.
 const AI_SCAN_NOTIFICATION_ID = 'ai-scan'
 const FACE_SCAN_NOTIFICATION_ID = 'face-scan'
+const EMBEDDING_INDEX_NOTIFICATION_ID = 'embedding-index'
 
 // Which arrow key drove a photo-to-photo navigation — 'right' means the
 // photo being navigated to should visually enter from the right (the user
@@ -146,7 +152,10 @@ function toPersonPhotoAssignments(
 // Scan progress is deliberately absent from this back-compat state shape —
 // it lives in its own high-churn context (useScanProgress), so consuming it
 // here would re-render every usePhotoLibrary consumer on each progress tick.
-type PhotoLibraryComposedState = Omit<PhotoLibraryState, 'aiScanProgress' | 'faceScanProgress'>
+type PhotoLibraryComposedState = Omit<
+  PhotoLibraryState,
+  'aiScanProgress' | 'embeddingIndexProgress' | 'faceScanProgress'
+>
 
 interface PhotoLibraryContextValue {
   state: PhotoLibraryComposedState
@@ -1356,6 +1365,58 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
     })
   }, [rescanAiFeatures])
 
+  // Ambient background-indexer status — unlike aiScanProgress above, this
+  // isn't tied to a single user-triggered request, so it's a plain mount
+  // subscription seeded with a status query (a subscriber that mounts
+  // mid-pass would otherwise see nothing until the next progress tick).
+  useEffect(() => {
+    let cancelled = false
+    window.api.getEmbeddingIndexStatus().then((progress) => {
+      if (!cancelled) dispatch({ type: 'SET_EMBEDDING_INDEX_PROGRESS', progress })
+    })
+    const unsubscribe = window.api.onEmbeddingIndexProgress((progress) => {
+      dispatch({ type: 'SET_EMBEDDING_INDEX_PROGRESS', progress })
+    })
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [])
+
+  // Drives the indexer's own notification from state rather than from the
+  // action that set it (there is no single action — see above), and
+  // suppresses it while the full AI-scan toast is up: the two can't run
+  // concurrently (embeddingIndexService pauses for a scan's duration), so
+  // showing both would just be visual noise.
+  const embeddingIndexToastShownRef = useRef(false)
+  useEffect(() => {
+    const progress = state.embeddingIndexProgress
+    if (state.aiScanProgress || !progress) {
+      if (embeddingIndexToastShownRef.current) {
+        notifications.hide(EMBEDDING_INDEX_NOTIFICATION_ID)
+        embeddingIndexToastShownRef.current = false
+      }
+      return
+    }
+    if (!embeddingIndexToastShownRef.current) {
+      embeddingIndexToastShownRef.current = true
+      notifications.show({
+        id: EMBEDDING_INDEX_NOTIFICATION_ID,
+        autoClose: false,
+        withCloseButton: true,
+        onClose: () => {
+          embeddingIndexToastShownRef.current = false
+        },
+        message: <EmbeddingIndexProgressToast progress={progress} />
+      })
+    } else {
+      notifications.update({
+        id: EMBEDDING_INDEX_NOTIFICATION_ID,
+        message: <EmbeddingIndexProgressToast progress={progress} />
+      })
+    }
+  }, [state.embeddingIndexProgress, state.aiScanProgress])
+
   const setNavbarSplitSizes = useCallback((sizes: number[]) => {
     dispatch({ type: 'SET_NAVBAR_SPLIT_SIZES', sizes })
     void window.api.setNavbarSplitSizes(sizes)
@@ -2087,9 +2148,10 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   const scanProgressValue: PhotoLibraryScanProgressValue = useMemo(
     () => ({
       aiScanProgress: state.aiScanProgress,
+      embeddingIndexProgress: state.embeddingIndexProgress,
       faceScanProgress: state.faceScanProgress
     }),
-    [state.aiScanProgress, state.faceScanProgress]
+    [state.aiScanProgress, state.embeddingIndexProgress, state.faceScanProgress]
   )
 
   return (

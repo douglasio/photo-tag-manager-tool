@@ -58,8 +58,12 @@ interface FakeRow {
 // Mimics just enough of better-sqlite3 to exercise photoRepository's actual
 // SQL shapes (upsert, LIKE-prefix scans, instr() substring search, iterate,
 // transaction) against a real in-memory Map, without a real SQLite file.
-function createFakeDb(): { rows: Map<string, FakeRow> } {
+function createFakeDb(): { rows: Map<string, FakeRow>; embeddedPaths: Set<string> } {
   const rows = new Map<string, FakeRow>()
+  // findReadyPhotosWithoutEmbeddings anti-joins against photo_embeddings
+  // directly rather than going through embeddingRepository (mocked away
+  // above) — this stands in for that table's rows.
+  const embeddedPaths = new Set<string>()
 
   const db = {
     prepare(sql: string) {
@@ -116,6 +120,15 @@ function createFakeDb(): { rows: Map<string, FakeRow> } {
         return {
           all: () =>
             Array.from(rows.values()).filter((r) => r.thumbnailStatus === 'ready' && r.thumbnailKey)
+        }
+      }
+      if (s.startsWith('SELECT p.path, p.thumbnailKey FROM photos p')) {
+        return {
+          all: () =>
+            Array.from(rows.values())
+              .filter((r) => r.thumbnailStatus === 'ready' && r.thumbnailKey)
+              .filter((r) => !embeddedPaths.has(r.path))
+              .map((r) => ({ path: r.path, thumbnailKey: r.thumbnailKey }))
         }
       }
       if (s.startsWith('SELECT path, thumbnailKey, dateTaken FROM photos')) {
@@ -199,7 +212,7 @@ function createFakeDb(): { rows: Map<string, FakeRow> } {
   }
 
   mockGetDb.mockReturnValue(db)
-  return { rows }
+  return { rows, embeddedPaths }
 }
 
 function makeRecord(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
@@ -305,6 +318,41 @@ describe('findPhotoPathsWithTag', () => {
       1
     )
     expect(photoRepository.findPhotoPathsWithTag('x', 10)).toEqual([])
+  })
+})
+
+describe('findReadyPhotosWithoutEmbeddings', () => {
+  it('excludes photos that already have a cached embedding', () => {
+    const { embeddedPaths } = createFakeDb()
+    photoRepository.upsertPhoto(
+      makeRecord('/a.jpg', { thumbnailStatus: 'ready', thumbnailKey: 'k1' }),
+      1,
+      1
+    )
+    photoRepository.upsertPhoto(
+      makeRecord('/b.jpg', { thumbnailStatus: 'ready', thumbnailKey: 'k2' }),
+      1,
+      1
+    )
+    embeddedPaths.add('/a.jpg')
+
+    expect(photoRepository.findReadyPhotosWithoutEmbeddings()).toEqual([
+      { filePath: '/b.jpg', thumbnailKey: 'k2' }
+    ])
+  })
+
+  it('excludes non-ready photos and photos under an excluded folder', () => {
+    const { embeddedPaths } = createFakeDb()
+    mockGetExcludedFolders.mockReturnValue(['/skip'])
+    photoRepository.upsertPhoto(makeRecord('/pending.jpg', { thumbnailStatus: 'pending' }), 1, 1)
+    photoRepository.upsertPhoto(
+      makeRecord('/skip/a.jpg', { thumbnailStatus: 'ready', thumbnailKey: 'k1' }),
+      1,
+      1
+    )
+
+    expect(photoRepository.findReadyPhotosWithoutEmbeddings()).toEqual([])
+    expect(embeddedPaths.size).toBe(0)
   })
 })
 

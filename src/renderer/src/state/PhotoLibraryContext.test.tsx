@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PhotoRecord } from '@shared/types'
 
 import { PhotoLibraryProvider, usePhotoLibrary } from './PhotoLibraryContext'
+import {
+  type PhotoLibraryScanProgressValue,
+  useScanProgress
+} from './PhotoLibraryScanProgressContext'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {
@@ -102,6 +106,8 @@ function createMockApi(): {
     cancelAiScan: vi.fn().mockResolvedValue(undefined),
     wasAiScanInterrupted: vi.fn().mockResolvedValue(false),
     onAiScanProgress: onMethod('onAiScanProgress'),
+    getEmbeddingIndexStatus: vi.fn().mockResolvedValue(null),
+    onEmbeddingIndexProgress: onMethod('onEmbeddingIndexProgress'),
     suggestTags: vi.fn().mockResolvedValue([]),
     setFaceDetectionEnabled: vi.fn().mockResolvedValue(undefined),
     getFacesForPhoto: vi.fn().mockResolvedValue([]),
@@ -271,6 +277,40 @@ describe('PhotoLibraryContext', () => {
 
       await waitFor(() => expect(mockApi.wasAiScanInterrupted).toHaveBeenCalled())
       expect(mockApi.rescanAiFeatures).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('background embedding indexer status', () => {
+    // Exposed via useScanProgress (a separate context from usePhotoLibrary's
+    // state, split out specifically so ~150ms progress ticks don't re-render
+    // every gallery/dashboard consumer — see PhotoLibraryScanProgressContext).
+    function setupScanProgress(): ReturnType<
+      typeof renderHook<PhotoLibraryScanProgressValue, unknown>
+    > {
+      return renderHook(() => useScanProgress(), { wrapper })
+    }
+
+    // Ambient, not tied to a single user action (unlike aiScanProgress) —
+    // a subscriber that mounted mid-pass would otherwise see nothing until
+    // the next progress tick, so it's seeded from a status query on mount.
+    it('seeds embeddingIndexProgress from a status query on mount', async () => {
+      mockApi.getEmbeddingIndexStatus.mockResolvedValue({ done: 3, total: 10 })
+      const { result } = setupScanProgress()
+
+      await waitFor(() =>
+        expect(result.current.embeddingIndexProgress).toEqual({ done: 3, total: 10 })
+      )
+    })
+
+    it('updates embeddingIndexProgress as onEmbeddingIndexProgress ticks arrive', async () => {
+      const { result } = setupScanProgress()
+      await waitFor(() => expect(mockApi.onEmbeddingIndexProgress).toHaveBeenCalled())
+
+      act(() => subscriptions.onEmbeddingIndexProgress({ done: 1, total: 5 }))
+      expect(result.current.embeddingIndexProgress).toEqual({ done: 1, total: 5 })
+
+      act(() => subscriptions.onEmbeddingIndexProgress(null))
+      expect(result.current.embeddingIndexProgress).toBeNull()
     })
   })
 

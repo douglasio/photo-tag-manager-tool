@@ -7,6 +7,7 @@ import {
 import type { AiScanProgress, AiScanResult } from '@shared/types'
 
 import { clusterDuplicates } from './duplicatePhotoService'
+import { resumeIndexer, stopIndexer } from './embeddingIndexService'
 import { embedAllReadyPhotos } from './photoEmbedding'
 import { disposeTagSuggestionWorker, ensureModelReady } from './tagSuggestionService'
 
@@ -23,6 +24,10 @@ export async function runFullAiScan(
 ): Promise<AiScanResult> {
   const scan = { cancelled: false }
   currentScan = scan
+  // Both this and the background indexer drive the same shared CLIP worker —
+  // must not overlap. Awaited so the indexer's in-flight photo (which can't
+  // be interrupted mid-inference) finishes before this scan touches it.
+  await stopIndexer()
   setAiScanInProgress(true)
   try {
     const embedded = await embedAllReadyPhotos(
@@ -45,6 +50,7 @@ export async function runFullAiScan(
   } finally {
     if (currentScan === scan) currentScan = null
     setAiScanInProgress(false)
+    resumeIndexer()
   }
 }
 

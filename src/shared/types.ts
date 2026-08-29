@@ -248,6 +248,14 @@ export interface AiScanResult {
   canceled: boolean
 }
 
+// The background embedding indexer's status — unlike AiScanProgress this is
+// single-phase (just embedding) and ambient rather than tied to one
+// user-triggered request, so it has no 'downloading'/'clustering' phase.
+export interface EmbeddingIndexProgress {
+  done: number
+  total: number
+}
+
 // Normalized 0..1 against the photo's own dimensions, not raw pixels — keeps
 // this independent of which resolution the box was detected against.
 export interface FaceBox {

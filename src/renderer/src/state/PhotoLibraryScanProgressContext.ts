@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-import type { AiScanProgress, FaceScanProgress } from '@shared/types'
+import type { AiScanProgress, EmbeddingIndexProgress, FaceScanProgress } from '@shared/types'
 
 // AI/face scan progress, split out of the Gallery bucket — progress ticks
 // arrive every ~150ms for the whole duration of a scan, and keeping them in
@@ -10,6 +10,7 @@ import type { AiScanProgress, FaceScanProgress } from '@shared/types'
 // should subscribe here.
 export interface PhotoLibraryScanProgressValue {
   aiScanProgress: AiScanProgress | null
+  embeddingIndexProgress: EmbeddingIndexProgress | null
   faceScanProgress: FaceScanProgress | null
 }
 
