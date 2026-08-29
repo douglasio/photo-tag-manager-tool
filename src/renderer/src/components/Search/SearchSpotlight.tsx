@@ -1,6 +1,7 @@
 import { memo, type ReactElement, useMemo, useState } from 'react'
 
 import { Badge, Chip, Group, Image, Text, Transition } from '@mantine/core'
+import { useElementSize, useReducedMotion } from '@mantine/hooks'
 import { Spotlight, spotlight } from '@mantine/spotlight'
 import {
   IconArrowLeft,
@@ -26,6 +27,11 @@ const PHOTO_ROW_LIMIT = 7
 const ROW_THUMB_SIZE = 64
 const GRID_THUMB_SIZE = 64
 const SLIDE_DURATION = 200
+
+// Both panels occupy this one grid cell so the outgoing and incoming lists
+// overlap during the slide instead of stacking. Left in normal flow they'd
+// briefly sum to twice the height, then snap when the old one unmounted.
+const PANEL_CELL = { gridArea: '1 / 1', alignSelf: 'start' } as const
 
 // Chips write predicates into the same parsed query the text box drives, so
 // toggling one visibly rewrites the input rather than tracking state beside it.
@@ -110,6 +116,24 @@ export const SearchSpotlight = memo(function SearchSpotlight(): ReactElement {
       folders: [...state.allFolderPaths].filter(match).sort().slice(0, ENTITY_LIMIT)
     }
   }, [needle, allTags, state.people, state.allFolderPaths])
+
+  // Overlapping the panels fixes the doubling, but the two are still
+  // different heights, so the cell itself is animated to whichever one is
+  // on its way in. ResizeObserver reports 0 for an unmounted panel, so the
+  // last real measurement is kept as the target for the side that's off
+  // screen — only the very first expand has nothing to animate from.
+  const reduceMotion = useReducedMotion()
+  const { ref: expandedRef, height: expandedHeight } = useElementSize()
+  const { ref: collapsedRef, height: collapsedHeight } = useElementSize()
+  const [lastHeights, setLastHeights] = useState({ expanded: 0, collapsed: 0 })
+  const measured = {
+    expanded: expandedHeight > 0 ? expandedHeight : lastHeights.expanded,
+    collapsed: collapsedHeight > 0 ? collapsedHeight : lastHeights.collapsed
+  }
+  if (measured.expanded !== lastHeights.expanded || measured.collapsed !== lastHeights.collapsed) {
+    setLastHeights(measured)
+  }
+  const panelHeight = expanded ? measured.expanded : measured.collapsed
 
   const close = (): void => spotlight.close()
   const back = (): void => setExpanded(false)
@@ -212,156 +236,167 @@ export const SearchSpotlight = memo(function SearchSpotlight(): ReactElement {
       )}
 
       <Spotlight.ActionsList>
-        {/* The expanded list slides in from the right ("forward"); the
-            compact row below slides in from the left ("back") — both
-            directions use Mantine's stock slide presets, no custom transition. */}
-        <Transition mounted={expanded} transition="slide-left" duration={SLIDE_DURATION}>
-          {(styles) => (
-            <Spotlight.ActionsGroup label={`Photos (${mergedTotal})`} style={styles}>
-              {backAction}
-              <Group gap="xs" px="md" py="xs" wrap="wrap">
-                {mergedHits.map((hit) => (
-                  <Spotlight.Action
-                    key={hit.filePath}
-                    aria-label={hit.fileName}
-                    onClick={() => openPhoto(hit.filePath)}
-                    style={{ width: GRID_THUMB_SIZE + 8, flex: '0 0 auto', padding: 4 }}
-                  >
-                    <ResultThumb hit={hit} size={GRID_THUMB_SIZE} Fallback={IconPhoto} />
-                  </Spotlight.Action>
-                ))}
-              </Group>
-              <Spotlight.Action onClick={showPhotosInGallery}>
-                <Group wrap="nowrap" gap="xs">
-                  <IconPhoto size={20} />
-                  <Text>
-                    Show <strong>{mergedHits.length}</strong> results in gallery
-                  </Text>
-                </Group>
-              </Spotlight.Action>
-            </Spotlight.ActionsGroup>
-          )}
-        </Transition>
-
-        <Transition mounted={!expanded} transition="slide-right" duration={SLIDE_DURATION}>
-          {(styles) => (
-            <div style={styles}>
-              {(photoRow.length > 0 || (includeVisualMatches && semanticLoading)) && (
+        <div
+          style={{
+            display: 'grid',
+            overflow: 'hidden',
+            height: panelHeight > 0 ? panelHeight : undefined,
+            transition: reduceMotion ? undefined : `height ${SLIDE_DURATION}ms ease`
+          }}
+        >
+          {/* The expanded list slides in from the right ("forward"); the
+              compact row below slides in from the left ("back") — both
+              directions use Mantine's stock slide presets, no custom transition. */}
+          <Transition mounted={expanded} transition="slide-left" duration={SLIDE_DURATION}>
+            {(styles) => (
+              <div ref={expandedRef} style={{ ...styles, ...PANEL_CELL }}>
                 <Spotlight.ActionsGroup label={`Photos (${mergedTotal})`}>
-                  <Group gap="xs" px="md" py="xs" wrap="nowrap">
-                    {photoRow.map((hit) => (
+                  {backAction}
+                  <Group gap="xs" px="md" py="xs" wrap="wrap">
+                    {mergedHits.map((hit) => (
                       <Spotlight.Action
                         key={hit.filePath}
                         aria-label={hit.fileName}
                         onClick={() => openPhoto(hit.filePath)}
-                        style={{ width: ROW_THUMB_SIZE + 8, flex: '0 0 auto', padding: 4 }}
+                        style={{ width: GRID_THUMB_SIZE + 8, flex: '0 0 auto', padding: 4 }}
                       >
-                        <ResultThumb hit={hit} size={ROW_THUMB_SIZE} Fallback={IconPhoto} />
+                        <ResultThumb hit={hit} size={GRID_THUMB_SIZE} Fallback={IconPhoto} />
                       </Spotlight.Action>
                     ))}
                   </Group>
-                  {mergedHits.length > PHOTO_ROW_LIMIT ? (
-                    <Spotlight.Action
-                      onClick={() => setExpanded(true)}
-                      closeSpotlightOnTrigger={false}
-                    >
-                      <Group wrap="nowrap" justify="space-between" w="100%">
-                        <Text size="sm">
-                          View all <strong>{mergedTotal}</strong>
-                        </Text>
-                        <IconChevronRight size={16} />
-                      </Group>
-                    </Spotlight.Action>
-                  ) : (
-                    photoRow.length > 0 && (
-                      <Spotlight.Action onClick={showPhotosInGallery}>
-                        <Group wrap="nowrap">
-                          <IconPhoto size={20} />
-                          <Text>Show these results in Gallery</Text>
+                  <Spotlight.Action onClick={showPhotosInGallery}>
+                    <Group wrap="nowrap" gap="xs">
+                      <IconPhoto size={20} />
+                      <Text>
+                        Show <strong>{mergedHits.length}</strong> results in gallery
+                      </Text>
+                    </Group>
+                  </Spotlight.Action>
+                </Spotlight.ActionsGroup>
+              </div>
+            )}
+          </Transition>
+
+          <Transition mounted={!expanded} transition="slide-right" duration={SLIDE_DURATION}>
+            {(styles) => (
+              <div ref={collapsedRef} style={{ ...styles, ...PANEL_CELL }}>
+                {(photoRow.length > 0 || (includeVisualMatches && semanticLoading)) && (
+                  <Spotlight.ActionsGroup label={`Photos (${mergedTotal})`}>
+                    <Group gap="xs" px="md" py="xs" wrap="nowrap">
+                      {photoRow.map((hit) => (
+                        <Spotlight.Action
+                          key={hit.filePath}
+                          aria-label={hit.fileName}
+                          onClick={() => openPhoto(hit.filePath)}
+                          style={{ width: ROW_THUMB_SIZE + 8, flex: '0 0 auto', padding: 4 }}
+                        >
+                          <ResultThumb hit={hit} size={ROW_THUMB_SIZE} Fallback={IconPhoto} />
+                        </Spotlight.Action>
+                      ))}
+                    </Group>
+                    {mergedHits.length > PHOTO_ROW_LIMIT ? (
+                      <Spotlight.Action
+                        onClick={() => setExpanded(true)}
+                        closeSpotlightOnTrigger={false}
+                      >
+                        <Group wrap="nowrap" justify="space-between" w="100%">
+                          <Text size="sm">
+                            View all <strong>{mergedTotal}</strong>
+                          </Text>
+                          <IconChevronRight size={16} />
                         </Group>
                       </Spotlight.Action>
-                    )
-                  )}
-                  {includeVisualMatches &&
-                    (modelDownloadProgress !== null ||
-                      embeddingIndexProgress ||
-                      unindexedCount > 0) && (
-                      <Group px="md" py="xs" gap="xs" wrap="nowrap">
-                        <Text size="xs" c="dimmed">
-                          {modelDownloadProgress !== null
-                            ? `Downloading visual search model… ${modelDownloadProgress}%`
-                            : embeddingIndexProgress
-                              ? `Indexing for visual search… ${embeddingIndexProgress.done} of ${embeddingIndexProgress.total}`
-                              : `${unindexedCount} photo${unindexedCount === 1 ? '' : 's'} not yet indexed for visual search`}
-                        </Text>
-                      </Group>
+                    ) : (
+                      photoRow.length > 0 && (
+                        <Spotlight.Action onClick={showPhotosInGallery}>
+                          <Group wrap="nowrap">
+                            <IconPhoto size={20} />
+                            <Text>Show these results in Gallery</Text>
+                          </Group>
+                        </Spotlight.Action>
+                      )
                     )}
-                </Spotlight.ActionsGroup>
-              )}
+                    {includeVisualMatches &&
+                      (modelDownloadProgress !== null ||
+                        embeddingIndexProgress ||
+                        unindexedCount > 0) && (
+                        <Group px="md" py="xs" gap="xs" wrap="nowrap">
+                          <Text size="xs" c="dimmed">
+                            {modelDownloadProgress !== null
+                              ? `Downloading visual search model… ${modelDownloadProgress}%`
+                              : embeddingIndexProgress
+                                ? `Indexing for visual search… ${embeddingIndexProgress.done} of ${embeddingIndexProgress.total}`
+                                : `${unindexedCount} photo${unindexedCount === 1 ? '' : 's'} not yet indexed for visual search`}
+                          </Text>
+                        </Group>
+                      )}
+                  </Spotlight.ActionsGroup>
+                )}
 
-              {entities.tags.length > 0 && (
-                <Spotlight.ActionsGroup label="Tags">
-                  {entities.tags.map((tag) => (
-                    <Spotlight.Action
-                      key={tag}
-                      label={tag}
-                      leftSection={<IconTag size={20} />}
-                      onClick={() => {
-                        setFolderTagFilter(tag)
-                        close()
-                      }}
-                    />
-                  ))}
-                </Spotlight.ActionsGroup>
-              )}
+                {entities.tags.length > 0 && (
+                  <Spotlight.ActionsGroup label="Tags">
+                    {entities.tags.map((tag) => (
+                      <Spotlight.Action
+                        key={tag}
+                        label={tag}
+                        leftSection={<IconTag size={20} />}
+                        onClick={() => {
+                          setFolderTagFilter(tag)
+                          close()
+                        }}
+                      />
+                    ))}
+                  </Spotlight.ActionsGroup>
+                )}
 
-              {entities.people.length > 0 && (
-                <Spotlight.ActionsGroup label="People">
-                  {entities.people.map((person) => (
-                    <Spotlight.Action
-                      key={person.id}
-                      label={person.name ?? 'Unnamed person'}
-                      leftSection={<IconUser size={20} />}
-                      rightSection={<Badge variant="default">{person.faceCount}</Badge>}
-                      onClick={() => {
-                        setPersonFilter(person.id)
-                        close()
-                      }}
-                    />
-                  ))}
-                </Spotlight.ActionsGroup>
-              )}
+                {entities.people.length > 0 && (
+                  <Spotlight.ActionsGroup label="People">
+                    {entities.people.map((person) => (
+                      <Spotlight.Action
+                        key={person.id}
+                        label={person.name ?? 'Unnamed person'}
+                        leftSection={<IconUser size={20} />}
+                        rightSection={<Badge variant="default">{person.faceCount}</Badge>}
+                        onClick={() => {
+                          setPersonFilter(person.id)
+                          close()
+                        }}
+                      />
+                    ))}
+                  </Spotlight.ActionsGroup>
+                )}
 
-              {entities.folders.length > 0 && (
-                <Spotlight.ActionsGroup label="Folders">
-                  {entities.folders.map((folder) => (
-                    <Spotlight.Action
-                      key={folder}
-                      label={folder}
-                      leftSection={<IconFolder size={20} />}
-                      onClick={() => {
-                        setFolderFilter(folder)
-                        close()
-                      }}
-                    />
-                  ))}
-                </Spotlight.ActionsGroup>
-              )}
+                {entities.folders.length > 0 && (
+                  <Spotlight.ActionsGroup label="Folders">
+                    {entities.folders.map((folder) => (
+                      <Spotlight.Action
+                        key={folder}
+                        label={folder}
+                        leftSection={<IconFolder size={20} />}
+                        onClick={() => {
+                          setFolderFilter(folder)
+                          close()
+                        }}
+                      />
+                    ))}
+                  </Spotlight.ActionsGroup>
+                )}
 
-              {!hasAnyResult && (
-                <Spotlight.Empty>
-                  <Text c="dimmed" size="sm">
-                    {loading
-                      ? 'Searching…'
-                      : needle.length === 0
-                        ? 'Try tag:beach or person:joe before:2020'
-                        : 'Nothing found.'}
-                  </Text>
-                </Spotlight.Empty>
-              )}
-            </div>
-          )}
-        </Transition>
+                {!hasAnyResult && (
+                  <Spotlight.Empty>
+                    <Text c="dimmed" size="sm">
+                      {loading
+                        ? 'Searching…'
+                        : needle.length === 0
+                          ? 'Try tag:beach or person:joe before:2020'
+                          : 'Nothing found.'}
+                    </Text>
+                  </Spotlight.Empty>
+                )}
+              </div>
+            )}
+          </Transition>
+        </div>
       </Spotlight.ActionsList>
 
       {!expanded && result.total > 0 && (
