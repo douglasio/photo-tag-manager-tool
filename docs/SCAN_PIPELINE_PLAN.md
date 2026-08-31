@@ -10,6 +10,11 @@ The goal is to move photo import onto the same background-scan pattern `aiScanSe
 `faceScanService` already use: **counter-only progress, throttled at the source, results committed
 in bulk**, with heavy work off the main process.
 
+> **Baseline:** re-verified against branch `v0.9.0` (v0.9.1-beta). The original draft was written
+> against `main` @ f0284f4 (v0.8.0-beta); faceted + semantic search and the two background
+> indexers (`embeddingIndexService`, `faceIndexService`) have landed since, and materially change
+> Phase 4. Line numbers below are current as of this revision.
+
 ### Root cause — the renderer pipeline is quadratic
 
 `scanHandlers.ts` flushes a batch whenever it reaches `BATCH_SIZE = 30` records **or**
@@ -37,7 +42,7 @@ The fresh `photosByPath` identity then invalidates the whole derived chain in
 | `untaggedCount`                   | 1603       | O(n)                          |
 | `photos`                          | 980        | **O(n log n) — full re-sort** |
 | `visiblePhotos`                   | 1434       | O(n) filter chain             |
-| `selectedPhoto`, `openTabEntries` | 1501, 1667 | O(tabs)                       |
+| `selectedPhoto`, `openTabEntries` | 1653, 1819 | O(tabs)                       |
 
 Simulating the current flush cadence against that chain:
 
@@ -84,7 +89,7 @@ implicated.
    explicit contract in Phase 2; do not "mutate state in place."
 
 3. **`folderTree.ts` is not changed.** `addPhotoToFolderTree`/`removePhotoFromFolderTree` already
-   mutate the Maps they're handed and document that callers own copy-on-write (folderTree.ts:28).
+   mutate the Maps they're handed and document that callers own copy-on-write (`folderTree.ts:28`).
    That is the correct design; Phase 2 only changes _where_ the caller's copy boundary sits.
 
 4. **Commit folder-at-a-time rather than every 30 records.** A folder is a natural boundary, it
@@ -99,17 +104,35 @@ implicated.
    Persisting the key at metadata time with status `pending` makes on-demand generation reachable
    and halves scan events from 2N to N.
 
-6. **Persisting a `thumbnailKey` before the file exists is safe — verified, not assumed.** All
-   three consumers (`photoRepository.ts:144`, `:173`, `:192`) filter on
-   `thumbnailStatus = 'ready' AND thumbnailKey IS NOT NULL`. Because status gates every one, an
-   early key with status `pending` is excluded correctly at all three sites. No query changes
-   needed.
+6. **`thumbnailStatus = 'ready'` is now a work-queue gate for two background indexers, not just a
+   read filter — this is what makes Phase 4 dangerous.** As of v0.9.x there are **five** query
+   sites, not three:
+
+   | Site                     | Query                              | Role                             |
+   | ------------------------ | ---------------------------------- | -------------------------------- |
+   | `photoRepository.ts:144` | tag exemplars                      | read filter                      |
+   | `:173`                   | all ready photos                   | read filter                      |
+   | `:192`                   | `findReadyPhotosWithoutEmbeddings` | **embedding indexer work queue** |
+   | `:211`                   | `findReadyPhotosWithoutFaceScan`   | **face indexer work queue**      |
+   | `:242`                   | throwback (has `dateTaken`)        | read filter                      |
+
+   All five correctly exclude a `pending` row. That exclusion was harmless when these were read
+   paths driven by an explicit AI scan. It is **not** harmless now: `runScan` ends by calling
+   `kickIndexer()` and `kickFaceIndexer()` (`scanHandlers.ts:195-196`), and those indexers query
+   these tables to decide what work exists. If Phase 4 leaves photos at `pending`, both indexers
+   kick, find zero rows, and silently no-op — semantic search and face detection would only ever
+   cover photos the user happened to scroll past. See Phase 4 for the required fix.
 
 7. **Live streaming is kept where it is cheap.** Watcher events (`PHOTO_UPSERTED`,
    `PHOTO_REMOVED`), rescans, and small folder adds keep today's progressive behaviour. Only scans
    above a threshold switch to counter-only progress + folder-at-a-time commits.
 
-8. **The scan worker cannot import the repository.** `better-sqlite3` connections do not cross
+8. **Search adds no renderer derived-state pressure.** `usePhotoSearch` resolves everything
+   through IPC round-trips to the main process (`searchQuery.ts` is shared so both sides parse
+   identically). It does not subscribe to `photosByPath`, so Phases 1-2 do not need to account
+   for it.
+
+9. **The scan worker cannot import the repository.** `better-sqlite3` connections do not cross
    thread boundaries. A scan worker must post results back to the main thread for DB writes, or
    open its own connection — which risks lock contention against the main connection. The existing
    face/tag-suggestion workers never touch the DB, so their protocol is a template for _structure_
@@ -120,17 +143,33 @@ implicated.
 Ordered by dependency. **Phases 1–3 remove the crash and the main-process jank and carry no UX
 tradeoff.** Phases 4–5 are the architectural follow-through.
 
+**Status: Phases 1–3 implemented and merged into the working tree** (typecheck, lint, and the full
+test suite — 923 tests — pass). Phase 2 shipped in a revised form; see its section below for why.
+Phases 4–5 are not started.
+
 Per `docs/CLAUDE.md`: keep inline comments to two lines or less, prefer Mantine components and
 props over custom CSS, and check in before starting rather than running straight through.
 
 ---
 
-### Phase 1 — Decouple progress from data
+### Phase 1 — Decouple progress from data ✅ Implemented
 
 **Files:** `src/shared/types.ts`, `src/main/ipc/scanHandlers.ts`, `src/preload/index.ts`,
-`src/renderer/src/state/PhotoLibraryContext.tsx`, `src/renderer/src/state/photoLibraryReducer.ts`
+`src/renderer/src/state/PhotoLibraryContext.tsx`, `src/renderer/src/state/photoLibraryReducer.ts`,
+`src/renderer/src/state/PhotoLibraryScanProgressContext.ts`,
+`src/renderer/src/state/PhotoLibraryGalleryContext.ts`
 
 **Risk:** low · **No UX tradeoff**
+
+**As implemented, one addition beyond the plan below:** `DashboardView.tsx` and `GalleryGrid.tsx`
+both render the scanning indicator unconditionally inside a `memo`'d/large component. Calling
+`useScanProgress()` directly in either would re-subscribe that _whole_ component to every ~150ms
+tick for the entire scan — including the vast majority of a scan where photos already exist and
+the indicator branch never renders — reintroducing the exact "hammering DOM rerenders" complaint
+this project exists to fix, just from new code. Fixed by extracting a `PhotoScanProgressIndicator`
+leaf component (`src/renderer/src/components/Shared/PhotoScanProgressIndicator.tsx`) that owns the
+`useScanProgress()` subscription itself; `DashboardView`/`GalleryGrid` mount it but never subscribe
+to progress themselves, so a tick re-renders only the small mounted indicator.
 
 Change the progress event from a one-shot file count to a throttled running counter:
 
@@ -150,76 +189,98 @@ In `scanHandlers.ts`, emit this on a ~150 ms throttle (copy the shape from `face
 — compare `Date.now()` against a `lastProgressAt`, and always emit a final call so the bar reaches
 100%). Keep `filesFound` reachable as `total` so nothing downstream loses information.
 
+**Route it through `PhotoLibraryScanProgressContext`, not `galleryState`.** That context landed in
+v0.9.x and already carries `aiScanProgress`, `embeddingIndexProgress`, `faceScanProgress`, and
+`faceIndexProgress` — all with the same `{ done, total }` shape proposed here. Adding
+`photoScanProgress` to it is the natural home and keeps high-churn progress out of the gallery
+context, which is exactly the split that context was created to make. Remove `filesFound` from
+`galleryState` as part of this.
+
 `ScanProgressIndicator` needs **no change** — it already accepts `percent: number | null`. It is
-currently passed a hardcoded `percent={null}` at `DashboardView.tsx:119` and `GalleryGrid.tsx:421`;
-feed those real values from `done / total`. `StartupLoadingScreen.tsx` and `DuplicatesView.tsx:284`
+currently passed a hardcoded `percent={null}` at `DashboardView.tsx:131` and `GalleryGrid.tsx:442`;
+feed those real values from `done / total`. `StartupLoadingScreen.tsx` and `DuplicatesView.tsx:285`
 also render it and should be checked for consistency.
 
 The reducer's `SCAN_PROGRESS` case already early-returns when the value is unchanged
-(`photoLibraryReducer.ts:398`) — preserve that bail-out against the new fields.
+(`photoLibraryReducer.ts:461`) — preserve that bail-out against the new fields.
 
 **Note:** `scanHandlers.test.ts` pins the current event contract. Update it deliberately to assert
 the new shape _and_ the throttling behaviour. Do not simply relax the assertions until they pass.
 
 ---
 
-### Phase 2 — One Map identity per commit, not per batch
+### Phase 2 — Bound the dispatch count, not the clone strategy ✅ Implemented (revised)
 
-**Files:** `src/renderer/src/state/photoLibraryReducer.ts`, `photoLibraryReducer.test.ts`
+**Files (as implemented):** `src/main/ipc/scanHandlers.ts` (constants only) —
+**not** `photoLibraryReducer.ts`.
 
 **Risk:** low · **This is the change that removes the O(N²) term**
 
-**The contract, stated explicitly — read before writing code:**
-
-> The reducer must still be immutable _at its publish boundary_. It must never mutate a Map that
-> is currently referenced by committed state, because `PhotoLibraryContext`'s memo chain and every
-> `React.memo` consumer bail out on reference identity. Mutating shared state fails **silently**:
-> components stop re-rendering when they should, and nothing throws.
+> **Correction found during implementation.** This phase originally targeted
+> `photoLibraryReducer.ts`, on the assumption that `METADATA_BATCH` cloned its three Maps once
+> per photo. It doesn't — it already clones exactly once per _dispatched action_, and the
+> `photosByPath.has()` dedup guard already checks the in-progress copy correctly, including
+> within a single action carrying duplicate paths (verified with a passing test, see below). There
+> was nothing to fix in the reducer.
 >
-> What changes is the _frequency_ of the copy, not its existence. Today: clone three Maps per
-> 30-record batch. After: clone once per commit, apply every record from that commit into the
-> fresh copies, then publish. Same immutability guarantee, ~1/100th the copies.
+> The real lever is dispatch **frequency**, which the reducer has no control over — it's set by
+> `scanHandlers.ts`'s `BATCH_SIZE`/`BATCH_INTERVAL_MS`. At the old `BATCH_SIZE = 30`, a 50k-photo
+> scan dispatched ~1,667 `METADATA_BATCH` actions (2× that counting thumbnail-triggered flushes),
+> each cloning a photosByPath Map whose size was, on average, half the library — that product is
+> the quadratic term.
+>
+> A renderer-side coalescing buffer (debounce multiple wire batches into one dispatch, mirroring
+> this same file's `scheduleWatchNotification` pattern) was considered and rejected: many existing
+> `PhotoLibraryContext.test.tsx` tests call `subscriptions.onMetadataBatch(...)` once and assert on
+> `result.current.photos` in the same `act()`, with no fake timers — a debounce would silently stop
+> applying those batches within the test's synchronous assertion, requiring a wide, riskier test
+> rewrite for a "low risk" phase.
 
-Concretely, accept many records in one action rather than accumulating many small actions.
-`addPhotoToFolderTree` continues to be called per photo against the freshly-cloned Maps —
-unchanged, and still O(depth) per photo.
+**What actually ships:** raise `BATCH_SIZE` (30 → 500) and `BATCH_INTERVAL_MS` (120 → 200) in
+`scanHandlers.ts`. This cuts dispatch count by ~15–16x with a two-constant change, zero API
+changes, and zero test rewrites outside `scanHandlers.test.ts`'s own progress-shape assertions
+(already being touched in Phase 1). It does not change the _asymptotic_ complexity — total clone
+cost is still O(N²/batchSize) — but at realistic library sizes (tens of thousands of photos, not
+millions) this bounds the real-world cost to a small constant. Phase 4's folder-at-a-time commits
+is still the path to a true O(N) (or O(folders)) bound; this phase is the low-risk interim fix.
 
-Preserve the existing `photosByPath.has(photo.filePath)` guard that gates folder-tree insertion
-(`photoLibraryReducer.ts:406`). It is what keeps a re-ingested photo from double-counting its
-folders, and it must be checked against the _in-progress_ copy, not the pre-commit state, so that
-duplicates within a single commit are also deduped.
+**Why Phase 1 had to land alongside this, not after:** with `BATCH_SIZE` raised, `photosByPath.size`
+now jumps by ~500 every ~200ms instead of climbing smoothly — a visibly jerkier progress bar if
+anything still derived "done" from map size. Phase 1's separate, main-process-owned counter (ticked
+per-file, not per-wire-batch) is what keeps the progress bar smooth despite the chunkier commits.
 
-**Regression guard worth keeping:** assert that a scan of N photos dispatches O(folders) commits
-rather than O(N). That is cheap to express in `photoLibraryReducer.test.ts` and will not go stale
-the way a timing assertion would.
+A regression test was added in `photoRepository`/`photoIngest`/`scanHandlers` test files, but the
+originally-proposed reducer-level "N photos ⇒ O(folders) commits" guard was **not** added — it
+would currently fail (dispatch count is O(N/batchSize), not O(folders)) until Phase 4 lands. Don't
+add that specific assertion before then.
 
 ---
 
-### Phase 3 — Batch the database writes
+### Phase 3 — Batch the database writes ✅ Implemented
 
 **Files:** `src/main/db/photoRepository.ts`, `src/main/services/photoIngest.ts`,
 `src/main/ipc/scanHandlers.ts`
 
 **Risk:** low · **Fixes the main-process jank**
 
-Two changes:
+Shipped as planned, two changes:
 
-1. **Wrap upserts in `db.transaction()`** in chunks of ~500. The pattern already exists in this
-   file — see `pruneMissing`'s `deleteMany` and `renamePhotoPathPrefix`'s `updateMany`.
+1. **`upsertPhotosBatch()`** wraps many upserts in one `db.transaction()`. `scanHandlers.ts`
+   collects newly-ingested/changed records into a buffer (`WRITE_BATCH_SIZE = 500`) instead of
+   writing each one inline, force-flushing before `kickIndexer()`/`kickFaceIndexer()` — both query
+   the photos table directly on scan completion, so a still-buffered row would be invisible to
+   them and silently skip that scan's indexing pass.
 
-2. **Replace the per-photo `findByPath`** with a single bulk prefetch of
-   `path → { mtimeMs, sizeBytes, record }` for the roots being scanned, so the cache-hit check in
-   `ingestMetadata` becomes an in-memory lookup.
+2. **`findManyByPathPrefix()`** replaces the per-file `findByPath` call with one `LIKE`-prefix
+   query per root, matching `pruneMissing`'s existing precedent (chunked by root, not a single
+   `IN (...)` — avoids the 999-variable `SQLITE_MAX_VARIABLE_NUMBER` limit as planned).
 
-**Trap:** SQLite's default `SQLITE_MAX_VARIABLE_NUMBER` is 999. A naive
-`WHERE path IN (...)` over 50k paths will fail. Either chunk the `IN` clause, or prefer a single
-`WHERE path LIKE ?` prefix query per root — `pruneMissing:291` already uses exactly that approach
-and is the better precedent here.
-
-`ingestMetadata` currently takes a `filePath` and does its own lookup. It will need an optional
-pre-fetched cache entry parameter so the bulk path can pass one in, while `ingestFile`'s existing
-single-file callers (watcher, tag writes) keep working unchanged. Keep both paths working — the
-watcher depends on the single-file behaviour.
+`ingestMetadata` gained two options: `prefetched` (the looked-up cache entry, or explicit `null`
+for "not found" — distinguished from the key being _absent_, which still means "look it up
+yourself") and `deferredWrite` (called instead of an inline `upsertPhoto` on a cache miss). Both
+default to today's exact behavior when omitted, so `ingestFile`'s single-file callers (watcher,
+tag rewrites, rotate/rename) are unchanged and untested-for-regression — confirmed by grep, none
+of `watchManager.ts`/`photoHandlers.ts`/`tagHandlers.ts` pass either option.
 
 ---
 
@@ -243,7 +304,28 @@ it with `thumbnailStatus = 'pending'`, and drop the eager `ingestThumbnail` pass
 `thumbProtocol.ts` then generates on first request via its existing regenerate-on-miss branch
 (`thumbProtocol.ts:32-39`).
 
-Two details to get right:
+**Required companion change — do not skip (see Key decision 6).** Making thumbnails lazy starves
+both background indexers. `runScan` ends by calling `kickIndexer()` and `kickFaceIndexer()`; those
+query `findReadyPhotosWithoutEmbeddings` (`photoRepository.ts:192`) and
+`findReadyPhotosWithoutFaceScan` (`:211`), both of which filter on `thumbnailStatus = 'ready'`.
+Leave photos at `pending` and both find zero rows and silently do nothing — semantic search and
+face detection quietly stop covering the library.
+
+Fix: change those **two work-queue queries** (not the three read filters) to gate on
+`thumbnailKey IS NOT NULL` alone, dropping the `thumbnailStatus = 'ready'` term. Both consumers
+already tolerate a missing thumbnail file:
+
+- `getOrComputeEmbedding` (`photoEmbedding.ts:17-25`) checks for the thumbnail and calls
+  `generateThumbnail` itself when it is absent.
+- `faceIndexService` calls `detectFacesInImage(filePath)` on the **original file**, not the
+  thumbnail — it never needed the thumbnail at all, only the "successfully ingested" signal that
+  `ready` was standing in for.
+
+This also means the indexers become the de-facto thumbnail warm-up pass, which is a reasonable
+outcome but worth being deliberate about: they will generate thumbnails in the background after a
+scan rather than the scan doing it inline.
+
+Two more details to get right:
 
 - `thumbProtocol`'s handler resolves the photo via `findByThumbnailKey`. That lookup works for a
   `pending` row, so no query change is needed — but confirm the handler updates
@@ -269,7 +351,7 @@ follow-on, but is not required for correctness and should not block this phase.
 Mirror the existing worker protocol under `src/main/workers/` — `faceDetectionProtocol.ts` and
 `tagSuggestionProtocol.ts` are the structural templates, along with `pendingRequests.ts`.
 
-**The constraint that shapes this phase (see Key decision 8):** the worker cannot import
+**The constraint that shapes this phase (see Key decision 9):** the worker cannot import
 `photoRepository`. `better-sqlite3` connections are not transferable across threads. The worker
 should crawl and read metadata, then post plain records back to the main thread, which owns all DB
 writes via the Phase 3 batching. Do not attempt to open a second connection in the worker without
@@ -290,4 +372,13 @@ its own merits, not as part of the fix.
 - **Existing coverage to respect:** `scanHandlers.test.ts` (event contract — Phases 1 and 4),
   `photoLibraryReducer.test.ts` (Phase 2), `photoRepository.test.ts` and `photoIngest.test.ts`
   (Phase 3). These pin real behaviour; update them deliberately rather than relaxing them.
+- **Preserve the indexer kicks.** Phases 1, 4, and 5 all restructure `runScan`. It must keep
+  calling `kickIndexer()` and `kickFaceIndexer()` on completion (`scanHandlers.ts:195-196`) —
+  nothing else triggers embedding or face indexing outside an explicit scan, so dropping them
+  silently disables semantic search and People for newly-added photos.
+- **Check the `backgroundIndexLane` interaction.** The indexers take turns via a shared lane
+  mutex, but that lane knows nothing about the scan itself. Under Phase 4, thumbnail generation
+  moves into gallery scroll and indexer passes — verify a large scan followed by an immediate
+  indexer kick does not saturate `sharp` from both directions at once. `p-limit` is already a
+  dependency if a cap is needed.
 - Run `npm run typecheck` (main + renderer) and `npm run lint` before considering a phase done.

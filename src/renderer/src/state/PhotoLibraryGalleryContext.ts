@@ -16,7 +16,6 @@ export interface GalleryLibraryState {
   selectedPaths: Set<string>
   status: ScanStatus
   initialLoadComplete: boolean
-  filesFound: number
   cacheHits: number
   errors: ScanCompleteEvent['errors']
   scanId: string | null

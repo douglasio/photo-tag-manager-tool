@@ -9,6 +9,7 @@ import type {
   PersonRecord,
   PhotoRecord,
   ScanCompleteEvent,
+  ScanPhase,
   TagGroup
 } from '@shared/types'
 import {
@@ -63,7 +64,11 @@ export interface PhotoLibraryState {
   status: ScanStatus
   // False until every folder's initial startup scan has resolved
   initialLoadComplete: boolean
-  filesFound: number
+  // Session-only, null when idle — lives here (not galleryState) for the same
+  // reason as aiScanProgress/faceScanProgress: publishing a running counter
+  // through the high-churn gallery bucket would re-render the entire visible
+  // UI on every ~150ms tick. See PhotoLibraryScanProgressContext.
+  photoScanProgress: { phase: ScanPhase; done: number; total: number } | null
   photosByPath: Map<string, PhotoRecord>
   cacheHits: number
   errors: ScanCompleteEvent['errors']
@@ -168,7 +173,7 @@ export const initialState: PhotoLibraryState = {
   scanId: null,
   status: 'idle',
   initialLoadComplete: false,
-  filesFound: 0,
+  photoScanProgress: null,
   photosByPath: new Map(),
   cacheHits: 0,
   errors: [],
@@ -228,7 +233,7 @@ export type PhotoLibraryAction =
   | { type: 'FOLDER_REMOVED'; folder: string }
   | { type: 'FOLDER_RENAMED'; oldFolder: string; newFolder: string }
   | { type: 'SCAN_STARTED'; scanId: string }
-  | { type: 'SCAN_PROGRESS'; filesFound: number }
+  | { type: 'SCAN_PROGRESS'; phase: ScanPhase; done: number; total: number }
   | { type: 'METADATA_BATCH'; photos: PhotoRecord[] }
   | { type: 'SCAN_COMPLETE'; result: ScanCompleteEvent }
   | { type: 'SCAN_CANCELED' }
@@ -456,11 +461,23 @@ export function photoLibraryReducer(
         ...state,
         scanId: action.scanId,
         status: 'scanning',
-        filesFound: 0
+        photoScanProgress: null
       }
-    case 'SCAN_PROGRESS':
-      if (action.filesFound === state.filesFound) return state
-      return { ...state, filesFound: action.filesFound }
+    case 'SCAN_PROGRESS': {
+      const current = state.photoScanProgress
+      if (
+        current &&
+        current.phase === action.phase &&
+        current.done === action.done &&
+        current.total === action.total
+      ) {
+        return state
+      }
+      return {
+        ...state,
+        photoScanProgress: { phase: action.phase, done: action.done, total: action.total }
+      }
+    }
     case 'METADATA_BATCH': {
       const photosByPath = new Map(state.photosByPath)
       const folderCounts = new Map(state.folderCounts)
@@ -530,6 +547,7 @@ export function photoLibraryReducer(
       return {
         ...state,
         status: 'complete',
+        photoScanProgress: null,
         cacheHits: state.cacheHits + action.result.cacheHits,
         errors: [...state.errors, ...action.result.errors],
         photosByPath,
@@ -543,7 +561,7 @@ export function photoLibraryReducer(
       }
     }
     case 'SCAN_CANCELED':
-      return { ...state, status: 'canceled' }
+      return { ...state, status: 'canceled', photoScanProgress: null }
     case 'INITIAL_LOAD_COMPLETE':
       return { ...state, initialLoadComplete: true }
     case 'SELECT_PHOTO':

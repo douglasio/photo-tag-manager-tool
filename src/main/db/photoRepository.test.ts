@@ -73,6 +73,17 @@ function createFakeDb(): { rows: Map<string, FakeRow>; embeddedPaths: Set<string
       if (s.startsWith('SELECT * FROM photos WHERE path = ?')) {
         return { get: (path: string) => rows.get(path) }
       }
+      if (s.startsWith('SELECT 1 FROM photos WHERE path = ?')) {
+        return { get: (path: string) => (rows.has(path) ? 1 : undefined) }
+      }
+      if (s.startsWith('SELECT * FROM photos WHERE path LIKE ?')) {
+        return {
+          all: (prefix: string) => {
+            const bare = prefix.slice(0, -1)
+            return Array.from(rows.values()).filter((r) => r.path.startsWith(bare))
+          }
+        }
+      }
       if (s.startsWith('INSERT INTO photos')) {
         return {
           run: (p: Record<string, unknown>) => {
@@ -290,6 +301,14 @@ describe('upsertPhoto + findByPath', () => {
     expect(photoRepository.findByPath('/missing.jpg')).toBeNull()
   })
 
+  it('photoExists reports true for a tracked photo and false otherwise', () => {
+    createFakeDb()
+    photoRepository.upsertPhoto(makeRecord('/a.jpg'), 100, 200)
+
+    expect(photoRepository.photoExists('/a.jpg')).toBe(true)
+    expect(photoRepository.photoExists('/missing.jpg')).toBe(false)
+  })
+
   it('preserves firstSeenAt and viewCount across a re-upsert (rescan), unlike other fields', () => {
     createFakeDb()
     photoRepository.upsertPhoto(makeRecord('/a.jpg'), 100, 200)
@@ -302,6 +321,43 @@ describe('upsertPhoto + findByPath', () => {
     const after = photoRepository.findByPath('/a.jpg')
     expect(after?.record.tags).toEqual(['new'])
     expect(after?.record.firstSeenAt).toBe(firstSeenAt)
+  })
+})
+
+describe('upsertPhotosBatch', () => {
+  it('writes every entry, reachable the same way as an individual upsertPhoto', () => {
+    createFakeDb()
+    photoRepository.upsertPhotosBatch([
+      { record: makeRecord('/a.jpg', { tags: ['x'] }), mtimeMs: 100, sizeBytes: 200 },
+      { record: makeRecord('/b.jpg', { tags: ['y'] }), mtimeMs: 101, sizeBytes: 201 }
+    ])
+
+    expect(photoRepository.findByPath('/a.jpg')?.record.tags).toEqual(['x'])
+    expect(photoRepository.findByPath('/b.jpg')?.record.tags).toEqual(['y'])
+  })
+
+  it('is a no-op for an empty batch', () => {
+    createFakeDb()
+    expect(() => photoRepository.upsertPhotosBatch([])).not.toThrow()
+  })
+})
+
+describe('findManyByPathPrefix', () => {
+  it('returns every row under any of the given roots, keyed by path', () => {
+    createFakeDb()
+    photoRepository.upsertPhoto(makeRecord('/root1/a.jpg', { tags: ['x'] }), 100, 200)
+    photoRepository.upsertPhoto(makeRecord('/root2/b.jpg', { tags: ['y'] }), 101, 201)
+    photoRepository.upsertPhoto(makeRecord('/elsewhere/c.jpg'), 102, 202)
+
+    const result = photoRepository.findManyByPathPrefix(['/root1', '/root2'])
+
+    expect(Array.from(result.keys()).sort()).toEqual(['/root1/a.jpg', '/root2/b.jpg'])
+    expect(result.get('/root1/a.jpg')).toMatchObject({ mtimeMs: 100, sizeBytes: 200 })
+  })
+
+  it('returns an empty map when nothing is cached under the given roots', () => {
+    createFakeDb()
+    expect(photoRepository.findManyByPathPrefix(['/root']).size).toBe(0)
   })
 })
 

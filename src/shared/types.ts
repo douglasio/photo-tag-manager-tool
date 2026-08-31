@@ -56,9 +56,13 @@ export interface ScanStartResult {
   scanId: string
 }
 
+export type ScanPhase = 'enumerating' | 'reading' | 'finalizing'
+
 export interface ScanProgressEvent {
   scanId: string
-  filesFound: number
+  phase: ScanPhase
+  done: number
+  total: number
 }
 
 export interface MetadataBatchEvent {

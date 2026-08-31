@@ -5,6 +5,7 @@ const {
   mockGetEmbedding,
   mockSetEmbedding,
   mockFindAllReadyPhotos,
+  mockPhotoExists,
   mockEmbedImage,
   mockThumbnailFilePath,
   mockGenerateThumbnail,
@@ -13,6 +14,7 @@ const {
   mockGetEmbedding: vi.fn(),
   mockSetEmbedding: vi.fn(),
   mockFindAllReadyPhotos: vi.fn(),
+  mockPhotoExists: vi.fn(),
   mockEmbedImage: vi.fn(),
   mockThumbnailFilePath: vi.fn(),
   mockGenerateThumbnail: vi.fn(),
@@ -23,7 +25,10 @@ vi.mock('@main/db/embeddingRepository', () => ({
   getEmbedding: mockGetEmbedding,
   setEmbedding: mockSetEmbedding
 }))
-vi.mock('@main/db/photoRepository', () => ({ findAllReadyPhotos: mockFindAllReadyPhotos }))
+vi.mock('@main/db/photoRepository', () => ({
+  findAllReadyPhotos: mockFindAllReadyPhotos,
+  photoExists: mockPhotoExists
+}))
 vi.mock('./tagSuggestionService', () => ({ embedImage: mockEmbedImage }))
 vi.mock('./thumbnailService', () => ({
   thumbnailFilePath: mockThumbnailFilePath,
@@ -42,6 +47,7 @@ describe('embedAllReadyPhotos', () => {
     mockGetEmbedding.mockReset().mockReturnValue(null)
     mockSetEmbedding.mockReset()
     mockFindAllReadyPhotos.mockReset()
+    mockPhotoExists.mockReset().mockReturnValue(true)
     mockEmbedImage.mockReset().mockResolvedValue([1, 0])
     mockThumbnailFilePath.mockReset().mockImplementation((key: string) => `/thumbs/${key}`)
     mockGenerateThumbnail.mockReset().mockResolvedValue(undefined)
@@ -103,6 +109,25 @@ describe('embedAllReadyPhotos', () => {
     const results = await embedAllReadyPhotos()
 
     expect(results.map((r) => r.filePath)).toEqual(['/a.jpg', '/c.jpg'])
+  })
+
+  // Regression: a folder removed mid-scan deletes its photos rows via
+  // pruneMissing, but this function's own photo list is a snapshot taken
+  // before that — without re-checking, it would still read the (still
+  // on-disk) file and write a fresh, orphaned embedding for a path no
+  // longer in the photos table.
+  it('skips a photo that no longer exists (its folder was removed mid-scan)', async () => {
+    mockFindAllReadyPhotos.mockReturnValue(makePhotos(['/a.jpg', '/removed/b.jpg', '/c.jpg']))
+    mockPhotoExists.mockImplementation((path: string) => path !== '/removed/b.jpg')
+    const onProgress = vi.fn()
+
+    const results = await embedAllReadyPhotos(onProgress)
+
+    expect(results.map((r) => r.filePath)).toEqual(['/a.jpg', '/c.jpg'])
+    expect(mockEmbedImage).not.toHaveBeenCalledWith(expect.stringContaining('removed'))
+    expect(mockSetEmbedding).not.toHaveBeenCalledWith('/removed/b.jpg', expect.anything())
+    // Progress still reaches the true total — loop position, not work done.
+    expect(onProgress).toHaveBeenLastCalledWith(3, 3)
   })
 
   it('stops early once isCancelled reports true, without discarding already-embedded results', async () => {

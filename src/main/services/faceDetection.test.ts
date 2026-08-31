@@ -5,18 +5,21 @@ const {
   mockInsertFace,
   mockFindReadyPhotosWithoutFaceScan,
   mockMarkFaceScanned,
+  mockPhotoExists,
   mockDetectFacesInImage
 } = vi.hoisted(() => ({
   mockInsertFace: vi.fn(),
   mockFindReadyPhotosWithoutFaceScan: vi.fn(),
   mockMarkFaceScanned: vi.fn(),
+  mockPhotoExists: vi.fn(),
   mockDetectFacesInImage: vi.fn()
 }))
 
 vi.mock('@main/db/faceRepository', () => ({ insertFace: mockInsertFace }))
 vi.mock('@main/db/photoRepository', () => ({
   findReadyPhotosWithoutFaceScan: mockFindReadyPhotosWithoutFaceScan,
-  markFaceScanned: mockMarkFaceScanned
+  markFaceScanned: mockMarkFaceScanned,
+  photoExists: mockPhotoExists
 }))
 vi.mock('./faceDetectionService', () => ({ detectFacesInImage: mockDetectFacesInImage }))
 
@@ -31,6 +34,7 @@ const oneFace = [{ box: { x: 0, y: 0, w: 1, h: 1 }, embedding: [1, 0] }]
 beforeEach(() => {
   vi.clearAllMocks()
   mockFindReadyPhotosWithoutFaceScan.mockReturnValue([])
+  mockPhotoExists.mockReturnValue(true)
   mockDetectFacesInImage.mockResolvedValue([])
 })
 
@@ -69,6 +73,24 @@ describe('detectAllReadyPhotoFaces', () => {
 
     expect(mockMarkFaceScanned).not.toHaveBeenCalledWith('/a.jpg')
     expect(mockMarkFaceScanned).toHaveBeenCalledWith('/b.jpg')
+    expect(result.photosScanned).toBe(2)
+  })
+
+  // Regression: a folder removed mid-scan deletes its photos rows via
+  // pruneMissing, but this function's own photo list is a snapshot taken
+  // before that — without re-checking, it would still read the (still
+  // on-disk) file and insert faces for a path no longer in the photos table.
+  it('skips a photo that no longer exists (its folder was removed mid-scan)', async () => {
+    mockFindReadyPhotosWithoutFaceScan.mockReturnValue(
+      makePhotos(['/a.jpg', '/removed/b.jpg', '/c.jpg'])
+    )
+    mockPhotoExists.mockImplementation((path: string) => path !== '/removed/b.jpg')
+    mockDetectFacesInImage.mockResolvedValue(oneFace)
+
+    const result = await detectAllReadyPhotoFaces()
+
+    expect(mockDetectFacesInImage).not.toHaveBeenCalledWith('/removed/b.jpg')
+    expect(mockMarkFaceScanned).not.toHaveBeenCalledWith('/removed/b.jpg')
     expect(result.photosScanned).toBe(2)
   })
 

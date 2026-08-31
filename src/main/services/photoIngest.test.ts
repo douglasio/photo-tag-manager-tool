@@ -33,7 +33,7 @@ vi.mock('../db/photoRepository', () => ({
   updateThumbnail: mockUpdateThumbnail
 }))
 
-import { ingestFile } from './photoIngest'
+import { ingestFile, ingestMetadata } from './photoIngest'
 
 function makePhoto(filePath: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
   return {
@@ -140,5 +140,70 @@ describe('ingestFile', () => {
     expect(mockUpdateThumbnail).toHaveBeenCalledWith('/a.jpg', 'thekey', 'error')
     expect(photo.thumbnailStatus).toBe('error')
     expect(photo.thumbnailKey).toBeNull()
+  })
+})
+
+describe('ingestMetadata bulk-scan options', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('uses a prefetched entry instead of calling findByPath', async () => {
+    mockStat.mockResolvedValue({ mtimeMs: 100, size: 200 })
+    mockFindByPath.mockReturnValue({
+      record: makePhoto('/a.jpg', { thumbnailStatus: 'error' }),
+      mtimeMs: 999,
+      sizeBytes: 999
+    })
+
+    const { fromCache } = await ingestMetadata('/a.jpg', {
+      prefetched: {
+        record: makePhoto('/a.jpg', { thumbnailStatus: 'ready' }),
+        mtimeMs: 100,
+        sizeBytes: 200
+      }
+    })
+
+    expect(mockFindByPath).not.toHaveBeenCalled()
+    expect(fromCache).toBe(true)
+  })
+
+  it('treats a prefetched null the same as no cache entry, without calling findByPath', async () => {
+    mockStat.mockResolvedValue({ mtimeMs: 1, size: 2 })
+    mockReadPhotoRecord.mockResolvedValue(makePhoto('/a.jpg', { thumbnailStatus: 'ready' }))
+
+    const { fromCache } = await ingestMetadata('/a.jpg', { prefetched: null })
+
+    expect(mockFindByPath).not.toHaveBeenCalled()
+    expect(fromCache).toBe(false)
+    expect(mockUpsertPhoto).toHaveBeenCalled()
+  })
+
+  it('calls deferredWrite instead of upsertPhoto on a cache miss when provided', async () => {
+    mockStat.mockResolvedValue({ mtimeMs: 1, size: 2 })
+    mockReadPhotoRecord.mockResolvedValue(makePhoto('/a.jpg', { thumbnailStatus: 'ready' }))
+    const deferredWrite = vi.fn()
+
+    await ingestMetadata('/a.jpg', { prefetched: null, deferredWrite })
+
+    expect(mockUpsertPhoto).not.toHaveBeenCalled()
+    expect(deferredWrite).toHaveBeenCalledWith({
+      record: expect.objectContaining({ filePath: '/a.jpg' }),
+      mtimeMs: 1,
+      sizeBytes: 2
+    })
+  })
+
+  it('never calls deferredWrite on a cache hit', async () => {
+    mockStat.mockResolvedValue({ mtimeMs: 100, size: 200 })
+    const deferredWrite = vi.fn()
+
+    await ingestMetadata('/a.jpg', {
+      prefetched: { record: makePhoto('/a.jpg'), mtimeMs: 100, sizeBytes: 200 },
+      deferredWrite
+    })
+
+    expect(deferredWrite).not.toHaveBeenCalled()
+    expect(mockUpsertPhoto).not.toHaveBeenCalled()
   })
 })

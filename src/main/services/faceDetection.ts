@@ -1,5 +1,9 @@
 import { insertFace } from '@main/db/faceRepository'
-import { findReadyPhotosWithoutFaceScan, markFaceScanned } from '@main/db/photoRepository'
+import {
+  findReadyPhotosWithoutFaceScan,
+  markFaceScanned,
+  photoExists
+} from '@main/db/photoRepository'
 
 import { detectFacesInImage } from './faceDetectionService'
 
@@ -19,24 +23,32 @@ export async function detectAllReadyPhotoFaces(
     if (isCancelled?.()) break
     const { filePath } = photos[i]
 
-    try {
-      const faces = await detectFacesInImage(filePath)
-      for (const face of faces) {
-        insertFace({
-          photoPath: filePath,
-          box: face.box,
-          embedding: Float32Array.from(face.embedding)
-        })
-        facesDetected++
+    // The photo list is a snapshot from before this loop started — a folder
+    // removed mid-scan deletes its rows, but this array still holds them.
+    // Skipping the detect here stops removal from resurrecting faces for a
+    // path no longer in the photos table. Progress below still advances by
+    // loop position, not photosScanned, so it keeps reaching 100%.
+    if (photoExists(filePath)) {
+      try {
+        const faces = await detectFacesInImage(filePath)
+        for (const face of faces) {
+          insertFace({
+            photoPath: filePath,
+            box: face.box,
+            embedding: Float32Array.from(face.embedding)
+          })
+          facesDetected++
+        }
+        // Marked only on success — a photo that threw stays queued so a later
+        // pass retries it, rather than being silently skipped forever.
+        markFaceScanned(filePath)
+      } catch (err) {
+        console.error(`Face detection failed for ${filePath}`, err)
       }
-      // Marked only on success — a photo that threw stays queued so a later
-      // pass retries it, rather than being silently skipped forever.
-      markFaceScanned(filePath)
-    } catch (err) {
-      console.error(`Face detection failed for ${filePath}`, err)
+
+      photosScanned++
     }
 
-    photosScanned++
     const now = Date.now()
     if (onProgress && now - lastProgressAt >= PROGRESS_INTERVAL_MS) {
       lastProgressAt = now

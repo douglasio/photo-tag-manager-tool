@@ -187,11 +187,17 @@ describe('photoLibraryReducer', () => {
       })
       expect(state.status).toBe('scanning')
 
-      state = photoLibraryReducer(state, { type: 'SCAN_PROGRESS', filesFound: 5 })
-      expect(state.filesFound).toBe(5)
+      state = photoLibraryReducer(state, {
+        type: 'SCAN_PROGRESS',
+        phase: 'reading',
+        done: 5,
+        total: 10
+      })
+      expect(state.photoScanProgress).toEqual({ phase: 'reading', done: 5, total: 10 })
 
       state = photoLibraryReducer(state, { type: 'SCAN_CANCELED' })
       expect(state.status).toBe('canceled')
+      expect(state.photoScanProgress).toBeNull()
     })
 
     it('flips initialLoadComplete to true and stays there', () => {
@@ -201,8 +207,16 @@ describe('photoLibraryReducer', () => {
     })
 
     it('returns the same state reference for a no-op progress update', () => {
-      const state = { ...initialState, filesFound: 5 }
-      const next = photoLibraryReducer(state, { type: 'SCAN_PROGRESS', filesFound: 5 })
+      const state = {
+        ...initialState,
+        photoScanProgress: { phase: 'reading' as const, done: 5, total: 10 }
+      }
+      const next = photoLibraryReducer(state, {
+        type: 'SCAN_PROGRESS',
+        phase: 'reading',
+        done: 5,
+        total: 10
+      })
       expect(next).toBe(state)
     })
 

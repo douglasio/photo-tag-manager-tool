@@ -1,7 +1,7 @@
 import { access } from 'fs/promises'
 
 import { getEmbedding, setEmbedding } from '@main/db/embeddingRepository'
-import { findAllReadyPhotos } from '@main/db/photoRepository'
+import { findAllReadyPhotos, photoExists } from '@main/db/photoRepository'
 
 import { embedImage } from './tagSuggestionService'
 import { generateThumbnail, thumbnailFilePath } from './thumbnailService'
@@ -48,12 +48,20 @@ export async function embedAllReadyPhotos(
   let lastProgressAt = 0
   for (let i = 0; i < photos.length; i++) {
     if (isCancelled?.()) break
-    // handle corrupt photos without breaking scan
-    try {
-      const embedding = await getOrComputeEmbedding(photos[i].filePath, photos[i].thumbnailKey)
-      results.push({ ...photos[i], embedding })
-    } catch (err) {
-      console.error(`failed to embed ${photos[i].filePath}, skipping`, err)
+    // The photo list is a snapshot from before this loop started — a folder
+    // removed mid-scan deletes its rows, but this array still holds them.
+    // Skipping the embed here (rather than only checking at the top of the
+    // scan) stops removal from resurrecting a fresh, orphaned embedding for
+    // a path no longer in the photos table. Still counted below in `done`
+    // (loop position, not work done) so the progress bar keeps reaching 100%.
+    if (photoExists(photos[i].filePath)) {
+      // handle corrupt photos without breaking scan
+      try {
+        const embedding = await getOrComputeEmbedding(photos[i].filePath, photos[i].thumbnailKey)
+        results.push({ ...photos[i], embedding })
+      } catch (err) {
+        console.error(`failed to embed ${photos[i].filePath}, skipping`, err)
+      }
     }
     const done = i + 1
     const now = Date.now()

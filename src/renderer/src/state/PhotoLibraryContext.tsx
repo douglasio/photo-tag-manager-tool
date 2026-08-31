@@ -156,7 +156,11 @@ function toPersonPhotoAssignments(
 // here would re-render every usePhotoLibrary consumer on each progress tick.
 type PhotoLibraryComposedState = Omit<
   PhotoLibraryState,
-  'aiScanProgress' | 'embeddingIndexProgress' | 'faceScanProgress' | 'faceIndexProgress'
+  | 'aiScanProgress'
+  | 'embeddingIndexProgress'
+  | 'faceScanProgress'
+  | 'faceIndexProgress'
+  | 'photoScanProgress'
 >
 
 interface PhotoLibraryContextValue {
@@ -356,7 +360,12 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
   useEffect(() => {
     const unsubscribeProgress = window.api.onScanProgress((payload) => {
       if (payload.scanId !== scanIdRef.current) return
-      dispatch({ type: 'SCAN_PROGRESS', filesFound: payload.filesFound })
+      dispatch({
+        type: 'SCAN_PROGRESS',
+        phase: payload.phase,
+        done: payload.done,
+        total: payload.total
+      })
     })
     const unsubscribeBatch = window.api.onMetadataBatch((payload) => {
       if (payload.scanId !== scanIdRef.current) return
@@ -2122,7 +2131,6 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       selectedPaths: state.selectedPaths,
       status: state.status,
       initialLoadComplete: state.initialLoadComplete,
-      filesFound: state.filesFound,
       cacheHits: state.cacheHits,
       errors: state.errors,
       scanId: state.scanId,
@@ -2153,7 +2161,6 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       state.selectedPaths,
       state.status,
       state.initialLoadComplete,
-      state.filesFound,
       state.cacheHits,
       state.errors,
       state.scanId,
@@ -2199,13 +2206,15 @@ export function PhotoLibraryProvider({ children }: { children: ReactNode }): Rea
       aiScanProgress: state.aiScanProgress,
       embeddingIndexProgress: state.embeddingIndexProgress,
       faceScanProgress: state.faceScanProgress,
-      faceIndexProgress: state.faceIndexProgress
+      faceIndexProgress: state.faceIndexProgress,
+      photoScanProgress: state.photoScanProgress
     }),
     [
       state.aiScanProgress,
       state.embeddingIndexProgress,
       state.faceScanProgress,
-      state.faceIndexProgress
+      state.faceIndexProgress,
+      state.photoScanProgress
     ]
   )
 

@@ -26,9 +26,9 @@ vi.mock('@components', () => ({
   FeaturedPersonWidget: () => <div>FeaturedPersonWidget</div>,
   FeaturedTagWidget: () => <div>FeaturedTagWidget</div>,
   NameThisPersonWidget: () => <div>NameThisPersonWidget</div>,
+  PhotoScanProgressIndicator: ({ label }: { label?: string }) => <div>{label}</div>,
   PhotosFromYearWidget: () => <div>PhotosFromYearWidget</div>,
   RecentlyAddedWidget: () => <div>RecentlyAddedWidget</div>,
-  ScanProgressIndicator: ({ label }: { label?: string }) => <div>{label}</div>,
   TaggingProgressWidget: () => <div>TaggingProgressWidget</div>,
   TagThisPhotoWidget: () => <div>TagThisPhotoWidget</div>,
   TimeWarpWidget: () => <div>TimeWarpWidget</div>,
@@ -102,5 +102,14 @@ describe('DashboardView', () => {
 
     expect(screen.getByText('Scanning for photos…')).toBeInTheDocument()
     expect(screen.queryByText('No photos yet')).not.toBeInTheDocument()
+  })
+
+  it('shows the scanning indicator instead of the widget grid even when the library already has photos', () => {
+    mockPhotosByPath = new Map([['/a.jpg', makePhoto('/a.jpg')]])
+    mockStatus = 'scanning'
+    renderView()
+
+    expect(screen.getByText('Scanning for photos…')).toBeInTheDocument()
+    expect(screen.queryByText('WelcomeWidget')).not.toBeInTheDocument()
   })
 })

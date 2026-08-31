@@ -6,6 +6,8 @@ import type { PhotoRecord } from '@shared/types'
 const {
   mockHandle,
   mockPruneMissing,
+  mockFindManyByPathPrefix,
+  mockUpsertPhotosBatch,
   mockGetExcludePatterns,
   mockScanDirectory,
   mockScanAllFolders,
@@ -17,6 +19,8 @@ const {
 } = vi.hoisted(() => ({
   mockHandle: vi.fn(),
   mockPruneMissing: vi.fn().mockReturnValue([]),
+  mockFindManyByPathPrefix: vi.fn().mockReturnValue(new Map()),
+  mockUpsertPhotosBatch: vi.fn(),
   mockGetExcludePatterns: vi.fn().mockReturnValue([]),
   mockScanDirectory: vi.fn(),
   mockScanAllFolders: vi.fn().mockResolvedValue([]),
@@ -28,7 +32,11 @@ const {
 }))
 
 vi.mock('electron', () => ({ ipcMain: { handle: mockHandle } }))
-vi.mock('@main/db/photoRepository', () => ({ pruneMissing: mockPruneMissing }))
+vi.mock('@main/db/photoRepository', () => ({
+  pruneMissing: mockPruneMissing,
+  findManyByPathPrefix: mockFindManyByPathPrefix,
+  upsertPhotosBatch: mockUpsertPhotosBatch
+}))
 vi.mock('@main/db/settingsRepository', () => ({ getExcludePatterns: mockGetExcludePatterns }))
 vi.mock('@main/services/directoryScanner', () => ({
   scanDirectory: mockScanDirectory,
@@ -95,6 +103,7 @@ function makeFakeSender(): { send: ReturnType<typeof vi.fn> } {
 beforeEach(() => {
   vi.clearAllMocks()
   mockPruneMissing.mockReturnValue([])
+  mockFindManyByPathPrefix.mockReturnValue(new Map())
   mockGetExcludePatterns.mockReturnValue([])
   mockScanAllFolders.mockResolvedValue([])
 })
@@ -126,20 +135,57 @@ describe('runScan happy path', () => {
     handlers.get('scan:start')!({ sender }, '/root')
     await flushMicrotasks()
 
-    const progress = sender.send.mock.calls.find(([channel]) => channel === 'scan:progress')
-    expect(progress?.[1]).toMatchObject({ filesFound: 2 })
+    const progressEvents = sender.send.mock.calls
+      .filter(([channel]) => channel === 'scan:progress')
+      .map(([, event]) => event)
+    // enumerating (before file count is known), reading (once it is), then
+    // reading again as each file finishes — done must reach total by the end.
+    expect(progressEvents[0]).toMatchObject({ phase: 'enumerating', done: 0, total: 0 })
+    expect(progressEvents[1]).toMatchObject({ phase: 'reading', done: 0, total: 2 })
+    expect(progressEvents.at(-1)).toMatchObject({ phase: 'finalizing', done: 2, total: 2 })
 
     const complete = sender.send.mock.calls.find(([channel]) => channel === 'scan:complete')
     expect(complete?.[1]).toMatchObject({ totalScanned: 2, cacheHits: 1, errors: [] })
     // Newly-ready photos need both embedding (visual search) and face detection.
     expect(mockKickIndexer).toHaveBeenCalled()
     expect(mockKickFaceIndexer).toHaveBeenCalled()
+    // Bulk cache lookup replaces per-file findByPath calls inside ingestMetadata.
+    expect(mockFindManyByPathPrefix).toHaveBeenCalledWith(['/root'])
 
     const batches = sender.send.mock.calls.filter(([channel]) => channel === 'scan:metadata-batch')
     const batchedPaths = batches
       .flatMap(([, event]) => (event as { photos: PhotoRecord[] }).photos)
       .map((p) => p.filePath)
     expect(batchedPaths.sort()).toEqual(['/root/a.jpg', '/root/b.jpg'])
+  })
+
+  it('flushes deferred writes via upsertPhotosBatch before scan:complete', async () => {
+    const handlers = getHandlers()
+    mockScanDirectory.mockResolvedValue(['/root/a.jpg'])
+    mockScanAllFolders.mockResolvedValue(['/root'])
+    mockIngestMetadata.mockImplementation(
+      async (filePath: string, options?: { deferredWrite?: (entry: unknown) => void }) => {
+        const photo = makePhoto(filePath)
+        options?.deferredWrite?.({ record: photo, mtimeMs: 1, sizeBytes: 1 })
+        return { photo, fromCache: false, fileStat: { mtimeMs: 1, size: 1 } }
+      }
+    )
+    const sender = makeFakeSender()
+
+    handlers.get('scan:start')!({ sender }, '/root')
+    await flushMicrotasks()
+
+    expect(mockUpsertPhotosBatch).toHaveBeenCalledWith([
+      expect.objectContaining({ mtimeMs: 1, sizeBytes: 1 })
+    ])
+    const upsertCallOrder = mockUpsertPhotosBatch.mock.invocationCallOrder[0]
+    const completeCallIndex = sender.send.mock.calls.findIndex(
+      ([channel]) => channel === 'scan:complete'
+    )
+    expect(completeCallIndex).toBeGreaterThanOrEqual(0)
+    // upsertPhotosBatch must run before scan:complete fires — kickIndexer/
+    // kickFaceIndexer query the photos table directly on that event.
+    expect(upsertCallOrder).toBeLessThan(sender.send.mock.invocationCallOrder[completeCallIndex])
   })
 
   it('does not send scan:complete until a queued thumbnail task also resolves', async () => {

@@ -72,54 +72,112 @@ export function findByPath(
   return { record: rowToPhotoRecord(row), mtimeMs: row.mtimeMs, sizeBytes: row.sizeBytes }
 }
 
+/** Cheap primary-key existence check — used by the background embedding/face
+ * indexers to re-verify a photo from their own start-of-pass snapshot hasn't
+ * been removed (e.g. its folder was removed) since that snapshot was taken,
+ * without paying for a full row read. */
+export function photoExists(filePath: string): boolean {
+  return getDb().prepare('SELECT 1 FROM photos WHERE path = ?').get(filePath) !== undefined
+}
+
+const UPSERT_PHOTO_SQL = `INSERT INTO photos (
+    path, fileName, mtimeMs, sizeBytes, tags, dateTaken, cameraMake, cameraModel,
+    widthPx, heightPx, format, comment, thumbnailKey, thumbnailStatus, lastScannedAt, firstSeenAt
+  ) VALUES (
+    @path, @fileName, @mtimeMs, @sizeBytes, @tags, @dateTaken, @cameraMake, @cameraModel,
+    @widthPx, @heightPx, @format, @comment, @thumbnailKey, @thumbnailStatus, @lastScannedAt, @firstSeenAt
+  )
+  ON CONFLICT(path) DO UPDATE SET
+    fileName = excluded.fileName,
+    mtimeMs = excluded.mtimeMs,
+    sizeBytes = excluded.sizeBytes,
+    tags = excluded.tags,
+    dateTaken = excluded.dateTaken,
+    cameraMake = excluded.cameraMake,
+    cameraModel = excluded.cameraModel,
+    widthPx = excluded.widthPx,
+    heightPx = excluded.heightPx,
+    format = excluded.format,
+    comment = excluded.comment,
+    thumbnailKey = excluded.thumbnailKey,
+    thumbnailStatus = excluded.thumbnailStatus,
+    lastScannedAt = excluded.lastScannedAt`
+
+function upsertPhotoParams(
+  record: PhotoRecord,
+  mtimeMs: number,
+  sizeBytes: number
+): Record<string, unknown> {
+  return {
+    path: record.filePath,
+    fileName: record.fileName,
+    mtimeMs,
+    sizeBytes,
+    // Coerced defensively (not just trusted as already string[]) — this is
+    // the one place anything ever writes to photos.tags, so guaranteeing
+    // the invariant here closes off every downstream read path at once.
+    tags: JSON.stringify(record.tags.map(String)),
+    dateTaken: record.metadata.dateTaken,
+    cameraMake: record.metadata.cameraMake,
+    cameraModel: record.metadata.cameraModel,
+    widthPx: record.metadata.widthPx,
+    heightPx: record.metadata.heightPx,
+    format: record.metadata.format,
+    comment: record.metadata.comment,
+    thumbnailKey: record.thumbnailKey,
+    thumbnailStatus: record.thumbnailStatus,
+    lastScannedAt: Date.now(),
+    // Only takes effect on a true INSERT — absent from ON CONFLICT SET above.
+    firstSeenAt: Date.now()
+  }
+}
+
 export function upsertPhoto(record: PhotoRecord, mtimeMs: number, sizeBytes: number): void {
   getDb()
-    .prepare(
-      `INSERT INTO photos (
-        path, fileName, mtimeMs, sizeBytes, tags, dateTaken, cameraMake, cameraModel,
-        widthPx, heightPx, format, comment, thumbnailKey, thumbnailStatus, lastScannedAt, firstSeenAt
-      ) VALUES (
-        @path, @fileName, @mtimeMs, @sizeBytes, @tags, @dateTaken, @cameraMake, @cameraModel,
-        @widthPx, @heightPx, @format, @comment, @thumbnailKey, @thumbnailStatus, @lastScannedAt, @firstSeenAt
-      )
-      ON CONFLICT(path) DO UPDATE SET
-        fileName = excluded.fileName,
-        mtimeMs = excluded.mtimeMs,
-        sizeBytes = excluded.sizeBytes,
-        tags = excluded.tags,
-        dateTaken = excluded.dateTaken,
-        cameraMake = excluded.cameraMake,
-        cameraModel = excluded.cameraModel,
-        widthPx = excluded.widthPx,
-        heightPx = excluded.heightPx,
-        format = excluded.format,
-        comment = excluded.comment,
-        thumbnailKey = excluded.thumbnailKey,
-        thumbnailStatus = excluded.thumbnailStatus,
-        lastScannedAt = excluded.lastScannedAt`
-    )
-    .run({
-      path: record.filePath,
-      fileName: record.fileName,
-      mtimeMs,
-      sizeBytes,
-      // Coerced defensively (not just trusted as already string[]) — this is
-      // the one place anything ever writes to photos.tags, so guaranteeing
-      // the invariant here closes off every downstream read path at once.
-      tags: JSON.stringify(record.tags.map(String)),
-      dateTaken: record.metadata.dateTaken,
-      cameraMake: record.metadata.cameraMake,
-      cameraModel: record.metadata.cameraModel,
-      widthPx: record.metadata.widthPx,
-      heightPx: record.metadata.heightPx,
-      format: record.metadata.format,
-      comment: record.metadata.comment,
-      thumbnailKey: record.thumbnailKey,
-      thumbnailStatus: record.thumbnailStatus,
-      lastScannedAt: Date.now(),
-      // Only takes effect on a true INSERT — absent from ON CONFLICT SET above.
-      firstSeenAt: Date.now()
-    })
+    .prepare(UPSERT_PHOTO_SQL)
+    .run(upsertPhotoParams(record, mtimeMs, sizeBytes))
+}
+
+/** Same write as upsertPhoto, for many rows inside a single transaction —
+ * each row outside an explicit transaction is its own implicit commit in
+ * better-sqlite3, so a scan upserting thousands of rows one at a time pays a
+ * full fsync-cycle per row. Batching amortizes that to one per call. */
+export function upsertPhotosBatch(
+  entries: { record: PhotoRecord; mtimeMs: number; sizeBytes: number }[]
+): void {
+  if (entries.length === 0) return
+  const db = getDb()
+  const statement = db.prepare(UPSERT_PHOTO_SQL)
+  const runAll = db.transaction((rows: typeof entries) => {
+    for (const { record, mtimeMs, sizeBytes } of rows) {
+      statement.run(upsertPhotoParams(record, mtimeMs, sizeBytes))
+    }
+  })
+  runAll(entries)
+}
+
+/** Bulk cache-lookup for a scan's own roots — replaces one findByPath call
+ * per file (a synchronous round trip each) with a handful of prefix queries,
+ * one per root. Chunked by root rather than a single `path IN (...)` over
+ * every file, both because roots are few and because SQLite's default
+ * SQLITE_MAX_VARIABLE_NUMBER (999) would reject an IN clause that large. */
+export function findManyByPathPrefix(
+  rootPaths: string[]
+): Map<string, { record: PhotoRecord; mtimeMs: number; sizeBytes: number }> {
+  const db = getDb()
+  const statement = db.prepare('SELECT * FROM photos WHERE path LIKE ?')
+  const result = new Map<string, { record: PhotoRecord; mtimeMs: number; sizeBytes: number }>()
+  for (const rootPath of rootPaths) {
+    const rows = statement.all(`${rootPath}%`) as PhotoRow[]
+    for (const row of rows) {
+      result.set(row.path, {
+        record: rowToPhotoRecord(row),
+        mtimeMs: row.mtimeMs,
+        sizeBytes: row.sizeBytes
+      })
+    }
+  }
+  return result
 }
 
 /** Bumps a photo's view count by one. Deliberately not part of upsertPhoto's

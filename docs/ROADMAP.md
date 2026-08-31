@@ -160,6 +160,8 @@ X. Photo editing — adopt `react-filerobot-image-editor` for crop/straighten/fi
 
 2. Profile the production build, never dev, for any renderer perf work. React 19 DEV calls `console.createTask` for every element (Owner Stacks) and StrictMode double-renders everything; in a dev trace that machinery was ~28% of samples and app code measured 0.02%, which is actively misleading. `npm run build && npm run preview`.
 
+3. Scan pipeline, Phases 4–5 (see SCAN_PIPELINE_PLAN.md — Phases 1–3 already shipped: throttled progress off the gallery bucket, larger scan batch/flush thresholds, and batched DB writes). Phase 4 is adaptive commits (folder-at-a-time, counter-only progress above a size threshold) plus making thumbnail generation lazy/on-demand instead of eager during the scan, which needs a companion fix to the embedding/face indexers' work-queue queries (they currently gate on `thumbnailStatus = 'ready'`, which lazy generation would starve). Phase 5 is moving enumeration/metadata reads into a worker thread, mirroring the existing face/tag-suggestion worker protocol — blocked on the fact that `better-sqlite3` connections can't cross thread boundaries, so the worker would need to hand results back for the main thread to write rather than importing the repository directly.
+
 ## Video
 
 See VIDEO_PLAN.md

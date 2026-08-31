@@ -13,16 +13,29 @@ export interface IngestMetadataResult {
   fileStat: Stats
 }
 
+type CacheEntry = { record: PhotoRecord; mtimeMs: number; sizeBytes: number }
+
 // Splits out metadata ingestion so a bulk scan can run this under its own concurrency limit
 export async function ingestMetadata(
   filePath: string,
   options?: {
     // Metadata-only writes (tags/comment/date-taken) bump mtime without touching pixels
     pixelsUnchanged?: boolean
+    // A bulk scan prefetches every root's cache rows in a few LIKE queries
+    // up front (findManyByPathPrefix) instead of one findByPath call per
+    // file — pass the looked-up entry (or null if none) to skip the
+    // per-file lookup here. Omitted entirely (not just undefined) means
+    // "look it up yourself," which every single-file caller relies on.
+    prefetched?: CacheEntry | null
+    // A bulk scan also defers the actual write, collecting entries to flush
+    // via upsertPhotosBatch instead of one autocommit write per file. When
+    // omitted, this writes immediately via upsertPhoto, same as before.
+    deferredWrite?: (entry: CacheEntry) => void
   }
 ): Promise<IngestMetadataResult> {
   const fileStat = await stat(filePath)
-  const cached = findByPath(filePath)
+  const usePrefetched = options !== undefined && 'prefetched' in options
+  const cached = usePrefetched ? (options.prefetched ?? null) : findByPath(filePath)
 
   let photo: PhotoRecord
   let fromCache = false
@@ -39,7 +52,12 @@ export async function ingestMetadata(
         thumbnailStatus: cached.record.thumbnailStatus
       }
     }
-    upsertPhoto(photo, fileStat.mtimeMs, fileStat.size)
+    const entry: CacheEntry = { record: photo, mtimeMs: fileStat.mtimeMs, sizeBytes: fileStat.size }
+    if (options?.deferredWrite) {
+      options.deferredWrite(entry)
+    } else {
+      upsertPhoto(photo, fileStat.mtimeMs, fileStat.size)
+    }
     // Reflect true DB values here instead of readPhotoRecord's placeholders
     photo = {
       ...photo,

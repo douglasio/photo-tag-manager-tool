@@ -4,7 +4,7 @@ import { Button, Group, Popover, RingProgress, Text, Tooltip } from '@mantine/co
 import { useDisclosure, useHover } from '@mantine/hooks'
 import { IconCheck, IconX } from '@tabler/icons-react'
 
-import { usePhotoLibrary } from '@state'
+import { usePhotoLibrary, useScanProgress } from '@state'
 
 import { ScanLogContent } from './ScanLogContent'
 
@@ -14,6 +14,7 @@ const FRESH_COMPLETE_MS = 4000
 
 export function ScanProgressBar(): ReactElement | null {
   const { state, cancelScan } = usePhotoLibrary()
+  const { photoScanProgress } = useScanProgress()
   const [logOpened, { toggle: toggleLog, close: closeLog }] = useDisclosure(false)
   const { hovered, ref } = useHover<HTMLButtonElement>()
   const [freshlyCompleted, setFreshlyCompleted] = useState(false)
@@ -35,9 +36,14 @@ export function ScanProgressBar(): ReactElement | null {
 
   if (state.status === 'idle') return null
 
-  const processed = state.photosByPath.size
-  const total = state.filesFound
-  const percent = total ? Math.round((processed / total) * 100) : 0
+  // Live counter (throttled, main-process-owned) while a scan is running —
+  // photoScanProgress is nulled on SCAN_COMPLETE/SCAN_CANCELED, so the
+  // post-scan "Synced"/"canceled" text below falls back to the library's
+  // actual size instead, which is the number that should show there anyway.
+  const done = photoScanProgress?.done ?? 0
+  const total = photoScanProgress?.total ?? 0
+  const percent = total ? Math.round((done / total) * 100) : 0
+  const librarySize = state.photosByPath.size
 
   return (
     <Group gap="sm" wrap="nowrap">
@@ -68,7 +74,7 @@ export function ScanProgressBar(): ReactElement | null {
                     sections={[{ value: percent, color: 'indigo' }]}
                   />
                   <Text c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                    {processed} / {total || '…'} found
+                    {done} / {total || '…'} found
                   </Text>
                 </>
               )}
@@ -81,7 +87,7 @@ export function ScanProgressBar(): ReactElement | null {
                     </Text>
                   </Group>
                 ) : (
-                  <Tooltip label={`${processed} photos successfully synced with file system`}>
+                  <Tooltip label={`${librarySize} photos successfully synced with file system`}>
                     <Group gap={4} wrap="nowrap">
                       <IconCheck
                         size={14}
@@ -97,7 +103,7 @@ export function ScanProgressBar(): ReactElement | null {
                   </Tooltip>
                 ))}
               {state.status === 'canceled' && (
-                <Text c="dimmed">Scan canceled ({processed} loaded)</Text>
+                <Text c="dimmed">Scan canceled ({librarySize} loaded)</Text>
               )}
             </Group>
           </Button>

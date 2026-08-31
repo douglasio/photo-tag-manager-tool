@@ -41,7 +41,7 @@ import {
   DelegatedTooltip,
   FaceCropThumbnail,
   PersonDescriptionField,
-  ScanProgressIndicator,
+  PhotoScanProgressIndicator,
   TagDeleteButton,
   TagDescriptionField
 } from '@components'
@@ -439,7 +439,7 @@ export const GalleryGrid = memo(function GalleryGrid(): ReactElement {
         {photos.length === 0 ? (
           <Center h="100%">
             {state.status === 'scanning' ? (
-              <ScanProgressIndicator percent={null} label="Scanning for photos…" />
+              <PhotoScanProgressIndicator label="Scanning for photos…" />
             ) : state.selectedPerson ? (
               <Box
                 style={{

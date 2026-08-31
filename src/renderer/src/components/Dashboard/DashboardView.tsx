@@ -7,9 +7,9 @@ import {
   FeaturedPersonWidget,
   FeaturedTagWidget,
   NameThisPersonWidget,
+  PhotoScanProgressIndicator,
   PhotosFromYearWidget,
   RecentlyAddedWidget,
-  ScanProgressIndicator,
   TaggingProgressWidget,
   TagThisPhotoWidget,
   TimeWarpWidget,
@@ -119,19 +119,24 @@ export const DashboardView = memo(function DashboardView(): React.JSX.Element {
     }
   ]
 
+  // Every widget below reads activePhotosByPath/tagCounts/etc., so a scan
+  // streaming in photos (even a rescan on an already-populated library)
+  // would re-render the whole grid on every commit otherwise — this bails
+  // out for the scan's full duration instead of showing that churn.
+  if (state.status === 'scanning') {
+    return (
+      <Box
+        flex="1"
+        mih={0}
+        display="flex"
+        style={{ alignItems: 'center', justifyContent: 'center' }}
+      >
+        <PhotoScanProgressIndicator label="Scanning for photos…" />
+      </Box>
+    )
+  }
+
   if (activePhotosByPath.size === 0) {
-    if (state.status === 'scanning') {
-      return (
-        <Box
-          flex="1"
-          mih={0}
-          display="flex"
-          style={{ alignItems: 'center', justifyContent: 'center' }}
-        >
-          <ScanProgressIndicator percent={null} label="Scanning for photos…" />
-        </Box>
-      )
-    }
     return (
       <Box
         flex="1"
