@@ -79,6 +79,19 @@ npm install
 npm run dev
 ```
 
+### In a container
+
+A `.devcontainer/` config is included, so you can develop without installing
+Node, build tools, or Electron's Linux runtime deps on the host. Open the
+folder in VS Code with the **Dev Containers** extension and choose "Reopen in
+Container" — it builds the image and runs `npm install` for you.
+
+The window renders on your host X11 display, so it only works if you're on
+X11 (not Wayland) — check with `echo $XDG_SESSION_TYPE`. Inside the container
+terminal, use `.devcontainer/dev.sh` instead of `npm run dev`: containers
+don't have a real GPU device attached, so Chromium's GPU process fails to
+initialize unless hardware acceleration is disabled.
+
 Other useful scripts:
 
 ```bash
